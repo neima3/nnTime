@@ -1,0 +1,38 @@
+# Deployment — time.neima.me
+
+**Instance:** Coolify public VPS — `https://cool.neima.me` (173.212.218.55).
+`*.neima.me` DNS already points here. (Do NOT use `coolify.nak.im` — that's the
+home-lab instance.)
+
+**App:** name `kairo`, project `Kairo`, server `localhost`
+(`g6gsqmd4wghi3wmqzih11ca9`), source: GitHub App (id 1) → `neima3/nnTime`,
+branch `main`, build pack **dockerfile** (repo `Dockerfile`, Next.js standalone,
+port 3000), domain `https://time.neima.me`.
+App UUID: see `COOLIFY_APP_UUID` in `.env.local` (also visible in the Coolify UI).
+
+**Credentials:** `.env.local` (gitignored) has `COOLIFY_API_URL` +
+`COOLIFY_API_TOKEN` (+ `COOLIFY_APP_UUID`). Token source of truth: 1Password item
+"cool.neima.me coolify api" (vault **AI**, item `4apenih3hzviy2o2jjlonbdh54`) —
+retrieve with `op item get 4apenih3hzviy2o2jjlonbdh54 --fields credential --reveal`
+(prompts biometrics). NOTE: token contains a `|` — keep it single-quoted in env files.
+
+## Deploy procedure
+1. Gates: `pnpm lint && pnpm build` green. Commit + push to `main` (Coolify builds
+   from git — pushing alone does NOT deploy unless auto-deploy webhook is enabled).
+2. Trigger:
+   ```bash
+   set -a; source .env.local; set +a
+   curl -s -H "Authorization: Bearer $COOLIFY_API_TOKEN" \
+     "$COOLIFY_API_URL/deploy?uuid=$COOLIFY_APP_UUID"
+   ```
+3. Poll: `GET $COOLIFY_API_URL/deployments/{deployment_uuid}` until
+   `status: finished` (or list via `GET /applications/$COOLIFY_APP_UUID`).
+4. Verify live (mandatory): `curl -sSI https://time.neima.me` → 200, then load the
+   site in a browser, smoke the changed routes, screenshot to `browser-qa/`.
+   A 200 homepage alone doesn't prove the new code is live — check for the change.
+5. Report truthfully what was and wasn't verified.
+
+## App env vars
+Set in Coolify UI (app → Environment Variables) AND mirrored in `.env.local`.
+As of Phase 0 none are required at runtime. Phase 1+ adds `DATABASE_URL`,
+`BETTER_AUTH_SECRET`, etc.
