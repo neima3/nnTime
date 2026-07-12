@@ -1,26 +1,158 @@
 @import "tailwindcss";
 
+/* ---------------------------------------------------------------------------
+   Kairo design tokens — "Soft Focus" system
+   Warm paper canvas, deep plum ink, iris primary, six pastel category hues.
+   Every color exists as a light + dark pair; dark mode = .dark on <html>.
+--------------------------------------------------------------------------- */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* canvas + surfaces */
+  --canvas: #f7f4ee;
+  --surface: #fffdf9;
+  --surface-raised: #ffffff;
+  --surface-sunken: #efebe2;
+  --border: #e5dfd2;
+  --border-strong: #d3cbba;
+
+  /* ink */
+  --ink: #241f31;
+  --ink-soft: #6f6883;
+  --ink-faint: #a49dae;
+  --ink-inverse: #fffdf9;
+
+  /* iris — primary */
+  --iris: #5b4fd6;
+  --iris-deep: #4a3fc2;
+  --iris-soft: #eae7fb;
+  --iris-ghost: #f3f1fd;
+
+  /* now-line + semantic */
+  --now: #ff5c4d;
+  --success: #23805c;
+  --success-soft: #d9f0e4;
+  --danger: #c93a3a;
+  --danger-soft: #fbdfdf;
+
+  /* category pastels: fill / ink pair */
+  --cat-peach: #ffd9c2;      --cat-peach-ink: #a34a1c;
+  --cat-butter: #ffe9a6;     --cat-butter-ink: #8a6900;
+  --cat-mint: #c8edd6;       --cat-mint-ink: #1e7a4c;
+  --cat-sky: #c8e3fa;        --cat-sky-ink: #1d6aa6;
+  --cat-lilac: #e2dbfb;      --cat-lilac-ink: #5b48c9;
+  --cat-rose: #fad5e3;       --cat-rose-ink: #b03769;
+
+  /* shadows — plum-tinted, soft */
+  --shadow-card: 0 1px 2px rgba(36, 31, 49, 0.05), 0 4px 16px rgba(36, 31, 49, 0.06);
+  --shadow-float: 0 2px 6px rgba(36, 31, 49, 0.08), 0 12px 32px rgba(36, 31, 49, 0.12);
+}
+
+.dark {
+  --canvas: #16131f;
+  --surface: #1e1a2a;
+  --surface-raised: #262133;
+  --surface-sunken: #110e18;
+  --border: #322c42;
+  --border-strong: #443d57;
+
+  --ink: #f0edf7;
+  --ink-soft: #a79fbc;
+  --ink-faint: #6f6883;
+  --ink-inverse: #241f31;
+
+  --iris: #8c81ea;
+  --iris-deep: #a49bf0;
+  --iris-soft: #322c52;
+  --iris-ghost: #262242;
+
+  --now: #ff6f61;
+  --success: #4cc593;
+  --success-soft: #1d3a2e;
+  --danger: #f07d7d;
+  --danger-soft: #3f2323;
+
+  --cat-peach: #4a2c1c;      --cat-peach-ink: #ffb894;
+  --cat-butter: #423714;     --cat-butter-ink: #f2d478;
+  --cat-mint: #1c3a2b;       --cat-mint-ink: #86dcae;
+  --cat-sky: #1c3348;        --cat-sky-ink: #8ec7f2;
+  --cat-lilac: #2e2749;      --cat-lilac-ink: #baaef5;
+  --cat-rose: #452432;       --cat-rose-ink: #f2a0c0;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.35);
+  --shadow-float: 0 2px 6px rgba(0, 0, 0, 0.5), 0 12px 32px rgba(0, 0, 0, 0.5);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-ink-inverse: var(--ink-inverse);
+  --color-iris: var(--iris);
+  --color-iris-deep: var(--iris-deep);
+  --color-iris-soft: var(--iris-soft);
+  --color-iris-ghost: var(--iris-ghost);
+  --color-now: var(--now);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-cat-peach: var(--cat-peach);
+  --color-cat-peach-ink: var(--cat-peach-ink);
+  --color-cat-butter: var(--cat-butter);
+  --color-cat-butter-ink: var(--cat-butter-ink);
+  --color-cat-mint: var(--cat-mint);
+  --color-cat-mint-ink: var(--cat-mint-ink);
+  --color-cat-sky: var(--cat-sky);
+  --color-cat-sky-ink: var(--cat-sky-ink);
+  --color-cat-lilac: var(--cat-lilac);
+  --color-cat-lilac-ink: var(--cat-lilac-ink);
+  --color-cat-rose: var(--cat-rose);
+  --color-cat-rose-ink: var(--cat-rose-ink);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-display: var(--font-bricolage);
+  --font-sans: var(--font-onest);
+  --font-mono: var(--font-spline-mono);
+
+  --radius-card: 1.25rem;
+  --radius-block: 1rem;
+  --radius-chip: 0.625rem;
+  --radius-pill: 999px;
+
+  --shadow-card: var(--shadow-card);
+  --shadow-float: var(--shadow-float);
+
+  --ease-spring: cubic-bezier(0.32, 1.25, 0.42, 1);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* time digits always tabular */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--iris);
+  color: var(--ink-inverse);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
