@@ -16,6 +16,12 @@
 mobile (375×812) viewports; layout, tab bar, FAB, timeline states all correct.
 Dark-mode tokens defined but not yet toggleable in UI (Phase 5 wires it).
 
+**Deployed:** Coolify app `kairo` (uuid `upovjycdksz4aoy98q4bpusg`, project `Kairo`)
+on cool.neima.me, built from `neima3/nnTime@main` via Dockerfile (standalone).
+Live-verified at https://time.neima.me (200, correct title, `/app/today` screenshot
+confirmed in browser). First deploy failed on corepack's interactive pnpm download
+prompt — fixed with `COREPACK_ENABLE_DOWNLOAD_PROMPT=0` + pinned `packageManager`.
+
 **Deviations/notes:**
 - Product name Kairo chosen by Fable; original identity, no Tiimo assets used.
 - create-next-app rejected capitalized dir name; scaffolded in temp dir and moved.
