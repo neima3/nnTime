@@ -10,8 +10,13 @@ import "server-only";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
+import { ensureMigrated } from "./migrate-on-startup";
 
 export * as schema from "./schema";
+
+// Run migrations on first import (once per process). This guarantees tables
+// exist before any query, without a separate migration command.
+ensureMigrated();
 
 /** Create a drizzle client bound to a specific connection string. */
 export function createDb(connectionString: string) {

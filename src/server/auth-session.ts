@@ -8,6 +8,7 @@
 import "server-only";
 import { headers } from "next/headers";
 import { auth } from "./auth";
+import { ensureMigrated } from "./db/migrate-on-startup";
 
 export interface AuthSession {
   userId: string;
@@ -21,6 +22,7 @@ export interface AuthSession {
  */
 export async function getSession(): Promise<AuthSession | null> {
   try {
+    await ensureMigrated(); // guarantee tables exist before querying
     const session = await auth.api.getSession({
       headers: await headers(),
     });

@@ -21,15 +21,9 @@ RUN addgroup -S nodejs && adduser -S nextjs -G nodejs
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-# Migration runner + SQL files (applied at container startup)
+# Migration SQL files (migrations run in-process via migrate-on-startup.ts)
 COPY --from=builder --chown=nextjs:nodejs /app/drizzle ./drizzle
-COPY --from=builder --chown=nextjs:nodejs /app/scripts/migrate.ts ./scripts/migrate.ts
-# The standalone build may not trace the postgres driver (dynamic imports).
-# Copy the full node_modules for the migration runner + auth.
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/postgres ./node_modules/postgres
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/drizzle-orm ./node_modules/drizzle-orm
 USER nextjs
 EXPOSE 3000
-# Run migrations, then start the server. If migrations fail (no DB), the app
-# still starts and serves mock-data fallback. Node 24 strips TS types natively.
-CMD ["sh", "-c", "node --experimental-strip-types scripts/migrate.ts || true && node server.js"]
+# Migrations run automatically on first DB import (ensureMigrated in db/index.ts).
+CMD ["node", "server.js"]
