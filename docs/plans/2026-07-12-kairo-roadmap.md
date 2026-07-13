@@ -48,7 +48,8 @@ design work BEFORE the consuming subphase starts.
         security headers, rate-limit framework
   - [x] 1C Auth + DB + CRUD with per-resource authorization + negative tests
   - [x] 1D UI wiring: Today, editor sheet, Anytime, To-do inbox route
-  - [ ] 1E Release: deploy, live verification, parity checklist update
+  - [x] 1E Release: deploy, live verification, parity checklist update
+        (auth UI + prod migration heal; real account verified live 2026-07-13)
 - [ ] Phase 2 — Scheduling core
   - [x] 2A Recurrence engine (series/override model, edit scopes, DST tests)
   - [x] 2B Routine materializer (durable idempotent job)

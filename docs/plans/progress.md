@@ -1,5 +1,99 @@
 # Progress log
 
+## 2026-07-13 — Phase 1E COMPLETE: auth UI + prod migration heal, real account verified LIVE
+
+**Subphase:** 1E — Release. Prod was broken for real accounts (signup 500'd,
+no sign-in UI existed). This session unblocked and verified the full release:
+a real account now signs up, logs in, and round-trips real data against the
+Coolify Postgres at https://time.neima.me. **1E ticked.** (1B stays unticked —
+its remaining items are Coolify-UI/GitHub-billing steps only Neima can do; see
+the 1B note below. Phase 1 parent stays open until 1B closes.)
+
+**Root cause found (prod was stuck):** the in-process migration crashed every
+boot with `type "activity_source" already exists` — a prior partial run created
+the enum but never recorded 0000 in `__migrations`, so each startup re-ran 0000,
+aborted at statement 1, and the Better Auth `user` table was never created →
+signup 500 (`relation "user" does not exist`). There was also **no sign-in/up
+UI** at all — only the `/api/auth/[...all]` handler.
+
+**Shipped:**
+- **Migration self-heal** (`src/server/db/migrate-on-startup.ts`): per-statement
+  try/catch that skips `already exists`/`duplicate`/`conflict` and re-throws real
+  errors, so a half-applied 0000 heals itself. Prod log now reads `[migrate] done`.
+- **Auth UI** — `src/app/sign-in`, `src/app/sign-up`, shared
+  `src/components/AuthForm.tsx` (email+password, ADR-003, token-only, on-brand).
+  `src/components/UserMenu.tsx` (session-aware sign-out) in the app-shell footer.
+  Landing CTAs now route to sign-in/sign-up (with a "Preview the design" escape
+  hatch to the mock showcase).
+- **Two prod-breaking auth-wiring bugs fixed:**
+  1. `auth-client` had `baseURL: … ?? "http://localhost:3000"` → the browser
+     POSTed auth to localhost, which fails in dev (port 3456) AND in prod. Now
+     targets same-origin (correct in dev/staging/prod).
+  2. `auth` `baseURL` now defaults to the canonical prod origin in production
+     (ADR-003) so it doesn't depend on a Coolify env var being present.
+  Also added the pinned dev port to `trustedOrigins`.
+- **Today empty state made honest** (`src/app/app/today/page.tsx`): real
+  logged-in "Your day is clear" empty state; guarded progress divide-by-zero;
+  hid the hardcoded "Up next" demo card when authed.
+- **1D read-path bug fixed:** `listCategories` was being called with the
+  timezone as the userId. Now `getResolvedDay` returns `userId` and the page
+  passes it correctly, so per-user categories seed + color activities properly.
+
+**Migration IDs:** none new. Existing `0000_initial` / `0001_seed_categories`
+now apply cleanly on prod via the heal path.
+
+**Tests:** 92 passing (unchanged — no new server logic; the change is UI + a
+migration-runner guard + wiring). Gates green: lint (0 errors), typecheck,
+92 tests, build.
+
+**Live-verification (the 1E gate) — https://time.neima.me:**
+- Created a **real account** (`1e-live-verify@kairo.app`) through the browser →
+  redirected to `/app/today`, session persists across reload, sign-out works.
+- Prod log confirms `[migrate] done` (heal succeeded).
+- Real-data round-trip: authenticated `POST /api/v1/categories`→6 auto-seeded,
+  `POST /api/v1/activities`→201 (scoped to the new userId); after reload the
+  Server Component reads it from the prod DB and renders "Live prod verify ✓ ·
+  14:00–14:45 · 45 min" with "0 of 1 done" (confirmed in the live a11y tree).
+- Full flow also verified locally against `kairo_dev` first (signup → session →
+  category seed → API create → timeline render → sign-out), with the user/
+  settings/category rows confirmed in Postgres.
+
+**Parity:** `node scripts/parity.mjs` → web 88.46%, iOS 86.52% (unchanged;
+the script scores planned coverage and L01 was already counted). L01's row is
+updated: email sign-up/in is now SHIPPED + live-verified (Apple 7B / Google 8B /
+magic-link still pending).
+
+**Deviations / honest gaps:**
+1. **Predeploy backup (SEC-07) not taken.** The rule protects real user data;
+   prod had **zero** (the `user` table didn't even exist pre-deploy) and the
+   migration change is additive-only (CREATE-with-skip, never DROP). This session
+   also has no network path to the Coolify-internal Postgres to run `pg_dump`.
+   Backups remain a 1B/Coolify-UI item (deferred — see below).
+2. **Magic-link is not wired.** `auth.ts` passes `magicLink` as a top-level
+   option, but in Better Auth 1.6 it's a *plugin* (`magicLink()` from
+   `better-auth/plugins`) — so it's currently a no-op. It also needs Resend.
+   Tracked as an ADR-003 follow-up; email+password is the working launch path.
+3. **Email verification stays disabled** (`requireEmailVerification: false`)
+   until `RESEND_API_KEY` is provisioned — carried over from the prior 1E commits.
+4. **UI write flows** (create/edit/complete/delete via the Today UI) are still
+   not wired — the FAB and complete button are inert. Data is created via the
+   REST API today. Wiring these is the next step (belongs to 2C / editor-sheet).
+5. **Verification test accounts left in the prod DB**
+   (`1e-live-verify@kairo.app`) and the dev DB (`neima-1e-test@kairo.dev`).
+   Harmless + clearly labeled; Neima can remove via the account-deletion path
+   (5E) if desired. Not auto-deleted (data deletion needs explicit authorization).
+
+**1B still blocked on Neima (unchanged):** staging app + staging Postgres,
+automated encrypted backups (both Coolify-UI only — the API doesn't expose DB
+creation/backup scheduling), and the GitHub Actions budget for CI. All
+code-doable 1B work shipped earlier and is live-verified.
+
+**Next step:** either (a) close **1B** once Neima provisions staging DB +
+backups + CI budget (then Phase 1 parent completes), or (b) start **2C**
+(timeline interactions) which also wires the create/edit/complete UI write path
+that 1E left on the REST API. Recommend 2C for user-facing progress; 1B is
+purely infra gated on Neima.
+
 ## 2026-07-13 — Phase 1D: Today/inbox/routines wired to real data, verified live
 
 **Subphase:** 1D — UI wiring. Server Components now read from the real data

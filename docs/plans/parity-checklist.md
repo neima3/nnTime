@@ -138,7 +138,7 @@ energy-pattern learning, and related rows — see table.
 | K03 | Mood tracking / check-ins | K | both | 5C | planned | 1 | — |
 | K04 | Apple Health sync (Tiimo Wellbeing) | K | ios | 8B | planned | 1 | Roadmap 8B itemizes HealthKit sync: write focus/mindful minutes, read sleep schedule for wind-down suggestions, explicit user opt-in. |
 | K05 | Editorial "review techniques" (Winventory, Progress Check, Tiny Rewards) | K | both | — | excluded | 0 | Research doc explicitly labels this "Content, not confirmed as app UI" — blog content, not an in-app feature. |
-| L01 | Sign-up via Apple / Google / Email | L | both | 1C, 7B, 8B | planned | 1 | Email+magic-link (1C), Sign in with Apple (7B), Google sign-in (8B). |
+| L01 | Sign-up via Apple / Google / Email | L | both | 1C, 7B, 8B | planned | 1 | Email+password sign-up/in SHIPPED + live-verified 2026-07-13 (real account created on time.neima.me, session persists, data round-trips). Magic-link needs Resend transport + the server plugin (ADR-003 follow-up); Sign in with Apple (7B), Google (8B) still planned. |
 | L02 | Cross-device sync | L | both | 1A/1B, 7C | planned | 1 | — |
 | L03 | No account merging | L | both | — | excluded | 0 | Describes a Tiimo limitation (unsupported), not a buildable feature; matched by default since Kairo doesn't build merging either. |
 | L04 | Family/shared profile billing | L | ios | — | deferred | 0 | Rolls into the family/shared-profiles deferral. |
