@@ -107,22 +107,44 @@ doubt, copy patterns from them, don't improvise.
 - Hero: badge pill, display headline with coral underline squiggle on "see",
   mini day-card mock (real category blocks), feature grid of 6 bordered cards.
 
-## Screens still to be designed (Fable/Opus ONLY — never cheap models)
-Each must exist in `docs/design/` BEFORE its consuming subphase starts (roadmap
-Phase 0.5c):
-1. Activity editor sheet (title, emoji picker, category, time, duration, repeat
-   with ADR-001 edit scopes, checklist, energy, tags, priority, notes) — bottom
-   sheet mobile / centered modal desktop. (Consumer: 1D)
-2. **To-do inbox screen** — brain-dump list, tags/priority, promote-to-day.
-   Becomes a 6th nav destination; AppShell nav update included. (Consumer: 1D)
-3. AI co-planner UI: breakdown review, plan-my-day proposal, disruption
-   re-plan — all per-item confirm affordances. (Consumer: 4)
-4. Month view + Review Today flow. (Consumer: 2D)
-5. Stats/insights + mood check-in. (Consumer: 5C)
-6. Onboarding flow. (Consumer: 6A) 7. Template gallery. (Consumer: 5D)
-8. Overlap/collision timeline layout + overnight split + imported locked-block
-   style addendum. (Consumer: 2C/5A)
-9. iOS-native adaptations (SwiftUI tokens), widgets, Live Activity. (Consumer: 7/8)
+## Screen designs — COMPLETE (Fable, 2026-07-12, Phase 0.5c)
+Every pending design now exists as a living reference screen. Implementing
+agents copy these exactly:
+1. **Activity editor sheet** → `/app/editor` (`src/app/app/editor/page.tsx`).
+   Desktop 560px modal / mobile full-height bottom sheet with drag handle.
+   Fields in order: emoji+title, category pills, When (date/time/duration
+   chips + "Anytime instead"), Repeat (with ADR-001 edit-scope save prompt),
+   Energy + Priority (None/Low/High), Steps (reorder handles + "Break it
+   down" AI button), Tags, Notes. Footer: Delete / Cancel / Save.
+2. **To-do inbox** → `/app/inbox`. Quick-add ("Get it out of your head…"),
+   tag filters, AI "Group by priority", rows with tags + priority flags,
+   hover actions "Anytime" and "Schedule", empty state included. Nav updated:
+   sidebar = Today/Inbox/Week/Focus/Routines/Stats/Settings; mobile bar =
+   Today/Inbox/Week/Focus/More (`/app/more` = More screen).
+3. **AI co-planner** → `/app/planner`: break-it-down review (per-step
+   accept/edit), plan-my-day proposal (per-item ✓/✗, "Schedule n accepted"),
+   disruption re-plan (time-shift diff rows, per-change accept). Rule shown on
+   screen: AI proposes, user confirms — always.
+4. **Month view** → `/app/month` (category dots, +n overflow, today ring,
+   week↔month toggle shared with `/app/week`). **Review Today** → `/app/review`
+   (item cards with Did it / Let it go / Tomorrow, progress dots, completion
+   state).
+5. **Stats + mood** → `/app/stats` (completion bars, focus bars, energy
+   balance band, gentle streak, mood strip + check-in row, gentle wins).
+   Data-viz rules on the screen: iris primary, pastels only for categories,
+   never red.
+6. **Onboarding** → `/onboarding` (4 steps: welcome, planning-feel quiz that
+   sets real defaults, first-routine pick, notification opt-in with
+   user-gesture note). 7. **Template gallery** → `/app/templates` (search,
+   group chips, step-preview cards, "By Kairo" provenance).
+8. **Timeline states addendum** → `/app/timeline-states`: overlap lanes
+   (equal split, 6px gap, max 3 + "+n more"), overnight midnight split with
+   dashed cut edge + continuation captions, imported locked blocks (surface
+   fill, 1.5px ink-faint border, lock badge, source caption, no drag/complete),
+   reduced-stimulation variant (outline, no emoji, condensed meta).
+9. **iOS adaptation** → `docs/design/ios-adaptation.md`: SwiftUI token/type
+   mapping, component translations, interactive widget specs (S/M/L + lock
+   screen), Live Activity/Dynamic Island states, native accessibility gate.
 
 ## Token canonicality (resolves the review contradiction)
 Named design tokens in `globals.css` are **canonical**. Raw hex values are

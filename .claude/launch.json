@@ -4,8 +4,8 @@
     {
       "name": "nntime-dev",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["dev"],
-      "port": 3000
+      "runtimeArgs": ["dev", "--port", "3456"],
+      "port": 3456
     }
   ]
 }

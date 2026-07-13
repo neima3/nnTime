@@ -1,5 +1,28 @@
 # Progress log
 
+## 2026-07-12 — Phase 0.5c complete: all design work (Fable, session 1 cont.)
+**Shipped (all as living reference screens, verified in browser desktop+mobile):**
+- `/app/editor` — activity editor (modal/bottom-sheet, edit-scope prompt,
+  energy/priority, steps with AI break-it-down, tags, notes).
+- `/app/inbox` — To-do brain-dump bucket (quick-add, tag filters, priority
+  flags, Anytime/Schedule promote actions, empty state). Nav redesigned:
+  sidebar 7 items (adds Inbox, Stats); mobile 5 tabs with `/app/more`.
+- `/app/planner` — AI co-planner: break-it-down review, plan-my-day proposal,
+  disruption re-plan; per-item confirm affordances throughout.
+- `/app/month` (+ week↔month toggle on `/app/week`), `/app/review` (Review
+  Today flow + completion state), `/app/stats` (+ mood check-ins),
+  `/app/templates`, `/app/timeline-states` (overlap lanes, overnight split,
+  locked imported blocks, reduced-stimulation), `/onboarding` (4 steps).
+- `docs/design/ios-adaptation.md` — SwiftUI tokens, components, interactive
+  widget specs, Live Activity/Dynamic Island, native a11y gate.
+- Fixes found during verification: month grid aligned to fictional
+  Saturday-July-12; editor energy/priority stack on mobile.
+**Gate note:** 0.5a/b/c/d all ticked — Phase 0.5 complete. Next: subphase 1A
+(domain + API contract) per `docs/plans/kairo-agent-prompt.md`.
+**Dev-env note:** port 3000 is held by the separate nn.suite dev server —
+nnTime dev now pinned to port 3456 in `.claude/launch.json`. Do not kill
+processes on :3000.
+
 ## 2026-07-12 — Codex review applied (Fable, session 1 cont.)
 **Shipped:**
 - Roadmap rewritten to v2: subphase execution model, Phase 0.5 contracts gate,

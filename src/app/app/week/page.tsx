@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { catClasses, type CategoryId } from "@/lib/mock";
@@ -80,6 +81,17 @@ export default function WeekPage() {
             <h1 className="font-display text-3xl font-bold tracking-tight">
               July 7 – 13
             </h1>
+          </div>
+          <div className="flex items-center rounded-2xl border border-border bg-surface p-1 shadow-card">
+            <span className="rounded-xl bg-iris-soft px-3.5 py-1.5 text-sm font-semibold text-iris">
+              Week
+            </span>
+            <Link
+              href="/app/month"
+              className="rounded-xl px-3.5 py-1.5 text-sm font-semibold text-ink-soft hover:text-ink"
+            >
+              Month
+            </Link>
           </div>
           <div className="flex items-center gap-1 rounded-2xl border border-border bg-surface p-1 shadow-card">
             <button aria-label="Previous week" className="grid size-9 place-items-center rounded-xl text-ink-soft hover:bg-surface-sunken">

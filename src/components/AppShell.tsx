@@ -1,20 +1,36 @@
 import Link from "next/link";
 import {
+  BarChart3,
   CalendarDays,
   CalendarRange,
+  Inbox,
+  LayoutGrid,
   Repeat,
   Settings,
   Sparkles,
   Timer,
 } from "lucide-react";
 
-const nav = [
-  { href: "/app/today", label: "Today", icon: CalendarDays },
-  { href: "/app/week", label: "Week", icon: CalendarRange },
-  { href: "/app/focus", label: "Focus", icon: Timer },
-  { href: "/app/routines", label: "Routines", icon: Repeat },
-  { href: "/app/settings", label: "Settings", icon: Settings },
+const sidebarNav = [
+  { href: "/app/today", label: "Today", key: "today", icon: CalendarDays },
+  { href: "/app/inbox", label: "Inbox", key: "inbox", icon: Inbox },
+  { href: "/app/week", label: "Week", key: "week", icon: CalendarRange },
+  { href: "/app/focus", label: "Focus", key: "focus", icon: Timer },
+  { href: "/app/routines", label: "Routines", key: "routines", icon: Repeat },
+  { href: "/app/stats", label: "Stats", key: "stats", icon: BarChart3 },
+  { href: "/app/settings", label: "Settings", key: "settings", icon: Settings },
 ];
+
+/* Mobile keeps 5 tabs; More collects Routines/Templates/Stats/Settings. */
+const mobileNav = [
+  { href: "/app/today", label: "Today", key: "today", icon: CalendarDays },
+  { href: "/app/inbox", label: "Inbox", key: "inbox", icon: Inbox },
+  { href: "/app/week", label: "Week", key: "week", icon: CalendarRange },
+  { href: "/app/focus", label: "Focus", key: "focus", icon: Timer },
+  { href: "/app/more", label: "More", key: "more", icon: LayoutGrid },
+];
+
+const moreKeys = new Set(["routines", "stats", "settings", "templates", "more"]);
 
 export function AppShell({
   active,
@@ -37,8 +53,8 @@ export function AppShell({
         </Link>
 
         <nav className="mt-8 flex flex-col gap-1">
-          {nav.map(({ href, label, icon: Icon }) => {
-            const isActive = label.toLowerCase() === active;
+          {sidebarNav.map(({ href, label, key, icon: Icon }) => {
+            const isActive = key === active;
             return (
               <Link
                 key={href}
@@ -64,9 +80,12 @@ export function AppShell({
           <p className="mt-1.5 text-[13px] leading-snug text-ink-soft">
             Break down any task into gentle, doable steps.
           </p>
-          <button className="mt-3 w-full rounded-xl bg-iris py-2 text-[13px] font-semibold text-ink-inverse transition-colors hover:bg-iris-deep">
+          <Link
+            href="/app/planner"
+            className="mt-3 block w-full rounded-xl bg-iris py-2 text-center text-[13px] font-semibold text-ink-inverse transition-colors hover:bg-iris-deep"
+          >
             Plan my day
-          </button>
+          </Link>
         </div>
       </aside>
 
@@ -75,8 +94,9 @@ export function AppShell({
 
       {/* mobile bottom bar */}
       <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-border bg-surface/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-        {nav.map(({ href, label, icon: Icon }) => {
-          const isActive = label.toLowerCase() === active;
+        {mobileNav.map(({ href, label, key, icon: Icon }) => {
+          const isActive =
+            key === active || (key === "more" && moreKeys.has(active));
           return (
             <Link
               key={href}

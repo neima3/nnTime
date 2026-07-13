@@ -35,8 +35,10 @@ design work BEFORE the consuming subphase starts.
 - [ ] Phase 0.5 — Execution contracts (BLOCKS PHASE 1)
   - [x] 0.5a Parity checklist + scoring script (draft — verify before Phase 1)
   - [x] 0.5b ADRs 001–005 written
-  - [ ] 0.5c Pending designs for Phases 1–3 consumers (editor sheet, To-do/inbox,
-        AI breakdown UI) produced by Fable/Opus
+  - [x] 0.5c ALL pending designs produced by Fable (2026-07-12): editor sheet,
+        To-do inbox + nav redesign, AI co-planner, month view, Review Today,
+        stats + mood, templates, timeline-states addendum, onboarding, iOS
+        adaptation doc — see design-spec "Screen designs — COMPLETE"
   - [x] 0.5d Gate: `node scripts/parity.mjs` reproduces ≥85% planned coverage —
         web 88.46%, iOS 86.52% (2026-07-12, after itemizing month view/extend/
         checklist-in-focus/high-contrast/Apple Health into phases)
