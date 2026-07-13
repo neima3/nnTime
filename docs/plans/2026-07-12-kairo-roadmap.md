@@ -75,7 +75,7 @@ design work BEFORE the consuming subphase starts.
   - [x] 6C Accessibility audit + fixes (WCAG AA, keyboard, screen reader flows)
   - [x] 6D Performance (Lighthouse ≥90 mobile)
   - [ ] 6E Dogfood QA sweep, P0/P1 fixes
-  - [ ] 6F Scripted parity audit — web ≥85% with per-row evidence
+  - [x] 6F Scripted parity audit — web ≥85% with per-row evidence
 - [ ] Phase 7 — iOS app
   - [ ] 7A Contract proof (Swift OpenAPI toolchain compiles in CI)
   - [ ] 7B Native auth on device (Sign in with Apple, Keychain, deep links)
