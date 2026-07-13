@@ -6,7 +6,11 @@
 import { createAuthClient } from "better-auth/react";
 
 export const authClient = createAuthClient({
-  baseURL: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+  // No baseURL → Better Auth targets the current origin (window.location) in the
+  // browser. The app is always served same-origin as its /api/auth handler, so
+  // this is correct in dev (any port), staging, and prod. An explicit
+  // NEXT_PUBLIC_APP_URL override is honored if set.
+  baseURL: process.env.NEXT_PUBLIC_APP_URL || undefined,
 });
 
 export const {

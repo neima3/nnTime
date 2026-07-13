@@ -28,10 +28,17 @@ import { buildCategoryMap, seriesToActivity, taskToInboxItem } from "@/lib/adapt
  */
 async function loadTodayData() {
   const resolved = await getResolvedDay();
-  if (!resolved) return { activities: mockActivities, inbox: mockInbox, dayLabel: DAY.label, dayDate: DAY.date };
+  if (!resolved)
+    return {
+      activities: mockActivities,
+      inbox: mockInbox,
+      dayLabel: DAY.label,
+      dayDate: DAY.date,
+      authed: false,
+    };
 
-  // Load categories for the color mapping.
-  const categories = await listCategories(resolved.zone ?? "UTC").catch(() => []);
+  // Load the user's categories for the color mapping (seeded on first access).
+  const categories = await listCategories(resolved.userId).catch(() => []);
   const categoryMap = buildCategoryMap(
     categories as unknown as Parameters<typeof buildCategoryMap>[0],
   );
@@ -51,7 +58,7 @@ async function loadTodayData() {
     weekday: "long",
   });
 
-  return { activities, inbox, dayLabel, dayDate };
+  return { activities, inbox, dayLabel, dayDate, authed: true };
 }
 
 const DAY_START = 7 * 60;
@@ -180,7 +187,7 @@ function Timeline({ activities }: { activities: Activity[] }) {
 
 function DayProgress({ activities }: { activities: Activity[] }) {
   const done = activities.filter((a) => a.done).length;
-  const pct = Math.round((done / activities.length) * 100);
+  const pct = activities.length ? Math.round((done / activities.length) * 100) : 0;
   const r = 15;
   const c = 2 * Math.PI * r;
   return (
@@ -210,7 +217,8 @@ function DayProgress({ activities }: { activities: Activity[] }) {
 }
 
 export default async function TodayPage() {
-  const { activities, inbox, dayLabel, dayDate } = await loadTodayData();
+  const { activities, inbox, dayLabel, dayDate, authed } = await loadTodayData();
+  const emptyDay = authed && activities.length === 0;
 
   return (
     <AppShell active="today">
@@ -225,7 +233,7 @@ export default async function TodayPage() {
                 {dayDate}
               </h1>
             </div>
-            <DayProgress activities={activities} />
+            {!emptyDay && <DayProgress activities={activities} />}
             <div className="flex items-center gap-1 rounded-2xl border border-border bg-surface p-1 shadow-card">
               <button aria-label="Previous day" className="grid size-9 place-items-center rounded-xl text-ink-soft hover:bg-surface-sunken">
                 <ChevronLeft size={18} />
@@ -239,7 +247,20 @@ export default async function TodayPage() {
             </div>
           </header>
 
-          <Timeline activities={activities} />
+          {emptyDay ? (
+            <div className="grid place-items-center rounded-3xl border border-dashed border-border bg-surface/60 px-6 py-20 text-center">
+              <span className="grid size-14 place-items-center rounded-2xl bg-iris-soft text-2xl" aria-hidden>
+                ✨
+              </span>
+              <p className="mt-4 font-display text-xl font-bold">Your day is clear</p>
+              <p className="mt-1.5 max-w-xs text-[14.5px] text-ink-soft">
+                Nothing scheduled yet. Add your first activity and watch it take
+                shape on the timeline.
+              </p>
+            </div>
+          ) : (
+            <Timeline activities={activities} />
+          )}
         </section>
 
         {/* right rail — desktop only */}
@@ -275,15 +296,17 @@ export default async function TodayPage() {
             </ul>
           </div>
 
-          <div className="rounded-3xl bg-iris p-5 text-ink-inverse shadow-float">
-            <p className="font-display text-lg font-bold leading-snug">
-              Up next: Pharmacy shift prep
-            </p>
-            <p className="tnum mt-1 text-sm opacity-80">13:30 · in 30 min</p>
-            <button className="mt-4 w-full rounded-xl bg-surface-raised/20 py-2.5 text-sm font-semibold backdrop-blur transition-colors hover:bg-surface-raised/30">
-              Start early
-            </button>
-          </div>
+          {!authed && (
+            <div className="rounded-3xl bg-iris p-5 text-ink-inverse shadow-float">
+              <p className="font-display text-lg font-bold leading-snug">
+                Up next: Pharmacy shift prep
+              </p>
+              <p className="tnum mt-1 text-sm opacity-80">13:30 · in 30 min</p>
+              <button className="mt-4 w-full rounded-xl bg-surface-raised/20 py-2.5 text-sm font-semibold backdrop-blur transition-colors hover:bg-surface-raised/30">
+                Start early
+              </button>
+            </div>
+          )}
         </aside>
       </div>
 

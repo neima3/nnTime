@@ -56,7 +56,19 @@ async function runMigrations(): Promise<void> {
         .map((s) => s.trim())
         .filter(Boolean);
       for (const stmt of statements) {
-        await sql.unsafe(stmt);
+        try {
+          await sql.unsafe(stmt);
+        } catch (e) {
+          // Idempotent re-run: ignore "already exists" / duplicate errors.
+          // This handles the case where a previous partial run created some
+          // objects but the __migrations record wasn't written.
+          const msg = e instanceof Error ? e.message : String(e);
+          if (/already exists|duplicate|conflict/i.test(msg)) {
+            console.log(`[migrate] (skip, already exists): ${stmt.slice(0, 60)}...`);
+          } else {
+            throw e; // real error, re-throw
+          }
+        }
       }
       await sql`INSERT INTO __migrations (filename) VALUES (${file})`;
       console.log(`[migrate] applied: ${file}`);

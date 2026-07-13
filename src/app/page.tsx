@@ -62,13 +62,21 @@ export default function LandingPage() {
           </span>
           <span className="font-display text-xl font-bold tracking-tight">Kairo</span>
         </div>
-        <Link
-          href="/app/today"
-          className="flex items-center gap-2 rounded-2xl bg-iris px-4 py-2.5 text-sm font-semibold text-ink-inverse shadow-card transition-colors hover:bg-iris-deep"
-        >
-          Open the app
-          <ArrowRight size={16} />
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/sign-in"
+            className="rounded-2xl px-4 py-2.5 text-sm font-semibold text-ink-soft transition-colors hover:bg-surface-sunken hover:text-ink"
+          >
+            Sign in
+          </Link>
+          <Link
+            href="/sign-up"
+            className="flex items-center gap-2 rounded-2xl bg-iris px-4 py-2.5 text-sm font-semibold text-ink-inverse shadow-card transition-colors hover:bg-iris-deep"
+          >
+            Get started
+            <ArrowRight size={16} />
+          </Link>
+        </div>
       </header>
 
       {/* hero */}
@@ -104,15 +112,18 @@ export default function LandingPage() {
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <Link
-              href="/app/today"
+              href="/sign-up"
               className="flex items-center gap-2 rounded-2xl bg-iris px-6 py-3.5 text-base font-semibold text-ink-inverse shadow-float transition-all hover:scale-[1.02] hover:bg-iris-deep"
             >
-              Preview the design
+              Get started free
               <ArrowRight size={18} />
             </Link>
-            <p className="text-sm font-medium text-ink-faint">
-              Web · iOS · design preview
-            </p>
+            <Link
+              href="/app/today"
+              className="text-sm font-semibold text-ink-soft transition-colors hover:text-iris"
+            >
+              Preview the design →
+            </Link>
           </div>
         </div>
 

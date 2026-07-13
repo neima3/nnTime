@@ -11,6 +11,7 @@ import { getOrCreateSettings, listTasks, listActivitySeries, type Db } from "../
 import { resolveDayBounds } from "../temporal/zone";
 
 export interface ResolvedDay {
+  userId: string;
   date: string;
   zone: string;
   start: Date;
@@ -46,6 +47,7 @@ export async function getResolvedDay(
   });
 
   return {
+    userId: session.userId,
     date: target,
     zone,
     start: bounds.start,

@@ -10,6 +10,7 @@ import {
   Sparkles,
   Timer,
 } from "lucide-react";
+import { UserMenu } from "./UserMenu";
 
 const sidebarNav = [
   { href: "/app/today", label: "Today", key: "today", icon: CalendarDays },
@@ -86,6 +87,10 @@ export function AppShell({
           >
             Plan my day
           </Link>
+        </div>
+
+        <div className="mt-3 border-t border-border pt-3">
+          <UserMenu />
         </div>
       </aside>
 

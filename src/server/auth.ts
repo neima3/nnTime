@@ -25,9 +25,18 @@ export const auth = betterAuth({
     schema: authSchema,
   }),
   appName: "Kairo",
-  baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
+  // Canonical origin (ADR-003). Defaults to the prod URL in production so auth
+  // works even if BETTER_AUTH_URL isn't set in the Coolify env; an explicit
+  // BETTER_AUTH_URL (e.g. staging) always wins.
+  baseURL:
+    process.env.BETTER_AUTH_URL ??
+    (process.env.NODE_ENV === "production"
+      ? "https://time.neima.me"
+      : "http://localhost:3000"),
   trustedOrigins: [
     process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
+    "http://localhost:3000",
+    "http://localhost:3456", // pinned dev port (.claude/launch.json)
     "https://time.neima.me",
     "https://time-staging.neima.me",
   ].filter(Boolean),
