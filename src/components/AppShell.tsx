@@ -42,8 +42,19 @@ export function AppShell({
 }) {
   return (
     <div className="flex min-h-dvh w-full bg-canvas">
+      {/* Skip to content — keyboard accessibility */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-xl focus:bg-iris focus:px-4 focus:py-2 focus:text-ink-inverse focus:shadow-float"
+      >
+        Skip to content
+      </a>
       {/* desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-border bg-surface px-4 py-6 md:flex">
+      <aside
+        className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-border bg-surface px-4 py-6 md:flex"
+        role="navigation"
+        aria-label="Main navigation"
+      >
         <Link href="/" className="flex items-center gap-2.5 px-2">
           <span className="grid size-9 place-items-center rounded-xl bg-iris text-lg text-ink-inverse shadow-card">
             ◔
@@ -60,7 +71,8 @@ export function AppShell({
               <Link
                 key={href}
                 href={href}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium transition-colors ${
+                aria-current={isActive ? "page" : undefined}
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none ${
                   isActive
                     ? "bg-iris-soft text-iris"
                     : "text-ink-soft hover:bg-surface-sunken hover:text-ink"
@@ -95,10 +107,13 @@ export function AppShell({
       </aside>
 
       {/* main */}
-      <main className="min-w-0 flex-1 pb-24 md:pb-0">{children}</main>
+      <main id="main-content" className="min-w-0 flex-1 pb-24 md:pb-0">{children}</main>
 
       {/* mobile bottom bar */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-border bg-surface/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+      <nav
+        className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t border-border bg-surface/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+        aria-label="Mobile navigation"
+      >
         {mobileNav.map(({ href, label, key, icon: Icon }) => {
           const isActive =
             key === active || (key === "more" && moreKeys.has(active));
@@ -106,7 +121,8 @@ export function AppShell({
             <Link
               key={href}
               href={href}
-              className={`flex flex-col items-center gap-1 px-3 pb-2 pt-2.5 text-[11px] font-medium ${
+              aria-current={isActive ? "page" : undefined}
+              className={`flex flex-col items-center gap-1 px-3 pb-2 pt-2.5 text-[11px] font-medium focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none ${
                 isActive ? "text-iris" : "text-ink-faint"
               }`}
             >

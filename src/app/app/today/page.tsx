@@ -204,7 +204,7 @@ export default async function TodayPage() {
       {/* FAB */}
       <button
         aria-label="Add activity"
-        className="fixed bottom-24 right-5 z-40 grid size-14 place-items-center rounded-2xl bg-iris text-ink-inverse shadow-float transition-transform hover:scale-105 md:bottom-8 md:right-8"
+        className="fixed bottom-24 right-5 z-40 grid size-14 place-items-center rounded-2xl bg-iris text-ink-inverse shadow-float transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none md:bottom-8 md:right-8"
       >
         <Plus size={26} strokeWidth={2.5} />
       </button>
