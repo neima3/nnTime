@@ -1,5 +1,96 @@
 # Progress log
 
+## 2026-07-13 — Phase 1A complete: domain + API contract (no UI change)
+
+**Subphase:** 1A — Domain + API contract (OpenAPI 3.1, schema invariants, sync
+semantics). **No UI change** (roadmap 1A is explicit). **No deploy** — no data
+layer to verify live yet; route handlers ship in 1C.
+
+**Shipped:**
+- **Drizzle schema** (`src/server/db/schema.ts`, 16 tables) per ADR-001/002/004:
+  `users`, `user_settings` (typed columns, not JSON), `categories` (6 seeded,
+  immutable semantic key), `tags`, `activity_series` (recurrence master with tz,
+  dtstart_local, rrule, exdate/rdate, template fields), `activity_occurrences`
+  (keyed by stable `(series_id, occurrence_key)`), `tasks` (one table,
+  `bucket ∈ {inbox, anytime}`), `checklist_items`, `routines`/`routine_steps`/
+  `routine_schedules`, `focus_sessions` (ADR-004 state machine + **partial
+  unique index** = one active session per user), `push_subscriptions`,
+  `planner_events` (append-only history), `idempotency_keys` (48h TTL),
+  `change_log` (bigint identity, per-user change sequence for `/changes?cursor=`).
+  Every owned row: UUIDv7 PK, `user_id`, `revision`, `created_at`/`updated_at`,
+  `deleted_at` tombstone. DB barrel imports `server-only`.
+- **Migrations** (`drizzle/`): `0000_initial.sql` (all tables/enums/indexes/
+  FK cascade/partial unique), `0001_seed_categories.sql` (6 canonical category
+  keys matching the design tokens). Forward-only, journal-tracked.
+- **OpenAPI 3.1 contract** (`api/openapi.yaml`, ~1730 lines): error envelope,
+  Idempotency-Key, If-Match/ETag, cursor pagination, closed enums, RFC 3339
+  instants + date-only, UUIDv7. Paths: `/day/{date}`, CRUD for activities (with
+  `editScope: this|this_and_future|all`), tasks (+`/schedule` conversion),
+  checklist-items, tags, routines (+steps/schedules), focus-sessions, settings,
+  categories, `POST /batch` (ordered ops/results), `GET /changes?cursor=`.
+  Validated with `@redocly/cli lint` (48 nullable→3.1-form fixes applied).
+  `cookieAuth` security scheme (Better Auth session).
+- **zod validators** (`src/server/schemas/`, 16 files): hand-written, one per
+  resource, matching the DB schema exactly. Closed enums mirror the pgEnums.
+  `responseSchemaRegistry` in `index.ts` keyed by OpenAPI component name.
+- **Temporal helpers** (`src/server/temporal/`): `zone.ts` (IANA validation,
+  DST-safe `wallClockToInstant` with gap-shift-forward + fold-first rules,
+  `resolveDayBounds` for `[start,end)` day windows); `recurrence.ts`
+  (wall-clock expansion in series tz → instants, custom N-day intervals,
+  EXDATE/RDATE, COUNT/UNTIL, occurrence_key derivation).
+- **vitest** configured: `pnpm test` / `test:watch` / `typecheck` scripts added;
+  ephemeral-DB-per-run test utilities; `server-only` stubbed in tests.
+
+**Migrations IDs:** `0000_initial`, `0001_seed_categories`.
+
+**Tests added (68 passing):**
+- `temporal.test.ts` (25) — ADR-001 deterministic matrix: DST gap
+  (spring-forward shift), DST fold (fall-back first/second), leap day, month-end
+  recurrence (Jan 31→Feb 29 clamp), weekly BYDAY, custom N-day interval, UNTIL,
+  EXDATE, planning-zone change (wall-time preserved), series-split
+  occurrence_key stability.
+- `migrations.test.ts` (5) — ephemeral Postgres: all tables/enums present,
+  change_log bigint identity, **ADR-004 partial unique index rejects a 2nd
+  active focus session** (completed/other-user allowed), FK cascade on user
+  delete.
+- `schema-invariants.test.ts` (29) — every soft-deletable table has the full
+  ADR-002 column set; append-only tables (planner_events, change_log) have no
+  updated_at/deleted_at; singleton (user_settings) keyed by user_id; all PKs
+  uuid; sync infra tables present.
+- `contract-parity.test.ts` (9) — **ADR-002 CI drift gate**: every zod registry
+  entry ↔ OpenAPI component matches; spec is valid 3.1.0; /changes, /batch,
+  /day, Idempotency-Key all defined.
+
+**Evidence:** all gates green locally: `pnpm lint && pnpm typecheck && pnpm test
+&& pnpm build`. DB integration tests run against ephemeral local Postgres
+(Homebrew pg@17, DB created/dropped per run). No browser evidence this phase
+(no UI change).
+
+**Live-verification result:** N/A — 1A ships no route handlers or UI; nothing
+to observe on time.neima.me. First live verification is 1C (CRUD handlers) /
+1E (release).
+
+**Parity numbers:** `node scripts/parity.mjs` → web 88.46%, iOS 86.52%
+(unchanged — 1A ships no end-user feature; rows stay planned).
+
+**Deviations:**
+- Added `yaml` dev dependency (tiny, standard for OpenAPI tooling) to parse the
+  spec in the contract-parity test. Not a runtime dependency.
+- Contract-parity test uses a directional parity model: every zod resource must
+  have an OpenAPI component (zod→spec), and OpenAPI-only enum/primitive
+  components (HourCycle, Revision, etc.) are allowed without a zod key — this
+  reflects that OpenAPI legitimately needs more named schemas than zod. The
+  `OPENAPI_ONLY_ALLOWED` set in the test documents which are exempt and why.
+- Schema-invariants test caught a real bug during development:
+  `push_subscriptions` was missing `revision` — fixed and migration regenerated.
+- `category_seed` table (not user-owned) holds the canonical 6 categories;
+  per-user category rows are created at signup in 1C.
+
+**Next step:** 1B — Infra safety: staging app + DB on Coolify, CI (GitHub
+Actions wrapping these tests with an ephemeral Postgres service), automated
+encrypted backups + PROVEN restore drill, migrations runbook, security headers
+verified live, rate-limit middleware framework. 1B is cheap-subagent friendly.
+
 ## 2026-07-12 — Phase 0.5c complete: all design work (Fable, session 1 cont.)
 **Shipped (all as living reference screens, verified in browser desktop+mobile):**
 - `/app/editor` — activity editor (modal/bottom-sheet, edit-scope prompt,

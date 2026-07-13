@@ -43,7 +43,7 @@ design work BEFORE the consuming subphase starts.
         web 88.46%, iOS 86.52% (2026-07-12, after itemizing month view/extend/
         checklist-in-focus/high-contrast/Apple Health into phases)
 - [ ] Phase 1 — Data foundation
-  - [ ] 1A Domain + API contract (OpenAPI 3.1, schema invariants, sync semantics)
+  - [x] 1A Domain + API contract (OpenAPI 3.1, schema invariants, sync semantics)
   - [ ] 1B Infra safety: staging, CI, backups+restore drill, migrations runbook,
         security headers, rate-limit framework
   - [ ] 1C Auth + DB + CRUD with per-resource authorization + negative tests

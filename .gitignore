@@ -42,3 +42,11 @@ next-env.d.ts
 
 # QA evidence (never commit)
 browser-qa/
+
+# Drizzle: migrations and the meta journal ARE committed (source of truth).
+# Only ignore local query cache/logs.
+drizzle/*.log
+
+# Agent session/workspace artifacts (never commit)
+.zcode/
+

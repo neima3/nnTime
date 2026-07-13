@@ -1,0 +1,1669 @@
+openapi: 3.1.0
+
+info:
+  title: Kairo API
+  version: 1.0.0
+  description: |
+    Kairo REST + JSON API contract for the web (Phase 1A+) and iOS (Phase 7)
+    clients. Binding per **ADR-002 — API contract & offline sync protocol**.
+
+    ## Conventions
+    - All user data is served `Cache-Control: private, no-store`.
+    - Mutations are conditional: PATCH/DELETE carry `If-Match: <revision>`;
+      a stale revision returns **409 Conflict** with the current server
+      state in `error.details`. See ADR-002 "Conflict policy".
+    - Every POST/PATCH/DELETE/PUT SHOULD send a client-generated
+      `Idempotency-Key` (UUID). The server replays the original response on
+      retry within a 48h window.
+    - Deletes are soft (tombstones); they surface in the `/changes` feed as
+      `op=delete` and are retained ≥30 days.
+    - Pagination is cursor-based (`?cursor=&limit=`); cursors are opaque.
+    - IDs are random **UUIDv7** strings (public id ≠ enumeration). Instants
+      are RFC 3339 UTC (`date-time`); date-only values are `date`
+      (`YYYY-MM-DD`). Enums are closed.
+    - Cross-user resource access returns **404** (SEC-01 anti-enumeration).
+    - Errors use the standard envelope
+      `{ error: { code, message, details?, retryable } }`.
+
+    Field names are camelCase in JSON, mirroring the Drizzle schema's
+    `src/server/db/schema.ts` (the source of truth for field names/types).
+    Component schemas are checked against the zod registry in CI
+    (`src/server/schemas/contract-parity.test.ts`).
+
+  contact:
+    name: Kairo
+    url: https://github.com/nn/nntime
+  license:
+    name: Proprietary
+    identifier: Proprietary
+
+servers:
+  - url: https://time.neima.me/api/v1
+    description: Production
+  - url: https://time-staging.neima.me/api/v1
+    description: Staging
+
+security:
+  - cookieAuth: []
+
+tags:
+  - name: Day
+    description: Read-model endpoints for rendering a planning day.
+  - name: Activities
+    description: Activity series + occurrence overrides (ADR-001).
+  - name: Tasks
+    description: Inbox + anytime tasks (ADR-001).
+  - name: Checklist
+    description: Checklist items shared across series/task/occurrence.
+  - name: Tags
+    description: User-scoped tag taxonomy.
+  - name: Routines
+    description: Routine masters + steps + schedules.
+  - name: Focus
+    description: Server-authoritative focus sessions (ADR-004).
+  - name: Settings
+    description: Current user's typed settings.
+  - name: Categories
+    description: Six seeded, user-editable categories.
+  - name: Batch
+    description: Ordered operations with ordered results (ADR-002).
+  - name: Sync
+    description: Incremental sync feed (`/changes`).
+
+# ---------------------------------------------------------------------------
+# Paths (relative to the server URL, which already includes /api/v1)
+# ---------------------------------------------------------------------------
+paths:
+  # ---- Day (ADR-001) -------------------------------------------------------
+  /day/{date}:
+    get:
+      tags: [Day]
+      summary: Render a planning day
+      description: |
+        Read model for the day view. `date` is a calendar day
+        (`YYYY-MM-DD`). `tz` (IANA zone) is optional and defaults to the
+        authenticated user's planning zone (`user_settings.timezone`).
+        The response echoes the resolved zone and the half-open UTC bounds
+        `[start, end)` for that local day. Activities whose interval
+        overlaps the window are returned; overnight activities may appear
+        split. Anytime tasks attached to `date` are returned separately.
+        Day snapshots are for rendering, not sync — clients sync via
+        `/changes`. (ADR-001.)
+      operationId: getDay
+      parameters:
+        - $ref: '#/components/parameters/DateString'
+        - name: tz
+          in: query
+          required: false
+          description: |
+            IANA timezone key (e.g. `America/New_York`). Defaults to the
+            authenticated user's planning zone when omitted.
+          schema:
+            type: string
+            example: America/New_York
+      responses:
+        '200':
+          description: The resolved day.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DayResponse'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  # ---- Activities (ADR-001) ------------------------------------------------
+  /activities:
+    post:
+      tags: [Activities]
+      summary: Create an activity series
+      description: |
+        Creates an `activity_series`. A one-off activity is a series with no
+        `rrule` and a single occurrence. The `tz` + `dtstartLocal` pair
+        carries wall-clock semantics; recurrence expands in the series zone
+        (ADR-001). Returns the created series.
+      operationId: createActivitySeries
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivitySeries'
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivitySeries'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+    get:
+      tags: [Activities]
+      summary: List activity series
+      operationId: listActivitySeries
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Page of series.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ActivitySeries' }
+                  nextCursor:
+                    type: [string, 'null']
+                    description: Opaque cursor for the next page; `null` when exhausted.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /activities/{id}:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    get:
+      tags: [Activities]
+      summary: Get an activity series
+      operationId: getActivitySeries
+      responses:
+        '200':
+          description: The series.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActivitySeries' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+    patch:
+      tags: [Activities]
+      summary: Update an activity series
+      description: |
+        Update a series. `editScope` (ADR-001) selects the mutation scope:
+        - `this` — write the occurrence row only (master untouched).
+        - `this_and_future` — truncate the old series and start a new one
+          at the selected occurrence (occurrence identity survives).
+        - `all` — update the master template; field-level overrides survive
+          unless the edited field was itself overridden.
+
+        For `this` / `this_and_future`, supply `occurrenceKey`.
+      operationId: updateActivitySeries
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/EditScope'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActivitySeries' }
+      responses:
+        '200':
+          description: The updated series (and, for future-split, the new series id).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActivitySeries' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+    delete:
+      tags: [Activities]
+      summary: Tombstone an activity series
+      description: |
+        Soft-delete (tombstone). `editScope` mirrors edit scopes:
+        - `this` — cancellation row for the single occurrence.
+        - `this_and_future` — UNTIL truncate at the selected occurrence.
+        - `all` — soft-delete the series; occurrences tombstoned.
+      operationId: deleteActivitySeries
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/EditScope'
+      responses:
+        '204': { description: Tombstoned (no body). }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /activities/{seriesId}/occurrences/{occurrenceKey}:
+    parameters:
+      - name: seriesId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+        description: The activity series id.
+      - name: occurrenceKey
+        in: path
+        required: true
+        schema: { type: string, format: date-time }
+        description: |
+          The original local start instant that identifies this occurrence
+          (ADR-001 stable identity). RFC 3339 UTC.
+    get:
+      tags: [Activities]
+      summary: Get an occurrence (materialized or virtual)
+      operationId: getActivityOccurrence
+      responses:
+        '200':
+          description: The occurrence, expanded virtually or overridden.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActivityOccurrence' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+    patch:
+      tags: [Activities]
+      summary: Override this occurrence
+      description: |
+        Equivalent to `PATCH /activities/{id}?editScope=this` but addressed
+        by occurrence key. Any null override field inherits from the series
+        template. (ADR-001 "This occurrence".)
+      operationId: overrideActivityOccurrence
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActivityOccurrence' }
+      responses:
+        '200':
+          description: The updated occurrence.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActivityOccurrence' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  # ---- Tasks (ADR-001) -----------------------------------------------------
+  /tasks:
+    post:
+      tags: [Tasks]
+      summary: Create a task
+      description: |
+        Create a task in bucket `inbox` (no date) or `anytime` (attached to
+        a `date` with no time). (ADR-001 "two buckets, one table".)
+      operationId: createTask
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Task' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Task' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+    get:
+      tags: [Tasks]
+      summary: List tasks
+      operationId: listTasks
+      parameters:
+        - name: bucket
+          in: query
+          required: false
+          schema: { $ref: '#/components/schemas/TaskBucket' }
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Page of tasks.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Task' }
+                  nextCursor: { type: [string, 'null'] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /tasks/{id}:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    get:
+      tags: [Tasks]
+      summary: Get a task
+      operationId: getTask
+      responses:
+        '200':
+          description: The task.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Task' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+    patch:
+      tags: [Tasks]
+      summary: Update a task
+      operationId: updateTask
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Task' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Task' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+    delete:
+      tags: [Tasks]
+      summary: Tombstone a task
+      operationId: deleteTask
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204': { description: Tombstoned (no body). }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /tasks/{id}/schedule:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    post:
+      tags: [Tasks]
+      summary: Schedule a task into an activity series
+      description: |
+        Converts a task to an `activity_series` (ADR-001 "Schedule"). The
+        task is soft-deleted with `convertedTo` pointing at the new series;
+        checklist and history transfer; identity is recorded in
+        `planner_events`. The request body is the new ActivitySeries.
+      operationId: scheduleTask
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActivitySeries' }
+      responses:
+        '201':
+          description: The created series. The source task is now soft-deleted.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ActivitySeries' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  # ---- Checklist items -----------------------------------------------------
+  /checklist-items:
+    post:
+      tags: [Checklist]
+      summary: Create a checklist item
+      description: |
+        Checklist items are polymorphic: `parentType` ∈ {series, task,
+        occurrence}; `parentId` references the owning row.
+      operationId: createChecklistItem
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChecklistItem' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChecklistItem' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /checklist-items/{id}:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    patch:
+      tags: [Checklist]
+      summary: Update a checklist item
+      operationId: updateChecklistItem
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChecklistItem' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChecklistItem' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+    delete:
+      tags: [Checklist]
+      summary: Tombstone a checklist item
+      operationId: deleteChecklistItem
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204': { description: Tombstoned (no body). }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  # ---- Tags ----------------------------------------------------------------
+  /tags:
+    post:
+      tags: [Tags]
+      summary: Create a tag
+      operationId: createTag
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Tag' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tag' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+    get:
+      tags: [Tags]
+      summary: List tags
+      operationId: listTags
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Page of tags.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Tag' }
+                  nextCursor: { type: [string, 'null'] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /tags/{id}:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    patch:
+      tags: [Tags]
+      summary: Update a tag
+      operationId: updateTag
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Tag' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tag' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+    delete:
+      tags: [Tags]
+      summary: Tombstone a tag
+      operationId: deleteTag
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204': { description: Tombstoned (no body). }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  # ---- Routines ------------------------------------------------------------
+  /routines:
+    post:
+      tags: [Routines]
+      summary: Create a routine
+      operationId: createRoutine
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Routine' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Routine' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+    get:
+      tags: [Routines]
+      summary: List routines
+      operationId: listRoutines
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Page of routines.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Routine' }
+                  nextCursor: { type: [string, 'null'] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /routines/{id}:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    get:
+      tags: [Routines]
+      summary: Get a routine
+      operationId: getRoutine
+      responses:
+        '200':
+          description: The routine.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Routine' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+    patch:
+      tags: [Routines]
+      summary: Update a routine
+      operationId: updateRoutine
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Routine' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Routine' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+    delete:
+      tags: [Routines]
+      summary: Tombstone a routine
+      operationId: deleteRoutine
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '204': { description: Tombstoned (no body). }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /routines/{id}/steps:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    post:
+      tags: [Routines]
+      summary: Add a step to a routine
+      operationId: createRoutineStep
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoutineStep' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RoutineStep' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /routines/{id}/schedules:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    post:
+      tags: [Routines]
+      summary: Add a schedule to a routine
+      description: |
+        Carries the recurrence + `paused` + `nextRunAt`. A durable job
+        materializes occurrences 48h ahead (ADR-004), deduped on
+        `(routine_schedule_id, occurrence_key)`.
+      operationId: createRoutineSchedule
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoutineSchedule' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RoutineSchedule' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  # ---- Focus sessions (ADR-004) --------------------------------------------
+  /focus-sessions:
+    post:
+      tags: [Focus]
+      summary: Start a focus session
+      description: |
+        Server-authoritative start (ADR-004). At most one
+        `running`/`paused` session may exist per user (partial unique
+        index). `activityOccurrenceId` is nullable for ad-hoc sessions.
+        Transitions are idempotent and use server time.
+      operationId: startFocusSession
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FocusSession' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FocusSession' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: |
+            A running/paused session already exists for this user; the
+            existing session is returned in `error.details`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  /focus-sessions/{id}:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    get:
+      tags: [Focus]
+      summary: Get a focus session
+      operationId: getFocusSession
+      responses:
+        '200':
+          description: The session. Clients derive remaining time from the row.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FocusSession' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+    patch:
+      tags: [Focus]
+      summary: Transition a focus session's state
+      description: |
+        Transitions the server-authoritative state machine
+        (ADR-004): `running | paused | completed | skipped | cancelled`.
+        Idempotent and validated; clients never persist countdowns.
+      operationId: updateFocusSession
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FocusSession' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FocusSession' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  # ---- Settings & categories ----------------------------------------------
+  /settings:
+    get:
+      tags: [Settings]
+      summary: Get the current user's settings
+      operationId: getUserSettings
+      responses:
+        '200':
+          description: The authenticated user's typed settings.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserSettings' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+    patch:
+      tags: [Settings]
+      summary: Update the current user's settings
+      operationId: updateUserSettings
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserSettings' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserSettings' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /categories:
+    get:
+      tags: [Categories]
+      summary: List categories
+      description: |
+        Six seeded categories. `key` is the immutable semantic id
+        (peach/butter/mint/sky/lilac/rose). `label` is user-editable.
+      operationId: listCategories
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Page of categories.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Category' }
+                  nextCursor: { type: [string, 'null'] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /categories/{id}:
+    parameters:
+      - $ref: '#/components/parameters/UuidId'
+    patch:
+      tags: [Categories]
+      summary: Update a category label
+      description: |
+        Only `label` (and `sortOrder`) is editable; `key` is immutable.
+      operationId: updateCategory
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Category' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  # ---- Batch (ADR-002) -----------------------------------------------------
+  /batch:
+    post:
+      tags: [Batch]
+      summary: Run ordered operations with ordered results
+      description: |
+        Executes a sequence of operations in request order and returns one
+        result per operation, each independently terminal or retryable
+        (ADR-002). Useful for offline replay on reconnect. Each operation
+        carries its own `idempotencyKey`; the outer request may also carry
+        one for whole-batch replay.
+      operationId: runBatch
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BatchRequest' }
+      responses:
+        '200':
+          description: Ordered results.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BatchResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ---- Sync (ADR-002) ------------------------------------------------------
+  /changes:
+    get:
+      tags: [Sync]
+      summary: Incremental sync feed
+      description: |
+        Returns rows ordered by a per-user change sequence (ADR-002).
+        Tombstones surface with `op=delete`. The cursor is opaque and
+        encodes the last id seen; pass it back as `cursor` to continue.
+        Day snapshots are for rendering, not sync.
+      operationId: getChanges
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque cursor from a previous response; defaults to the beginning.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      responses:
+        '200':
+          description: A page of change entries.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChangesResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+# ---------------------------------------------------------------------------
+# Components
+# ---------------------------------------------------------------------------
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: kairo_session
+      description: |
+        Better Auth session cookie (ADR-003). All endpoints require an
+        authenticated session. Bearer tokens are added in Phase 7.
+
+  parameters:
+    UuidId:
+      name: id
+      in: path
+      required: true
+      description: Resource id (UUIDv7).
+      schema: { type: string, format: uuid }
+
+    DateString:
+      name: date
+      in: path
+      required: true
+      description: Calendar day `YYYY-MM-DD` (RFC 3339 full-date).
+      schema: { type: string, format: date }
+
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: |
+        Client-generated UUID per logical mutation. The server replays the
+        original response on retry within a 48h window (ADR-002).
+      schema: { type: string, format: uuid }
+
+    IfMatch:
+      name: If-Match
+      in: header
+      required: false
+      description: |
+        Conditional write guard. Pass the current `revision` (as a string)
+        of the resource; a mismatch yields **409 Conflict** with the
+        current server state in `error.details` (ADR-002).
+      schema: { type: string }
+
+    EditScope:
+      name: editScope
+      in: query
+      required: false
+      description: |
+        Edit/delete scope (ADR-001). Defaults to `this`. For `this` and
+        `this_and_future`, the request must also identify an occurrence.
+      schema: { $ref: '#/components/schemas/EditScope' }
+
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque pagination cursor from a previous response.
+      schema: { type: string }
+
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+
+  responses:
+    BadRequest:
+      description: Malformed request body or parameters.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+    Unauthorized:
+      description: No authenticated session.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+    NotFound:
+      description: |
+        Resource not found, or owned by another user (SEC-01: cross-user
+        access returns 404 to avoid enumeration).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+    Conflict:
+      description: |
+        Revision mismatch (stale `If-Match`), or a state constraint was
+        violated. `error.details` carries the current server state.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  schemas:
+    # ---- Shared primitives & enums ----------------------------------------
+    HourCycle:
+      type: string
+      enum: [h12, h24]
+      description: Mirrors the `hour_cycle` pgEnum (closed).
+
+    ThemeMode:
+      type: string
+      enum: [system, light, dark]
+      description: Mirrors the `theme_mode` pgEnum (closed).
+
+    TaskBucket:
+      type: string
+      enum: [inbox, anytime]
+      description: ADR-001. `inbox` (no date) or `anytime` (dated, no time).
+
+    EnergyLevel:
+      type: string
+      enum: [low, medium, high]
+      description: Mirrors the `energy_level` pgEnum (closed).
+
+    Priority:
+      type: string
+      enum: [none, low, high]
+      description: Mirrors the `priority` pgEnum (closed).
+
+    OccurrenceStatus:
+      type: string
+      enum: [pending, completed, skipped, cancelled]
+      description: ADR-001 occurrence lifecycle. Mirrors `occurrence_status` pgEnum.
+
+    ChecklistParent:
+      type: string
+      enum: [series, task, occurrence]
+      description: Mirrors the `checklist_parent` pgEnum (closed).
+
+    ActivitySource:
+      type: string
+      enum: [manual, routine, calendar]
+      description: Mirrors the `activity_source` pgEnum (closed). Calendar-imported occurrences are read-only in Kairo (ADR-001).
+
+    FocusState:
+      type: string
+      enum: [running, paused, completed, skipped, cancelled]
+      description: ADR-004 server-authoritative focus-session state machine.
+
+    PlannerEventType:
+      type: string
+      enum:
+        - complete
+        - uncomplete
+        - skip
+        - reschedule
+        - focus_start
+        - focus_stop
+        - energy_change
+        - mood_checkin
+        - carryover
+      description: ADR-001 planner_events history event types. Mirrors `planner_event_type` pgEnum.
+
+    ChangeOp:
+      type: string
+      enum: [upsert, delete]
+      description: ADR-002 change_log op. Tombstones surface as `delete`.
+
+    EditScope:
+      type: string
+      enum: [this, this_and_future, all]
+      default: this
+      description: ADR-001 edit/delete scope for series mutations.
+
+    Revision:
+      type: integer
+      format: int32
+      minimum: 1
+      description: |
+        Monotonic integer `revision`. The conditional-write guard
+        (`If-Match`) compares against this; bump happens inside the same
+        transaction as each write.
+
+    # ---- Error envelope (ADR-002) -----------------------------------------
+    Error:
+      type: object
+      required: [code, message, retryable]
+      properties:
+        code:
+          type: string
+          description: |
+            Stable, machine-readable error code (e.g. `bad_request`,
+            `unauthenticated`, `not_found`, `conflict`, `rate_limited`,
+            `internal_error`).
+        message:
+          type: string
+          description: Human-readable summary safe to surface in UI.
+        details:
+          description: |
+            Optional structured details. On **409 Conflict**, carries the
+            current server state of the resource so the client can rebase.
+          type: object
+          additionalProperties: true
+        retryable:
+          type: boolean
+          description: |
+            Whether the client should retry (e.g. 429/5xx with backoff).
+            4xx terminal (other than 429) → `false`.
+
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error: { $ref: '#/components/schemas/Error' }
+
+    # ---- Identity-adjacent -------------------------------------------------
+    Category:
+      type: object
+      description: |
+        One of six seeded categories. `key` is the immutable semantic id;
+        `label` is user-editable. Soft-delete falls back to a canonical
+        key. Mirrors the `categories` table.
+      required: [id, userId, key, label, sortOrder, revision, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: UUIDv7.
+        userId: { type: string, format: uuid }
+        key:
+          type: string
+          description: Immutable semantic key (e.g. `peach`).
+        label: { type: string }
+        sortOrder: { type: integer, format: int32 }
+        revision: { $ref: '#/components/schemas/Revision' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        deletedAt:
+          type: [string, 'null']
+          format: date-time
+          description: Tombstone instant; present when soft-deleted.
+
+    Tag:
+      type: object
+      description: Mirrors the `tags` table.
+      required: [id, userId, name, revision, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        name: { type: string }
+        color:
+          type: [string, 'null']
+          description: Token name (e.g. `iris`) — never raw hex.
+        revision: { $ref: '#/components/schemas/Revision' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        deletedAt: { type: [string, 'null'], format: date-time }
+
+    UserSettings:
+      type: object
+      description: |
+        Typed columns for the current user (ADR-001). JSON is only used for
+        presentation extras (`notificationPrefs`).
+      required:
+        - userId
+        - timezone
+        - locale
+        - weekStart
+        - hourCycle
+        - theme
+        - reducedStimulation
+        - notificationPrefs
+        - schemaVersion
+        - revision
+        - createdAt
+        - updatedAt
+      properties:
+        userId: { type: string, format: uuid }
+        timezone:
+          type: string
+          description: IANA zone key, validated at the service edge.
+        locale: { type: string, default: en }
+        weekStart:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 6
+          description: 0=Sun … 6=Sat.
+        hourCycle: { $ref: '#/components/schemas/HourCycle' }
+        theme: { $ref: '#/components/schemas/ThemeMode' }
+        reducedStimulation: { type: boolean }
+        notificationPrefs:
+          type: object
+          additionalProperties: true
+          description: Per-type reminder offsets, sound choices, quiet hours (presentation-only).
+        schemaVersion: { type: integer, format: int32 }
+        revision: { $ref: '#/components/schemas/Revision' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    # ---- Tasks (ADR-001) ---------------------------------------------------
+    Task:
+      type: object
+      description: |
+        A task in bucket `inbox` (no date) or `anytime` (dated, no time).
+        "Schedule" sets `convertedTo` and soft-deletes the row
+        (ADR-001). Mirrors the `tasks` table.
+      required: [id, userId, bucket, title, priority, revision, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        bucket: { $ref: '#/components/schemas/TaskBucket' }
+        title: { type: string }
+        emoji: { type: [string, 'null'] }
+        categoryId: { type: [string, 'null'], format: uuid }
+        date:
+          type: [string, 'null']
+          format: date
+          description: Calendar day for `anytime` tasks; null for `inbox`.
+        priority: { $ref: '#/components/schemas/Priority' }
+        energy:
+          oneOf:
+            - $ref: '#/components/schemas/EnergyLevel'
+            - type: 'null'
+        notes: { type: [string, 'null'] }
+        convertedTo:
+          type: [string, 'null']
+          format: uuid
+          description: Points at the new `activity_series` once scheduled.
+        revision: { $ref: '#/components/schemas/Revision' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        deletedAt: { type: [string, 'null'], format: date-time }
+
+    # ---- Activities (ADR-001) ---------------------------------------------
+    ActivitySeries:
+      type: object
+      description: |
+        Recurrence master (ADR-001). One-off activities are a series with
+        no `rrule` and one occurrence. `tz` + `dtstartLocal` carry
+        wall-clock semantics; expansion happens in the series zone.
+        Template fields are copied onto materialized occurrences unless
+        overridden. Mirrors the `activity_series` table.
+      required:
+        - id
+        - userId
+        - tz
+        - dtstartLocal
+        - title
+        - durationMin
+        - priority
+        - source
+        - revision
+        - createdAt
+        - updatedAt
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        tz:
+          type: string
+          description: IANA zone for wall-clock expansion.
+        dtstartLocal:
+          type: string
+          format: date-time
+          description: Local dtstart as an RFC 3339 instant (stored timestamptz).
+        rrule:
+          type: [string, 'null']
+          description: RRULE string; null = one-off.
+        exdate:
+          type: [array, 'null']
+          items: { type: string, format: date }
+          description: EXDATE list (calendar dates).
+        rdate:
+          type: [array, 'null']
+          items: { type: string, format: date-time }
+          description: RDATE list (instants).
+        title: { type: string }
+        emoji: { type: [string, 'null'] }
+        categoryId: { type: [string, 'null'], format: uuid }
+        durationMin:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Authoritative duration; end time is derived.
+        checklistTemplate:
+          type: array
+          items: { type: object, additionalProperties: true }
+          description: Template checklist copied onto materialized occurrences.
+        energy:
+          oneOf:
+            - $ref: '#/components/schemas/EnergyLevel'
+            - type: 'null'
+        priority: { $ref: '#/components/schemas/Priority' }
+        tags:
+          type: [array, 'null']
+          items: { type: string, format: uuid }
+        notes: { type: [string, 'null'] }
+        source: { $ref: '#/components/schemas/ActivitySource' }
+        sourceRef:
+          type: [string, 'null']
+          description: Routine id or calendar provider id.
+        revision: { $ref: '#/components/schemas/Revision' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        deletedAt: { type: [string, 'null'], format: date-time }
+
+    ActivityOccurrence:
+      type: object
+      description: |
+        Materialized-or-overridden instance keyed by
+        `(seriesId, occurrenceKey)` where `occurrenceKey` = original local
+        start (stable identity, survives series splits — ADR-001). Rows
+        exist when overridden, completed, skipped, cancelled, or within the
+        materialization horizon; otherwise occurrences expand virtually.
+        Override columns null = inherit from series template. Mirrors the
+        `activity_occurrences` table.
+      required:
+        - id
+        - userId
+        - seriesId
+        - occurrenceKey
+        - status
+        - revision
+        - createdAt
+        - updatedAt
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        seriesId: { type: string, format: uuid }
+        occurrenceKey:
+          type: string
+          format: date-time
+          description: The original local start instant identifying this occurrence.
+        title: { type: [string, 'null'] }
+        startAt: { type: [string, 'null'], format: date-time }
+        durationMin: { type: [integer, 'null'], format: int32 }
+        status: { $ref: '#/components/schemas/OccurrenceStatus' }
+        checklistOverride:
+          type: [object, 'null']
+          additionalProperties: true
+        energy:
+          oneOf:
+            - $ref: '#/components/schemas/EnergyLevel'
+            - type: 'null'
+        completedAt: { type: [string, 'null'], format: date-time }
+        revision: { $ref: '#/components/schemas/Revision' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        deletedAt: { type: [string, 'null'], format: date-time }
+
+    # ---- Checklist ---------------------------------------------------------
+    ChecklistItem:
+      type: object
+      description: |
+        Shared across series/task/occurrence via
+        (`parentType`, `parentId`). Mirrors the `checklist_items` table.
+      required:
+        - id
+        - userId
+        - parentType
+        - parentId
+        - label
+        - sortOrder
+        - done
+        - revision
+        - createdAt
+        - updatedAt
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        parentType: { $ref: '#/components/schemas/ChecklistParent' }
+        parentId: { type: string, format: uuid }
+        label: { type: string }
+        sortOrder: { type: integer, format: int32 }
+        done: { type: boolean }
+        revision: { $ref: '#/components/schemas/Revision' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        deletedAt: { type: [string, 'null'], format: date-time }
+
+    # ---- Routines ----------------------------------------------------------
+    Routine:
+      type: object
+      description: Mirrors the `routines` table.
+      required: [id, userId, title, revision, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        title: { type: string }
+        emoji: { type: [string, 'null'] }
+        categoryId: { type: [string, 'null'], format: uuid }
+        notes: { type: [string, 'null'] }
+        revision: { $ref: '#/components/schemas/Revision' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        deletedAt: { type: [string, 'null'], format: date-time }
+
+    RoutineStep:
+      type: object
+      description: Mirrors the `routine_steps` table.
+      required: [id, userId, routineId, title, sortOrder, revision, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        routineId: { type: string, format: uuid }
+        title: { type: string }
+        durationMin: { type: [integer, 'null'], format: int32 }
+        sortOrder: { type: integer, format: int32 }
+        revision: { $ref: '#/components/schemas/Revision' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        deletedAt: { type: [string, 'null'], format: date-time }
+
+    RoutineSchedule:
+      type: object
+      description: |
+        Carries recurrence + `paused` + `nextRunAt`. A durable job
+        materializes occurrences 48h ahead, deduped on
+        `(routine_schedule_id, occurrence_key)` (ADR-004). Mirrors the
+        `routine_schedules` table.
+      required: [id, userId, routineId, tz, paused, revision, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        routineId: { type: string, format: uuid }
+        tz: { type: string }
+        rrule: { type: [string, 'null'] }
+        paused: { type: boolean }
+        nextRunAt: { type: [string, 'null'], format: date-time }
+        revision: { $ref: '#/components/schemas/Revision' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        deletedAt: { type: [string, 'null'], format: date-time }
+
+    # ---- Focus sessions (ADR-004) -----------------------------------------
+    FocusSession:
+      type: object
+      description: |
+        Server-authoritative focus session (ADR-004). At most one
+        `running`/`paused` session per user. Clients derive remaining
+        time from the row; they never persist countdowns.
+      required:
+        - id
+        - userId
+        - state
+        - startedAt
+        - targetDurationMin
+        - accumulatedPauseSec
+        - revision
+        - createdAt
+        - updatedAt
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        activityOccurrenceId:
+          type: [string, 'null']
+          format: uuid
+          description: Nullable for ad-hoc sessions.
+        state: { $ref: '#/components/schemas/FocusState' }
+        startedAt: { type: string, format: date-time }
+        targetDurationMin: { type: integer, format: int32 }
+        accumulatedPauseSec: { type: integer, format: int32, default: 0 }
+        currentIntervalStartedAt: { type: [string, 'null'], format: date-time }
+        revision: { $ref: '#/components/schemas/Revision' }
+        completionReason: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    # ---- History (ADR-001) -------------------------------------------------
+    PlannerEvent:
+      type: object
+      description: |
+        Append-only history row (ADR-001). Streaks and stats read ONLY
+        this table. Mirrors the `planner_events` table. (Exposed as a
+        named component for contract parity with the zod registry; not
+        surfaced as its own top-level route in Phase 1A.)
+      required:
+        - id
+        - userId
+        - entityType
+        - entityId
+        - eventType
+        - occurredAt
+        - tz
+        - createdAt
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        entityType:
+          type: string
+          description: Discriminator for `entityId` (e.g. `task`, `activity_occurrence`).
+        entityId: { type: string, format: uuid }
+        eventType: { $ref: '#/components/schemas/PlannerEventType' }
+        payload:
+          type: object
+          additionalProperties: true
+          description: Event-specific structured payload.
+        occurredAt: { type: string, format: date-time }
+        tz: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    # ---- Batch (ADR-002) ---------------------------------------------------
+    BatchOperation:
+      type: object
+      description: A single operation within a `BatchRequest`.
+      required: [requestMethod, requestPath]
+      properties:
+        idempotencyKey:
+          type: string
+          format: uuid
+          description: Per-operation idempotency key (recommended).
+        requestMethod:
+          type: string
+          enum: [POST, PATCH, DELETE, PUT]
+          description: HTTP verb of the inner operation.
+        requestPath:
+          type: string
+          description: Path relative to the server URL (no `/api/v1` prefix).
+          example: /tasks
+        body:
+          description: Optional JSON body for the inner operation.
+          type: object
+          additionalProperties: true
+        ifMatch:
+          type: [string, 'null']
+          description: Optional per-operation `If-Match` revision.
+
+    BatchRequest:
+      type: object
+      description: Ordered list of operations executed in order (ADR-002).
+      required: [operations]
+      properties:
+        operations:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items: { $ref: '#/components/schemas/BatchOperation' }
+
+    BatchResult:
+      type: object
+      description: The result of one batch operation, in request order.
+      required: [status]
+      properties:
+        status:
+          type: integer
+          description: HTTP status that the inner operation produced.
+        body:
+          description: The inner operation's response body, if any.
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: 'null'
+        error: { $ref: '#/components/schemas/Error' }
+
+    BatchResponse:
+      type: object
+      description: Ordered results, one per input operation (ADR-002).
+      required: [results]
+      properties:
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/BatchResult' }
+
+    # ---- Sync feed (ADR-002) ----------------------------------------------
+    ChangeLogEntry:
+      type: object
+      description: |
+        One row of the per-user change sequence. Tombstones carry
+        `op=delete`. Mirrors the `change_log` table.
+      required: [id, entityType, entityId, op, revision, occurredAt]
+      properties:
+        id:
+          type: string
+          description: |
+            Per-user change sequence id (stringified bigint). The opaque
+            cursor encodes the last id seen.
+        entityType:
+          type: string
+        entityId: { type: string, format: uuid }
+        op: { $ref: '#/components/schemas/ChangeOp' }
+        revision: { $ref: '#/components/schemas/Revision' }
+        occurredAt: { type: string, format: date-time }
+
+    ChangesResponse:
+      type: object
+      description: A page of the incremental sync feed (ADR-002).
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ChangeLogEntry' }
+        nextCursor:
+          type: [string, 'null']
+          description: Opaque cursor for the next page; `null` when exhausted.
+
+    # ---- Day read-model (ADR-001) -----------------------------------------
+    DayResponse:
+      type: object
+      description: |
+        Read model for `GET /day/{date}?tz=`. Echoes the resolved zone and
+        the half-open UTC bounds `[start, end)` for the requested local
+        day. Activities whose interval overlaps the window are returned;
+        anytime tasks attached to `date` are returned separately.
+        Overnight activities may appear split at midnight. Day snapshots
+        are for rendering, not sync. (ADR-001.)
+      required: [date, tz, startUtc, endUtc, activities, anytimeTasks]
+      properties:
+        date: { type: string, format: date }
+        tz:
+          type: string
+          description: The IANA zone used to resolve the day (echoed).
+        startUtc:
+          type: string
+          format: date-time
+          description: Inclusive lower UTC bound of the local day.
+        endUtc:
+          type: string
+          format: date-time
+          description: Exclusive upper UTC bound of the local day.
+        activities:
+          type: array
+          items: { $ref: '#/components/schemas/ActivityOccurrence' }
+        anytimeTasks:
+          type: array
+          items: { $ref: '#/components/schemas/Task' }

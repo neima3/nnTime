@@ -36,3 +36,41 @@ retrieve with `op item get 4apenih3hzviy2o2jjlonbdh54 --fields credential --reve
 Set in Coolify UI (app → Environment Variables) AND mirrored in `.env.local`.
 As of Phase 0 none are required at runtime. Phase 1+ adds `DATABASE_URL`,
 `BETTER_AUTH_SECRET`, etc.
+
+## Postgres provisioning (Phase 1A+)
+
+Kairo uses a Coolify-managed Postgres on the same VPS. One database per
+environment (staging gets its own app + DB; prod is the live planner).
+
+**Provisioning a managed Postgres in Coolify:**
+1. Coolify UI → project `Kairo` → Add Resource → **PostgreSQL**.
+2. Name it `kairo-pg` (prod) or `kairo-pg-staging`. Use the `localhost` server.
+3. After creation, Coolify exposes a `postgresql://...` connection string in
+   the resource's "Connection" tab. Copy it.
+4. In the **kairo** app (and staging app) → Environment Variables → add
+   `DATABASE_URL='postgresql://user:pass@host:port/dbname'` (quoted; the value
+   contains special chars). Mirror it in local `.env.local`.
+
+**Local dev (Phase 1A):** Homebrew `postgresql@17`, database `kairo_dev`:
+```bash
+psql -d postgres -c "CREATE DATABASE kairo_dev;"
+# .env.local:
+DATABASE_URL='postgresql://nn@localhost:5432/kairo_dev'
+```
+The Dockerfile does NOT run migrations (forward-only migrations run via
+`pnpm db:migrate` in the deploy step, see migrations runbook below).
+
+**Schema migrations runbook (Phase 1A establishes the pattern; 1B hardens):**
+- Migrations are forward-only, numbered (`drizzle/0000_initial.sql`, …).
+- Regenerate after schema changes: `pnpm db:generate`.
+- Apply to a DB: `pnpm db:migrate` (uses `DATABASE_URL`).
+- **Predeploy backup before every production migration** (SEC-07; full drill in
+  Phase 1B). Until 1B ships the backup automation, run a manual `pg_dump` of
+  the prod DB before applying any migration.
+- Breaking schema changes use expand/migrate/contract across two deploys with a
+  compatibility window for old clients (ADR-002).
+- Rollback = redeploy the previous image + restore the predeploy backup
+  (forward-only means no `db:rollback`).
+
+**Healthcheck endpoint** `/api/health` returns `{status:"ok"}` once 1B ships
+the route; for 1A it is not yet implemented (no route handlers this phase).
