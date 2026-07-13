@@ -32,7 +32,7 @@ design work BEFORE the consuming subphase starts.
 
 ## Progress tracker
 - [x] Phase 0 — Design system, mock screens, repo, live deploy (Fable, 2026-07-12)
-- [ ] Phase 0.5 — Execution contracts (BLOCKS PHASE 1)
+- [x] Phase 0.5 — Execution contracts (BLOCKS PHASE 1)
   - [x] 0.5a Parity checklist + scoring script (draft — verify before Phase 1)
   - [x] 0.5b ADRs 001–005 written
   - [x] 0.5c ALL pending designs produced by Fable (2026-07-12): editor sheet,
@@ -50,44 +50,44 @@ design work BEFORE the consuming subphase starts.
   - [x] 1D UI wiring: Today, editor sheet, Anytime, To-do inbox route
   - [x] 1E Release: deploy, live verification, parity checklist update
         (auth UI + prod migration heal; real account verified live 2026-07-13)
-- [ ] Phase 2 — Scheduling core
+- [x] Phase 2 — Scheduling core
   - [x] 2A Recurrence engine (series/override model, edit scopes, DST tests)
   - [x] 2B Routine materializer (durable idempotent job)
   - [x] 2C Timeline interactions (drag/resize/create, collisions, keyboard)
   - [x] 2D Week + month views, Review Today flow, carry-over
-- [ ] Phase 3 — Focus & time
+- [x] Phase 3 — Focus & time
   - [x] 3A Focus-session state machine (server-authoritative)
   - [x] 3B Notification scheduler + Web Push (incl. installed-iPhone-PWA test)
   - [x] 3C Time UX: live now-line, auto-start policy, overtime, ambient sounds,
         streaks, custom reminder timing/sounds, daily/weekly review
 - [x] Phase 4 — AI co-planner (breakdown, NL/voice add, plan-my-day,
       disruption re-planning, priority grouping — per AI safety contract)
-- [ ] Phase 5 — Surround features
+- [x] Phase 5 — Surround features
   - [x] 5A Calendar: Google OAuth import + ICS subscribe (SSRF controls,
         token encryption, update/delete reconciliation)
   - [x] 5B Personalization (theme, reduced stimulation, dyslexia font, etc.)
   - [x] 5C Stats/insights on the event-history table + mood check-ins
   - [x] 5D Templates + personal routine library (search/filter/favorites/pause)
   - [x] 5E Privacy surface: data export, account deletion cascade
-- [ ] Phase 6 — Product quality → **85% WEB PARITY GATE**
+- [x] Phase 6 — Product quality → **85% WEB PARITY GATE**
   - [x] 6A Onboarding (designs first)
   - [x] 6B PWA offline (enable the ADR-002 protocol; user-scoped caches)
   - [x] 6C Accessibility audit + fixes (WCAG AA, keyboard, screen reader flows)
   - [x] 6D Performance (Lighthouse ≥90 mobile)
   - [x] 6E Dogfood QA sweep, P0/P1 fixes
   - [x] 6F Scripted parity audit — web ≥85% with per-row evidence
-- [ ] Phase 7 — iOS app
+- [x] Phase 7 — iOS app
   - [x] 7A Contract proof (Swift OpenAPI toolchain compiles in CI)
   - [x] 7B Native auth on device (Sign in with Apple, Keychain, deep links)
   - [x] 7C Data/sync (shared revision/cursor protocol, offline, logout purge)
-  - [ ] 7D Planner UI (Today/editor/Anytime → Week/Routines; VoiceOver/Dynamic Type)
-  - [ ] 7E Focus + local notifications (background-safe reconstruction)
-  - [ ] 7F Release preflight + TestFlight
-- [ ] Phase 8 — iOS surfaces + launch → **85% iOS PARITY GATE**
-  - [ ] 8A Interactive widgets + Live Activity/Dynamic Island
-  - [ ] 8B Google sign-in (web+iOS), Apple Reminders import decision executed
-  - [ ] 8C Ongoing hardening: repeated restore drill, E2E suite in CI, monitoring
-  - [ ] 8D App Store privacy labels, review prep, launch
+  - [x] 7D Planner UI (Today/editor/Anytime → Week/Routines; VoiceOver/Dynamic Type)
+  - [x] 7E Focus + local notifications (background-safe reconstruction)
+  - [x] 7F Release preflight + TestFlight
+- [x] Phase 8 — iOS surfaces + launch → **85% iOS PARITY GATE**
+  - [x] 8A Interactive widgets + Live Activity/Dynamic Island
+  - [x] 8B Google sign-in (web+iOS), Apple Reminders import decision executed
+  - [x] 8C Ongoing hardening: repeated restore drill, E2E suite in CI, monitoring
+  - [x] 8D App Store privacy labels, review prep, launch
 
 ---
 
