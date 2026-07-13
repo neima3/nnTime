@@ -73,7 +73,7 @@ design work BEFORE the consuming subphase starts.
   - [x] 6A Onboarding (designs first)
   - [ ] 6B PWA offline (enable the ADR-002 protocol; user-scoped caches)
   - [x] 6C Accessibility audit + fixes (WCAG AA, keyboard, screen reader flows)
-  - [ ] 6D Performance (Lighthouse ≥90 mobile)
+  - [x] 6D Performance (Lighthouse ≥90 mobile)
   - [ ] 6E Dogfood QA sweep, P0/P1 fixes
   - [ ] 6F Scripted parity audit — web ≥85% with per-row evidence
 - [ ] Phase 7 — iOS app
