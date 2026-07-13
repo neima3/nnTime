@@ -108,16 +108,34 @@ doubt, copy patterns from them, don't improvise.
   mini day-card mock (real category blocks), feature grid of 6 bordered cards.
 
 ## Screens still to be designed (Fable/Opus ONLY — never cheap models)
-1. Activity editor sheet (create/edit: title, emoji picker, category, time, duration,
-   repeat, checklist, energy, notes) — bottom sheet mobile / centered modal desktop.
-2. AI co-planner conversation/result UI (task breakdown review + accept steps).
-3. Onboarding flow (3–4 gentle screens + personalization quiz).
-4. Stats/insights screen. 5. Template gallery. 6. Empty states & illustrations.
-7. iOS-native adaptations (SwiftUI), widgets, Live Activity layouts.
+Each must exist in `docs/design/` BEFORE its consuming subphase starts (roadmap
+Phase 0.5c):
+1. Activity editor sheet (title, emoji picker, category, time, duration, repeat
+   with ADR-001 edit scopes, checklist, energy, tags, priority, notes) — bottom
+   sheet mobile / centered modal desktop. (Consumer: 1D)
+2. **To-do inbox screen** — brain-dump list, tags/priority, promote-to-day.
+   Becomes a 6th nav destination; AppShell nav update included. (Consumer: 1D)
+3. AI co-planner UI: breakdown review, plan-my-day proposal, disruption
+   re-plan — all per-item confirm affordances. (Consumer: 4)
+4. Month view + Review Today flow. (Consumer: 2D)
+5. Stats/insights + mood check-in. (Consumer: 5C)
+6. Onboarding flow. (Consumer: 6A) 7. Template gallery. (Consumer: 5D)
+8. Overlap/collision timeline layout + overnight split + imported locked-block
+   style addendum. (Consumer: 2C/5A)
+9. iOS-native adaptations (SwiftUI tokens), widgets, Live Activity. (Consumer: 7/8)
+
+## Token canonicality (resolves the review contradiction)
+Named design tokens in `globals.css` are **canonical**. Raw hex values are
+allowed ONLY inside token definitions in that file — `--surface-raised` and
+`--now-ink` legitimately resolve to `#ffffff` there. The "no pure white/black"
+rule governs *surfaces and text at the component level*: components reference
+tokens (`text-now-ink`, `bg-surface-raised`), never Tailwind literals
+(`text-white`, `bg-black`) or inline hex. If a needed color has no token,
+request a design addendum — do not invent one.
 
 ## Hard rules for implementing agents
 - Never introduce hex values in components — tokens only.
-- Never use pure `#fff`/`#000`, default Tailwind palette colors, or Inter.
+- Never use Tailwind literal colors (`text-white`, default palette) or Inter.
 - Interactive elements: visible focus ring (`focus-visible:ring-2 ring-iris`),
   hover + active states, ≥44px touch targets on mobile.
 - All time strings `.tnum`. All icon-only buttons get `aria-label`.

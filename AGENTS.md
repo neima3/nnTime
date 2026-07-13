@@ -10,18 +10,21 @@ Visual daily planner (Tiimo category, ADHD/neurodivergent-first). Web app
 (Next.js 16) + future native SwiftUI iOS app. Target: ≥85% Tiimo feature parity.
 
 ## Start here (reading order)
-1. `docs/plans/2026-07-12-kairo-roadmap.md` — phased plan + progress tracker
-2. `docs/design/design-spec.md` — BINDING design contract (tokens only, no improvising)
-3. `docs/research/tiimo-features.md` — feature parity source of truth
-4. `docs/plans/progress.md` — session-by-session handoff notes
-5. `docs/DEPLOYMENT.md` — how time.neima.me deploys (Coolify)
+1. `docs/plans/2026-07-12-kairo-roadmap.md` — subphased plan + progress tracker
+2. `docs/adr/ADR-001…005` — BINDING contracts (temporal/recurrence, API+sync,
+   auth, jobs/notifications, security). Deviating = stop and hand off.
+3. `docs/design/design-spec.md` — BINDING design contract (tokens only)
+4. `docs/plans/parity-checklist.md` — scored feature matrix (+ `scripts/parity.mjs`)
+5. `docs/plans/progress.md` — session-by-session handoff notes
+6. `docs/DEPLOYMENT.md` — how time.neima.me deploys (Coolify)
 
 If you were given no other instructions: execute `docs/plans/kairo-agent-prompt.md`.
 
 ## Commands / gates
 - `pnpm dev` — dev server (port 3000; `.claude/launch.json` has a `nntime-dev` config)
 - `pnpm lint && pnpm build` — REQUIRED green before every commit
-- `pnpm test` — once vitest lands (Phase 1+)
+  (becomes `lint && typecheck && test && build` once Phase 1B adds them)
+- `node scripts/parity.mjs` — recompute parity percentages after feature work
 
 ## Structure
 - `src/app/` — App Router. `/` landing; `/app/*` = product (today, week, focus,

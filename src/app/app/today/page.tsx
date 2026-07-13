@@ -124,7 +124,7 @@ function Timeline() {
         className="absolute inset-x-0 z-20 flex items-center gap-2"
         style={{ top: top(NOW_MIN) }}
       >
-        <span className="tnum w-10 -translate-y-1/2 rounded-md bg-now text-center text-[11px] font-bold text-white">
+        <span className="tnum w-10 -translate-y-1/2 rounded-md bg-now text-center text-[11px] font-bold text-now-ink">
           {fmt(NOW_MIN)}
         </span>
         <div className="relative h-0.5 flex-1 rounded bg-now">

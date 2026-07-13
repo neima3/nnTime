@@ -29,6 +29,7 @@
 
   /* now-line + semantic */
   --now: #ff5c4d;
+  --now-ink: #ffffff; /* text on --now; white in both themes by design */
   --success: #23805c;
   --success-soft: #d9f0e4;
   --danger: #c93a3a;
@@ -66,6 +67,7 @@
   --iris-ghost: #262242;
 
   --now: #ff6f61;
+  --now-ink: #ffffff;
   --success: #4cc593;
   --success-soft: #1d3a2e;
   --danger: #f07d7d;
@@ -98,6 +100,7 @@
   --color-iris-soft: var(--iris-soft);
   --color-iris-ghost: var(--iris-ghost);
   --color-now: var(--now);
+  --color-now-ink: var(--now-ink);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-danger: var(--danger);

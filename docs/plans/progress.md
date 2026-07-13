@@ -1,5 +1,28 @@
 # Progress log
 
+## 2026-07-12 — Codex review applied (Fable, session 1 cont.)
+**Shipped:**
+- Roadmap rewritten to v2: subphase execution model, Phase 0.5 contracts gate,
+  Phase 1 split 1A–1E (contract → infra safety → auth/CRUD → UI → release),
+  Phase 7 split 7A–7F, missing parity features mapped to phases, security
+  contract section, scripted parity scoring (equal per-row weights, per-platform
+  85% targets).
+- Binding ADRs 001–005 written (`docs/adr/`): temporal/recurrence, API+offline
+  sync, auth (web+native), jobs/timer/notifications, security/privacy.
+- Parity checklist (98 rows) + `scripts/parity.mjs` (subagent-built; verified
+  by running the script myself). First run: web 85.90% PASS, iOS 83.15% FAIL —
+  fixed by strengthening the roadmap (not the credits): month view/extend/
+  checklist-in-focus itemized for iOS, high-contrast added to 5B, Apple Health
+  to 8B. Final: **web 88.46%, iOS 86.52% — gate 0.5d PASSED and ticked.**
+- Executor prompt updated to subphase model; AGENTS.md reading order + gates.
+- Design-token contradiction fixed: `--now-ink` token added, `text-white`
+  removed from Today screen (verified in browser); design-spec token-
+  canonicality section + pending-designs list with consuming subphases.
+- Disposition record: `docs/plans/codex-review-response.md`.
+
+**Next step:** Phase 0.5c — Fable/Opus designs for editor sheet, To-do inbox,
+AI UI; then verify gate 0.5d (script ≥85% planned for web AND iOS); then 1A.
+
 ## 2026-07-12 — Phase 0 (Fable, session 1)
 **Shipped:**
 - Next.js 16 + Tailwind v4 scaffold (pnpm), package `nntime`, product name **Kairo**.
