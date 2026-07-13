@@ -502,17 +502,23 @@ export async function getChanges(
   opts: { db?: Db } = {},
 ) {
   const db = opts.db ?? dbDefault;
-  const rows = await db
-    .select()
-    .from(schema.changeLog)
-    .where(
-      and(eq(schema.changeLog.userId, userId), gt(schema.changeLog.id, BigInt(cursor))),
-    )
-    .orderBy(asc(schema.changeLog.id))
-    .limit(limit + 1);
-  const hasMore = rows.length > limit;
-  const items = hasMore ? rows.slice(0, limit) : rows;
-  const nextCursor = hasMore ? items[items.length - 1].id.toString() : null;
+  // Use raw SQL for the bigint comparison to avoid drizzle type issues.
+  const rows = await db.execute(
+    sql`SELECT * FROM change_log WHERE user_id = ${userId} AND id > ${cursor} ORDER BY id ASC LIMIT ${limit + 1}`,
+  );
+  const result = ((rows as unknown as Record<string, unknown>[]) ?? []).map((r) => ({
+    id: r.id,
+    userId: r.user_id,
+    entityType: r.entity_type,
+    entityId: r.entity_id,
+    op: r.op,
+    revision: r.revision,
+    occurredAt: r.occurred_at,
+  }));
+  const hasMore = result.length > limit;
+  const items = hasMore ? result.slice(0, limit) : result;
+  const lastItem = items[items.length - 1];
+  const nextCursor = hasMore && lastItem ? String(lastItem.id) : null;
   return { items, nextCursor };
 }
 
@@ -528,11 +534,18 @@ export async function appendChangeLog(
   op: "upsert" | "delete",
   revision: number,
 ) {
-  await db.insert(schema.changeLog).values({
-    userId,
-    entityType,
-    entityId,
-    op,
-    revision,
-  });
+  try {
+    await db.insert(schema.changeLog).values({
+      userId,
+      entityType,
+      entityId,
+      op,
+      revision,
+    });
+  } catch (e) {
+    // Log but don't crash the mutation — the change_log is for sync, not
+    // transactional integrity. A missing change_log row means the client
+    // won't see the change via incremental sync, but the data itself is saved.
+    console.error("[dal] appendChangeLog failed:", e instanceof Error ? e.message : e);
+  }
 }
