@@ -8,15 +8,51 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import {
-  activities,
+  activities as mockActivities,
   catClasses,
   DAY,
   fmt,
   fmtDuration,
-  inbox,
+  inbox as mockInbox,
   NOW_MIN,
   type Activity,
 } from "@/lib/mock";
+import { getResolvedDay } from "@/server/services/day";
+import { listCategories } from "@/server/dal";
+import { buildCategoryMap, seriesToActivity, taskToInboxItem } from "@/lib/adapters";
+
+/**
+ * Load real data for the Today screen. Falls back to mock data when the user is
+ * not logged in (preserves the design reference and lets the page render for
+ * visitors). ADR-002: Server Component calls the same DAL as route handlers.
+ */
+async function loadTodayData() {
+  const resolved = await getResolvedDay();
+  if (!resolved) return { activities: mockActivities, inbox: mockInbox, dayLabel: DAY.label, dayDate: DAY.date };
+
+  // Load categories for the color mapping.
+  const categories = await listCategories(resolved.zone ?? "UTC").catch(() => []);
+  const categoryMap = buildCategoryMap(
+    categories as unknown as Parameters<typeof buildCategoryMap>[0],
+  );
+
+  // Convert series + anytime tasks to render shapes.
+  const activities = (resolved.activities as Parameters<typeof seriesToActivity>[0][])
+    .map((s) => seriesToActivity(s, categoryMap, resolved.zone));
+  const inbox = (resolved.anytimeTasks as Parameters<typeof taskToInboxItem>[0][])
+    .map((t) => taskToInboxItem(t, categoryMap));
+
+  // Compute day label/date from the resolved date.
+  const dayDate = new Date(resolved.date + "T00:00:00").toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+  });
+  const dayLabel = new Date(resolved.date + "T00:00:00").toLocaleDateString("en-US", {
+    weekday: "long",
+  });
+
+  return { activities, inbox, dayLabel, dayDate };
+}
 
 const DAY_START = 7 * 60;
 const DAY_END = 23 * 60;
@@ -99,7 +135,7 @@ function ActivityCard({ a }: { a: Activity }) {
   );
 }
 
-function Timeline() {
+function Timeline({ activities }: { activities: Activity[] }) {
   const hours = [];
   for (let h = DAY_START / 60; h <= DAY_END / 60; h++) hours.push(h);
 
@@ -142,7 +178,7 @@ function Timeline() {
   );
 }
 
-function DayProgress() {
+function DayProgress({ activities }: { activities: Activity[] }) {
   const done = activities.filter((a) => a.done).length;
   const pct = Math.round((done / activities.length) * 100);
   const r = 15;
@@ -173,7 +209,9 @@ function DayProgress() {
   );
 }
 
-export default function TodayPage() {
+export default async function TodayPage() {
+  const { activities, inbox, dayLabel, dayDate } = await loadTodayData();
+
   return (
     <AppShell active="today">
       <div className="mx-auto flex max-w-5xl gap-8 px-4 py-6 md:px-8">
@@ -181,13 +219,13 @@ export default function TodayPage() {
           <header className="mb-6 flex flex-wrap items-center gap-3">
             <div className="mr-auto">
               <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-iris">
-                {DAY.label}
+                {dayLabel}
               </p>
               <h1 className="font-display text-3xl font-bold tracking-tight">
-                {DAY.date}
+                {dayDate}
               </h1>
             </div>
-            <DayProgress />
+            <DayProgress activities={activities} />
             <div className="flex items-center gap-1 rounded-2xl border border-border bg-surface p-1 shadow-card">
               <button aria-label="Previous day" className="grid size-9 place-items-center rounded-xl text-ink-soft hover:bg-surface-sunken">
                 <ChevronLeft size={18} />
@@ -201,7 +239,7 @@ export default function TodayPage() {
             </div>
           </header>
 
-          <Timeline />
+          <Timeline activities={activities} />
         </section>
 
         {/* right rail — desktop only */}

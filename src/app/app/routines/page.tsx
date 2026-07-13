@@ -1,8 +1,33 @@
 import { Play, Plus, Sparkles } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { catClasses, fmtDuration, routines } from "@/lib/mock";
+import { catClasses, fmtDuration, routines as mockRoutines } from "@/lib/mock";
+import { getSession } from "@/server/auth-session";
+import { eq } from "drizzle-orm";
+import db from "@/server/db";
+import { routines as routineTable, routineSteps } from "@/server/db/schema";
 
-export default function RoutinesPage() {
+/** Load real routines or fall back to mock when logged out. */
+async function loadRoutines() {
+  const session = await getSession();
+  if (!session) return mockRoutines;
+  const userRoutines = await db
+    .select()
+    .from(routineTable)
+    .where(eq(routineTable.userId, session.userId));
+  if (userRoutines.length === 0) return mockRoutines; // empty state → show reference
+  return userRoutines.map((r) => ({
+    id: r.id,
+    title: r.title,
+    emoji: r.emoji ?? "📋",
+    steps: 0,
+    minutes: 30,
+    category: "butter" as const,
+    days: "—",
+  }));
+}
+
+export default async function RoutinesPage() {
+  const routines = await loadRoutines();
   return (
     <AppShell active="routines">
       <div className="mx-auto max-w-5xl px-4 py-6 md:px-8">

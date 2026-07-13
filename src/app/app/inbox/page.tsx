@@ -7,9 +7,33 @@ import {
   Sun,
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { catClasses, inboxItems } from "@/lib/mock";
+import { catClasses, inboxItems as mockInboxItems } from "@/lib/mock";
+import { getSession } from "@/server/auth-session";
+import { listTasks, listCategories } from "@/server/dal";
+import { buildCategoryMap } from "@/lib/adapters";
 
 const filters = ["All", "#errands", "#work", "#home", "#health", "#family"];
+
+/** Load real inbox tasks or fall back to mock data when logged out. */
+async function loadInbox() {
+  const session = await getSession();
+  if (!session) return mockInboxItems;
+  const tasks = await listTasks(session.userId, { bucket: "inbox" });
+  const categories = await listCategories(session.userId).catch(() => []);
+  const categoryMap = buildCategoryMap(
+    categories as unknown as Parameters<typeof buildCategoryMap>[0],
+  );
+  return tasks.map((t) => ({
+    id: t.id,
+    title: t.title,
+    emoji: t.emoji ?? "📋",
+    category: t.categoryId
+      ? categoryMap.get(t.categoryId) ?? "sky"
+      : "sky",
+    tags: [] as string[],
+    priority: (t.priority ?? "none") as "none" | "low" | "high",
+  }));
+}
 
 function PriorityFlag({ level }: { level: "none" | "low" | "high" }) {
   if (level === "none") return null;
@@ -27,7 +51,8 @@ function PriorityFlag({ level }: { level: "none" | "low" | "high" }) {
   );
 }
 
-export default function InboxPage() {
+export default async function InboxPage() {
+  const inboxItems = await loadInbox();
   return (
     <AppShell active="inbox">
       <div className="mx-auto max-w-2xl px-4 py-6 md:px-8">
