@@ -50,3 +50,8 @@ drizzle/*.log
 # Agent session/workspace artifacts (never commit)
 .zcode/
 
+
+# iOS build artifacts
+ios/Kairo/.build/
+ios/Kairo/.swiftpm/
+ios/Kairo/Package.resolved
