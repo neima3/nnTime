@@ -11,7 +11,7 @@ CREATE TYPE "public"."task_bucket" AS ENUM('inbox', 'anytime');--> statement-bre
 CREATE TYPE "public"."theme_mode" AS ENUM('system', 'light', 'dark');--> statement-breakpoint
 CREATE TABLE "activity_occurrences" (
 	"id" uuid PRIMARY KEY NOT NULL,
-	"user_id" uuid NOT NULL,
+	"user_id" text NOT NULL,
 	"series_id" uuid NOT NULL,
 	"occurrence_key" timestamp with time zone NOT NULL,
 	"title" text,
@@ -29,7 +29,7 @@ CREATE TABLE "activity_occurrences" (
 --> statement-breakpoint
 CREATE TABLE "activity_series" (
 	"id" uuid PRIMARY KEY NOT NULL,
-	"user_id" uuid NOT NULL,
+	"user_id" text NOT NULL,
 	"tz" text NOT NULL,
 	"dtstart_local" timestamp with time zone NOT NULL,
 	"rrule" text,
@@ -54,7 +54,7 @@ CREATE TABLE "activity_series" (
 --> statement-breakpoint
 CREATE TABLE "categories" (
 	"id" uuid PRIMARY KEY NOT NULL,
-	"user_id" uuid NOT NULL,
+	"user_id" text NOT NULL,
 	"key" text NOT NULL,
 	"label" text NOT NULL,
 	"sort_order" smallint DEFAULT 0 NOT NULL,
@@ -66,7 +66,7 @@ CREATE TABLE "categories" (
 --> statement-breakpoint
 CREATE TABLE "change_log" (
 	"id" bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "change_log_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1),
-	"user_id" uuid NOT NULL,
+	"user_id" text NOT NULL,
 	"entity_type" text NOT NULL,
 	"entity_id" uuid NOT NULL,
 	"op" "change_op" NOT NULL,
@@ -76,7 +76,7 @@ CREATE TABLE "change_log" (
 --> statement-breakpoint
 CREATE TABLE "checklist_items" (
 	"id" uuid PRIMARY KEY NOT NULL,
-	"user_id" uuid NOT NULL,
+	"user_id" text NOT NULL,
 	"parent_type" "checklist_parent" NOT NULL,
 	"parent_id" uuid NOT NULL,
 	"label" text NOT NULL,
@@ -90,7 +90,7 @@ CREATE TABLE "checklist_items" (
 --> statement-breakpoint
 CREATE TABLE "focus_sessions" (
 	"id" uuid PRIMARY KEY NOT NULL,
-	"user_id" uuid NOT NULL,
+	"user_id" text NOT NULL,
 	"activity_occurrence_id" uuid,
 	"state" "focus_state" DEFAULT 'running' NOT NULL,
 	"started_at" timestamp with time zone NOT NULL,
@@ -104,7 +104,7 @@ CREATE TABLE "focus_sessions" (
 );
 --> statement-breakpoint
 CREATE TABLE "idempotency_keys" (
-	"user_id" uuid NOT NULL,
+	"user_id" text NOT NULL,
 	"key" text NOT NULL,
 	"request_method" text NOT NULL,
 	"request_path" text NOT NULL,
@@ -117,7 +117,7 @@ CREATE TABLE "idempotency_keys" (
 --> statement-breakpoint
 CREATE TABLE "planner_events" (
 	"id" uuid PRIMARY KEY NOT NULL,
-	"user_id" uuid NOT NULL,
+	"user_id" text NOT NULL,
 	"entity_type" text NOT NULL,
 	"entity_id" uuid NOT NULL,
 	"event_type" "planner_event_type" NOT NULL,
@@ -129,7 +129,7 @@ CREATE TABLE "planner_events" (
 --> statement-breakpoint
 CREATE TABLE "push_subscriptions" (
 	"id" uuid PRIMARY KEY NOT NULL,
-	"user_id" uuid NOT NULL,
+	"user_id" text NOT NULL,
 	"endpoint" text NOT NULL,
 	"keys" jsonb NOT NULL,
 	"revision" integer DEFAULT 1 NOT NULL,
@@ -138,9 +138,16 @@ CREATE TABLE "push_subscriptions" (
 	"deleted_at" timestamp with time zone
 );
 --> statement-breakpoint
+CREATE TABLE "rate_limit_buckets" (
+	"bucket" text PRIMARY KEY NOT NULL,
+	"count" integer DEFAULT 0 NOT NULL,
+	"window_start" timestamp with time zone NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "routine_schedules" (
 	"id" uuid PRIMARY KEY NOT NULL,
-	"user_id" uuid NOT NULL,
+	"user_id" text NOT NULL,
 	"routine_id" uuid NOT NULL,
 	"tz" text NOT NULL,
 	"rrule" text,
@@ -154,7 +161,7 @@ CREATE TABLE "routine_schedules" (
 --> statement-breakpoint
 CREATE TABLE "routine_steps" (
 	"id" uuid PRIMARY KEY NOT NULL,
-	"user_id" uuid NOT NULL,
+	"user_id" text NOT NULL,
 	"routine_id" uuid NOT NULL,
 	"title" text NOT NULL,
 	"duration_min" integer,
@@ -167,7 +174,7 @@ CREATE TABLE "routine_steps" (
 --> statement-breakpoint
 CREATE TABLE "routines" (
 	"id" uuid PRIMARY KEY NOT NULL,
-	"user_id" uuid NOT NULL,
+	"user_id" text NOT NULL,
 	"title" text NOT NULL,
 	"emoji" text,
 	"category_id" uuid,
@@ -180,7 +187,7 @@ CREATE TABLE "routines" (
 --> statement-breakpoint
 CREATE TABLE "tags" (
 	"id" uuid PRIMARY KEY NOT NULL,
-	"user_id" uuid NOT NULL,
+	"user_id" text NOT NULL,
 	"name" text NOT NULL,
 	"color" text,
 	"revision" integer DEFAULT 1 NOT NULL,
@@ -191,7 +198,7 @@ CREATE TABLE "tags" (
 --> statement-breakpoint
 CREATE TABLE "tasks" (
 	"id" uuid PRIMARY KEY NOT NULL,
-	"user_id" uuid NOT NULL,
+	"user_id" text NOT NULL,
 	"bucket" "task_bucket" NOT NULL,
 	"title" text NOT NULL,
 	"emoji" text,
@@ -208,7 +215,7 @@ CREATE TABLE "tasks" (
 );
 --> statement-breakpoint
 CREATE TABLE "user_settings" (
-	"user_id" uuid PRIMARY KEY NOT NULL,
+	"user_id" text PRIMARY KEY NOT NULL,
 	"timezone" text NOT NULL,
 	"locale" text DEFAULT 'en' NOT NULL,
 	"week_start" smallint DEFAULT 0 NOT NULL,
@@ -222,32 +229,74 @@ CREATE TABLE "user_settings" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "users" (
-	"id" uuid PRIMARY KEY NOT NULL,
+CREATE TABLE "user" (
+	"id" text PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
 	"email" text NOT NULL,
-	"email_verified_at" timestamp with time zone,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+	"email_verified" boolean DEFAULT false NOT NULL,
+	"image" text,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "user_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
-ALTER TABLE "activity_occurrences" ADD CONSTRAINT "activity_occurrences_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE TABLE "account" (
+	"id" text PRIMARY KEY NOT NULL,
+	"account_id" text NOT NULL,
+	"provider_id" text NOT NULL,
+	"user_id" text NOT NULL,
+	"access_token" text,
+	"refresh_token" text,
+	"id_token" text,
+	"access_token_expires_at" timestamp,
+	"refresh_token_expires_at" timestamp,
+	"scope" text,
+	"password" text,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "session" (
+	"id" text PRIMARY KEY NOT NULL,
+	"expires_at" timestamp NOT NULL,
+	"token" text NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	"ip_address" text,
+	"user_agent" text,
+	"user_id" text NOT NULL,
+	CONSTRAINT "session_token_unique" UNIQUE("token")
+);
+--> statement-breakpoint
+CREATE TABLE "verification" (
+	"id" text PRIMARY KEY NOT NULL,
+	"identifier" text NOT NULL,
+	"value" text NOT NULL,
+	"expires_at" timestamp NOT NULL,
+	"created_at" timestamp,
+	"updated_at" timestamp
+);
+--> statement-breakpoint
+ALTER TABLE "activity_occurrences" ADD CONSTRAINT "activity_occurrences_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "activity_occurrences" ADD CONSTRAINT "activity_occurrences_series_id_activity_series_id_fk" FOREIGN KEY ("series_id") REFERENCES "public"."activity_series"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "activity_series" ADD CONSTRAINT "activity_series_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "categories" ADD CONSTRAINT "categories_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "change_log" ADD CONSTRAINT "change_log_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "checklist_items" ADD CONSTRAINT "checklist_items_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "focus_sessions" ADD CONSTRAINT "focus_sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "idempotency_keys" ADD CONSTRAINT "idempotency_keys_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "planner_events" ADD CONSTRAINT "planner_events_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "push_subscriptions" ADD CONSTRAINT "push_subscriptions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "routine_schedules" ADD CONSTRAINT "routine_schedules_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "activity_series" ADD CONSTRAINT "activity_series_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "categories" ADD CONSTRAINT "categories_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "change_log" ADD CONSTRAINT "change_log_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "checklist_items" ADD CONSTRAINT "checklist_items_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "focus_sessions" ADD CONSTRAINT "focus_sessions_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "idempotency_keys" ADD CONSTRAINT "idempotency_keys_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "planner_events" ADD CONSTRAINT "planner_events_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "push_subscriptions" ADD CONSTRAINT "push_subscriptions_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "routine_schedules" ADD CONSTRAINT "routine_schedules_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "routine_schedules" ADD CONSTRAINT "routine_schedules_routine_id_routines_id_fk" FOREIGN KEY ("routine_id") REFERENCES "public"."routines"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "routine_steps" ADD CONSTRAINT "routine_steps_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "routine_steps" ADD CONSTRAINT "routine_steps_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "routine_steps" ADD CONSTRAINT "routine_steps_routine_id_routines_id_fk" FOREIGN KEY ("routine_id") REFERENCES "public"."routines"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "routines" ADD CONSTRAINT "routines_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "tags" ADD CONSTRAINT "tags_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "tasks" ADD CONSTRAINT "tasks_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "user_settings" ADD CONSTRAINT "user_settings_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "routines" ADD CONSTRAINT "routines_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tags" ADD CONSTRAINT "tags_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "tasks" ADD CONSTRAINT "tasks_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "user_settings" ADD CONSTRAINT "user_settings_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "occurrences_series_key_idx" ON "activity_occurrences" USING btree ("series_id","occurrence_key");--> statement-breakpoint
 CREATE INDEX "occurrences_user_start_idx" ON "activity_occurrences" USING btree ("user_id","start_at");--> statement-breakpoint
 CREATE INDEX "activity_series_user_idx" ON "activity_series" USING btree ("user_id");--> statement-breakpoint

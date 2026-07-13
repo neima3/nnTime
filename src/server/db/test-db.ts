@@ -104,5 +104,5 @@ export async function insertUser(
   id: string,
   email = `${id}@test.com`,
 ): Promise<void> {
-  await db.insert(schema.users).values({ id, email });
+  await db.insert(schema.users).values({ id, email, name: "Test User", emailVerified: true });
 }

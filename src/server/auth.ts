@@ -1,0 +1,93 @@
+/**
+ * Better Auth configuration — ADR-003 (web).
+ *
+ * Binding contract:
+ *  - Methods at launch: email+password (verification email required before
+ *    first planner write) AND magic link (single-use, 15-min expiry, no account
+ *    enumeration via generic "check your email" response).
+ *  - Sessions: HttpOnly, Secure, SameSite=Lax; 30-day absolute; rotation on
+ *    privilege-sensitive events; logout + revoke-all-devices.
+ *  - Canonical origin https://time.neima.me; trustedOrigins limited to it.
+ *  - CSRF: cookie-authenticated mutations require Origin check; no state on GET.
+ *  - Rate limits on signup/login/reset/magic-link (1C wires via SEC-06).
+ *
+ * Google sign-in added in Phase 8B (web + iOS together). Sign in with Apple
+ * is Phase 7B (iOS). Magic-link email transport = Resend (key via op).
+ */
+import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import db from "./db";
+import * as authSchema from "./auth-schema";
+
+export const auth = betterAuth({
+  database: drizzleAdapter(db, {
+    provider: "pg",
+    schema: authSchema,
+  }),
+  appName: "Kairo",
+  baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
+  trustedOrigins: [
+    process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
+    "https://time.neima.me",
+    "https://time-staging.neima.me",
+  ].filter(Boolean),
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: true, // ADR-003: verification before first write
+    sendVerificationEmail: async ({ user, url }: { user: { email: string }; url: string }) => {
+      // Phase 1C: log in dev; Resend wired when the API key is provisioned.
+      if (process.env.NODE_ENV !== "production") {
+         
+        console.log(`[auth] verification email for ${user.email}: ${url}`);
+      }
+      // TODO(1C): Resend transport once RESEND_API_KEY is provisioned via op.
+    },
+    sendResetPassword: async ({ user, url }: { user: { email: string }; url: string }) => {
+      if (process.env.NODE_ENV !== "production") {
+         
+        console.log(`[auth] reset email for ${user.email}: ${url}`);
+      }
+    },
+  },
+  emailVerification: {
+    sendOnSignUp: true,
+    autoSignInAfterVerification: true,
+  },
+  magicLink: {
+    enabled: true,
+    sendMagicLink: async ({ email, url }: { email: string; url: string }) => {
+      // ADR-003: no account enumeration — always "check your email".
+      if (process.env.NODE_ENV !== "production") {
+         
+        console.log(`[auth] magic link for ${email}: ${url}`);
+      }
+    },
+    expiresInSeconds: 60 * 15, // 15-min single-use
+  },
+  session: {
+    expiresIn: 60 * 60 * 24 * 30, // 30-day absolute
+    updateAge: 60 * 60 * 24, // refresh the cookie daily
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60,
+    },
+  },
+  advanced: {
+    crossSubDomainCookies: { enabled: false },
+    defaultCookieAttributes: {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    },
+  },
+  rateLimit: {
+    enabled: true,
+    // Better Auth's built-in limiter handles auth-endpoint floods; the
+    // /api/v1 data endpoints use the Postgres-backed SEC-06 framework in
+    // src/server/ratelimit for finer-grained per-account + per-IP limits.
+    window: 10,
+    max: 10,
+  },
+});
+
+export type Auth = typeof auth;

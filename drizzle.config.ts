@@ -6,7 +6,7 @@ import { defineConfig } from "drizzle-kit";
  * DATABASE_URL is set in .env.local locally and in Coolify env for staging/prod.
  */
 export default defineConfig({
-  schema: "./src/server/db/schema.ts",
+  schema: ["./src/server/db/schema.ts", "./src/server/auth-schema.ts"],
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {

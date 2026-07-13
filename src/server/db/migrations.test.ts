@@ -56,7 +56,12 @@ describe("migrations apply and schema is complete", () => {
     
     const tableNames = (result as { tablename: string }[]).map((r) => r.tablename);
     const expected = [
-      "users",
+      // Better Auth tables
+      "user",
+      "session",
+      "account",
+      "verification",
+      // Kairo app tables
       "user_settings",
       "categories",
       "category_seed",
@@ -73,6 +78,7 @@ describe("migrations apply and schema is complete", () => {
       "planner_events",
       "idempotency_keys",
       "change_log",
+      "rate_limit_buckets",
     ];
     for (const t of expected) {
       expect(tableNames).toContain(t);

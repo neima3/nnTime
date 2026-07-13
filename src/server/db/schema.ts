@@ -91,31 +91,23 @@ export const changeOp = pgEnum("change_op", ["upsert", "delete"]);
 /* -------------------------------------------------------------------------- */
 
 /**
- * Minimal identity row for 1A. Better Auth extends this table in 1C
- * (its own columns — password hashes, sessions, verification tokens — land in
- * separate Better Auth tables, not by mutating this shape).
+ * Identity is owned by Better Auth (src/server/auth-schema.ts → the `user`
+ * table). All Kairo tables reference `user.id` (a text PK) via a text `user_id`
+ * FK. This keeps auth lifecycle (password, verification, session) in Better
+ * Auth's schema and Kairo data in this schema. See ADR-003.
  */
-export const users = pgTable("users", {
-  id: uuid("id").primaryKey(),
-  email: text("email").notNull(),
-  emailVerifiedAt: timestamp("email_verified_at", {
-    withTimezone: true,
-    mode: "date",
-  }),
-  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" })
-    .notNull()
-    .defaultNow(),
-});
+import { user } from "../auth-schema";
+// Re-export as `users` so DAL/tests importing from this schema get one symbol.
+export { user as users } from "../auth-schema";
+/** Local alias so references(() => users.id) resolves without a circular import. */
+const users = user;
 
 /**
  * ADR-001: typed columns (NOT JSON) for timezone/locale/etc. JSON only for
  * presentation extras (notification_prefs). Defaults are applied at signup (1C).
  */
 export const userSettings = pgTable("user_settings", {
-  userId: uuid("user_id")
+  userId: text("user_id")
     .primaryKey()
     .references(() => users.id, { onDelete: "cascade" }),
   timezone: text("timezone").notNull(), // IANA key, validated at the service edge
@@ -151,7 +143,7 @@ export const categories = pgTable(
   "categories",
   {
     id: uuid("id").primaryKey(),
-    userId: uuid("user_id")
+    userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     key: text("key").notNull(), // immutable semantic key
@@ -178,7 +170,7 @@ export const tags = pgTable(
   "tags",
   {
     id: uuid("id").primaryKey(),
-    userId: uuid("user_id")
+    userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
@@ -214,7 +206,7 @@ export const activitySeries = pgTable(
   "activity_series",
   {
     id: uuid("id").primaryKey(),
-    userId: uuid("user_id")
+    userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     tz: text("tz").notNull(), // IANA zone for wall-clock expansion
@@ -261,7 +253,7 @@ export const activityOccurrences = pgTable(
   "activity_occurrences",
   {
     id: uuid("id").primaryKey(),
-    userId: uuid("user_id")
+    userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     seriesId: uuid("series_id")
@@ -311,7 +303,7 @@ export const tasks = pgTable(
   "tasks",
   {
     id: uuid("id").primaryKey(),
-    userId: uuid("user_id")
+    userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     bucket: taskBucket("bucket").notNull(),
@@ -343,7 +335,7 @@ export const checklistItems = pgTable(
   "checklist_items",
   {
     id: uuid("id").primaryKey(),
-    userId: uuid("user_id")
+    userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     parentType: checklistParent("parent_type").notNull(),
@@ -369,7 +361,7 @@ export const checklistItems = pgTable(
 
 export const routines = pgTable("routines", {
   id: uuid("id").primaryKey(),
-  userId: uuid("user_id")
+  userId: text("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
@@ -390,7 +382,7 @@ export const routineSteps = pgTable(
   "routine_steps",
   {
     id: uuid("id").primaryKey(),
-    userId: uuid("user_id")
+    userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     routineId: uuid("routine_id")
@@ -419,7 +411,7 @@ export const routineSchedules = pgTable(
   "routine_schedules",
   {
     id: uuid("id").primaryKey(),
-    userId: uuid("user_id")
+    userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     routineId: uuid("routine_id")
@@ -456,7 +448,7 @@ export const focusSessions = pgTable(
   "focus_sessions",
   {
     id: uuid("id").primaryKey(),
-    userId: uuid("user_id")
+    userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     activityOccurrenceId: uuid("activity_occurrence_id"), // nullable for ad-hoc
@@ -498,7 +490,7 @@ export const pushSubscriptions = pgTable(
   "push_subscriptions",
   {
     id: uuid("id").primaryKey(),
-    userId: uuid("user_id")
+    userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     endpoint: text("endpoint").notNull(),
@@ -526,7 +518,7 @@ export const plannerEvents = pgTable(
   "planner_events",
   {
     id: uuid("id").primaryKey(),
-    userId: uuid("user_id")
+    userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     entityType: text("entity_type").notNull(),
@@ -559,7 +551,7 @@ export const plannerEvents = pgTable(
 export const idempotencyKeys = pgTable(
   "idempotency_keys",
   {
-    userId: uuid("user_id")
+    userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     key: text("key").notNull(), // client-supplied UUID
@@ -590,7 +582,7 @@ export const changeLog = pgTable(
   "change_log",
   {
     id: bigint("id", { mode: "bigint" }).primaryKey().generatedAlwaysAsIdentity(),
-    userId: uuid("user_id")
+    userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     entityType: text("entity_type").notNull(),
