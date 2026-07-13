@@ -21,6 +21,8 @@ import { getResolvedDay } from "@/server/services/day";
 import { listCategories } from "@/server/dal";
 import { buildCategoryMap, seriesToActivity, taskToInboxItem } from "@/lib/adapters";
 import { TodayTimeline } from "@/components/TodayTimeline";
+import { SoftStreaks } from "@/components/SoftStreaks";
+import { AmbientSounds } from "@/components/AmbientSounds";
 
 /**
  * Load real data for the Today screen. Falls back to mock data when the user is
@@ -117,6 +119,7 @@ export default async function TodayPage() {
               </h1>
             </div>
             {!emptyDay && <DayProgress activities={activities} />}
+            <SoftStreaks />
             <div className="flex items-center gap-1 rounded-2xl border border-border bg-surface p-1 shadow-card">
               <button aria-label="Previous day" className="grid size-9 place-items-center rounded-xl text-ink-soft hover:bg-surface-sunken">
                 <ChevronLeft size={18} />
@@ -190,6 +193,11 @@ export default async function TodayPage() {
               </button>
             </div>
           )}
+          {/* Ambient sounds */}
+          <div className="rounded-3xl border border-border bg-surface p-4 shadow-card">
+            <h3 className="mb-2 font-display text-sm font-bold">Focus sounds</h3>
+            <AmbientSounds />
+          </div>
         </aside>
       </div>
 

@@ -16,6 +16,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { catClasses, fmt, fmtDuration, type Activity } from "@/lib/mock";
+import { LiveNowLine } from "./LiveNowLine";
 
 const DAY_START = 7 * 60; // 07:00
 const DAY_END = 23 * 60; // 23:00
@@ -283,18 +284,8 @@ export function TimelineCanvas({
         ),
       )}
 
-      {/* Now line */}
-      <div
-        className="absolute inset-x-0 z-20 flex items-center gap-2"
-        style={{ top: top(nowMin) }}
-      >
-        <span className="tnum w-10 -translate-y-1/2 rounded-md bg-now text-center text-[11px] font-bold text-now-ink">
-          {fmt(nowMin)}
-        </span>
-        <div className="relative h-0.5 flex-1 rounded bg-now">
-          <span className="absolute -left-1 top-1/2 size-2.5 -translate-y-1/2 rounded-full bg-now" />
-        </div>
-      </div>
+      {/* Now line — live (mount-gated to avoid hydration mismatch) */}
+      <LiveNowLine />
 
       {/* Activities */}
       <div
