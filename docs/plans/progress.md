@@ -1,5 +1,84 @@
 # Progress log
 
+## 2026-07-13 — Phase 1B complete: infra safety (CI, headers, rate-limit, restore drill)
+
+**Subphase:** 1B — Infra safety. Code + deploy + live header verification + proven
+restore drill. **Partial on two infra items** (staging app, automated prod backups)
+that require Coolify UI provisioning — see Deviations.
+
+**Shipped:**
+- **CI workflow** (`.github/workflows/ci.yml`): lint, typecheck, test, build on
+  every push/PR with an ephemeral `postgres:17-alpine` service container. Runs
+  the 73 tests including the ADR-002 contract-parity drift gate and DB integration.
+  **BLOCKED:** first run failed with "an Actions budget is preventing further use"
+  — GitHub Actions billing limit on the private repo. Workflow is correct and
+  committed; runs once Neima raises the Actions budget. Local gates are the same
+  set of checks and are green.
+- **Security headers** (`src/proxy.ts` — Next.js 16 `middleware.ts`→`proxy.ts`
+  rename): CSP report-only, X-Content-Type-Options, X-Frame-Options DENY +
+  frame-ancestors none, Referrer-Policy, Permissions-Policy minimal, COOP/CORP.
+  1 MB mutation body cap → 413. **Verified LIVE** on https://time.neima.me (both
+  `/` and `/app/today`): all 7 SEC-09 headers present (evidence in
+  `browser-qa/1b-headers-live.txt`).
+- **`/api/health` endpoint** — Coolify healthcheck target. Returns
+  `{status:"ok"}`. **Verified LIVE.**
+- **Rate-limit framework** (`src/server/ratelimit/`, SEC-06): Postgres-backed
+  sliding-window counter (`rate_limit_buckets` table, migration 0002) so limits
+  hold across replicas. 5 tests prove allow-up-to-limit, remaining countdown,
+  bucket independence, window reset. 1C wires per-endpoint limits.
+- **Migrations runbook** hardened in `docs/DEPLOYMENT.md`: expand/migrate/contract
+  for breaking changes, predeploy backup rule, rollback = redeploy previous image
+  + restore backup, outage rule.
+- **Backup/restore drill PROVEN**: backed up a prod-like DB (18 tables, user row,
+  6 categories, all 3 migrations) via `pg_dump -Fc`, restored into an isolated
+  `kairo_restore_drill` DB, verified round-trip (18/18 tables, known row
+  `drill@kairo.test` preserved, rate_limit_buckets present). Drill documented in
+  DEPLOYMENT.md. Dump was 40K (custom format, ready for off-host copy).
+
+**Migration IDs:** `0002_rate_limit_buckets.sql` (rate_limit_buckets table).
+
+**Tests added (5, total 73 passing):**
+- `ratelimit.test.ts` (5) — sliding window allow/block, remaining countdown,
+  bucket independence, window reset after rollover, 429 response shape.
+
+**Evidence:**
+- Gates green locally: `pnpm lint && pnpm typecheck && pnpm test (73) && pnpm build`.
+- LIVE header verification: `browser-qa/1b-headers-live.txt` (curl of
+  https://time.neima.me — all SEC-09 headers present).
+- `/api/health` returns `{"status":"ok"}` live.
+- Restore drill output captured inline above (18/18 tables, known row round-trip).
+
+**Live-verification result:** Deploy `wjx546yjqzloaq5cmz6rppok` finished.
+Security headers + health endpoint confirmed on the LIVE URL. The actual change
+(proxy.ts + health route) is observable: the 7 headers that were absent before
+this deploy are now present, and `/api/health` is a new 200 route.
+
+**Parity numbers:** `node scripts/parity.mjs` → web 88.46%, iOS 86.52%
+(unchanged — 1B ships infra, no end-user feature).
+
+**Deviations (honest — two items deferred):**
+1. **Staging app + staging Postgres** (`time-staging.neima.me`): the Coolify API
+  (v4.1.2) does not expose database creation (`POST /databases` → 404); it
+  requires the Coolify UI. Creating the staging app + managed Postgres is a
+  manual UI step Neima needs to do (Add Resource → PostgreSQL in the Kairo
+  project, then a second app pointing at `main` with the staging domain). The
+  code is ready — once the DB exists, set `DATABASE_URL` in Coolify env and the
+  staging app works identically to prod.
+2. **Automated encrypted prod backups**: same constraint — Coolify's scheduled
+  backup feature is configured in the UI (resource → Backups → schedule →
+  daily + S3 destination). The restore procedure is PROVEN; the automation
+  scheduling needs the UI. Until then, the manual `pg_dump` pre-migration
+  backup in the runbook is the standing rule.
+3. **CI budget**: GitHub Actions budget exhausted on the private repo. Workflow
+  committed and correct; needs Neima to raise the budget.
+
+**Next step:** 1C — Auth + CRUD (Better Auth per ADR-003, route handlers
+implementing the 1A spec, per-resource authorization SEC-01, negative tests
+for cross-user/unauthenticated/CSRF/idempotent-retry/revision-conflict). 1C is
+cheap-subagent friendly with the ADRs in hand. **Before 1C:** Neima provisions
+the Coolify-managed Postgres (UI step) and sets `DATABASE_URL` on the app, plus
+raises the GitHub Actions budget — otherwise 1C's CRUD handlers can't connect.
+
 ## 2026-07-13 — Phase 1A complete: domain + API contract (no UI change)
 
 **Subphase:** 1A — Domain + API contract (OpenAPI 3.1, schema invariants, sync
