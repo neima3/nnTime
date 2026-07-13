@@ -1,11 +1,66 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { catClasses, monthDays } from "@/lib/mock";
+import { catClasses, monthDays as mockMonthDays, type CategoryId } from "@/lib/mock";
+import { getSession } from "@/server/auth-session";
+import { listActivitySeries, listCategories } from "@/server/dal";
+import { buildCategoryMap } from "@/lib/adapters";
 
 const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-export default function MonthPage() {
+/** Load real month data or fall back to mock when logged out. */
+async function loadMonth() {
+  const session = await getSession();
+  if (!session) return mockMonthDays;
+  const series = await listActivitySeries(session.userId);
+  const categories = await listCategories(session.userId).catch(() => []);
+  const categoryMap = buildCategoryMap(categories as unknown as Parameters<typeof buildCategoryMap>[0]);
+
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const startWeekday = (firstDay.getDay() + 6) % 7; // 0=Mon
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const prevMonthDays = new Date(year, month, 0).getDate();
+
+  // Map activity series to dates in this month.
+  const dotsByDay = new Map<number, CategoryId[]>();
+  for (const s of series) {
+    const d = s.dtstartLocal;
+    if (d.getFullYear() === year && d.getMonth() === month) {
+      const day = d.getDate();
+      const cat = s.categoryId ? categoryMap.get(s.categoryId) ?? "sky" : "sky";
+      const existing = dotsByDay.get(day) ?? [];
+      if (existing.length < 3) existing.push(cat);
+      dotsByDay.set(day, existing);
+    }
+  }
+
+  const result: { date: number; isToday?: boolean; otherMonth?: boolean; dots: CategoryId[]; more?: number }[] = [];
+  // Leading days from prev month.
+  for (let i = startWeekday - 1; i >= 0; i--) {
+    result.push({ date: prevMonthDays - i, otherMonth: true, dots: [] });
+  }
+  // Current month days.
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dots = dotsByDay.get(d) ?? [];
+    result.push({
+      date: d,
+      isToday: d === now.getDate(),
+      dots: dots.slice(0, 3),
+      more: dots.length > 3 ? dots.length - 3 : undefined,
+    });
+  }
+  // Trailing days to fill the grid.
+  while (result.length % 7 !== 0) {
+    result.push({ date: result.length - daysInMonth - startWeekday + 1, otherMonth: true, dots: [] });
+  }
+  return result;
+}
+
+export default async function MonthPage() {
+  const monthDays = await loadMonth();
   return (
     <AppShell active="week">
       <div className="mx-auto max-w-5xl px-4 py-6 md:px-8">

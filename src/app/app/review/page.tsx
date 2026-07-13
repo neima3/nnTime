@@ -1,13 +1,56 @@
 import { ArrowRight, Check, ListChecks, SkipForward } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { catClasses, reviewItems } from "@/lib/mock";
+import { catClasses, reviewItems as mockReviewItems, type CategoryId, fmt, fmtDuration } from "@/lib/mock";
+import { getSession } from "@/server/auth-session";
+import { listActivitySeries, listCategories } from "@/server/dal";
+import { buildCategoryMap, dateToMinutesFromMidnight } from "@/lib/adapters";
 
-/* Design reference: the guided end-of-day "Review Today" flow (Phase 2D).
-   One card per unfinished item, three gentle verbs, then a soft summary.
-   Two states shown: mid-flow and completion. */
+/** Load real review items (unfinished activities for today) or fall back to mock. */
+async function loadReviewItems() {
+  const session = await getSession();
+  if (!session) return mockReviewItems;
+  const series = await listActivitySeries(session.userId);
+  const categories = await listCategories(session.userId).catch(() => []);
+  const categoryMap = buildCategoryMap(categories as unknown as Parameters<typeof buildCategoryMap>[0]);
+  const today = new Date().toISOString().slice(0, 10);
+  return series
+    .filter((s) => s.dtstartLocal.toISOString().slice(0, 10) === today)
+    .map((s) => {
+      const startMin = dateToMinutesFromMidnight(s.dtstartLocal, "UTC");
+      const cat = s.categoryId ? categoryMap.get(s.categoryId) ?? "sky" : "sky";
+      return {
+        id: s.id,
+        title: s.title,
+        emoji: s.emoji ?? "📋",
+        category: cat,
+        time: `${fmt(startMin)} – ${fmt(startMin + s.durationMin)}`,
+        checklist: undefined as string | undefined,
+      };
+    });
+}
 
-export default function ReviewPage() {
+export type ReviewItem = {
+  id: string;
+  title: string;
+  emoji: string;
+  category: CategoryId;
+  time: string;
+  checklist?: string;
+};
+
+export default async function ReviewPage() {
+  const reviewItems = await loadReviewItems();
   const current = reviewItems[0];
+  if (!current) {
+    return (
+      <AppShell active="today">
+        <div className="mx-auto flex max-w-lg flex-col items-center px-4 py-20 text-center">
+          <p className="font-display text-2xl font-bold">All done ✨</p>
+          <p className="mt-2 text-[14px] text-ink-soft">Nothing left to review for today.</p>
+        </div>
+      </AppShell>
+    );
+  }
   const cat = catClasses[current.category];
 
   return (

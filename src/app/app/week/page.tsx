@@ -2,6 +2,10 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { catClasses, type CategoryId } from "@/lib/mock";
+import { getSession } from "@/server/auth-session";
+import { listActivitySeries, listCategories } from "@/server/dal";
+import { buildCategoryMap, dateToMinutesFromMidnight } from "@/lib/adapters";
+import { fmt } from "@/lib/mock";
 
 type Block = { emoji: string; title: string; time: string; category: CategoryId };
 
@@ -69,7 +73,48 @@ const week: { day: string; date: number; isToday?: boolean; blocks: Block[] }[] 
   },
 ];
 
-export default function WeekPage() {
+/** Load real week data or fall back to mock when logged out. */
+async function loadWeek() {
+  const session = await getSession();
+  if (!session) return week;
+  const series = await listActivitySeries(session.userId);
+  const categories = await listCategories(session.userId).catch(() => []);
+  const categoryMap = buildCategoryMap(categories as unknown as Parameters<typeof buildCategoryMap>[0]);
+  const today = new Date();
+  const todayDate = today.getDate();
+  const dayOfWeek = (today.getDay() + 6) % 7; // 0=Mon
+
+  // Build 7 days starting Monday.
+  const days: { day: string; date: number; isToday?: boolean; blocks: Block[] }[] = [];
+  const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(today);
+    date.setDate(todayDate - dayOfWeek + i);
+    const dateStr = date.toISOString().slice(0, 10);
+    const dayBlocks: Block[] = series
+      .filter((s) => s.dtstartLocal.toISOString().slice(0, 10) === dateStr)
+      .map((s) => {
+        const startMin = dateToMinutesFromMidnight(s.dtstartLocal, "UTC");
+        const cat = s.categoryId ? categoryMap.get(s.categoryId) ?? "sky" : "sky";
+        return {
+          emoji: s.emoji ?? "📋",
+          title: s.title,
+          time: `${fmt(startMin)}`,
+          category: cat,
+        };
+      });
+    days.push({
+      day: dayNames[i],
+      date: date.getDate(),
+      isToday: i === dayOfWeek,
+      blocks: dayBlocks,
+    });
+  }
+  return days;
+}
+
+export default async function WeekPage() {
+  const weekData = await loadWeek();
   return (
     <AppShell active="week">
       <div className="mx-auto max-w-6xl px-4 py-6 md:px-8">
@@ -107,7 +152,7 @@ export default function WeekPage() {
         </header>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-          {week.map((d) => (
+          {weekData.map((d) => (
             <section
               key={d.day}
               className={`flex flex-col gap-2 rounded-3xl border p-3 ${
