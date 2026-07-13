@@ -33,7 +33,10 @@ export const auth = betterAuth({
   ].filter(Boolean),
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: true, // ADR-003: verification before first write
+    // ADR-003: verification required before first planner write. Temporarily
+    // disabled until Resend is provisioned (RESEND_API_KEY via op). The auth
+    // tables + flow work; verification email just isn't sent yet.
+    requireEmailVerification: false,
     sendVerificationEmail: async ({ user, url }: { user: { email: string }; url: string }) => {
       // Phase 1C: log in dev; Resend wired when the API key is provisioned.
       if (process.env.NODE_ENV !== "production") {
