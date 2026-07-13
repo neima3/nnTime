@@ -15,15 +15,21 @@ export interface AuthSession {
 }
 
 /**
- * Get the authenticated session. Returns null if not authenticated (handler
- * should return 401). Uses Better Auth's API to validate the session cookie.
+ * Get the authenticated session. Returns null if not authenticated OR if the
+ * database isn't available (e.g. DATABASE_URL not yet provisioned). This lets
+ * Server Components fall back to mock data gracefully during infra setup.
  */
 export async function getSession(): Promise<AuthSession | null> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  if (!session?.user?.id) return null;
-  return { userId: session.user.id, sessionId: session.session.id };
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+    if (!session?.user?.id) return null;
+    return { userId: session.user.id, sessionId: session.session.id };
+  } catch {
+    // DB not connected (no DATABASE_URL in prod yet) or auth not configured.
+    return null;
+  }
 }
 
 /**
