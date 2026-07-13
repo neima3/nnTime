@@ -46,12 +46,12 @@ design work BEFORE the consuming subphase starts.
   - [x] 1A Domain + API contract (OpenAPI 3.1, schema invariants, sync semantics)
   - [ ] 1B Infra safety: staging, CI, backups+restore drill, migrations runbook,
         security headers, rate-limit framework
-  - [ ] 1C Auth + DB + CRUD with per-resource authorization + negative tests
+  - [x] 1C Auth + DB + CRUD with per-resource authorization + negative tests
   - [ ] 1D UI wiring: Today, editor sheet, Anytime, To-do inbox route
   - [ ] 1E Release: deploy, live verification, parity checklist update
 - [ ] Phase 2 — Scheduling core
-  - [ ] 2A Recurrence engine (series/override model, edit scopes, DST tests)
-  - [ ] 2B Routine materializer (durable idempotent job)
+  - [x] 2A Recurrence engine (series/override model, edit scopes, DST tests)
+  - [x] 2B Routine materializer (durable idempotent job)
   - [ ] 2C Timeline interactions (drag/resize/create, collisions, keyboard)
   - [ ] 2D Week + month views, Review Today flow, carry-over
 - [ ] Phase 3 — Focus & time

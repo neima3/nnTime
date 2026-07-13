@@ -520,7 +520,7 @@ export async function getChanges(
 /* Internal: append to change_log                                             */
 /* -------------------------------------------------------------------------- */
 
-async function appendChangeLog(
+export async function appendChangeLog(
   db: Db,
   userId: string,
   entityType: string,
