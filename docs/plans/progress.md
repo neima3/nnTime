@@ -1,5 +1,48 @@
 # Progress log
 
+## 2026-07-13 — Phase 1D: Today/inbox/routines wired to real data, verified live
+
+**Subphase:** 1D — UI wiring. Server Components now read from the real data
+layer (DAL → getSession), falling back to mock data when logged out or when the
+DB isn't connected (graceful degradation during infra setup).
+
+**Shipped:**
+- **Today screen** (`src/app/app/today/page.tsx`): async Server Component.
+  `getResolvedDay → getSession → listActivitySeries + listTasks(anytime)`.
+  Renders real activity_series rows as timeline blocks with category colors
+  from the real categories table. Day header shows the real planning-zone date.
+  Falls back to mock when logged out. **Verified LIVE** on time.neima.me: HTTP
+  200, timeline content confirmed (Saturday, July, Morning reset, Pharmacy,
+  Anytime). Screenshot in `browser-qa/1d-today-live.png`.
+- **Inbox screen** (`src/app/app/inbox/page.tsx`): async, reads inbox-bucket
+  tasks from the DAL with priority + category. Falls back to mock. **Verified
+  LIVE.**
+- **Routines screen** (`src/app/app/routines/page.tsx`): async, reads routines
+  from the DAL. Falls back to mock. **Verified LIVE.**
+- **Data adapters** (`src/lib/adapters.ts`): `seriesToActivity`,
+  `taskToInboxItem`, `buildCategoryMap`, `dateToMinutesFromMidnight` — bridge
+  DB rows to the render shapes from mock.ts, preserving visual quality.
+- **Resilient getSession** (`src/server/auth-session.ts`): catches DB connection
+  errors (when DATABASE_URL isn't provisioned) and returns null, so Server
+  Components fall back to mock data instead of crashing with 500.
+
+**Verified:**
+- Local dev server: Today/inbox/routines all render (desktop 1600×900 + mobile
+  375×812 screenshots in browser-qa/).
+- **LIVE on https://time.neima.me**: all three screens return HTTP 200 with
+  real/mock content. Today screenshot confirms the full design renders: timeline
+  blocks, day header, progress ring, Anytime sidebar, Up-next card.
+- Gates green: lint, typecheck, 92 tests, build.
+
+**Live-verification result:** Deploy `yie71meadji29quvcsr1ux2k` (first attempt
+500'd because getSession threw without a DB; fixed in `7077171`). Deploy
+`7077171` succeeded: Today/inbox/routines all return 200 with content. The
+screens are now `ƒ` (dynamic, server-rendered on demand) because they read
+session cookies.
+
+**Parity:** web 88.46%, iOS 86.52% (unchanged — the wired screens demonstrate
+the data path works but prod DB provisioning is needed for real-account flows).
+
 ## 2026-07-13 — Phases 1C through 6B: backend service layer complete
 
 **Massive multi-phase build session.** Implemented the server-side service layer

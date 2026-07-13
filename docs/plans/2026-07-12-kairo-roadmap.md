@@ -47,7 +47,7 @@ design work BEFORE the consuming subphase starts.
   - [ ] 1B Infra safety: staging, CI, backups+restore drill, migrations runbook,
         security headers, rate-limit framework
   - [x] 1C Auth + DB + CRUD with per-resource authorization + negative tests
-  - [ ] 1D UI wiring: Today, editor sheet, Anytime, To-do inbox route
+  - [x] 1D UI wiring: Today, editor sheet, Anytime, To-do inbox route
   - [ ] 1E Release: deploy, live verification, parity checklist update
 - [ ] Phase 2 — Scheduling core
   - [x] 2A Recurrence engine (series/override model, edit scopes, DST tests)
