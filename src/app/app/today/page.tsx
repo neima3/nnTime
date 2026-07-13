@@ -20,6 +20,7 @@ import {
 import { getResolvedDay } from "@/server/services/day";
 import { listCategories } from "@/server/dal";
 import { buildCategoryMap, seriesToActivity, taskToInboxItem } from "@/lib/adapters";
+import { TodayTimeline } from "@/components/TodayTimeline";
 
 /**
  * Load real data for the Today screen. Falls back to mock data when the user is
@@ -66,124 +67,6 @@ const DAY_END = 23 * 60;
 const PX_PER_MIN = 1.7;
 
 const top = (min: number) => (min - DAY_START) * PX_PER_MIN;
-
-function ActivityCard({ a }: { a: Activity }) {
-  const cat = catClasses[a.category];
-  const past = a.start + a.duration <= NOW_MIN;
-  const current = a.start <= NOW_MIN && NOW_MIN < a.start + a.duration;
-  const h = a.duration * PX_PER_MIN;
-  const compact = h < 76;
-  const checklistDone = a.checklist?.filter((c) => c.done).length ?? 0;
-
-  return (
-    <div
-      className={`group absolute inset-x-0 flex gap-3 rounded-2xl px-3.5 transition-transform hover:-translate-y-px hover:shadow-card ${cat.fill} ${
-        past ? "opacity-55 saturate-50" : ""
-      } ${current ? "shadow-float ring-2 ring-now/70" : ""} ${
-        compact ? "items-center py-1.5" : "py-3"
-      }`}
-      style={{ top: top(a.start), height: h }}
-    >
-      <span
-        className={`grid shrink-0 place-items-center rounded-full bg-surface-raised/80 ${
-          compact ? "size-8 text-base" : "size-10 text-lg"
-        }`}
-        aria-hidden
-      >
-        {a.emoji}
-      </span>
-
-      <div className="min-w-0 flex-1">
-        <p
-          className={`truncate font-semibold leading-tight ${cat.ink} ${
-            compact ? "text-[14px]" : "text-[15px]"
-          } ${a.done ? "line-through decoration-2 opacity-70" : ""}`}
-        >
-          {a.title}
-        </p>
-        <p className={`tnum mt-0.5 truncate text-[12px] font-medium ${cat.ink} opacity-70`}>
-          {fmt(a.start)} – {fmt(a.start + a.duration)} · {fmtDuration(a.duration)}
-        </p>
-        {!compact && (a.checklist || a.energy) && (
-          <div className="mt-1.5 flex items-center gap-1.5">
-            {a.checklist && (
-              <span
-                className={`inline-flex items-center gap-1 rounded-lg bg-surface-raised/70 px-1.5 py-0.5 text-[11px] font-semibold ${cat.ink}`}
-              >
-                <ListChecks size={12} />
-                {checklistDone}/{a.checklist.length}
-              </span>
-            )}
-            {a.energy && (
-              <span
-                className={`inline-flex items-center gap-1 rounded-lg bg-surface-raised/70 px-1.5 py-0.5 text-[11px] font-semibold capitalize ${cat.ink}`}
-              >
-                <Zap size={12} />
-                {a.energy}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      <button
-        aria-label={a.done ? "Mark incomplete" : "Mark complete"}
-        className={`grid shrink-0 place-items-center self-center rounded-full border-2 transition-colors ${
-          compact ? "size-7" : "size-8"
-        } ${
-          a.done
-            ? "border-transparent bg-success text-ink-inverse"
-            : `border-current ${cat.ink} opacity-50 hover:opacity-100`
-        }`}
-      >
-        {a.done && <Check size={16} strokeWidth={3} />}
-      </button>
-    </div>
-  );
-}
-
-function Timeline({ activities }: { activities: Activity[] }) {
-  const hours = [];
-  for (let h = DAY_START / 60; h <= DAY_END / 60; h++) hours.push(h);
-
-  return (
-    <div className="relative" style={{ height: (DAY_END - DAY_START) * PX_PER_MIN }}>
-      {/* hour grid */}
-      {hours.map((h) => (
-        <div
-          key={h}
-          className="absolute inset-x-0 flex items-start gap-3"
-          style={{ top: top(h * 60) }}
-        >
-          <span className="tnum w-10 -translate-y-1/2 text-right text-[12px] font-medium text-ink-faint">
-            {h}:00
-          </span>
-          <div className="mt-px h-px flex-1 bg-border" />
-        </div>
-      ))}
-
-      {/* now line */}
-      <div
-        className="absolute inset-x-0 z-20 flex items-center gap-2"
-        style={{ top: top(NOW_MIN) }}
-      >
-        <span className="tnum w-10 -translate-y-1/2 rounded-md bg-now text-center text-[11px] font-bold text-now-ink">
-          {fmt(NOW_MIN)}
-        </span>
-        <div className="relative h-0.5 flex-1 rounded bg-now">
-          <span className="absolute -left-1 top-1/2 size-2.5 -translate-y-1/2 rounded-full bg-now" />
-        </div>
-      </div>
-
-      {/* activities */}
-      <div className="absolute inset-y-0 left-14 right-1">
-        {activities.map((a) => (
-          <ActivityCard key={a.id} a={a} />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function DayProgress({ activities }: { activities: Activity[] }) {
   const done = activities.filter((a) => a.done).length;
@@ -259,7 +142,7 @@ export default async function TodayPage() {
               </p>
             </div>
           ) : (
-            <Timeline activities={activities} />
+            <TodayTimeline activities={activities} />
           )}
         </section>
 
