@@ -54,7 +54,7 @@ design work BEFORE the consuming subphase starts.
   - [x] 2A Recurrence engine (series/override model, edit scopes, DST tests)
   - [x] 2B Routine materializer (durable idempotent job)
   - [x] 2C Timeline interactions (drag/resize/create, collisions, keyboard)
-  - [ ] 2D Week + month views, Review Today flow, carry-over
+  - [x] 2D Week + month views, Review Today flow, carry-over
 - [ ] Phase 3 — Focus & time
   - [x] 3A Focus-session state machine (server-authoritative)
   - [x] 3B Notification scheduler + Web Push (incl. installed-iPhone-PWA test)
