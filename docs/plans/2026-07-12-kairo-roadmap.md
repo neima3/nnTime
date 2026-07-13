@@ -58,7 +58,7 @@ design work BEFORE the consuming subphase starts.
 - [ ] Phase 3 — Focus & time
   - [x] 3A Focus-session state machine (server-authoritative)
   - [x] 3B Notification scheduler + Web Push (incl. installed-iPhone-PWA test)
-  - [ ] 3C Time UX: live now-line, auto-start policy, overtime, ambient sounds,
+  - [x] 3C Time UX: live now-line, auto-start policy, overtime, ambient sounds,
         streaks, custom reminder timing/sounds, daily/weekly review
 - [x] Phase 4 — AI co-planner (breakdown, NL/voice add, plan-my-day,
       disruption re-planning, priority grouping — per AI safety contract)
