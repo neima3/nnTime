@@ -21,6 +21,12 @@ export const metadata: Metadata = {
   title: "Kairo — time you can see",
   description:
     "A visual daily planner that makes time tangible. Built for brains that plan differently.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Kairo",
+  },
 };
 
 export default function RootLayout({

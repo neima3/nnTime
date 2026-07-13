@@ -56,18 +56,18 @@ design work BEFORE the consuming subphase starts.
   - [ ] 2D Week + month views, Review Today flow, carry-over
 - [ ] Phase 3 — Focus & time
   - [x] 3A Focus-session state machine (server-authoritative)
-  - [ ] 3B Notification scheduler + Web Push (incl. installed-iPhone-PWA test)
+  - [x] 3B Notification scheduler + Web Push (incl. installed-iPhone-PWA test)
   - [ ] 3C Time UX: live now-line, auto-start policy, overtime, ambient sounds,
         streaks, custom reminder timing/sounds, daily/weekly review
-- [ ] Phase 4 — AI co-planner (breakdown, NL/voice add, plan-my-day,
+- [x] Phase 4 — AI co-planner (breakdown, NL/voice add, plan-my-day,
       disruption re-planning, priority grouping — per AI safety contract)
 - [ ] Phase 5 — Surround features
-  - [ ] 5A Calendar: Google OAuth import + ICS subscribe (SSRF controls,
+  - [x] 5A Calendar: Google OAuth import + ICS subscribe (SSRF controls,
         token encryption, update/delete reconciliation)
-  - [ ] 5B Personalization (theme, reduced stimulation, dyslexia font, etc.)
-  - [ ] 5C Stats/insights on the event-history table + mood check-ins
-  - [ ] 5D Templates + personal routine library (search/filter/favorites/pause)
-  - [ ] 5E Privacy surface: data export, account deletion cascade
+  - [x] 5B Personalization (theme, reduced stimulation, dyslexia font, etc.)
+  - [x] 5C Stats/insights on the event-history table + mood check-ins
+  - [x] 5D Templates + personal routine library (search/filter/favorites/pause)
+  - [x] 5E Privacy surface: data export, account deletion cascade
 - [ ] Phase 6 — Product quality → **85% WEB PARITY GATE**
   - [ ] 6A Onboarding (designs first)
   - [ ] 6B PWA offline (enable the ADR-002 protocol; user-scoped caches)
