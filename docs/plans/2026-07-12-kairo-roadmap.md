@@ -79,7 +79,7 @@ design work BEFORE the consuming subphase starts.
 - [ ] Phase 7 — iOS app
   - [x] 7A Contract proof (Swift OpenAPI toolchain compiles in CI)
   - [x] 7B Native auth on device (Sign in with Apple, Keychain, deep links)
-  - [ ] 7C Data/sync (shared revision/cursor protocol, offline, logout purge)
+  - [x] 7C Data/sync (shared revision/cursor protocol, offline, logout purge)
   - [ ] 7D Planner UI (Today/editor/Anytime → Week/Routines; VoiceOver/Dynamic Type)
   - [ ] 7E Focus + local notifications (background-safe reconstruction)
   - [ ] 7F Release preflight + TestFlight
