@@ -70,7 +70,7 @@ export async function materializeRoutines(opts: { db?: Db } = {}): Promise<{
       );
 
     let materialized = 0;
-    let skippedPaused = 0;
+    const skippedPaused = 0;
 
     for (const sched of schedules) {
       // Load the routine for template fields.
