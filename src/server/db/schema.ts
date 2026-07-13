@@ -607,6 +607,29 @@ export const changeLog = pgTable(
   (t) => [index("change_log_user_id_idx").on(t.userId, t.id)],
 );
 
+/**
+ * Rate-limit counter buckets (SEC-06). One row per (bucket key) with a
+ * sliding window count. `bucket` identifies the limit scope, e.g.
+ * "signup:ip:1.2.3.4" or "login:account:user@x.com".
+ */
+export const rateLimitBuckets = pgTable(
+  "rate_limit_buckets",
+  {
+    bucket: text("bucket").primaryKey(),
+    count: integer("count").notNull().default(0),
+    windowStart: timestamp("window_start", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+  },
+);
+
 /* -------------------------------------------------------------------------- */
 /* Exports for the DAL / tests                                                */
 /* -------------------------------------------------------------------------- */
