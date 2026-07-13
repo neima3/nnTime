@@ -78,7 +78,7 @@ design work BEFORE the consuming subphase starts.
   - [x] 6F Scripted parity audit — web ≥85% with per-row evidence
 - [ ] Phase 7 — iOS app
   - [x] 7A Contract proof (Swift OpenAPI toolchain compiles in CI)
-  - [ ] 7B Native auth on device (Sign in with Apple, Keychain, deep links)
+  - [x] 7B Native auth on device (Sign in with Apple, Keychain, deep links)
   - [ ] 7C Data/sync (shared revision/cursor protocol, offline, logout purge)
   - [ ] 7D Planner UI (Today/editor/Anytime → Week/Routines; VoiceOver/Dynamic Type)
   - [ ] 7E Focus + local notifications (background-safe reconstruction)
