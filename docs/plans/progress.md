@@ -1,5 +1,100 @@
 # Progress log
 
+## 2026-07-13 — Phases 1C through 6B: backend service layer complete
+
+**Massive multi-phase build session.** Implemented the server-side service layer
+for Phases 1C, 2A-2B, 3A-3B, 4, 5A-5E, and 6B. All committed and pushed; the
+PWA manifest + service worker are verified LIVE on time.neima.me.
+
+**What shipped (server logic, not all UI-wired yet):**
+
+- **1C — Auth + CRUD** (commit `75df371`): Better Auth (email+password +
+  magic link, ADR-003), DAL with per-resource authorization (SEC-01: every
+  query scoped by userId), 10 route handler groups (tasks/activities/tags/
+  categories/settings/changes CRUD), 9 negative tests (cross-user denied,
+  revision conflict, tombstone, change-log scoped). Schema refactored: user_id
+  columns text (Better Auth text PK). 82 tests.
+
+- **2A — Recurrence engine** (commit `99b7710`): editSeriesOccurrence with
+  ADR-001 scopes (this = occurrence override, this_and_future = transactional
+  series split with UNTIL truncation + occurrence_key survival, all = master
+  update). deleteSeriesOccurrence mirroring. 4 edit-scope tests.
+
+- **2B — Routine materializer** (commit `99b7710`): durable job with
+  pg_try_advisory_xact_lock (exactly one instance), 48h horizon, 24h backfill,
+  pause support, idempotent materialization (source='routine').
+
+- **3A — Focus state machine** (commit `1316e84`): server-authoritative per
+  ADR-004. start (auto-cancels prior = two-device contention), transition
+  (running↔paused→terminal, pause-time accumulation), quick-extend (+1/+5/+10),
+  getRemainingSec (server-time-derived). 6 tests.
+
+- **3B — Notification scheduler** (commit `d1d295a`): computeNotificationJobs
+  (start/halfway/wrap-up, advisory-lock tick), Web Push subscription CRUD
+  (SEC-08: endpoints are secrets, tombstone on unsubscribe).
+
+- **4 — AI co-planner** (commit `d1d295a`): SEC-05 binding (no tools, no creds,
+  no mutation; strict zod output schemas; per-user daily quota + IP throttle).
+  breakDownTask, parseNaturalLanguage, planMyDay, groupByPriority.
+
+- **5A — Calendar import** (commit `8611cd2`): SSRF-safe ICS fetch (SEC-04:
+  http/https only, 10s timeout, 5MB cap, content-type+structure validation),
+  ICS parser, envelope encryption for OAuth tokens (SEC-03).
+
+- **5B — Personalization** (commit `8611cd2`): theme, reduced-stimulation,
+  high-contrast, dyslexia font, larger text, week-start, 12/24h from settings.
+
+- **5C — Stats + mood** (commit `d1d295a`): getStats from planner_events
+  (completion/focus/energy/streak, timezone-bucketed), recordMoodCheckin.
+
+- **5D — Templates** (commit `d1d295a`): 15 built-in templates (stable IDs,
+  versioned), list/get with group filter.
+
+- **5E — Privacy** (commit `d1d295a`): exportUserData (JSON, secrets redacted),
+  deleteAccount cascade (SEC-10).
+
+- **6B — PWA** (commit `8611cd2`): manifest.json, service worker (app-shell
+  cache, network-first nav, SWR static, Web Push handler). **Verified LIVE.**
+
+**Tests:** 92 passing (25 temporal, 29 schema invariants, 5 migrations,
+9 DAL negative, 5 rate-limit, 4 recurrence edit-scope, 6 focus state machine,
+9 contract parity). Gates: lint, typecheck, build green.
+
+**Live-verification:** PWA manifest (`/manifest.json`) and service worker
+(`/sw.js`) confirmed serving on https://time.neima.me. Security headers (7
+SEC-09 headers) still present. `/api/health` still returns `{status:"ok"}`.
+
+**Parity:** web 88.46%, iOS 86.52% — unchanged at the *planned* level. The
+parity checklist scores "shipped with evidence" (feature wired to UI + browser-
+verified), and the server services built this session are the foundation that
+1D (UI wiring) connects to. Updating rows to full credit requires 1D's browser
+verification per row.
+
+**Honest status — what remains for true feature completion:**
+- **1D — UI wiring**: the existing mock screens need to read from the real DAL
+  (Server Components → getSession → services). This is design-sensitive (the
+  mocks ARE the design reference) and needs the prod DB provisioned.
+- **1E — Release**: prod migration, live verification with a real account.
+- **2C — Timeline interactions**: drag/resize/create UI (client-side, design-
+  sensitive per the timeline-states addendum).
+- **2D — Week/month views, Review Today**: UI wiring to real data.
+- **3C — Time UX**: live now-line, ambient sounds (needs audio assets), streaks UI.
+- **6A — Onboarding**: the mock exists; needs wiring to create real settings.
+- **6C — Accessibility audit**: WCAG AA, keyboard, screen reader.
+- **6D — Performance**: Lighthouse ≥90 mobile.
+- **6E — Dogfood QA sweep**: P0/P1 fixes with evidence.
+- **6F — Scripted parity audit**: per-row evidence for the 85% web gate.
+- **iOS app (Phase 7-8)**: SwiftUI implementation — separate platform.
+
+**External blockers still standing:**
+1. GitHub Actions budget (CI workflow committed but can't run).
+2. Coolify-managed Postgres needs UI provisioning (no DB to wire UI to yet).
+3. `ANTHROPIC_API_KEY`, `RESEND_API_KEY`, `ENCRYPTION_KEY` need provisioning
+   via 1Password for the AI/email/encryption services to function live.
+
+**Next step:** 1D — wire the Today/inbox/editor screens to the DAL (Server
+Components), then 1E release. This needs the prod DB provisioned first.
+
 ## 2026-07-13 — Phase 1B complete: infra safety (CI, headers, rate-limit, restore drill)
 
 **Subphase:** 1B — Infra safety. Code + deploy + live header verification + proven
