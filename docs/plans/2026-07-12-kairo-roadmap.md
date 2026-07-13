@@ -71,7 +71,7 @@ design work BEFORE the consuming subphase starts.
   - [x] 5E Privacy surface: data export, account deletion cascade
 - [ ] Phase 6 — Product quality → **85% WEB PARITY GATE**
   - [x] 6A Onboarding (designs first)
-  - [ ] 6B PWA offline (enable the ADR-002 protocol; user-scoped caches)
+  - [x] 6B PWA offline (enable the ADR-002 protocol; user-scoped caches)
   - [x] 6C Accessibility audit + fixes (WCAG AA, keyboard, screen reader flows)
   - [x] 6D Performance (Lighthouse ≥90 mobile)
   - [x] 6E Dogfood QA sweep, P0/P1 fixes
