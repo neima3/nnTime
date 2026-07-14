@@ -88,7 +88,13 @@ export const activitySeriesCreate = z.object({
  *  - all              → update the master
  */
 export const activitySeriesUpdate = z.object({
+  /** ADR-001 edit scope; defaults to `all` for one-off / master updates. */
   editScope: editScopeEnum.optional(),
+  /**
+   * Occurrence identity for `this` / `this_and_future`. Optional for `all`
+   * (server falls back to the series dtstartLocal).
+   */
+  occurrenceKey: instant.optional(),
   tz: ianaTimezone.optional(),
   dtstartLocal: instant.optional(),
   rrule: z.string().nullable().optional(),
@@ -105,6 +111,10 @@ export const activitySeriesUpdate = z.object({
   notes: z.string().nullable().optional(),
   source: activitySourceEnum.optional(),
   sourceRef: z.string().nullable().optional(),
+  /** Occurrence-only fields (editScope=this). */
+  status: z.enum(["pending", "completed", "skipped", "cancelled"]).optional(),
+  startAt: instant.optional(),
+  completedAt: instant.nullable().optional(),
 });
 
 export type ActivitySeriesResponse = z.infer<typeof activitySeriesResponse>;

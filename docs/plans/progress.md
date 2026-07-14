@@ -1,5 +1,63 @@
 # Progress log
 
+## 2026-07-14 — 10× 20-phase program: core product loop shipped (Phases 1–7, 9–11, 13)
+
+**Program:** `docs/plans/2026-07-14-10x-20-phase-roadmap.md` + executor prompt
+`docs/plans/10x-20-phase-agent-prompt.md`. Goal: turn server-complete foundation
+into a daily-usable planner write loop.
+
+**Ticked this session:** 1, 2, 3, 4, 5, 6, 7 (partial), 9, 10, 11, 13.  
+**Open:** 8 (routines write UI), 12 (stats UI), 14–20 (AI routes, auth polish,
+offline, a11y, perf, dogfood, deploy handoff — deploy still pending this note).
+
+**Shipped:**
+- **Phase 1:** `PATCH /api/v1/activities/{id}` wired to `editSeriesOccurrence`
+  (was 501). ConflictError/NotFoundError mapping; field whitelist; occurrenceKey
+  on update schema.
+- **Phase 2:** Real `ActivityEditor` + FAB → create; categories/settings load;
+  checklist template; redirect to Today.
+- **Phase 3:** Complete toggle on timeline blocks (`editScope=this` + status);
+  double-click/Enter open editor; delete from editor.
+- **Phase 4:** `?date=` day nav; now-line only on isToday; day-filtered
+  `getResolvedDay` + occurrence status merge.
+- **Phase 5:** InboxClient create / Anytime promote / schedule / delete.
+- **Phase 6:** Focus API GET/POST + PATCH transition/extend; FocusClient UI.
+- **Phase 7:** `GET /api/v1/day/{date}`, privacy export + account delete routes.
+  (Routines CRUD routes + batch still open.)
+- **Phase 9:** Week view real data + week nav + links to Today/editor.
+- **Phase 10:** ReviewClient complete / let-go / move tomorrow.
+- **Phase 11:** SettingsClient theme/reduced-stimulation/hour cycle/week start
+  + export button.
+- **Phase 13:** TemplatesClient “Apply to Today” creates real activity.
+
+**Tests / gates:** `pnpm typecheck` green; lint 0 errors; **92 tests pass**;
+build green (routes include new focus/day/privacy).
+
+**Browser evidence (local, port 3456):**
+- Signup → empty Today → FAB → editor → save → block “10x Deep work block”
+  9:00–9:45 on timeline (a11y tree).
+- Complete → button becomes “Mark incomplete”.
+- Inbox add “Buy groceries for week” with Anytime/Schedule/Delete actions.
+- Focus shows “Start focus”; Settings loads theme/time controls.
+- Screenshots: `browser-qa/10x-today-desktop.png`, `10x-today-mobile.png`
+  (Chrome headless; interactive authed flow verified via agent-browser a11y).
+
+**Parity:** web 88.46%, iOS 86.52% (planned coverage unchanged; UI evidence
+added for core loop — checklist rows can be tightened in Phase 20).
+
+**Deviations / remaining:**
+1. Routines write UI + routines API routes not done (Phase 8).
+2. Month view not upgraded beyond prior partial wiring.
+3. Batch mutations endpoint not implemented.
+4. Magic-link still plugin-broken (Phase 15).
+5. AI UI still degrades without key (Phase 14).
+6. Live deploy/verify not yet run in this progress block — do Phase 20 next.
+
+**Next step:** Phase 8 (routines) or Phase 20 (commit/push/deploy/live-verify
+core loop on time.neima.me). Prefer Phase 20 if shipping user-facing value now.
+
+---
+
 ## 2026-07-13 — Phase 1E COMPLETE: auth UI + prod migration heal, real account verified LIVE
 
 **Subphase:** 1E — Release. Prod was broken for real accounts (signup 500'd,

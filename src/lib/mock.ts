@@ -19,6 +19,13 @@ export type Activity = {
   done?: boolean;
   checklist?: { label: string; done: boolean }[];
   energy?: "low" | "medium" | "high";
+  /** Present when loaded from the real API — used for If-Match writes. */
+  revision?: number;
+  categoryId?: string;
+  /** ISO occurrence_key for editScope=this (defaults to series dtstart). */
+  occurrenceKey?: string;
+  notes?: string;
+  priority?: "none" | "low" | "high";
 };
 
 export const NOW_MIN = 13 * 60; // 13:00

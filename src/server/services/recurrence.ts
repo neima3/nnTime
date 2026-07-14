@@ -13,14 +13,68 @@
  * Completed past occurrences are never mutated by series edits.
  */
 import "server-only";
-import type { Db } from "../dal";
+import {
+  appendChangeLog,
+  ConflictError,
+  NotFoundError,
+  type Db,
+} from "../dal";
 import dbDefault from "../db";
 import * as schema from "../db/schema";
-import { and, eq, isNull, lt, gte } from "drizzle-orm";
-import { expandSeries } from "../temporal/recurrence";
-import { appendChangeLog } from "../dal";
+import { and, eq, isNull, gte, sql } from "drizzle-orm";
 
 export type EditScope = "this" | "this_and_future" | "all";
+
+/** Whitelist of series columns safe to patch via editScope=all / this_and_future. */
+const SERIES_PATCH_KEYS = new Set([
+  "tz",
+  "dtstartLocal",
+  "rrule",
+  "exdate",
+  "rdate",
+  "title",
+  "emoji",
+  "categoryId",
+  "durationMin",
+  "checklistTemplate",
+  "energy",
+  "priority",
+  "tags",
+  "notes",
+  "source",
+  "sourceRef",
+]);
+
+/** Whitelist of occurrence override columns for editScope=this. */
+const OCCURRENCE_PATCH_KEYS = new Set([
+  "title",
+  "startAt",
+  "durationMin",
+  "status",
+  "completedAt",
+  "checklistOverride",
+  "energy",
+]);
+
+export function pickSeriesPatch(patch: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined) continue;
+    if (!SERIES_PATCH_KEYS.has(k)) continue;
+    out[k] = v;
+  }
+  return out;
+}
+
+export function pickOccurrencePatch(patch: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined) continue;
+    if (!OCCURRENCE_PATCH_KEYS.has(k)) continue;
+    out[k] = v;
+  }
+  return out;
+}
 
 /**
  * Apply an edit to an activity series at a specific occurrence, honoring the
@@ -49,20 +103,32 @@ export async function editSeriesOccurrence(
       ),
     )
     .limit(1);
-  if (!series) throw new Error("series not found");
+  if (!series) throw new NotFoundError("activity_series");
   if (series.revision !== ifMatchRevision) {
-    throw new Error("revision mismatch");
+    throw new ConflictError("revision mismatch", series);
   }
 
   switch (scope) {
     case "this":
-      return editThisOccurrence(db, userId, seriesId, occurrenceKey, patch);
+      return editThisOccurrence(
+        db,
+        userId,
+        seriesId,
+        occurrenceKey,
+        pickOccurrencePatch(patch),
+      );
 
     case "this_and_future":
-      return editThisAndFuture(db, userId, series, occurrenceKey, patch);
+      return editThisAndFuture(
+        db,
+        userId,
+        series,
+        occurrenceKey,
+        pickSeriesPatch(patch),
+      );
 
     case "all":
-      return editAll(db, userId, series, patch);
+      return editAll(db, userId, series, pickSeriesPatch(patch));
   }
 }
 
@@ -83,9 +149,7 @@ async function editThisOccurrence(
       userId,
       seriesId,
       occurrenceKey,
-      ...Object.fromEntries(
-        Object.entries(patch).filter(([, v]) => v !== undefined),
-      ),
+      ...patch,
     })
     .onConflictDoUpdate({
       target: [schema.activityOccurrences.seriesId, schema.activityOccurrences.occurrenceKey],
@@ -165,6 +229,7 @@ async function editAll(
   series: { id: string; revision: number },
   patch: Record<string, unknown>,
 ): Promise<void> {
+  if (Object.keys(patch).length === 0) return;
   const [updated] = await db
     .update(schema.activitySeries)
     .set({
@@ -222,4 +287,3 @@ function truncateRruleUntil(rrule: string, until: Date): string {
   return `${parts.join(";")};UNTIL=${untilStr}`;
 }
 
-import { sql } from "drizzle-orm";

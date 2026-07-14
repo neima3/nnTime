@@ -1,14 +1,20 @@
 /**
- * Server-side day resolution service — shared by Server Components and the
- * (future) /api/v1/day route. ADR-002: same code path, never self-HTTP.
+ * Server-side day resolution service — shared by Server Components and
+ * GET /api/v1/day/{date}. ADR-002: same code path, never self-HTTP.
  *
  * Reads the authenticated user's settings, resolves the day in their planning
- * zone, and returns activities + anytime tasks for that day.
+ * zone, filters activities into that day, and merges occurrence completion state.
  */
 import "server-only";
 import { getSession } from "../auth-session";
-import { getOrCreateSettings, listTasks, listActivitySeries, type Db } from "../dal";
-import { resolveDayBounds } from "../temporal/zone";
+import {
+  getOrCreateSettings,
+  listTasks,
+  listActivitySeries,
+  listUserOccurrences,
+  type Db,
+} from "../dal";
+import { resolveDayBounds, instantToDateStr } from "../temporal/zone";
 
 export interface ResolvedDay {
   userId: string;
@@ -18,6 +24,8 @@ export interface ResolvedDay {
   end: Date;
   activities: unknown[];
   anytimeTasks: unknown[];
+  /** seriesId → occurrence status for the occurrence_key matching series start. */
+  occurrenceStatusBySeries: Record<string, string>;
 }
 
 /**
@@ -33,17 +41,45 @@ export async function getResolvedDay(
 
   const settings = await getOrCreateSettings(session.userId, opts);
   const zone = settings.timezone;
-  const target = dateStr ?? new Date().toISOString().slice(0, 10);
+  // Prefer the caller's date; otherwise use "today" in the planning zone.
+  const target =
+    dateStr ?? instantToDateStr(new Date(), zone);
 
   const bounds = resolveDayBounds(target, zone);
 
-  // For 1D: return the raw series + tasks. Phase 2A's recurrence engine expands
-  // series into occurrences within [start, end). For now, list all non-deleted
-  // series and anytime tasks; the UI renders what it gets.
   const series = await listActivitySeries(session.userId, opts);
   const anytimeTasks = await listTasks(session.userId, {
     bucket: "anytime",
     ...opts,
+  });
+  const occurrences = await listUserOccurrences(session.userId, opts);
+
+  // Keep series whose wall-clock date in the series/planning zone is the target day.
+  // One-offs use series.tz for expansion; fall back to planning zone.
+  const daySeries = series.filter((s) => {
+    const seriesZone = s.tz || zone;
+    try {
+      return instantToDateStr(s.dtstartLocal, seriesZone) === target;
+    } catch {
+      return s.dtstartLocal >= bounds.start && s.dtstartLocal < bounds.end;
+    }
+  });
+
+  const occurrenceStatusBySeries: Record<string, string> = {};
+  for (const occ of occurrences) {
+    // Prefer status keyed by series for one-offs (occurrence_key ≈ dtstart).
+    occurrenceStatusBySeries[occ.seriesId] = occ.status;
+  }
+
+  // Anytime tasks: bucket anytime with matching date OR null date (floating).
+  const dayAnytime = anytimeTasks.filter((t) => {
+    if (!t.date) return true;
+    // date column is date-only
+    const d =
+      t.date instanceof Date
+        ? t.date.toISOString().slice(0, 10)
+        : String(t.date).slice(0, 10);
+    return d === target;
   });
 
   return {
@@ -52,7 +88,8 @@ export async function getResolvedDay(
     zone,
     start: bounds.start,
     end: bounds.end,
-    activities: series,
-    anytimeTasks,
+    activities: daySeries,
+    anytimeTasks: dayAnytime,
+    occurrenceStatusBySeries,
   };
 }

@@ -103,6 +103,7 @@ export async function updateTask(
   userId: string,
   id: string,
   input: Partial<{
+    bucket: "inbox" | "anytime";
     title: string;
     emoji: string;
     categoryId: string;
@@ -198,6 +199,7 @@ export async function createActivitySeries(
     priority?: "none" | "low" | "high";
     notes?: string;
     source?: "manual" | "routine" | "calendar";
+    checklistTemplate?: unknown[];
   },
   opts: { db?: Db } = {},
 ) {
@@ -210,7 +212,16 @@ export async function createActivitySeries(
       userId,
       priority: input.priority ?? "none",
       source: input.source ?? "manual",
-      ...input,
+      checklistTemplate: input.checklistTemplate ?? [],
+      tz: input.tz,
+      dtstartLocal: input.dtstartLocal,
+      rrule: input.rrule ?? null,
+      title: input.title,
+      emoji: input.emoji,
+      categoryId: input.categoryId,
+      durationMin: input.durationMin,
+      energy: input.energy ?? null,
+      notes: input.notes,
     })
     .returning();
   await appendChangeLog(db, userId, "activity_series", id, "upsert", series!.revision);
@@ -263,6 +274,23 @@ export async function listOccurrences(
       ),
     )
     .orderBy(asc(schema.activityOccurrences.startAt));
+}
+
+/** All non-deleted occurrence overrides for a user (day resolution / complete state). */
+export async function listUserOccurrences(
+  userId: string,
+  opts: { db?: Db } = {},
+) {
+  const db = opts.db ?? dbDefault;
+  return db
+    .select()
+    .from(schema.activityOccurrences)
+    .where(
+      and(
+        eq(schema.activityOccurrences.userId, userId),
+        isNull(schema.activityOccurrences.deletedAt),
+      ),
+    );
 }
 
 export async function upsertOccurrence(

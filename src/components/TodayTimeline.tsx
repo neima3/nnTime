@@ -2,42 +2,50 @@
 
 /**
  * Today timeline wrapper — bridges the Server Component's data with the
- * interactive TimelineCanvas (Phase 2C). Handles optimistic mutations via
- * fetch calls to the /api/v1/tasks and /api/v1/activities endpoints.
+ * interactive TimelineCanvas. Handles optimistic mutations via /api/v1.
  */
 
 import { useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { TimelineCanvas } from "./TimelineCanvas";
 import type { Activity } from "@/lib/mock";
-import { NOW_MIN } from "@/lib/mock";
+import { localMinutesToInstant } from "@/lib/adapters";
 
 interface TodayTimelineProps {
   activities: Activity[];
+  date: string;
+  zone: string;
+  /** Minutes from midnight for "now" styling; live line when isToday. */
+  nowMin: number;
+  isToday: boolean;
+  authed: boolean;
 }
 
-export function TodayTimeline({ activities }: TodayTimelineProps) {
+export function TodayTimeline({
+  activities,
+  date,
+  zone,
+  nowMin,
+  isToday,
+  authed,
+}: TodayTimelineProps) {
+  const router = useRouter();
+
   const handleUpdateActivity = useCallback(
     async (id: string, start: number, duration: number): Promise<{ ok: boolean }> => {
+      if (!authed) return { ok: false };
       try {
-        // For 2C: activities are activity_series rows. The PATCH endpoint with
-        // edit-scope is Phase 2A — here we update the dtstartLocal (start time)
-        // and durationMin. We need the current revision for If-Match.
-        // First, GET the activity to get its revision.
-        const getRes = await fetch(`/api/v1/activities/${id}`);
-        if (!getRes.ok) return { ok: false };
-        const activity = await getRes.json();
-        const revision = activity.revision;
+        const act = activities.find((a) => a.id === id);
+        let revision = act?.revision;
 
-        // Convert minutes-from-midnight back to a UTC instant (today's date).
-        const today = new Date();
-        const dtstartLocal = new Date(
-          today.getFullYear(),
-          today.getMonth(),
-          today.getDate(),
-          Math.floor(start / 60),
-          start % 60,
-          0,
-        );
+        if (revision == null) {
+          const getRes = await fetch(`/api/v1/activities/${id}`);
+          if (!getRes.ok) return { ok: false };
+          const activity = await getRes.json();
+          revision = activity.revision;
+        }
+
+        const dtstartLocal = localMinutesToInstant(date, start, zone);
 
         const patchRes = await fetch(`/api/v1/activities/${id}`, {
           method: "PATCH",
@@ -46,35 +54,88 @@ export function TodayTimeline({ activities }: TodayTimelineProps) {
             "If-Match": String(revision),
           },
           body: JSON.stringify({
-            dtstartLocal: dtstartLocal.toISOString(),
+            dtstartLocal,
             durationMin: duration,
             editScope: "all",
           }),
         });
 
-        if (patchRes.status === 409) return { ok: false }; // conflict
+        if (patchRes.status === 409) return { ok: false };
         if (!patchRes.ok) return { ok: false };
+        router.refresh();
         return { ok: true };
       } catch {
         return { ok: false };
       }
     },
-    [],
+    [activities, date, zone, authed, router],
   );
 
-  const handleCreateActivity = useCallback((start: number) => {
-    // For 2C: tapping an empty slot opens the editor (Phase 1D's editor sheet).
-    // For now, navigate to the editor with query params.
-    const params = new URLSearchParams({ start: String(start), date: new Date().toISOString().slice(0, 10) });
-    window.location.href = `/app/editor?${params}`;
-  }, []);
+  const handleCreateActivity = useCallback(
+    (start: number) => {
+      const params = new URLSearchParams({
+        start: String(start),
+        date,
+      });
+      router.push(`/app/editor?${params}`);
+    },
+    [date, router],
+  );
+
+  const handleComplete = useCallback(
+    async (id: string): Promise<{ ok: boolean }> => {
+      if (!authed) return { ok: false };
+      try {
+        const act = activities.find((a) => a.id === id);
+        let revision = act?.revision;
+        if (revision == null) {
+          const getRes = await fetch(`/api/v1/activities/${id}`);
+          if (!getRes.ok) return { ok: false };
+          revision = (await getRes.json()).revision;
+        }
+        const occurrenceKey = act?.occurrenceKey;
+        const nextStatus = act?.done ? "pending" : "completed";
+
+        const res = await fetch(`/api/v1/activities/${id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "If-Match": String(revision),
+          },
+          body: JSON.stringify({
+            editScope: "this",
+            occurrenceKey,
+            status: nextStatus,
+            completedAt:
+              nextStatus === "completed" ? new Date().toISOString() : null,
+          }),
+        });
+        if (!res.ok) return { ok: false };
+        router.refresh();
+        return { ok: true };
+      } catch {
+        return { ok: false };
+      }
+    },
+    [activities, authed, router],
+  );
+
+  const handleOpen = useCallback(
+    (id: string) => {
+      router.push(`/app/editor?id=${id}&date=${date}`);
+    },
+    [router, date],
+  );
 
   return (
     <TimelineCanvas
       activities={activities}
-      nowMin={NOW_MIN}
+      nowMin={nowMin}
+      showNowLine={isToday}
       onUpdateActivity={handleUpdateActivity}
       onCreateActivity={handleCreateActivity}
+      onComplete={authed ? handleComplete : undefined}
+      onOpen={handleOpen}
     />
   );
 }

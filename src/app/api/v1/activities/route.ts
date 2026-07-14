@@ -33,6 +33,7 @@ export async function POST(request: Request) {
       priority: body.priority,
       notes: body.notes,
       source: body.source,
+      checklistTemplate: body.checklistTemplate,
     });
     return Response.json(series, { status: 201 });
   });

@@ -15,6 +15,7 @@
  */
 
 import { useCallback, useRef, useState } from "react";
+import { Check } from "lucide-react";
 import { catClasses, fmt, fmtDuration, type Activity } from "@/lib/mock";
 import { LiveNowLine } from "./LiveNowLine";
 
@@ -37,8 +38,12 @@ interface DragState {
 interface TimelineCanvasProps {
   activities: Activity[];
   nowMin: number;
+  /** When false, hide the live now-line (viewing another day). */
+  showNowLine?: boolean;
   onUpdateActivity: (id: string, start: number, duration: number) => Promise<{ ok: boolean }>;
   onCreateActivity?: (start: number) => void;
+  onComplete?: (id: string) => Promise<{ ok: boolean }>;
+  onOpen?: (id: string) => void;
 }
 
 /** Compute overlap lanes for side-by-side layout (design-spec addendum 1). */
@@ -96,20 +101,29 @@ function computeLanes(activities: Activity[]): Map<string, { lane: number; laneC
 export function TimelineCanvas({
   activities,
   nowMin,
+  showNowLine = true,
   onUpdateActivity,
   onCreateActivity,
+  onComplete,
+  onOpen,
 }: TimelineCanvasProps) {
   const [drag, setDrag] = useState<DragState | null>(null);
   const [optimistic, setOptimistic] = useState<Map<string, { start: number; duration: number }>>(
     new Map(),
   );
+  const [doneOptimistic, setDoneOptimistic] = useState<Map<string, boolean>>(new Map());
   const [conflictId, setConflictId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Merge optimistic overrides into the activity list.
   const displayActivities = activities.map((a) => {
     const opt = optimistic.get(a.id);
-    return opt ? { ...a, start: opt.start, duration: opt.duration } : a;
+    const done = doneOptimistic.has(a.id) ? doneOptimistic.get(a.id) : a.done;
+    return {
+      ...a,
+      ...(opt ? { start: opt.start, duration: opt.duration } : {}),
+      done,
+    };
   });
 
   const lanes = computeLanes(displayActivities);
@@ -284,8 +298,8 @@ export function TimelineCanvas({
         ),
       )}
 
-      {/* Now line — live (mount-gated to avoid hydration mismatch) */}
-      <LiveNowLine />
+      {/* Now line — live only when viewing today */}
+      {showNowLine && <LiveNowLine />}
 
       {/* Activities */}
       <div
@@ -296,7 +310,7 @@ export function TimelineCanvas({
         {displayActivities.map((a) => {
           const cat = catClasses[a.category];
           const past = a.start + a.duration <= nowMin;
-          const current = a.start <= nowMin && nowMin < a.start + a.duration;
+          const current = showNowLine && a.start <= nowMin && nowMin < a.start + a.duration;
           const h = a.duration * PX_PER_MIN;
           const compact = h < 76;
           const laneInfo = lanes.get(a.id);
@@ -311,11 +325,11 @@ export function TimelineCanvas({
               key={a.id}
               role="button"
               tabIndex={0}
-              aria-label={`${a.title}, ${fmt(a.start)} to ${fmt(a.start + a.duration)}, ${fmtDuration(a.duration)}. Use arrow keys to move, plus or minus to resize.`}
-              aria-keyshortcuts="ArrowUp ArrowDown + -"
+              aria-label={`${a.title}, ${fmt(a.start)} to ${fmt(a.start + a.duration)}, ${fmtDuration(a.duration)}. Use arrow keys to move, plus or minus to resize. Enter to edit.`}
+              aria-keyshortcuts="ArrowUp ArrowDown + - Enter"
               className={`group absolute flex gap-3 rounded-2xl px-3.5 outline-none transition-transform hover:-translate-y-px hover:shadow-card focus-visible:ring-2 focus-visible:ring-iris ${cat.fill} ${
-                past ? "opacity-55 saturate-50" : ""
-              } ${current ? "shadow-float ring-2 ring-now/70" : ""} ${
+                past && !a.done ? "opacity-55 saturate-50" : ""
+              } ${a.done ? "opacity-70" : ""} ${current ? "shadow-float ring-2 ring-now/70" : ""} ${
                 compact ? "items-center py-1.5" : "py-3"
               } ${hasConflict ? "ring-2 ring-danger animate-pulse" : ""} cursor-grab active:cursor-grabbing`}
               style={{
@@ -326,7 +340,15 @@ export function TimelineCanvas({
                 touchAction: "none",
               }}
               onPointerDown={(e) => handlePointerDown(e, a.id, "move", a)}
-              onKeyDown={(e) => handleKeyDown(e, a)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && onOpen) {
+                  e.preventDefault();
+                  onOpen(a.id);
+                  return;
+                }
+                handleKeyDown(e, a);
+              }}
+              onDoubleClick={() => onOpen?.(a.id)}
             >
               <span
                 className={`grid shrink-0 place-items-center rounded-full bg-surface-raised/80 ${
@@ -349,6 +371,40 @@ export function TimelineCanvas({
                   {fmt(a.start)} – {fmt(a.start + a.duration)} · {fmtDuration(a.duration)}
                 </p>
               </div>
+
+              {onComplete && (
+                <button
+                  type="button"
+                  aria-label={a.done ? `Mark ${a.title} incomplete` : `Complete ${a.title}`}
+                  className={`grid shrink-0 place-items-center rounded-full border-2 transition-colors ${
+                    compact ? "size-7" : "size-8"
+                  } ${
+                    a.done
+                      ? "border-transparent bg-success text-ink-inverse"
+                      : `border-current ${cat.ink} opacity-50 hover:opacity-100 hover:bg-surface-raised/50`
+                  }`}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={async (e) => {
+                    e.stopPropagation();
+                    const next = !a.done;
+                    setDoneOptimistic((prev) => {
+                      const m = new Map(prev);
+                      m.set(a.id, next);
+                      return m;
+                    });
+                    const result = await onComplete(a.id);
+                    if (!result.ok) {
+                      setDoneOptimistic((prev) => {
+                        const m = new Map(prev);
+                        m.delete(a.id);
+                        return m;
+                      });
+                    }
+                  }}
+                >
+                  {a.done && <Check size={14} strokeWidth={3} />}
+                </button>
+              )}
 
               {/* Resize handles (hidden on compact) */}
               {!compact && (
