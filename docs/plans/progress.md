@@ -51,10 +51,15 @@ added for core loop — checklist rows can be tightened in Phase 20).
 3. Batch mutations endpoint not implemented.
 4. Magic-link still plugin-broken (Phase 15).
 5. AI UI still degrades without key (Phase 14).
-6. Live deploy/verify not yet run in this progress block — do Phase 20 next.
+6. **Push blocked this session:** `gh` token invalid + SSH key denied for
+   `neima3/nnTime`. Commit is local: `c9c9b1d` on `main` (13 commits ahead of
+   origin). Coolify builds from GitHub — cannot deploy new code until push works.
+7. Live deploy/verify deferred until push is unblocked (re-auth `gh auth login`
+   or fix SSH deploy key).
 
-**Next step:** Phase 8 (routines) or Phase 20 (commit/push/deploy/live-verify
-core loop on time.neima.me). Prefer Phase 20 if shipping user-facing value now.
+**Next step:** Neima re-auth GitHub (`gh auth login`), then
+`git push origin main` → Coolify deploy → live-verify create/complete on
+time.neima.me. Then Phase 8 (routines write) or 12 (stats).
 
 ---
 
