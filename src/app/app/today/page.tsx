@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   ChevronLeft,
   ChevronRight,
+  ListChecks,
   Plus,
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
@@ -167,6 +168,15 @@ export default async function TodayPage({
             </div>
             {!emptyDay && <DayProgress activities={activities} />}
             <SoftStreaks />
+            {authed && (
+              <Link
+                href="/app/review"
+                className="inline-flex items-center gap-1.5 rounded-2xl border border-border bg-surface px-3 py-2 text-[13px] font-semibold text-ink-soft shadow-card hover:bg-surface-sunken hover:text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+              >
+                <ListChecks size={15} />
+                Review
+              </Link>
+            )}
             <div className="flex items-center gap-1 rounded-2xl border border-border bg-surface p-1 shadow-card">
               {prevDate ? (
                 <Link

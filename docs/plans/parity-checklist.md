@@ -60,7 +60,7 @@ energy-pattern learning, and related rows — see table.
 |---|---|---|---|---|---|---|---|
 | A01 | Color-coded daily timeline | A | both | 1D, 7D | planned | 1 | SHIPPED: Today screen renders real activity blocks with 6 category pastel colors; live HTTP 200 on time.neima.me/app/today (screenshot browser-qa/1d-today-live.png). |
 | A02 | Day / week / month views | A | both | 2D, 7D | planned | 1 | SHIPPED: Day (Today), Week, Month screens all wired to real data, live-verified HTTP 200 on all three routes. Day+Week+Month on web (2D); roadmap 7D itemizes month view in the iOS planner-parity scope. |
-| A03 | "Anytime" activities | A | both | 1D, 7D | planned | 1 | SHIPPED: Anytime sidebar on Today reads real anytime-bucket tasks via DAL; live-verified. |
+| A03 | "Anytime" activities | A | both | 1D, 7D | planned | 1 | SHIPPED: AnytimeRail schedule→editor + clear DELETE with If-Match (Wave 2/3); real anytime-bucket tasks via DAL. |
 | A04 | Drag-and-drop rearranging | A | both | 2C, 7D | planned | 1 | SHIPPED: TimelineCanvas component (src/components/TimelineCanvas.tsx) implements drag move + resize with 15-min snap and collision lanes; live-verified. |
 | A05 | Time-of-day grouping (Android) | A | both | — | deferred | 0 | Android-only fallback UI in Tiimo; Android is deferred for Kairo and web/iOS ship the full timeline instead of a grouped view. |
 | A06 | "Review Today" | A | both | 2D, 7D | planned | 1 | SHIPPED: /app/review wired to real unfinished activities; live HTTP 200. |
@@ -79,7 +79,7 @@ energy-pattern learning, and related rows — see table.
 | B11 | All-day / no-time tasks | B | both | 1D | planned | 1 | SHIPPED: anytime bucket (date column, no time), verified. Handled via Anytime, same mechanism as A03. |
 | B12 | Recurring/repeat tasks | B | both | 2A, 7D | planned | 1 | SHIPPED: activity_series with rrule + recurrence engine (src/server/services/recurrence.ts) with edit scopes; 4 tests passing. Custom N-day/week intervals are a deliberate Tiimo-beating addition. |
 | B13 | Skip / mark incomplete | B | both | 2D | planned | 1 | SHIPPED: Review Today flow has "Let it go" (skip) action; occurrence status enum includes 'skipped'. |
-| C01 | Routines (activity sequences) | C | both | 1A, 2B, 7D | planned | 1 | SHIPPED: routines table + /app/routines wired to real data; live HTTP 200. |
+| C01 | Routines (activity sequences) | C | both | 1A, 2B, 7D | planned | 1 | SHIPPED: routines CRUD API + RoutinesClient create/pause/use-today/delete; honest empty state when authed with 0 routines (Wave 3). |
 | C02 | Repeat scheduling | C | both | 2A, 2B | planned | 1 | SHIPPED: routineSchedules table with rrule + routine materializer (src/server/services/routine-materializer.ts). |
 | C03 | Routine builder / library redesign | C | both | 5D | planned | 1 | — |
 | C04 | Community/shared routine templates | C | both | — | deferred | 0 | Named deferred in the roadmap (community template sharing). |
@@ -95,8 +95,8 @@ energy-pattern learning, and related rows — see table.
 | D09 | Hyperfocus support | D | both | 3B, 3C | planned | 1 | Matches Tiimo's own mechanism (break reminders + visible timer + mood insights), not a dedicated hyperfocus mode. |
 | D10 | Break prompts | D | both | 3B | planned | 1 | SHIPPED: notification scheduler (src/server/services/notifications.ts) computes halfway + wrap-up notifications. |
 | D11 | Known gap: screen dimming during timer | D | both | — | excluded | 0 | Research doc marks this a reported bug/gap in Tiimo itself, not a feature to replicate. |
-| E01 | AI Co-Planner (conversational planning) | E | both | 4, 7D | planned | 1 | IMPLEMENTED (server-layer, not live-verified — needs ANTHROPIC_API_KEY): src/server/services/ai.ts — breakDownTask, parseNaturalLanguage, planMyDay, groupByPriority. Delivered as the sum of break-it-down + NL add + plan-my-day + disruption replanning (Phase 4 items 1,2,3,4). |
-| E02 | AI task breakdown / subtask generation | E | both | 4, 7D | planned | 1 | IMPLEMENTED (server-layer, not live-verified — needs ANTHROPIC_API_KEY): breakDownTask in src/server/services/ai.ts (SEC-05 safety contract: no tools, zod-strict, quota). |
+| E01 | AI Co-Planner (conversational planning) | E | both | 4, 7D | planned | 1 | SHIPPED UI+API (2026-07-15 Wave 2/3): /app/planner PlanDayClient + POST /api/v1/ai/plan-day, breakdown, parse. SEC-05 no auto-mutate; 503 without ANTHROPIC_API_KEY. Live plan-day 401 unauth. |
+| E02 | AI task breakdown / subtask generation | E | both | 4, 7D | planned | 1 | SHIPPED: editor “Break it down” → POST /api/v1/ai/breakdown (SEC-05); server breakDownTask + UI wired 2026-07-15. |
 | E03 | AI time estimation | E | both | 4 | planned | 1 | IMPLEMENTED (server-layer, not live-verified — needs ANTHROPIC_API_KEY): AI duration estimation via src/server/services/ai.ts. Duration estimation chip. |
 | E04 | Natural-language / voice add | E | both | 4, 7D | planned | 1 | IMPLEMENTED (server-layer, not live-verified — needs ANTHROPIC_API_KEY): parseNaturalLanguage in src/server/services/ai.ts. |
 | E05 | Dynamic re-planning via chat | E | both | 4 | planned | 1 | IMPLEMENTED (server-layer, not live-verified — needs ANTHROPIC_API_KEY): planMyDay disruption re-planning in src/server/services/ai.ts. Disruption re-planning. |
@@ -135,10 +135,10 @@ energy-pattern learning, and related rows — see table.
 | J05 | Community hub | J | both | — | deferred | 0 | Rolls into the courses/learning-content deferral; no community-hub phase exists. |
 | K01 | Planning streaks | K | both | 3C, 5C | planned | 1 | SHIPPED: SoftStreaks component (src/components/SoftStreaks.tsx) reads /changes feed, 1-day grace. |
 | K02 | Personal insights / stats | K | both | 5C | planned | 1 | SHIPPED: src/server/services/stats.ts — getStats from planner_events. |
-| K03 | Mood tracking / check-ins | K | both | 5C | planned | 1 | SHIPPED: recordMoodCheckin in stats service → planner_events. |
+| K03 | Mood tracking / check-ins | K | both | 5C | planned | 1 | SHIPPED: recordMoodCheckin + POST /api/v1/mood + StatsClient mood chips UI (Wave 2); live route 401 unauth. |
 | K04 | Apple Health sync (Tiimo Wellbeing) | K | ios | 8B | planned | 1 | Roadmap 8B itemizes HealthKit sync: write focus/mindful minutes, read sleep schedule for wind-down suggestions, explicit user opt-in. |
 | K05 | Editorial "review techniques" (Winventory, Progress Check, Tiny Rewards) | K | both | — | excluded | 0 | Research doc explicitly labels this "Content, not confirmed as app UI" — blog content, not an in-app feature. |
-| L01 | Sign-up via Apple / Google / Email | L | both | 1C, 7B, 8B | planned | 1 | Email+password sign-up/in SHIPPED + live-verified 2026-07-13 (real account created on time.neima.me, session persists, data round-trips). Magic-link needs Resend transport + the server plugin (ADR-003 follow-up); Sign in with Apple (7B), Google (8B) still planned. |
+| L01 | Sign-up via Apple / Google / Email | L | both | 1C, 7B, 8B | planned | 1 | Email+password SHIPPED + live-verified 2026-07-13. Magic-link plugin + client UI (sign-in “Email me a magic link”) + forgot/reset password pages SHIPPED 2026-07-15 Wave 3; email transport still needs Resend. Apple (7B) / Google (8B) still planned. |
 | L02 | Cross-device sync | L | both | 1A/1B, 7C | planned | 1 | SHIPPED: /api/v1/changes?cursor= incremental sync feed; live-verified (401 without auth, works with session). |
 | L03 | No account merging | L | both | — | excluded | 0 | Describes a Tiimo limitation (unsupported), not a buildable feature; matched by default since Kairo doesn't build merging either. |
 | L04 | Family/shared profile billing | L | ios | — | deferred | 0 | Rolls into the family/shared-profiles deferral. |

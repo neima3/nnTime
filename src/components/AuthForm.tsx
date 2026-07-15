@@ -3,15 +3,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, Mail } from "lucide-react";
 import { signIn, signUp } from "@/lib/auth-client";
 
 type Mode = "sign-in" | "sign-up";
 
 /**
- * Email + password auth (ADR-003). Verification email is disabled until Resend
- * is provisioned, so sign-up signs the user straight in. Magic link needs the
- * server-side plugin + Resend transport (tracked as an ADR-003 follow-up).
+ * Email + password auth (ADR-003). Magic link optional.
+ * Without Resend: reset/magic still accept and return generic success
+ * (no account enumeration); server logs the URL in non-production.
  */
 export function AuthForm({ mode }: { mode: Mode }) {
   const router = useRouter();
@@ -19,17 +19,24 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [magicPending, setMagicPending] = useState(false);
 
   const isSignUp = mode === "sign-up";
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setInfo(null);
     setPending(true);
     try {
       const res = isSignUp
-        ? await signUp.email({ email, password, name: name.trim() || email.split("@")[0] })
+        ? await signUp.email({
+            email,
+            password,
+            name: name.trim() || email.split("@")[0] || "Planner",
+          })
         : await signIn.email({ email, password });
       if (res.error) {
         setError(res.error.message ?? "Something went wrong. Please try again.");
@@ -42,6 +49,33 @@ export function AuthForm({ mode }: { mode: Mode }) {
       setError("Couldn't reach the server. Please try again.");
       setPending(false);
     }
+  }
+
+  async function onMagicLink() {
+    if (!email.trim()) {
+      setError("Enter your email first.");
+      return;
+    }
+    setError(null);
+    setInfo(null);
+    setMagicPending(true);
+    try {
+      const res = await signIn.magicLink({
+        email: email.trim(),
+        callbackURL: "/app/today",
+      });
+      if (res.error) {
+        setError(res.error.message ?? "Could not send magic link.");
+        setMagicPending(false);
+        return;
+      }
+      setInfo(
+        "If that address is valid, a sign-in link is on the way. Check your inbox (and spam). Local dev logs the link in the server console when email isn't configured.",
+      );
+    } catch {
+      setError("Couldn't reach the server. Please try again.");
+    }
+    setMagicPending(false);
   }
 
   return (
@@ -95,12 +129,31 @@ export function AuthForm({ mode }: { mode: Mode }) {
               placeholder={isSignUp ? "At least 8 characters" : "Your password"}
             />
 
+            {!isSignUp && (
+              <div className="flex justify-end">
+                <Link
+                  href="/forgot-password"
+                  className="text-[13px] font-semibold text-iris hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+            )}
+
             {error && (
               <p
                 role="alert"
                 className="rounded-xl bg-danger-soft px-3.5 py-2.5 text-[13px] font-medium text-danger"
               >
                 {error}
+              </p>
+            )}
+            {info && (
+              <p
+                role="status"
+                className="rounded-xl bg-iris-soft px-3.5 py-2.5 text-[13px] font-medium text-iris"
+              >
+                {info}
               </p>
             )}
 
@@ -119,6 +172,24 @@ export function AuthForm({ mode }: { mode: Mode }) {
               )}
             </button>
           </form>
+
+          {!isSignUp && (
+            <button
+              type="button"
+              disabled={magicPending}
+              onClick={() => void onMagicLink()}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-surface py-3 text-[14px] font-semibold text-ink-soft transition-colors hover:bg-surface-sunken hover:text-ink disabled:opacity-70"
+            >
+              {magicPending ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <>
+                  <Mail size={16} />
+                  Email me a magic link
+                </>
+              )}
+            </button>
+          )}
         </div>
 
         <p className="mt-5 text-center text-[14px] text-ink-soft">
@@ -157,3 +228,4 @@ function Field({
     </label>
   );
 }
+

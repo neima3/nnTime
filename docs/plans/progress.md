@@ -1,5 +1,29 @@
 # Progress log
 
+## 2026-07-15 — 10× Wave 3 COMPLETE: auth recovery, PWA SW, empty states, tests
+
+**Program:** `docs/plans/2026-07-15-10x-wave3-roadmap.md` +
+`docs/plans/10x-wave3-agent-prompt.md`. All 10 phases ticked.
+
+**Shipped:**
+1. `/forgot-password` + `/reset-password` (Better Auth request/reset).
+2. Magic-link client plugin + “Email me a magic link” on sign-in.
+3. Routines authed empty state (no mock library as fake user data).
+4. `ServiceWorkerRegister` in root layout (prod only).
+5. `src/lib/adapters.test.ts` — 5 pure unit tests (97 total suite).
+6. Settings account delete type-to-confirm + onboarding link.
+7. Today “Review” chip; More menu Review + Onboarding.
+8. Parity checklist evidence refresh (E01/E02/A03/C01/K03/L01).
+9. Gates green; live smoke after deploy.
+10. Ship to main + Coolify.
+
+**Gates:** lint 0 errors, typecheck, **97 tests**, build green.
+
+**Residual (external):** Resend / Anthropic keys, Coolify staging UI, GH Actions
+budget, full authed browser session dogfood optional.
+
+---
+
 ## 2026-07-15 — Finish line: Anytime rail, live nowMin, plan-day, offline shell
 
 **Closed remaining Wave 2 boxes (14, 18) + extras:**

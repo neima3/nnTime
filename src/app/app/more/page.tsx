@@ -17,7 +17,9 @@ const items = [
   { href: "/app/templates", label: "Templates", hint: "Ready-made routines by Kairo", icon: LayoutTemplate, tint: "bg-cat-butter text-cat-butter-ink" },
   { href: "/app/stats", label: "Stats", hint: "Your week in a gentle mirror", icon: BarChart3, tint: "bg-cat-mint text-cat-mint-ink" },
   { href: "/app/planner", label: "AI co-planner", hint: "Break down, plan, re-plan", icon: Sparkles, tint: "bg-iris-soft text-iris" },
+  { href: "/app/review", label: "Review today", hint: "Let go, move, or complete leftovers", icon: Sparkles, tint: "bg-cat-peach text-cat-peach-ink" },
   { href: "/app/settings", label: "Settings", hint: "Account, appearance, notifications", icon: Settings, tint: "bg-cat-sky text-cat-sky-ink" },
+  { href: "/onboarding", label: "Onboarding", hint: "Gentle setup if you want a reset", icon: LayoutTemplate, tint: "bg-surface-sunken text-ink-soft" },
 ];
 
 export default function MorePage() {

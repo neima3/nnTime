@@ -209,6 +209,27 @@ export function SettingsClient() {
     setStatus("Export downloaded");
   }, []);
 
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+
+  const deleteAccount = useCallback(async () => {
+    if (deleteConfirm !== "delete-my-account") {
+      setStatus('Type delete-my-account to confirm');
+      return;
+    }
+    setDeleteBusy(true);
+    const res = await fetch("/api/v1/privacy/account", {
+      method: "DELETE",
+      headers: { Confirm: "delete-my-account" },
+    });
+    setDeleteBusy(false);
+    if (!res.ok && res.status !== 204) {
+      setStatus("Could not delete account");
+      return;
+    }
+    window.location.href = "/";
+  }, [deleteConfirm]);
+
   if (!authed) {
     return (
       <p className="rounded-2xl border border-border bg-surface px-5 py-8 text-center text-[14px] text-ink-soft">
@@ -343,6 +364,45 @@ export function SettingsClient() {
             >
               Export
             </button>
+          }
+        />
+        <div className="space-y-3 px-5 py-4">
+          <div>
+            <p className="text-[15px] font-semibold text-danger">Delete account</p>
+            <p className="mt-0.5 text-[13px] text-ink-soft">
+              Permanently removes your planner data (SEC-10). Type{" "}
+              <code className="rounded bg-surface-sunken px-1 text-[12px]">
+                delete-my-account
+              </code>{" "}
+              to confirm.
+            </p>
+          </div>
+          <input
+            value={deleteConfirm}
+            onChange={(e) => setDeleteConfirm(e.target.value)}
+            placeholder="delete-my-account"
+            className="w-full rounded-xl border border-border bg-surface-sunken px-3 py-2 text-[13px] font-medium outline-none focus:ring-2 focus:ring-iris"
+            aria-label="Type delete-my-account to confirm"
+          />
+          <button
+            type="button"
+            disabled={deleteBusy || deleteConfirm !== "delete-my-account"}
+            onClick={() => void deleteAccount()}
+            className="rounded-xl bg-danger-soft px-3 py-2 text-[13px] font-semibold text-danger disabled:opacity-40"
+          >
+            {deleteBusy ? "Deleting…" : "Delete my account forever"}
+          </button>
+        </div>
+        <Row
+          label="Onboarding"
+          hint="Revisit the gentle setup flow"
+          right={
+            <a
+              href="/onboarding"
+              className="rounded-xl border border-border px-3 py-1.5 text-[13px] font-semibold text-ink-soft hover:text-ink"
+            >
+              Open
+            </a>
           }
         />
       </Section>

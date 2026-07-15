@@ -28,7 +28,11 @@ async function load(): Promise<{ items: RoutineView[]; authed: boolean }> {
       })),
     };
   }
+  // Honest empty state when authed — never fake mock library as user data.
   const routines = await listRoutines(session.userId);
+  if (routines.length === 0) {
+    return { items: [], authed: true };
+  }
   const items: RoutineView[] = await Promise.all(
     routines.map(async (r) => {
       const steps = await listRoutineSteps(session.userId, r.id);
