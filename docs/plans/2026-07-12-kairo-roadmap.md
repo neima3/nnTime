@@ -42,9 +42,9 @@ design work BEFORE the consuming subphase starts.
   - [x] 0.5d Gate: `node scripts/parity.mjs` reproduces ≥85% planned coverage —
         web 88.46%, iOS 86.52% (2026-07-12, after itemizing month view/extend/
         checklist-in-focus/high-contrast/Apple Health into phases)
-- [ ] Phase 1 — Data foundation
+- [x] Phase 1 — Data foundation
   - [x] 1A Domain + API contract (OpenAPI 3.1, schema invariants, sync semantics)
-  - [ ] 1B Infra safety: staging, CI, backups+restore drill, migrations runbook,
+  - [x] 1B Infra safety: staging, CI, backups+restore drill, migrations runbook,
         security headers, rate-limit framework
   - [x] 1C Auth + DB + CRUD with per-resource authorization + negative tests
   - [x] 1D UI wiring: Today, editor sheet, Anytime, To-do inbox route
