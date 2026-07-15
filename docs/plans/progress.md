@@ -1,5 +1,25 @@
 # Progress log
 
+## 2026-07-15 — 10× Wave 4 COMPLETE: PWA icons, ICS import, Resend, keyboard UX
+
+**Program:** `docs/plans/2026-07-15-10x-wave4-roadmap.md` — all 10 phases.
+
+**Shipped:**
+1. `public/icon-192.png`, `icon-512.png`, `favicon-32.png` + layout icons.
+2. `POST /api/v1/calendar/ics` + Settings Calendars import UI (SEC-04 fetch).
+3. `src/server/email.ts` Resend transport; auth magic/reset/verify use it when keyed.
+4. Timeline checklist chips; FocusClient steps list.
+5. `POST /api/v1/ai/group-priority` + Inbox “Group by priority”.
+6. `KeyboardShortcuts`: `n` new activity, `?` help.
+7. Landing CTAs → onboarding; removed unused Next.js public SVGs.
+8. Rate-limit create activities/tasks (60/min/user).
+9. `calendar.test.ts` (parser + SSRF protocol guards); vitest hookTimeout 90s.
+10. **101 tests** pass; build green; ship + Coolify.
+
+**Residual:** Resend/Anthropic keys in Coolify env; full authed browser session optional.
+
+---
+
 ## 2026-07-15 — 10× Wave 3 COMPLETE: auth recovery, PWA SW, empty states, tests
 
 **Program:** `docs/plans/2026-07-15-10x-wave3-roadmap.md` +

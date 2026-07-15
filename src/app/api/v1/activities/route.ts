@@ -7,6 +7,7 @@ import { requireSession } from "@/server/auth-session";
 import { listActivitySeries, createActivitySeries } from "@/server/dal";
 import { handleErrors, parseBody } from "@/server/api-errors";
 import { activitySeriesCreate } from "@/server/schemas/activity-series";
+import { checkRateLimit, rateLimitedResponse } from "@/server/ratelimit";
 
 export async function GET() {
   return handleErrors(async () => {
@@ -19,6 +20,11 @@ export async function GET() {
 export async function POST(request: Request) {
   return handleErrors(async () => {
     const { userId } = await requireSession();
+    const rl = await checkRateLimit(`api:activities:create:${userId}`, {
+      limit: 60,
+      windowSec: 60,
+    });
+    if (!rl.allowed) return rateLimitedResponse(rl);
     const body = await parseBody(request, activitySeriesCreate);
     if (body instanceof Response) return body;
     const series = await createActivitySeries(userId, {

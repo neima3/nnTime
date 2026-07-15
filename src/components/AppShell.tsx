@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { UserMenu } from "./UserMenu";
 import { OfflineShell } from "./OfflineShell";
+import { KeyboardShortcuts } from "./KeyboardShortcuts";
 
 const sidebarNav = [
   { href: "/app/today", label: "Today", key: "today", icon: CalendarDays },
@@ -110,6 +111,7 @@ export function AppShell({
       {/* main */}
       <main id="main-content" className="min-w-0 flex-1 pb-24 md:pb-0">{children}</main>
       <OfflineShell />
+      <KeyboardShortcuts />
 
       {/* mobile bottom bar */}
       <nav

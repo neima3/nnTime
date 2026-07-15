@@ -11,10 +11,12 @@ import {
   CalendarPlus,
   Flag,
   Plus,
+  Sparkles,
   Sun,
   Trash2,
 } from "lucide-react";
 import { catClasses, type CategoryId } from "@/lib/mock";
+import { toast } from "./Toast";
 
 export type InboxItem = {
   id: string;
@@ -54,6 +56,50 @@ export function InboxClient({
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [groupMsg, setGroupMsg] = useState<string | null>(null);
+
+  const groupByPriority = useCallback(async () => {
+    if (!authed) {
+      toast("Sign in to use AI grouping");
+      return;
+    }
+    setBusy("group");
+    setGroupMsg(null);
+    try {
+      const res = await fetch("/api/v1/ai/group-priority", { method: "POST" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setGroupMsg(data?.error?.message ?? "AI grouping unavailable");
+        setBusy(null);
+        return;
+      }
+      if (data.message) {
+        setGroupMsg(data.message);
+        setBusy(null);
+        return;
+      }
+      const priorityOf = new Map<string, "high" | "low" | "none">();
+      for (const g of data.groups ?? []) {
+        const p = (g.priority === "high" || g.priority === "low" ? g.priority : "none") as
+          | "high"
+          | "low"
+          | "none";
+        for (const id of g.taskIds ?? []) priorityOf.set(id, p);
+      }
+      setItems((prev) => {
+        const next = prev.map((it) => ({
+          ...it,
+          priority: priorityOf.get(it.id) ?? it.priority,
+        }));
+        const rank = { high: 0, low: 1, none: 2 };
+        return next.sort((a, b) => rank[a.priority] - rank[b.priority]);
+      });
+      toast("Grouped by priority (suggestion — save via edit later)");
+    } catch {
+      setGroupMsg("Network error");
+    }
+    setBusy(null);
+  }, [authed]);
 
   const create = useCallback(async () => {
     const title = draft.trim();
@@ -182,6 +228,20 @@ export function InboxClient({
 
   return (
     <>
+      <div className="mb-3 flex justify-end">
+        <button
+          type="button"
+          disabled={!authed || busy === "group" || items.length === 0}
+          onClick={() => void groupByPriority()}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[13px] font-semibold text-iris transition-colors hover:bg-iris-ghost disabled:opacity-50"
+        >
+          <Sparkles size={14} />
+          {busy === "group" ? "Grouping…" : "Group by priority"}
+        </button>
+      </div>
+      {groupMsg && (
+        <p className="mb-2 text-[13px] font-medium text-ink-soft">{groupMsg}</p>
+      )}
       <div className="mt-5 flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3 shadow-card focus-within:ring-2 focus-within:ring-iris">
         <Plus size={18} className="shrink-0 text-ink-faint" />
         <input

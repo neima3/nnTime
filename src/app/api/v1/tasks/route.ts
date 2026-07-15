@@ -4,8 +4,9 @@
  */
 import { requireSession } from "@/server/auth-session";
 import { listTasks, createTask } from "@/server/dal";
-import { handleErrors, parseBody, errorResponse } from "@/server/api-errors";
+import { handleErrors, parseBody } from "@/server/api-errors";
 import { taskCreate } from "@/server/schemas/task";
+import { checkRateLimit, rateLimitedResponse } from "@/server/ratelimit";
 
 export async function GET(request: Request) {
   return handleErrors(async () => {
@@ -22,6 +23,11 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   return handleErrors(async () => {
     const { userId } = await requireSession();
+    const rl = await checkRateLimit(`api:tasks:create:${userId}`, {
+      limit: 60,
+      windowSec: 60,
+    });
+    if (!rl.allowed) return rateLimitedResponse(rl);
     const body = await parseBody(request, taskCreate);
     if (body instanceof Response) return body;
     // zod dateStr is a string; the DAL expects a Date for the `date` column.

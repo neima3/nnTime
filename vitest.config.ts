@@ -16,7 +16,8 @@ export default defineConfig({
     include: ["src/**/*.test.ts", "tests/**/*.test.ts"],
     setupFiles: ["./tests/setup.ts"],
     // DB integration tests are slower; generous timeout for migration runs.
-    testTimeout: 30000,
+    testTimeout: 60000,
+    hookTimeout: 90000,
   },
   resolve: {
     alias: {

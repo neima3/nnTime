@@ -377,7 +377,24 @@ export function TimelineCanvas({
                 </p>
                 <p className={`tnum mt-0.5 truncate text-[12px] font-medium ${cat.ink} opacity-70`}>
                   {fmt(a.start)} – {fmt(a.start + a.duration)} · {fmtDuration(a.duration)}
+                  {a.checklist && a.checklist.length > 0
+                    ? ` · ${a.checklist.filter((c) => c.done).length}/${a.checklist.length} steps`
+                    : ""}
                 </p>
+                {!compact && a.checklist && a.checklist.length > 0 && (
+                  <ul className="mt-1 space-y-0.5">
+                    {a.checklist.slice(0, 3).map((c, i) => (
+                      <li
+                        key={i}
+                        className={`truncate text-[11px] font-medium ${cat.ink} opacity-60 ${
+                          c.done ? "line-through" : ""
+                        }`}
+                      >
+                        {c.done ? "✓" : "○"} {c.label}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
 
               <div className="flex shrink-0 items-center gap-1">

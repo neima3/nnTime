@@ -70,7 +70,13 @@ export default function LandingPage() {
             Sign in
           </Link>
           <Link
-            href="/sign-up"
+            href="/app/today"
+            className="hidden rounded-2xl px-4 py-2.5 text-sm font-semibold text-ink-soft transition-colors hover:bg-surface-sunken hover:text-ink sm:inline"
+          >
+            Preview
+          </Link>
+          <Link
+            href="/onboarding"
             className="flex items-center gap-2 rounded-2xl bg-iris px-4 py-2.5 text-sm font-semibold text-ink-inverse shadow-card transition-colors hover:bg-iris-deep"
           >
             Get started
@@ -112,17 +118,17 @@ export default function LandingPage() {
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <Link
-              href="/sign-up"
+              href="/onboarding"
               className="flex items-center gap-2 rounded-2xl bg-iris px-6 py-3.5 text-base font-semibold text-ink-inverse shadow-float transition-all hover:scale-[1.02] hover:bg-iris-deep"
             >
               Get started free
               <ArrowRight size={18} />
             </Link>
             <Link
-              href="/app/today"
+              href="/sign-up"
               className="text-sm font-semibold text-ink-soft transition-colors hover:text-iris"
             >
-              Preview the design →
+              Or create an account →
             </Link>
           </div>
         </div>

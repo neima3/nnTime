@@ -80,11 +80,13 @@ export function FocusClient({
   defaultEmoji,
   defaultDurationMin,
   activityId,
+  steps = [],
 }: {
   defaultTitle: string;
   defaultEmoji: string;
   defaultDurationMin: number;
   activityId?: string;
+  steps?: string[];
 }) {
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
@@ -294,6 +296,19 @@ export function FocusClient({
           emoji={emoji}
         />
       </div>
+
+      {steps.length > 0 && (
+        <ul className="mt-6 w-full max-w-sm space-y-1.5 rounded-2xl border border-border bg-surface p-4 shadow-card">
+          <li className="mb-1 text-[11px] font-bold uppercase tracking-wide text-ink-faint">
+            Steps
+          </li>
+          {steps.map((s, i) => (
+            <li key={i} className="text-[14px] font-medium text-ink-soft">
+              ○ {s}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {error && (
         <p role="alert" className="mt-4 text-[13px] font-semibold text-danger">

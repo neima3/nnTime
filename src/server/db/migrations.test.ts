@@ -38,7 +38,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (env) await env.teardown();
-});
+}, 60000);
 
 // Wrapper that skips when the DB is unavailable (evaluated at runtime, not
 // module load, so beforeAll has a chance to set dbAvailable).

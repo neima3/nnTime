@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Accessibility,
   Bell,
+  Calendar,
   ChevronRight,
   Moon,
   Palette,
@@ -211,6 +212,35 @@ export function SettingsClient() {
 
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [icsUrl, setIcsUrl] = useState("");
+  const [icsBusy, setIcsBusy] = useState(false);
+
+  const importIcs = useCallback(async () => {
+    if (!icsUrl.trim()) {
+      setStatus("Paste an ICS calendar URL first");
+      return;
+    }
+    setIcsBusy(true);
+    setStatus(null);
+    try {
+      const res = await fetch("/api/v1/calendar/ics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: icsUrl.trim() }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setStatus(data?.error?.message ?? "ICS import failed");
+        setIcsBusy(false);
+        return;
+      }
+      setStatus(`Imported ${data.imported ?? 0} events to your planner`);
+      setIcsUrl("");
+    } catch {
+      setStatus("Network error importing calendar");
+    }
+    setIcsBusy(false);
+  }, [icsUrl]);
 
   const deleteAccount = useCallback(async () => {
     if (deleteConfirm !== "delete-my-account") {
@@ -350,6 +380,31 @@ export function SettingsClient() {
           hint="Configure sounds after Web Push is enabled on this device"
           right={<ChevronRight size={18} className="text-ink-faint" />}
         />
+      </Section>
+
+      <Section icon={Calendar} title="Calendars">
+        <div className="space-y-3 px-5 py-4">
+          <p className="text-[15px] font-semibold">Import ICS feed</p>
+          <p className="text-[13px] text-ink-soft">
+            Subscribe to a public ICS URL (Google/Apple calendar publish link).
+            Events become read-only calendar blocks (SEC-04 SSRF-safe fetch).
+          </p>
+          <input
+            type="url"
+            value={icsUrl}
+            onChange={(e) => setIcsUrl(e.target.value)}
+            placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"
+            className="w-full rounded-xl border border-border bg-surface-sunken px-3 py-2 text-[13px] outline-none focus:ring-2 focus:ring-iris"
+          />
+          <button
+            type="button"
+            disabled={icsBusy || !icsUrl.trim()}
+            onClick={() => void importIcs()}
+            className="rounded-xl bg-iris-soft px-3 py-2 text-[13px] font-semibold text-iris disabled:opacity-40"
+          >
+            {icsBusy ? "Importing…" : "Import now"}
+          </button>
+        </div>
       </Section>
 
       <Section icon={User} title="Privacy">

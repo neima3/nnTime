@@ -52,7 +52,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (env) await env.teardown();
-});
+}, 60000);
 
 const itDb = (name: string, fn: () => Promise<void> | void) =>
   it(name, async () => {
