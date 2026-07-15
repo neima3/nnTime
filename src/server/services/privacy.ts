@@ -18,36 +18,24 @@ import { auth } from "../auth";
  */
 export async function exportUserData(userId: string, opts: { db?: Db } = {}): Promise<Record<string, unknown>> {
   const db = opts.db ?? dbDefault;
-  const tables = {
-    user_settings: schema.userSettings,
-    categories: schema.categories,
-    tags: schema.tags,
-    activity_series: schema.activitySeries,
-    activity_occurrences: schema.activityOccurrences,
-    tasks: schema.tasks,
-    checklist_items: schema.checklistItems,
-    routines: schema.routines,
-    routine_steps: schema.routineSteps,
-    routine_schedules: schema.routineSchedules,
-    focus_sessions: schema.focusSessions,
-    push_subscriptions: schema.pushSubscriptions,
-    planner_events: schema.plannerEvents,
-  };
-
   const result: Record<string, unknown> = { exportedAt: new Date().toISOString() };
-  for (const [name, table] of Object.entries(tables)) {
-    const rows = await db.select().from(table).where(eq(table.userId, userId));
-    // Redact secrets: push subscription endpoints.
-    if (name === "push_subscriptions") {
-      result[name] = (rows as { endpoint: string }[]).map((r) => ({
-        ...r,
-        endpoint: "[redacted]",
-        keys: "[redacted]",
-      }));
-    } else {
-      result[name] = rows;
-    }
-  }
+
+  // Query each table individually (avoids TS type issues with heterogeneous tables).
+  result.user_settings = await db.select().from(schema.userSettings).where(eq(schema.userSettings.userId, userId));
+  result.categories = await db.select().from(schema.categories).where(eq(schema.categories.userId, userId));
+  result.tags = await db.select().from(schema.tags).where(eq(schema.tags.userId, userId));
+  result.activity_series = await db.select().from(schema.activitySeries).where(eq(schema.activitySeries.userId, userId));
+  result.activity_occurrences = await db.select().from(schema.activityOccurrences).where(eq(schema.activityOccurrences.userId, userId));
+  result.tasks = await db.select().from(schema.tasks).where(eq(schema.tasks.userId, userId));
+  result.checklist_items = await db.select().from(schema.checklistItems).where(eq(schema.checklistItems.userId, userId));
+  result.routines = await db.select().from(schema.routines).where(eq(schema.routines.userId, userId));
+  result.routine_steps = await db.select().from(schema.routineSteps).where(eq(schema.routineSteps.userId, userId));
+  result.routine_schedules = await db.select().from(schema.routineSchedules).where(eq(schema.routineSchedules.userId, userId));
+  result.focus_sessions = await db.select().from(schema.focusSessions).where(eq(schema.focusSessions.userId, userId));
+  // Redact push subscription secrets.
+  result.push_subscriptions = (await db.select().from(schema.pushSubscriptions).where(eq(schema.pushSubscriptions.userId, userId))).map((r) => ({ ...r, endpoint: "[redacted]", keys: "[redacted]" }));
+  result.planner_events = await db.select().from(schema.plannerEvents).where(eq(schema.plannerEvents.userId, userId));
+
   return result;
 }
 
