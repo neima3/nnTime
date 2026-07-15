@@ -551,6 +551,263 @@ export async function getChanges(
 }
 
 /* -------------------------------------------------------------------------- */
+/* Routines                                                                   */
+/* -------------------------------------------------------------------------- */
+
+export async function listRoutines(userId: string, opts: { db?: Db } = {}) {
+  const db = opts.db ?? dbDefault;
+  return db
+    .select()
+    .from(schema.routines)
+    .where(and(eq(schema.routines.userId, userId), isNull(schema.routines.deletedAt)))
+    .orderBy(asc(schema.routines.createdAt));
+}
+
+export async function getRoutine(userId: string, id: string, opts: { db?: Db } = {}) {
+  const db = opts.db ?? dbDefault;
+  const [row] = await db
+    .select()
+    .from(schema.routines)
+    .where(and(eq(schema.routines.id, id), eq(schema.routines.userId, userId)))
+    .limit(1);
+  if (!row || row.deletedAt) throw new NotFoundError("routine");
+  return row;
+}
+
+export async function createRoutine(
+  userId: string,
+  input: {
+    title: string;
+    emoji?: string;
+    categoryId?: string;
+    notes?: string;
+    steps?: { title: string; durationMin?: number | null }[];
+  },
+  opts: { db?: Db } = {},
+) {
+  const db = opts.db ?? dbDefault;
+  const id = crypto.randomUUID();
+  const [routine] = await db
+    .insert(schema.routines)
+    .values({
+      id,
+      userId,
+      title: input.title,
+      emoji: input.emoji,
+      categoryId: input.categoryId,
+      notes: input.notes,
+    })
+    .returning();
+  const steps = input.steps ?? [];
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i]!;
+    await db.insert(schema.routineSteps).values({
+      id: crypto.randomUUID(),
+      userId,
+      routineId: id,
+      title: s.title,
+      durationMin: s.durationMin ?? null,
+      sortOrder: i,
+    });
+  }
+  await appendChangeLog(db, userId, "routines", id, "upsert", routine!.revision);
+  return routine!;
+}
+
+export async function updateRoutine(
+  userId: string,
+  id: string,
+  input: Partial<{
+    title: string;
+    emoji: string | null;
+    categoryId: string | null;
+    notes: string | null;
+  }>,
+  ifMatchRevision: number,
+  opts: { db?: Db } = {},
+) {
+  const db = opts.db ?? dbDefault;
+  const existing = await getRoutine(userId, id, opts);
+  if (existing.revision !== ifMatchRevision) {
+    throw new ConflictError("revision mismatch", existing);
+  }
+  const [updated] = await db
+    .update(schema.routines)
+    .set({ ...input, revision: existing.revision + 1, updatedAt: new Date() })
+    .where(and(eq(schema.routines.id, id), eq(schema.routines.userId, userId)))
+    .returning();
+  await appendChangeLog(db, userId, "routines", id, "upsert", updated!.revision);
+  return updated!;
+}
+
+export async function deleteRoutine(
+  userId: string,
+  id: string,
+  ifMatchRevision: number,
+  opts: { db?: Db } = {},
+) {
+  const db = opts.db ?? dbDefault;
+  const existing = await getRoutine(userId, id, opts);
+  if (existing.revision !== ifMatchRevision) {
+    throw new ConflictError("revision mismatch", existing);
+  }
+  await db
+    .update(schema.routines)
+    .set({ deletedAt: new Date(), revision: existing.revision + 1 })
+    .where(and(eq(schema.routines.id, id), eq(schema.routines.userId, userId)));
+  await appendChangeLog(db, userId, "routines", id, "delete", existing.revision + 1);
+}
+
+export async function listRoutineSteps(
+  userId: string,
+  routineId: string,
+  opts: { db?: Db } = {},
+) {
+  const db = opts.db ?? dbDefault;
+  await getRoutine(userId, routineId, opts);
+  return db
+    .select()
+    .from(schema.routineSteps)
+    .where(
+      and(
+        eq(schema.routineSteps.routineId, routineId),
+        eq(schema.routineSteps.userId, userId),
+        isNull(schema.routineSteps.deletedAt),
+      ),
+    )
+    .orderBy(asc(schema.routineSteps.sortOrder));
+}
+
+export async function listRoutineSchedules(
+  userId: string,
+  routineId: string,
+  opts: { db?: Db } = {},
+) {
+  const db = opts.db ?? dbDefault;
+  await getRoutine(userId, routineId, opts);
+  return db
+    .select()
+    .from(schema.routineSchedules)
+    .where(
+      and(
+        eq(schema.routineSchedules.routineId, routineId),
+        eq(schema.routineSchedules.userId, userId),
+        isNull(schema.routineSchedules.deletedAt),
+      ),
+    );
+}
+
+export async function createRoutineSchedule(
+  userId: string,
+  input: {
+    routineId: string;
+    tz: string;
+    rrule?: string | null;
+    paused?: boolean;
+  },
+  opts: { db?: Db } = {},
+) {
+  const db = opts.db ?? dbDefault;
+  await getRoutine(userId, input.routineId, opts);
+  const id = crypto.randomUUID();
+  const [sched] = await db
+    .insert(schema.routineSchedules)
+    .values({
+      id,
+      userId,
+      routineId: input.routineId,
+      tz: input.tz,
+      rrule: input.rrule ?? null,
+      paused: input.paused ?? false,
+    })
+    .returning();
+  await appendChangeLog(db, userId, "routine_schedules", id, "upsert", sched!.revision);
+  return sched!;
+}
+
+export async function updateRoutineSchedule(
+  userId: string,
+  id: string,
+  input: Partial<{ paused: boolean; rrule: string | null; tz: string }>,
+  ifMatchRevision: number,
+  opts: { db?: Db } = {},
+) {
+  const db = opts.db ?? dbDefault;
+  const [existing] = await db
+    .select()
+    .from(schema.routineSchedules)
+    .where(
+      and(
+        eq(schema.routineSchedules.id, id),
+        eq(schema.routineSchedules.userId, userId),
+      ),
+    )
+    .limit(1);
+  if (!existing || existing.deletedAt) throw new NotFoundError("routine_schedule");
+  if (existing.revision !== ifMatchRevision) {
+    throw new ConflictError("revision mismatch", existing);
+  }
+  const [updated] = await db
+    .update(schema.routineSchedules)
+    .set({ ...input, revision: existing.revision + 1, updatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.routineSchedules.id, id),
+        eq(schema.routineSchedules.userId, userId),
+      ),
+    )
+    .returning();
+  await appendChangeLog(db, userId, "routine_schedules", id, "upsert", updated!.revision);
+  return updated!;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Planner events (ADR-001 history — stats/streaks)                           */
+/* -------------------------------------------------------------------------- */
+
+export async function appendPlannerEvent(
+  userId: string,
+  input: {
+    entityType: string;
+    entityId: string;
+    eventType:
+      | "complete"
+      | "uncomplete"
+      | "skip"
+      | "reschedule"
+      | "focus_start"
+      | "focus_stop"
+      | "energy_change"
+      | "mood_checkin"
+      | "carryover";
+    payload?: Record<string, unknown>;
+    tz?: string;
+  },
+  opts: { db?: Db } = {},
+) {
+  const db = opts.db ?? dbDefault;
+  let tz = input.tz;
+  if (!tz) {
+    try {
+      const s = await getOrCreateSettings(userId, opts);
+      tz = s.timezone;
+    } catch {
+      tz = "UTC";
+    }
+  }
+  await db.insert(schema.plannerEvents).values({
+    id: crypto.randomUUID(),
+    userId,
+    entityType: input.entityType,
+    entityId: input.entityId,
+    eventType: input.eventType,
+    payload: input.payload ?? {},
+    occurredAt: new Date(),
+    tz: tz!,
+  });
+}
+
+/* -------------------------------------------------------------------------- */
 /* Internal: append to change_log                                             */
 /* -------------------------------------------------------------------------- */
 

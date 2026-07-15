@@ -15,7 +15,7 @@
  */
 
 import { useCallback, useRef, useState } from "react";
-import { Check } from "lucide-react";
+import { Check, Timer } from "lucide-react";
 import { catClasses, fmt, fmtDuration, type Activity } from "@/lib/mock";
 import { LiveNowLine } from "./LiveNowLine";
 
@@ -44,6 +44,7 @@ interface TimelineCanvasProps {
   onCreateActivity?: (start: number) => void;
   onComplete?: (id: string) => Promise<{ ok: boolean }>;
   onOpen?: (id: string) => void;
+  onFocus?: (id: string) => void;
 }
 
 /** Compute overlap lanes for side-by-side layout (design-spec addendum 1). */
@@ -106,6 +107,7 @@ export function TimelineCanvas({
   onCreateActivity,
   onComplete,
   onOpen,
+  onFocus,
 }: TimelineCanvasProps) {
   const [drag, setDrag] = useState<DragState | null>(null);
   const [optimistic, setOptimistic] = useState<Map<string, { start: number; duration: number }>>(
@@ -372,39 +374,57 @@ export function TimelineCanvas({
                 </p>
               </div>
 
-              {onComplete && (
-                <button
-                  type="button"
-                  aria-label={a.done ? `Mark ${a.title} incomplete` : `Complete ${a.title}`}
-                  className={`grid shrink-0 place-items-center rounded-full border-2 transition-colors ${
-                    compact ? "size-7" : "size-8"
-                  } ${
-                    a.done
-                      ? "border-transparent bg-success text-ink-inverse"
-                      : `border-current ${cat.ink} opacity-50 hover:opacity-100 hover:bg-surface-raised/50`
-                  }`}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    const next = !a.done;
-                    setDoneOptimistic((prev) => {
-                      const m = new Map(prev);
-                      m.set(a.id, next);
-                      return m;
-                    });
-                    const result = await onComplete(a.id);
-                    if (!result.ok) {
+              <div className="flex shrink-0 items-center gap-1">
+                {onFocus && !a.done && (
+                  <button
+                    type="button"
+                    aria-label={`Focus on ${a.title}`}
+                    className={`grid place-items-center rounded-full border-2 border-current opacity-40 hover:opacity-100 ${cat.ink} ${
+                      compact ? "size-7" : "size-8"
+                    }`}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onFocus(a.id);
+                    }}
+                  >
+                    <Timer size={14} />
+                  </button>
+                )}
+                {onComplete && (
+                  <button
+                    type="button"
+                    aria-label={a.done ? `Mark ${a.title} incomplete` : `Complete ${a.title}`}
+                    className={`grid place-items-center rounded-full border-2 transition-colors ${
+                      compact ? "size-7" : "size-8"
+                    } ${
+                      a.done
+                        ? "border-transparent bg-success text-ink-inverse"
+                        : `border-current ${cat.ink} opacity-50 hover:opacity-100 hover:bg-surface-raised/50`
+                    }`}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      const next = !a.done;
                       setDoneOptimistic((prev) => {
                         const m = new Map(prev);
-                        m.delete(a.id);
+                        m.set(a.id, next);
                         return m;
                       });
-                    }
-                  }}
-                >
-                  {a.done && <Check size={14} strokeWidth={3} />}
-                </button>
-              )}
+                      const result = await onComplete(a.id);
+                      if (!result.ok) {
+                        setDoneOptimistic((prev) => {
+                          const m = new Map(prev);
+                          m.delete(a.id);
+                          return m;
+                        });
+                      }
+                    }}
+                  >
+                    {a.done && <Check size={14} strokeWidth={3} />}
+                  </button>
+                )}
+              </div>
 
               {/* Resize handles (hidden on compact) */}
               {!compact && (

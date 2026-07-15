@@ -6,7 +6,11 @@
  * service (Phase 2A + 10× Phase 1).
  */
 import { requireSession } from "@/server/auth-session";
-import { getActivitySeries, deleteActivitySeries } from "@/server/dal";
+import {
+  getActivitySeries,
+  deleteActivitySeries,
+  appendPlannerEvent,
+} from "@/server/dal";
 import { handleErrors, errorResponse, parseBody } from "@/server/api-errors";
 import { activitySeriesUpdate } from "@/server/schemas/activity-series";
 import { editSeriesOccurrence } from "@/server/services/recurrence";
@@ -80,6 +84,30 @@ export async function PATCH(
       patch,
       Number(ifMatch),
     );
+
+    // History for stats/streaks (ADR-001 planner_events).
+    if (status === "completed") {
+      await appendPlannerEvent(userId, {
+        entityType: "activity_series",
+        entityId: id,
+        eventType: "complete",
+        payload: { occurrenceKey: occurrenceKey.toISOString() },
+      }).catch(() => {});
+    } else if (status === "skipped") {
+      await appendPlannerEvent(userId, {
+        entityType: "activity_series",
+        entityId: id,
+        eventType: "skip",
+        payload: { occurrenceKey: occurrenceKey.toISOString() },
+      }).catch(() => {});
+    } else if (status === "pending" && completedAt === null) {
+      await appendPlannerEvent(userId, {
+        entityType: "activity_series",
+        entityId: id,
+        eventType: "uncomplete",
+        payload: {},
+      }).catch(() => {});
+    }
 
     // For this_and_future the "current" series may be the truncated original;
     // clients re-fetch the day. For all/this return the still-current master.

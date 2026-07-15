@@ -19,6 +19,7 @@ import { buildCategoryMap, seriesToActivity, taskToInboxItem } from "@/lib/adapt
 import { TodayTimeline } from "@/components/TodayTimeline";
 import { SoftStreaks } from "@/components/SoftStreaks";
 import { AmbientSounds } from "@/components/AmbientSounds";
+import { ToastHost } from "@/components/Toast";
 import { instantToDateStr } from "@/server/temporal/zone";
 
 function shiftDate(dateStr: string, deltaDays: number): string {
@@ -152,6 +153,7 @@ export default async function TodayPage({
 
   return (
     <AppShell active="today">
+      <ToastHost />
       <div className="timeline-scroll-container mx-auto flex max-w-5xl gap-8 px-4 py-6 md:px-8">
         <section className="min-w-0 flex-1">
           <header className="mb-6 flex flex-wrap items-center gap-3">

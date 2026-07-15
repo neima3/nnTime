@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { TimelineCanvas } from "./TimelineCanvas";
 import type { Activity } from "@/lib/mock";
 import { localMinutesToInstant } from "@/lib/adapters";
+import { toast } from "./Toast";
 
 interface TodayTimelineProps {
   activities: Activity[];
@@ -60,8 +61,12 @@ export function TodayTimeline({
           }),
         });
 
-        if (patchRes.status === 409) return { ok: false };
+        if (patchRes.status === 409) {
+          toast("Conflict — refresh and try again");
+          return { ok: false };
+        }
         if (!patchRes.ok) return { ok: false };
+        toast("Saved");
         router.refresh();
         return { ok: true };
       } catch {
@@ -111,6 +116,7 @@ export function TodayTimeline({
           }),
         });
         if (!res.ok) return { ok: false };
+        toast(nextStatus === "completed" ? "Nice — marked done" : "Restored");
         router.refresh();
         return { ok: true };
       } catch {
@@ -127,6 +133,21 @@ export function TodayTimeline({
     [router, date],
   );
 
+  const handleFocus = useCallback(
+    (id: string) => {
+      const act = activities.find((a) => a.id === id);
+      if (!act) return;
+      const params = new URLSearchParams({
+        title: act.title,
+        emoji: act.emoji,
+        duration: String(act.duration),
+        activityId: act.id,
+      });
+      router.push(`/app/focus?${params}`);
+    },
+    [activities, router],
+  );
+
   return (
     <TimelineCanvas
       activities={activities}
@@ -136,6 +157,7 @@ export function TodayTimeline({
       onCreateActivity={handleCreateActivity}
       onComplete={authed ? handleComplete : undefined}
       onOpen={handleOpen}
+      onFocus={handleFocus}
     />
   );
 }

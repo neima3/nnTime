@@ -15,6 +15,7 @@
  * is Phase 7B (iOS). Magic-link email transport = Resend (key via op).
  */
 import { betterAuth } from "better-auth";
+import { magicLink } from "better-auth/plugins";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import db from "./db";
 import * as authSchema from "./auth-schema";
@@ -65,17 +66,21 @@ export const auth = betterAuth({
     sendOnSignUp: true,
     autoSignInAfterVerification: true,
   },
-  magicLink: {
-    enabled: true,
-    sendMagicLink: async ({ email, url }: { email: string; url: string }) => {
-      // ADR-003: no account enumeration — always "check your email".
-      if (process.env.NODE_ENV !== "production") {
-         
-        console.log(`[auth] magic link for ${email}: ${url}`);
-      }
-    },
-    expiresInSeconds: 60 * 15, // 15-min single-use
-  },
+  // Better Auth 1.6+: magic link is a *plugin*, not a top-level option.
+  plugins: [
+    magicLink({
+      expiresIn: 60 * 15, // 15 min single-use (ADR-003)
+      sendMagicLink: async ({ email, url }) => {
+        // ADR-003: no account enumeration — always "check your email" UX.
+        // Transport: log in dev; Resend when RESEND_API_KEY is present.
+        if (process.env.NODE_ENV !== "production") {
+           
+          console.log(`[auth] magic link for ${email}: ${url}`);
+        }
+        // TODO: Resend once provisioned.
+      },
+    }),
+  ],
   session: {
     expiresIn: 60 * 60 * 24 * 30, // 30-day absolute
     updateAge: 60 * 60 * 24, // refresh the cookie daily

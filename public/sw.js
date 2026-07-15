@@ -11,7 +11,7 @@
  * This is a minimal SW; the full ADR-002 offline mutation queue lands with 6B's
  * complete enablement.
  */
-const CACHE_VERSION = "kairo-v1";
+const CACHE_VERSION = "kairo-v2-wave2";
 const APP_SHELL = ["/", "/app/today", "/manifest.json"];
 
 self.addEventListener("install", (event) => {

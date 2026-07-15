@@ -3,75 +3,140 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { catClasses, monthDays as mockMonthDays, type CategoryId } from "@/lib/mock";
 import { getSession } from "@/server/auth-session";
-import { listActivitySeries, listCategories } from "@/server/dal";
+import { listActivitySeries, listCategories, getOrCreateSettings } from "@/server/dal";
 import { buildCategoryMap } from "@/lib/adapters";
+import { instantToDateStr } from "@/server/temporal/zone";
 
 const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-/** Load real month data or fall back to mock when logged out. */
-async function loadMonth() {
+type DayCell = {
+  date: number;
+  dateStr?: string;
+  isToday?: boolean;
+  otherMonth?: boolean;
+  dots: CategoryId[];
+  more?: number;
+};
+
+function shiftMonth(year: number, month: number, delta: number) {
+  const d = new Date(Date.UTC(year, month + delta, 1));
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth() };
+}
+
+async function loadMonth(year: number, month: number): Promise<{
+  days: DayCell[];
+  label: string;
+  year: number;
+  month: number;
+  authed: boolean;
+}> {
   const session = await getSession();
-  if (!session) return mockMonthDays;
+  const monthLabel = new Date(year, month, 1).toLocaleDateString("en-US", {
+    month: "long",
+  });
+
+  if (!session) {
+    return {
+      days: mockMonthDays,
+      label: monthLabel,
+      year,
+      month,
+      authed: false,
+    };
+  }
+
+  const settings = await getOrCreateSettings(session.userId);
+  const zone = settings.timezone;
+  const todayStr = instantToDateStr(new Date(), zone);
   const series = await listActivitySeries(session.userId);
   const categories = await listCategories(session.userId).catch(() => []);
-  const categoryMap = buildCategoryMap(categories as unknown as Parameters<typeof buildCategoryMap>[0]);
+  const categoryMap = buildCategoryMap(
+    categories as unknown as Parameters<typeof buildCategoryMap>[0],
+  );
 
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
   const firstDay = new Date(year, month, 1);
   const startWeekday = (firstDay.getDay() + 6) % 7; // 0=Mon
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const prevMonthDays = new Date(year, month, 0).getDate();
 
-  // Map activity series to dates in this month.
   const dotsByDay = new Map<number, CategoryId[]>();
   for (const s of series) {
-    const d = s.dtstartLocal;
-    if (d.getFullYear() === year && d.getMonth() === month) {
-      const day = d.getDate();
-      const cat = s.categoryId ? categoryMap.get(s.categoryId) ?? "sky" : "sky";
-      const existing = dotsByDay.get(day) ?? [];
-      if (existing.length < 3) existing.push(cat);
-      dotsByDay.set(day, existing);
+    let dateStr: string;
+    try {
+      dateStr = instantToDateStr(s.dtstartLocal, s.tz || zone);
+    } catch {
+      continue;
+    }
+    const [y, m, d] = dateStr.split("-").map(Number);
+    if (y === year && m === month + 1) {
+      const cat = s.categoryId
+        ? categoryMap.get(s.categoryId) ?? "sky"
+        : "sky";
+      const existing = dotsByDay.get(d!) ?? [];
+      if (existing.length < 4) existing.push(cat);
+      dotsByDay.set(d!, existing);
     }
   }
 
-  const result: { date: number; isToday?: boolean; otherMonth?: boolean; dots: CategoryId[]; more?: number }[] = [];
-  // Leading days from prev month.
+  const result: DayCell[] = [];
   for (let i = startWeekday - 1; i >= 0; i--) {
     result.push({ date: prevMonthDays - i, otherMonth: true, dots: [] });
   }
-  // Current month days.
   for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     const dots = dotsByDay.get(d) ?? [];
     result.push({
       date: d,
-      isToday: d === now.getDate(),
+      dateStr,
+      isToday: dateStr === todayStr,
       dots: dots.slice(0, 3),
       more: dots.length > 3 ? dots.length - 3 : undefined,
     });
   }
-  // Trailing days to fill the grid.
   while (result.length % 7 !== 0) {
-    result.push({ date: result.length - daysInMonth - startWeekday + 1, otherMonth: true, dots: [] });
+    result.push({
+      date: result.length - daysInMonth - startWeekday + 1,
+      otherMonth: true,
+      dots: [],
+    });
   }
-  return result;
+
+  return { days: result, label: monthLabel, year, month, authed: true };
 }
 
-export default async function MonthPage() {
-  const monthDays = await loadMonth();
+export default async function MonthPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const now = new Date();
+  let year = now.getFullYear();
+  let month = now.getMonth();
+  if (typeof sp.ym === "string" && /^\d{4}-\d{2}$/.test(sp.ym)) {
+    const [y, m] = sp.ym.split("-").map(Number);
+    year = y!;
+    month = m! - 1;
+  }
+
+  const { days, label } = await loadMonth(year, month);
+  const prev = shiftMonth(year, month, -1);
+  const next = shiftMonth(year, month, 1);
+  const prevYm = `${prev.year}-${String(prev.month + 1).padStart(2, "0")}`;
+  const nextYm = `${next.year}-${String(next.month + 1).padStart(2, "0")}`;
+
   return (
     <AppShell active="week">
       <div className="mx-auto max-w-5xl px-4 py-6 md:px-8">
         <header className="mb-6 flex flex-wrap items-center gap-3">
           <div className="mr-auto">
             <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-iris">
-              2026
+              {year}
             </p>
-            <h1 className="font-display text-3xl font-bold tracking-tight">July</h1>
+            <h1 className="font-display text-3xl font-bold tracking-tight">
+              {label}
+            </h1>
           </div>
-          {/* week/month toggle — lives on both views */}
           <div className="flex items-center rounded-2xl border border-border bg-surface p-1 shadow-card">
             <Link
               href="/app/week"
@@ -84,82 +149,84 @@ export default async function MonthPage() {
             </span>
           </div>
           <div className="flex items-center gap-1 rounded-2xl border border-border bg-surface p-1 shadow-card">
-            <button aria-label="Previous month" className="grid size-9 place-items-center rounded-xl text-ink-soft hover:bg-surface-sunken">
+            <Link
+              href={`/app/month?ym=${prevYm}`}
+              aria-label="Previous month"
+              className="grid size-9 place-items-center rounded-xl text-ink-soft hover:bg-surface-sunken"
+            >
               <ChevronLeft size={18} />
-            </button>
-            <button className="rounded-xl px-3 py-1.5 text-sm font-semibold text-iris hover:bg-iris-ghost">
+            </Link>
+            <Link
+              href="/app/month"
+              className="rounded-xl px-3 py-1.5 text-sm font-semibold text-iris hover:bg-iris-ghost"
+            >
               This month
-            </button>
-            <button aria-label="Next month" className="grid size-9 place-items-center rounded-xl text-ink-soft hover:bg-surface-sunken">
+            </Link>
+            <Link
+              href={`/app/month?ym=${nextYm}`}
+              aria-label="Next month"
+              className="grid size-9 place-items-center rounded-xl text-ink-soft hover:bg-surface-sunken"
+            >
               <ChevronRight size={18} />
-            </button>
+            </Link>
           </div>
         </header>
 
-        <div className="overflow-hidden rounded-3xl border border-border bg-surface shadow-card">
-          <div className="grid grid-cols-7 border-b border-border bg-surface-raised">
-            {weekdays.map((d, i) => (
-              <p
-                key={d}
-                className={`py-2.5 text-center text-[12px] font-bold uppercase tracking-wide ${
-                  i >= 5 ? "text-ink-faint" : "text-ink-soft"
-                }`}
-              >
-                {d}
-              </p>
-            ))}
-          </div>
-          <div className="grid grid-cols-7">
-            {monthDays.map((d, i) => {
-              const weekend = i % 7 >= 5;
-              return (
-                <button
-                  key={i}
-                  className={`group relative flex aspect-square flex-col items-center justify-center gap-1.5 border-b border-r border-border p-1 transition-colors [&:nth-child(7n)]:border-r-0 sm:aspect-[4/3] ${
-                    d.otherMonth
-                      ? "bg-surface-sunken/50"
-                      : weekend
-                        ? "bg-surface-sunken/25 hover:bg-iris-ghost"
-                        : "hover:bg-iris-ghost"
+        <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+          {weekdays.map((w) => (
+            <div
+              key={w}
+              className="px-1 pb-1 text-center text-[11px] font-bold uppercase tracking-wide text-ink-faint"
+            >
+              {w}
+            </div>
+          ))}
+          {days.map((d, i) => {
+            const inner = (
+              <>
+                <span
+                  className={`tnum text-[13px] font-bold ${
+                    d.isToday ? "text-iris" : d.otherMonth ? "text-ink-faint" : ""
                   }`}
-                  aria-label={`July ${d.date}`}
                 >
-                  <span
-                    className={`tnum grid size-8 place-items-center rounded-full text-[15px] font-semibold ${
-                      d.isToday
-                        ? "bg-iris font-bold text-ink-inverse shadow-card"
-                        : d.otherMonth
-                          ? "text-ink-faint"
-                          : ""
-                    }`}
-                  >
-                    {d.date}
-                  </span>
-                  <span className="flex h-2 items-center gap-1">
-                    {d.dots.map((c, j) => (
-                      <span
-                        key={j}
-                        className={`size-1.5 rounded-full ${catClasses[c].dot} ${
-                          d.otherMonth ? "opacity-40" : ""
-                        }`}
-                      />
-                    ))}
-                    {d.more && (
-                      <span className="text-[10px] font-bold text-ink-faint">
-                        +{d.more}
-                      </span>
-                    )}
-                  </span>
-                </button>
+                  {d.date}
+                </span>
+                <div className="mt-1.5 flex flex-wrap gap-0.5">
+                  {d.dots.map((c, j) => (
+                    <span
+                      key={j}
+                      className={`size-1.5 rounded-full ${catClasses[c].dot}`}
+                    />
+                  ))}
+                  {d.more ? (
+                    <span className="text-[9px] font-bold text-ink-faint">
+                      +{d.more}
+                    </span>
+                  ) : null}
+                </div>
+              </>
+            );
+            const cls = `min-h-16 rounded-2xl border p-2 transition-colors ${
+              d.isToday
+                ? "border-iris bg-iris-ghost shadow-card"
+                : d.otherMonth
+                  ? "border-transparent bg-transparent"
+                  : "border-border bg-surface hover:bg-surface-raised"
+            }`;
+            if (d.dateStr && !d.otherMonth) {
+              return (
+                <Link key={i} href={`/app/today?date=${d.dateStr}`} className={cls}>
+                  {inner}
+                </Link>
               );
-            })}
-          </div>
+            }
+            return (
+              <div key={i} className={cls}>
+                {inner}
+              </div>
+            );
+          })}
         </div>
-
-        <p className="mt-4 text-[13px] text-ink-soft">
-          Dots are category colors (max 3 + overflow count). Tapping a day opens
-          that day&apos;s timeline (<code className="rounded bg-surface-sunken px-1 text-[12px]">/app/day/[date]</code>).
-        </p>
       </div>
     </AppShell>
   );

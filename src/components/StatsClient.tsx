@@ -1,0 +1,185 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Flame } from "lucide-react";
+import { toast } from "./Toast";
+
+type Stats = {
+  byDate: Record<string, { completed: number; focusMin: number; mood: string | null }>;
+  streak: { current: number; best: number };
+  totalCompleted: number;
+  totalFocusMin: number;
+  days: number;
+};
+
+const MOODS = [
+  { id: "low", label: "Low", emoji: "🌧️" },
+  { id: "okay", label: "Okay", emoji: "⛅" },
+  { id: "good", label: "Good", emoji: "🌤️" },
+  { id: "great", label: "Great", emoji: "☀️" },
+] as const;
+
+function Card({
+  title,
+  hint,
+  children,
+  wide,
+}: {
+  title: string;
+  hint?: string;
+  children: React.ReactNode;
+  wide?: boolean;
+}) {
+  return (
+    <section
+      className={`rounded-3xl border border-border bg-surface p-5 shadow-card ${
+        wide ? "sm:col-span-2" : ""
+      }`}
+    >
+      <h2 className="font-display text-base font-bold">{title}</h2>
+      {hint && <p className="mt-0.5 text-[12.5px] text-ink-soft">{hint}</p>}
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
+
+export function StatsClient() {
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [authed, setAuthed] = useState(true);
+  const [moodBusy, setMoodBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/v1/stats?days=14")
+      .then(async (r) => {
+        if (r.status === 401) {
+          if (!cancelled) setAuthed(false);
+          return null;
+        }
+        if (!r.ok) return null;
+        return r.json();
+      })
+      .then((data) => {
+        if (!cancelled && data) setStats(data);
+      })
+      .catch(() => {
+        if (!cancelled) setAuthed(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function sendMood(mood: string) {
+    setMoodBusy(true);
+    const res = await fetch("/api/v1/mood", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mood }),
+    });
+    setMoodBusy(false);
+    if (!res.ok) {
+      toast("Could not save mood");
+      return;
+    }
+    toast("Mood noted — thank you");
+  }
+
+  if (!authed) {
+    return (
+      <p className="text-[14px] text-ink-soft">
+        <a href="/sign-in" className="font-semibold text-iris">
+          Sign in
+        </a>{" "}
+        to see your personal insights.
+      </p>
+    );
+  }
+
+  if (!stats) {
+    return <p className="text-[14px] text-ink-soft">Loading insights…</p>;
+  }
+
+  const last7 = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    const key = d.toISOString().slice(0, 10);
+    return {
+      key,
+      label: d.toLocaleDateString("en-US", { weekday: "narrow" }),
+      completed: stats.byDate[key]?.completed ?? 0,
+    };
+  });
+  const maxC = Math.max(1, ...last7.map((d) => d.completed));
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Card title="This week" hint="Completions — no judgment, just shape">
+        <div className="flex items-end justify-between gap-2">
+          {last7.map((d) => (
+            <div key={d.key} className="flex flex-1 flex-col items-center gap-1.5">
+              <span className="tnum text-[10.5px] font-semibold text-ink-faint">
+                {d.completed > 0 ? d.completed : "·"}
+              </span>
+              <div className="flex h-24 w-full items-end rounded-lg bg-surface-sunken">
+                <div
+                  className="w-full rounded-lg bg-iris/70"
+                  style={{
+                    height: `${Math.max((d.completed / maxC) * 100, d.completed > 0 ? 10 : 0)}%`,
+                  }}
+                />
+              </div>
+              <span className="text-[11px] font-bold text-ink-soft">{d.label}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card title="Soft streak" hint="1-day grace · never shaming">
+        <div className="flex items-center gap-3">
+          <Flame size={28} className="text-iris" />
+          <div>
+            <p className="tnum font-display text-3xl font-bold">
+              {stats.streak.current}
+            </p>
+            <p className="text-[13px] text-ink-soft">
+              current · best {stats.streak.best}
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      <Card title="Totals (14 days)">
+        <dl className="space-y-2 text-[14px]">
+          <div className="flex justify-between">
+            <dt className="text-ink-soft">Completed</dt>
+            <dd className="tnum font-bold">{stats.totalCompleted}</dd>
+          </div>
+          <div className="flex justify-between">
+            <dt className="text-ink-soft">Focus minutes</dt>
+            <dd className="tnum font-bold">{stats.totalFocusMin}</dd>
+          </div>
+        </dl>
+      </Card>
+
+      <Card title="Mood check-in" hint="One tap · private">
+        <div className="flex flex-wrap gap-2">
+          {MOODS.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              disabled={moodBusy}
+              onClick={() => void sendMood(m.id)}
+              className="flex flex-col items-center gap-1 rounded-2xl border border-border bg-surface-raised px-3 py-2 text-[12px] font-semibold hover:bg-iris-ghost focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:opacity-50"
+            >
+              <span className="text-xl" aria-hidden>
+                {m.emoji}
+              </span>
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}

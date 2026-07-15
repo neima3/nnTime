@@ -169,6 +169,14 @@ export function ActivityEditor(props: ActivityEditorProps) {
     else router.push(`/app/today?date=${date}`);
   }, [props, router, date]);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [close]);
+
   const save = useCallback(async () => {
     const trimmed = title.trim();
     if (!trimmed) {
@@ -500,9 +508,36 @@ export function ActivityEditor(props: ActivityEditorProps) {
                 </button>
                 <button
                   type="button"
-                  title="AI break-down lands in Phase 14"
-                  disabled
-                  className="flex items-center gap-1.5 rounded-xl bg-iris-soft px-3 py-2 text-[13px] font-semibold text-iris opacity-60"
+                  title="AI suggests steps — you confirm each one"
+                  disabled={saving || !title.trim()}
+                  onClick={async () => {
+                    setError(null);
+                    setSaving(true);
+                    try {
+                      const res = await fetch("/api/v1/ai/breakdown", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ title: title.trim() }),
+                      });
+                      const data = await res.json().catch(() => null);
+                      if (!res.ok) {
+                        setError(
+                          data?.error?.message ??
+                            "AI unavailable — add steps manually.",
+                        );
+                        setSaving(false);
+                        return;
+                      }
+                      const next = (data?.steps as string[] | undefined) ?? [];
+                      if (next.length) {
+                        setSteps((prev) => [...prev, ...next.filter(Boolean)]);
+                      }
+                    } catch {
+                      setError("Network error talking to AI.");
+                    }
+                    setSaving(false);
+                  }}
+                  className="flex items-center gap-1.5 rounded-xl bg-iris-soft px-3 py-2 text-[13px] font-semibold text-iris transition-colors hover:bg-iris-ghost disabled:opacity-50"
                 >
                   <Sparkles size={14} />
                   Break it down

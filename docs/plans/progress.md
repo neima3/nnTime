@@ -1,5 +1,43 @@
 # Progress log
 
+## 2026-07-15 — 10× Wave 2: routines, stats, AI, month, batch, deploy
+
+**Program:** `docs/plans/2026-07-15-10x-wave2-roadmap.md` +
+`docs/plans/10x-wave2-agent-prompt.md`.
+
+**Ticked:** 1–13, 15–17, 19–20 (14 Anytime rail + 18 perf left thin).
+
+**Shipped:**
+- **P1 Deploy Wave 1:** Coolify deploy `d6sicrx4jpmrwmz1iyniwc5j` finished on
+  commit `c0b68d8`. Live: `/app/editor` `/app/today` `/app/focus` → 200;
+  screenshot `browser-qa/wave2-live-editor.png`.
+- **P2–4 Routines:** DAL CRUD + steps/schedules; REST list/create/patch/delete +
+  schedule pause; `RoutinesClient` create/pause/use-today/delete.
+- **P5–7 Insights:** `GET /api/v1/stats`, `POST /api/v1/mood`, `StatsClient` UI;
+  complete/skip/uncomplete append `planner_events` in activity PATCH.
+- **P8 Month:** real dots + `?ym=` nav + day → Today links (zone-aware).
+- **P9 AI:** `POST /api/v1/ai/breakdown` + `/parse` (SEC-05, 503 without key);
+  editor “Break it down” wired.
+- **P10 Focus from Today:** timer button on blocks → `/app/focus?...`.
+- **P11 Batch:** `POST /api/v1/batch` ordered fan-out.
+- **P12 Auth:** Better Auth `magicLink()` **plugin** (was silent top-level no-op).
+- **P13 SW:** cache version `kairo-v2-wave2`.
+- **P15 Toasts:** `Toast` host on Today/routines/stats; save/complete feedback.
+- **P16 SoftStreaks:** reads `/api/v1/stats` streak.
+- **P17 Escape** closes activity editor.
+
+**Gates:** typecheck, lint 0 errors, 92 tests, build green (new routes listed).
+
+**Live after Wave 2 deploy:** re-trigger Coolify after this commit lands; verify
+`/api/v1/stats` → 401 (not 404) when logged out.
+
+**Parity:** still 88.46% / 86.52% planned; evidence rows not mass-updated.
+
+**Next:** Anytime rail write actions (14), live nowMin (18), dogfood authed create
+on live with real session, Resend for magic-link emails.
+
+---
+
 ## 2026-07-14 — 10× 20-phase program: core product loop shipped (Phases 1–7, 9–11, 13)
 
 **Program:** `docs/plans/2026-07-14-10x-20-phase-roadmap.md` + executor prompt

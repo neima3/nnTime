@@ -93,9 +93,10 @@ export async function recordMoodCheckin(
     id: crypto.randomUUID(),
     userId,
     entityType: "user",
-    entityId: userId,
+    // entityId is uuid column; store synthetic id, user in payload (Better Auth text PKs).
+    entityId: crypto.randomUUID(),
     eventType: "mood_checkin",
-    payload: { mood, note },
+    payload: { mood, note, userId },
     occurredAt: new Date(),
     tz: settings.timezone,
   });
