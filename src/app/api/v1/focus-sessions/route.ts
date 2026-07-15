@@ -11,6 +11,7 @@ import {
   getRemainingSec,
   type FocusState,
 } from "@/server/services/focus";
+import { appendPlannerEvent } from "@/server/dal";
 import { z } from "zod";
 
 const createBody = z.object({
@@ -53,6 +54,15 @@ export async function POST(request: Request) {
       targetDurationMin: body.targetDurationMin,
       activityOccurrenceId: body.activityOccurrenceId,
     });
+    await appendPlannerEvent(userId, {
+      entityType: "focus_session",
+      entityId: session.id,
+      eventType: "focus_start",
+      payload: {
+        targetDurationMin: body.targetDurationMin,
+        title: body.title,
+      },
+    }).catch(() => {});
     const remainingSec = getRemainingSec({
       state: session.state as FocusState,
       startedAt: session.startedAt,

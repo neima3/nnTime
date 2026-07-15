@@ -17,7 +17,7 @@
 import { useCallback, useRef, useState } from "react";
 import { Check, Timer } from "lucide-react";
 import { catClasses, fmt, fmtDuration, type Activity } from "@/lib/mock";
-import { LiveNowLine } from "./LiveNowLine";
+import { LiveNowLine, useLiveNowMin } from "./LiveNowLine";
 
 const DAY_START = 7 * 60; // 07:00
 const DAY_END = 23 * 60; // 23:00
@@ -116,6 +116,9 @@ export function TimelineCanvas({
   const [doneOptimistic, setDoneOptimistic] = useState<Map<string, boolean>>(new Map());
   const [conflictId, setConflictId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Live clock drives past/current styling when viewing today (Phase 18).
+  const liveNow = useLiveNowMin(showNowLine);
+  const effectiveNow = showNowLine && liveNow != null ? liveNow : nowMin;
 
   // Merge optimistic overrides into the activity list.
   const displayActivities = activities.map((a) => {
@@ -301,7 +304,7 @@ export function TimelineCanvas({
       )}
 
       {/* Now line — live only when viewing today */}
-      {showNowLine && <LiveNowLine />}
+      {showNowLine && liveNow != null && <LiveNowLine nowMin={liveNow} />}
 
       {/* Activities */}
       <div
@@ -311,8 +314,11 @@ export function TimelineCanvas({
       >
         {displayActivities.map((a) => {
           const cat = catClasses[a.category];
-          const past = a.start + a.duration <= nowMin;
-          const current = showNowLine && a.start <= nowMin && nowMin < a.start + a.duration;
+          const past = a.start + a.duration <= effectiveNow;
+          const current =
+            showNowLine &&
+            a.start <= effectiveNow &&
+            effectiveNow < a.start + a.duration;
           const h = a.duration * PX_PER_MIN;
           const compact = h < 76;
           const laneInfo = lanes.get(a.id);

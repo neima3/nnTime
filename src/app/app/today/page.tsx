@@ -7,7 +7,6 @@ import {
 import { AppShell } from "@/components/AppShell";
 import {
   activities as mockActivities,
-  catClasses,
   DAY,
   inbox as mockInbox,
   NOW_MIN,
@@ -20,6 +19,7 @@ import { TodayTimeline } from "@/components/TodayTimeline";
 import { SoftStreaks } from "@/components/SoftStreaks";
 import { AmbientSounds } from "@/components/AmbientSounds";
 import { ToastHost } from "@/components/Toast";
+import { AnytimeRail } from "@/components/AnytimeRail";
 import { instantToDateStr } from "@/server/temporal/zone";
 
 function shiftDate(dateStr: string, deltaDays: number): string {
@@ -251,38 +251,17 @@ export default async function TodayPage({
         </section>
 
         <aside className="hidden w-72 shrink-0 flex-col gap-4 lg:flex">
-          <div className="rounded-3xl border border-border bg-surface p-5 shadow-card">
-            <div className="flex items-center justify-between">
-              <h2 className="font-display text-lg font-bold">Anytime</h2>
-              <span className="rounded-full bg-iris-soft px-2 py-0.5 text-[12px] font-bold text-iris">
-                {inbox.length}
-              </span>
-            </div>
-            <p className="mt-1 text-[13px] text-ink-soft">
-              No time pressure — open one when you have space.
-            </p>
-            <ul className="mt-4 space-y-2">
-              {inbox.map((t) => {
-                const cat = catClasses[t.category];
-                return (
-                  <li
-                    key={t.id}
-                    className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 ${cat.fill}`}
-                  >
-                    <span className="text-base" aria-hidden>
-                      {t.emoji}
-                    </span>
-                    <span className={`flex-1 truncate text-[14px] font-semibold ${cat.ink}`}>
-                      {t.title}
-                    </span>
-                  </li>
-                );
-              })}
-              {inbox.length === 0 && (
-                <li className="text-[13px] text-ink-faint">No anytime items.</li>
-              )}
-            </ul>
-          </div>
+          <AnytimeRail
+            items={inbox.map((t) => ({
+              id: t.id,
+              title: t.title,
+              emoji: t.emoji,
+              category: t.category,
+              revision: "revision" in t ? Number(t.revision) : 1,
+            }))}
+            date={date === "mock" ? new Date().toISOString().slice(0, 10) : date}
+            authed={authed}
+          />
 
           {!authed && (
             <div className="rounded-3xl bg-iris p-5 text-ink-inverse shadow-float">

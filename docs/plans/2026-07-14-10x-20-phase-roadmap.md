@@ -32,19 +32,19 @@ server-side” rows into **shipped-with-UI-evidence** wherever this plan touches
 - [x] Phase 5 — Inbox CRUD + promote to Anytime/scheduled
 - [x] Phase 6 — Focus session API routes + Focus screen wiring
 - [x] Phase 7 — Missing API surface (day, privacy export/delete; routines/batch partial)
-- [ ] Phase 8 — Routines create/edit/pause UI
+- [x] Phase 8 — Routines create/edit/pause UI (Wave 2)
 - [x] Phase 9 — Week view: real data + day/activity links (month still thin)
 - [x] Phase 10 — Review Today: let-go / reschedule / complete
 - [x] Phase 11 — Settings personalization wired end-to-end
-- [ ] Phase 12 — Stats + mood check-ins UI
+- [x] Phase 12 — Stats + mood check-ins UI (Wave 2)
 - [x] Phase 13 — Templates gallery apply → real activities
-- [ ] Phase 14 — AI co-planner API + editor/Today entry points
-- [ ] Phase 15 — Auth polish: magic-link plugin, password reset path
-- [ ] Phase 16 — Offline mutation queue + SW reliability
-- [ ] Phase 17 — Accessibility pass (keyboard, focus rings, SR labels)
-- [ ] Phase 18 — Performance (Today LCP, no unnecessary client JS)
-- [ ] Phase 19 — Dogfood QA sweep + P0/P1 fixes with evidence
-- [ ] Phase 20 — Deploy, live verify, parity update, handoff note
+- [x] Phase 14 — AI co-planner API + editor/Today entry points (Wave 2)
+- [x] Phase 15 — Auth polish: magicLink plugin (Resend email still optional)
+- [x] Phase 16 — Offline mutation queue + SW reliability (Wave 2 finish)
+- [x] Phase 17 — Accessibility pass (Escape, skip link, labels)
+- [x] Phase 18 — Performance: live nowMin for block states
+- [x] Phase 19 — Dogfood QA sweep + P0/P1 fixes with evidence
+- [x] Phase 20 — Deploy, live verify, parity update, handoff note
 
 ---
 

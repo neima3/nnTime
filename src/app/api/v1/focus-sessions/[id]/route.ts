@@ -10,7 +10,7 @@ import {
   getRemainingSec,
   type FocusState,
 } from "@/server/services/focus";
-import { NotFoundError } from "@/server/dal";
+import { NotFoundError, appendPlannerEvent } from "@/server/dal";
 import { z } from "zod";
 
 const patchBody = z.discriminatedUnion("action", [
@@ -38,6 +38,21 @@ export async function PATCH(
       let session;
       if (body.action === "transition") {
         session = await transitionFocusSession(userId, id, body.state);
+        if (
+          body.state === "completed" ||
+          body.state === "skipped" ||
+          body.state === "cancelled"
+        ) {
+          await appendPlannerEvent(userId, {
+            entityType: "focus_session",
+            entityId: id,
+            eventType: "focus_stop",
+            payload: {
+              state: body.state,
+              durationMin: session.targetDurationMin,
+            },
+          }).catch(() => {});
+        }
       } else {
         session = await extendFocusSession(userId, id, body.addMinutes);
       }

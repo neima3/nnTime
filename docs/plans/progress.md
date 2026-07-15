@@ -1,5 +1,30 @@
 # Progress log
 
+## 2026-07-15 — Finish line: Anytime rail, live nowMin, plan-day, offline shell
+
+**Closed remaining Wave 2 boxes (14, 18) + extras:**
+- **AnytimeRail:** schedule → editor; clear → DELETE task with If-Match.
+- **Live nowMin:** `useLiveNowMin` drives past/current block styling + now-line.
+- **OfflineShell:** mounts offline queue for signed-in user in AppShell.
+- **Plan my day:** `POST /api/v1/ai/plan-day` + interactive `PlanDayClient` on
+  `/app/planner` (accept opens editor — SEC-05 no auto-mutate).
+- **Focus history:** focus_start / focus_stop → planner_events.
+- Roadmaps fully ticked (Wave 1 + Wave 2 trackers).
+
+**Gates:** typecheck, lint 0 errors, 92 tests, build green (after clearing
+disk ENOSPC via `rm -rf .next`).
+
+**Ship:** commit + push + Coolify deploy; live verify new routes 401 not 404.
+
+**Honest residual (external, not code-blocked):**
+- Resend not provisioned → magic-link/reset emails only log in dev.
+- Coolify staging + automated backups still UI-only (1B).
+- GitHub Actions budget if still exhausted.
+- Authed live create/complete with real browser session not re-proven this pass
+  (API surface + prior Wave 1 evidence stand).
+
+---
+
 ## 2026-07-15 — 10× Wave 2: routines, stats, AI, month, batch, deploy
 
 **Program:** `docs/plans/2026-07-15-10x-wave2-roadmap.md` +

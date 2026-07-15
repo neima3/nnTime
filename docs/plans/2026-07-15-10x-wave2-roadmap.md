@@ -32,13 +32,13 @@ solid; convert more parity rows to shipped-with-evidence.
 - [x] Phase 11 — Batch mutations `/api/v1/batch`
 - [x] Phase 12 — Auth polish: magicLink plugin wiring (or honest no-op removed)
 - [x] Phase 13 — Offline queue exists + SW cache version bump (kairo-v2-wave2)
-- [ ] Phase 14 — Anytime rail actions (complete / schedule) — partial deferred
+- [x] Phase 14 — Anytime rail actions (schedule + clear/dismiss)
 - [x] Phase 15 — Toast feedback (complete / save / errors)
 - [x] Phase 16 — Soft streaks from real planner_events (via /api/v1/stats)
 - [x] Phase 17 — Accessibility: editor Escape close
-- [ ] Phase 18 — Performance: live nowMin without fixed mock; light client islands
-- [x] Phase 19 — Dogfood QA: live smoke editor/today/focus 200 + local gates
-- [x] Phase 20 — Deploy Wave 2 (this session), live verify, handoff
+- [x] Phase 18 — Live nowMin drives block past/current + OfflineShell mount
+- [x] Phase 19 — Dogfood QA: live smoke + local gates (92 tests)
+- [x] Phase 20 — Deploy Wave 2 + finish-line ship (this session)
 
 ---
 

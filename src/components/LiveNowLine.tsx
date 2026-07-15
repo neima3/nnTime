@@ -1,15 +1,8 @@
 "use client";
 
 /**
- * Live now-line — Phase 3C.
- *
- * Renders a coral now-line at the current time position on the timeline,
- * updating every second. Mount-gated: renders nothing on SSR, then appears
- * on the client after mount to avoid hydration mismatch (the server doesn't
- * know the real time at render).
- *
- * Auto-scroll: scrolls the timeline container so the now-line is visible
- * on mount (brings the user to "now" instead of the top of the day).
+ * Live now-line + shared hook for current minutes-from-midnight.
+ * Mount-gated to avoid SSR/client time hydration mismatch.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -26,38 +19,49 @@ function nowMinutes() {
   return now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
 }
 
-export function LiveNowLine() {
-  const [mounted, setMounted] = useState(false);
-  const [nowMin, setNowMin] = useState(13 * 60); // default 13:00 (matches mock)
-  const containerRef = useRef<HTMLDivElement>(null);
+/** Live minutes from midnight; null until client mount when `live` is true. */
+export function useLiveNowMin(live: boolean): number | null {
+  const [nowMin, setNowMin] = useState<number | null>(live ? null : 0);
 
   useEffect(() => {
-    // Mount-gated: set real time only on client to avoid hydration mismatch.
-    // The setState calls here are intentional — the whole point is to update
-    // from the SSR-default (13:00) to the real client time after mount.
+    if (!live) return;
     /* eslint-disable react-hooks/set-state-in-effect */
-    setMounted(true);
     setNowMin(nowMinutes());
     /* eslint-enable react-hooks/set-state-in-effect */
-
-    const interval = setInterval(() => {
-      setNowMin(nowMinutes());
-    }, 1000); // update once per second per design-spec
-
+    const interval = setInterval(() => setNowMin(nowMinutes()), 1000);
     return () => clearInterval(interval);
+  }, [live]);
+
+  return live ? nowMin : null;
+}
+
+export function LiveNowLine({ nowMin: external }: { nowMin?: number } = {}) {
+  const internal = useLiveNowMin(external === undefined);
+  const nowMin = external ?? internal;
+  const [mounted, setMounted] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const scrolled = useRef(false);
+
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setMounted(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
-  // Auto-scroll to now on mount.
   useEffect(() => {
-    if (!mounted) return;
+    if (!mounted || nowMin == null || scrolled.current) return;
     const el = containerRef.current?.closest(".timeline-scroll-container");
     if (el) {
       const nowTop = top(nowMin);
-      el.scrollTo({ top: Math.max(0, nowTop - el.clientHeight / 2), behavior: "smooth" });
+      el.scrollTo({
+        top: Math.max(0, nowTop - el.clientHeight / 2),
+        behavior: "smooth",
+      });
+      scrolled.current = true;
     }
   }, [mounted, nowMin]);
 
-  if (!mounted) return null; // no SSR — prevents hydration mismatch
+  if (!mounted || nowMin == null) return null;
 
   const clampedMin = Math.max(DAY_START, Math.min(DAY_END, nowMin));
 
