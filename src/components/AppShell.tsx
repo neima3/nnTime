@@ -122,6 +122,7 @@ export function AppShell({
         <div className="mt-3 border-t border-border pt-3">
           <UserMenu />
         </div>
+        <ShortcutsHint />
       </aside>
 
       {/* main */}
@@ -151,6 +152,22 @@ export function AppShell({
           );
         })}
       </nav>
+    </div>
+  );
+}
+
+export function ShortcutsHint() {
+  return (
+    <div className="rounded-2xl border border-border bg-surface-sunken p-3 text-[11px] text-ink-faint">
+      <p className="font-semibold uppercase tracking-wide">Shortcuts</p>
+      <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5">
+        <span><kbd className="rounded bg-surface px-1 font-mono">N</kbd> New</span>
+        <span><kbd className="rounded bg-surface px-1 font-mono">T</kbd> Today</span>
+        <span><kbd className="rounded bg-surface px-1 font-mono">I</kbd> Inbox</span>
+        <span><kbd className="rounded bg-surface px-1 font-mono">W</kbd> Week</span>
+        <span><kbd className="rounded bg-surface px-1 font-mono">F</kbd> Focus</span>
+        <span><kbd className="rounded bg-surface px-1 font-mono">S</kbd> Settings</span>
+      </div>
     </div>
   );
 }
