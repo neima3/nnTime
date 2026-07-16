@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, Onest, Spline_Sans_Mono } from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { ThemeScript } from "./theme-script";
 import "./globals.css";
 
 const bricolage = Bricolage_Grotesque({
@@ -48,6 +49,9 @@ export default function RootLayout({
       className={`${bricolage.variable} ${onest.variable} ${splineMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        <ThemeScript />
+      </head>
       <body className="min-h-full flex flex-col">
         <ServiceWorkerRegister />
         {children}

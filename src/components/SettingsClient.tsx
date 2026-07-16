@@ -104,6 +104,7 @@ function applyTheme(theme: Settings["theme"]) {
     root.classList.toggle("dark", prefersDark);
   }
   root.dataset.theme = theme;
+  try { localStorage.setItem("kairo-theme", theme); } catch {}
 }
 
 export function SettingsClient() {
