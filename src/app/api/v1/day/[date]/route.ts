@@ -1,13 +1,13 @@
 /**
- * GET /api/v1/day/{YYYY-MM-DD} — ADR-001/002.
- * Same resolution path as the Today Server Component (no self-HTTP).
+ * GET /api/v1/day/{YYYY-MM-DD}?tz=<iana> — ADR-001/002.
+ * Resolves the day in the user's planning zone (or ?tz override).
  */
 import { requireSession } from "@/server/auth-session";
 import { handleErrors, errorResponse } from "@/server/api-errors";
 import { getResolvedDay } from "@/server/services/day";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ date: string }> },
 ) {
   return handleErrors(async () => {
@@ -16,7 +16,10 @@ export async function GET(
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return errorResponse("bad_request", "date must be YYYY-MM-DD", 400);
     }
-    const resolved = await getResolvedDay(date);
+    // Optional tz override from query param (ADR-001: defaults to user's zone).
+    const url = new URL(request.url);
+    const tzOverride = url.searchParams.get("tz") || undefined;
+    const resolved = await getResolvedDay(date, { tzOverride });
     if (!resolved) {
       return errorResponse("unauthorized", "Not authenticated", 401);
     }

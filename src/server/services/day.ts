@@ -34,13 +34,15 @@ export interface ResolvedDay {
  */
 export async function getResolvedDay(
   dateStr?: string,
-  opts: { db?: Db } = {},
+  opts: { db?: Db; tzOverride?: string } = {},
 ): Promise<ResolvedDay | null> {
   const session = await getSession();
   if (!session) return null;
 
   const settings = await getOrCreateSettings(session.userId, opts);
-  const zone = settings.timezone;
+  // Allow caller-provided tz override (e.g. ?tz= from the API); otherwise use
+  // the user's planning zone from settings.
+  const zone = opts.tzOverride || settings.timezone;
   // Prefer the caller's date; otherwise use "today" in the planning zone.
   const target =
     dateStr ?? instantToDateStr(new Date(), zone);

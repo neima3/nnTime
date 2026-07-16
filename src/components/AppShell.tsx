@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect } from "react";
 import {
   BarChart3,
   CalendarDays,
@@ -12,7 +15,6 @@ import {
 } from "lucide-react";
 import { UserMenu } from "./UserMenu";
 import { OfflineShell } from "./OfflineShell";
-import { KeyboardShortcuts } from "./KeyboardShortcuts";
 
 const sidebarNav = [
   { href: "/app/today", label: "Today", key: "today", icon: CalendarDays },
@@ -42,6 +44,20 @@ export function AppShell({
   active: string;
   children: React.ReactNode;
 }) {
+  // Keyboard shortcuts: n=new, t=today, i=inbox, w=week, f=focus, s=settings
+  useEffect(() => {
+    function handler(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable || target.tagName === "SELECT") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const routes: Record<string, string> = { n: "/app/editor", t: "/app/today", i: "/app/inbox", w: "/app/week", f: "/app/focus", s: "/app/settings" };
+      const route = routes[e.key.toLowerCase()];
+      if (route) { e.preventDefault(); window.location.href = route; }
+    }
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   return (
     <div className="flex min-h-dvh w-full bg-canvas">
       {/* Skip to content — keyboard accessibility */}
@@ -111,7 +127,6 @@ export function AppShell({
       {/* main */}
       <main id="main-content" className="min-w-0 flex-1 pb-24 md:pb-0">{children}</main>
       <OfflineShell />
-      <KeyboardShortcuts />
 
       {/* mobile bottom bar */}
       <nav

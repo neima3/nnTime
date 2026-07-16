@@ -113,7 +113,12 @@ export function SettingsClient() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/v1/settings")
+    const tz = typeof Intl !== "undefined"
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : undefined;
+    fetch("/api/v1/settings", {
+      headers: tz ? { "x-timezone": tz } : {},
+    })
       .then(async (r) => {
         if (r.status === 401) {
           if (!cancelled) setAuthed(false);
