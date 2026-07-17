@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createEphemeralDb, insertUser, type EphemeralDb } from "../db/test-db";
 import {
   startFocusSession, transitionFocusSession, extendFocusSession,
-  getActiveSession, type Db,
+  getActiveSession,
 } from "./focus";
 
 let env: EphemeralDb | null = null;
@@ -53,7 +53,6 @@ describe("Focus extend + multi-extend", () => {
     const s1 = await startFocusSession(userId, { targetDurationMin: 25 }, { db: env!.db });
     const s2 = await startFocusSession(userId, { targetDurationMin: 15 }, { db: env!.db });
     
-    // s1 should be cancelled
     const active = await getActiveSession(userId, { db: env!.db });
     expect(active?.id).toBe(s2.id);
     expect(active?.id).not.toBe(s1.id);
