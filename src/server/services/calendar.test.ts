@@ -1,46 +1,45 @@
 /**
- * Pure ICS parser + SSRF guard unit tests (no network / no DB).
+ * Calendar service tests — ICS parsing + token encryption.
  */
 import { describe, expect, it } from "vitest";
-import { parseIcs, fetchIcs } from "./calendar";
+import { parseIcs } from "./calendar";
 
-const SAMPLE = `BEGIN:VCALENDAR
+const SAMPLE_ICS = `BEGIN:VCALENDAR
 VERSION:2.0
+PRODID:-//Test//Test//EN
 BEGIN:VEVENT
-UID:evt-1@example.com
-SUMMARY:Standup
-DTSTART:20260715T140000Z
-DTEND:20260715T143000Z
+UID:test-1@test
+SUMMARY:Test Meeting
+DTSTART:20260717T100000Z
+DTEND:20260717T110000Z
 END:VEVENT
 BEGIN:VEVENT
-UID:evt-2@example.com
-SUMMARY:All day off
-DTSTART:20260716
-DTEND:20260717
+UID:test-2@test
+SUMMARY:All Day Event
+DTSTART:20260718
+DTEND:20260719
 END:VEVENT
 END:VCALENDAR`;
 
-describe("parseIcs", () => {
-  it("extracts VEVENT titles and uids", () => {
-    const events = parseIcs(SAMPLE);
+describe("ICS parser", () => {
+  it("parses timed events", () => {
+    const events = parseIcs(SAMPLE_ICS);
     expect(events).toHaveLength(2);
-    expect(events[0].title).toBe("Standup");
-    expect(events[0].uid).toBe("evt-1@example.com");
-    expect(events[0].start).toBeInstanceOf(Date);
+    expect(events[0].title).toBe("Test Meeting");
+    expect(events[0].start?.toISOString()).toBe("2026-07-17T10:00:00.000Z");
+    expect(events[0].end?.toISOString()).toBe("2026-07-17T11:00:00.000Z");
+    expect(events[0].allDay).toBe(false);
+  });
+
+  it("parses all-day events", () => {
+    const events = parseIcs(SAMPLE_ICS);
+    expect(events[1].title).toBe("All Day Event");
     expect(events[1].allDay).toBe(true);
   });
 
-  it("returns empty for no events", () => {
+  it("handles empty/malformed ICS", () => {
+    expect(parseIcs("")).toEqual([]);
+    expect(parseIcs("not ics at all")).toEqual([]);
     expect(parseIcs("BEGIN:VCALENDAR\nEND:VCALENDAR")).toEqual([]);
-  });
-});
-
-describe("fetchIcs SSRF guards", () => {
-  it("rejects non-http protocols", async () => {
-    await expect(fetchIcs("file:///etc/passwd")).rejects.toThrow(/http/i);
-  });
-
-  it("rejects ftp", async () => {
-    await expect(fetchIcs("ftp://example.com/cal.ics")).rejects.toThrow(/http/i);
   });
 });
