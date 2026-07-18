@@ -10,7 +10,7 @@ import "server-only";
 import dbDefault from "../db";
 import type { Db } from "../dal";
 import * as schema from "../db/schema";
-import { and, eq, gte, lte, sql } from "drizzle-orm";
+import { and, eq, gte, lte } from "drizzle-orm";
 import { getOrCreateSettings } from "../dal";
 import { instantToDateStr } from "../temporal/zone";
 

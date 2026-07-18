@@ -194,18 +194,17 @@ async function editThisAndFuture(
 
     // 2. Create the new series starting at occurrenceKey with the patch applied.
     const newSeriesId = crypto.randomUUID();
-    const [newSeries] = await tx
+    await tx
       .insert(schema.activitySeries)
       .values({
         id: newSeriesId,
         userId,
         tz: series.tz,
         dtstartLocal: occurrenceKey,
-        rrule: series.rrule, // the new series keeps the recurrence pattern
+        rrule: series.rrule,
         ...patch,
         revision: 1,
-      } as typeof schema.activitySeries.$inferInsert)
-      .returning();
+      } as typeof schema.activitySeries.$inferInsert);
 
     await appendChangeLog(tx as unknown as Db, userId, "activity_series", newSeriesId, "upsert", 1);
 

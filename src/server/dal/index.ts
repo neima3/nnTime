@@ -17,7 +17,7 @@ import "server-only";
 import dbDefault from "../db";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import * as schema from "../db/schema";
-import { and, eq, isNull, asc, gt, sql } from "drizzle-orm";
+import { and, eq, isNull, asc, sql } from "drizzle-orm";
 
 // Schema-agnostic drizzle client type so both the app instance and ephemeral
 // test DBs are accepted.

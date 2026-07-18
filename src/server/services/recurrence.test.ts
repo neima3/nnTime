@@ -13,7 +13,6 @@ import { createActivitySeries, getActivitySeries } from "../dal";
 import {
   editSeriesOccurrence,
   deleteSeriesOccurrence,
-  type EditScope,
 } from "./recurrence";
 import { activityOccurrences, activitySeries as seriesTable } from "../db/schema";
 import { eq } from "drizzle-orm";

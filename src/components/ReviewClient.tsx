@@ -36,16 +36,12 @@ export function ReviewClient({
 }) {
   const router = useRouter();
   const [items, setItems] = useState(initial);
-  const [index, setIndex] = useState(0);
+  const [index] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const current = items[index];
   const remaining = items.length - index;
-
-  const advance = useCallback(() => {
-    setIndex((i) => i + 1);
-  }, []);
 
   const act = useCallback(
     async (kind: "complete" | "skip" | "tomorrow") => {

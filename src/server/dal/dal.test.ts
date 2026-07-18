@@ -12,14 +12,11 @@
  * These run against an ephemeral Postgres (migrations applied fresh).
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
 import {
   createEphemeralDb,
   insertUser,
   type EphemeralDb,
 } from "../db/test-db";
-import * as schema from "../db/schema";
 import {
   createTask,
   getTask,

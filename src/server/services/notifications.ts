@@ -17,7 +17,7 @@ import "server-only";
 import dbDefault from "../db";
 import type { Db } from "../dal";
 import * as schema from "../db/schema";
-import { and, eq, isNull, lte, inArray, sql } from "drizzle-orm";
+import { and, eq, isNull, lte, sql } from "drizzle-orm";
 
 export type NotificationType =
   | "start"

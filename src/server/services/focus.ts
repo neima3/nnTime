@@ -16,7 +16,7 @@ import "server-only";
 import dbDefault from "../db";
 import type { Db } from "../dal";
 import * as schema from "../db/schema";
-import { and, eq, isNull, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { appendChangeLog } from "../dal";
 
 export type FocusState = "running" | "paused" | "completed" | "skipped" | "cancelled";
@@ -187,9 +187,6 @@ export function getRemainingSec(session: {
   const now = Date.now();
   const startMs = session.startedAt.getTime();
   const pauseMs = session.accumulatedPauseSec * 1000;
-  const currentIntervalMs = session.currentIntervalStartedAt
-    ? now - session.currentIntervalStartedAt.getTime()
-    : 0;
   const elapsedMs = now - startMs - pauseMs;
   const targetMs = session.targetDurationMin * 60 * 1000;
   return Math.floor((targetMs - elapsedMs) / 1000);
