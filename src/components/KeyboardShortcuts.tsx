@@ -7,6 +7,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { X } from "lucide-react";
+import { clientToday } from "@/lib/client-date";
 
 function isTypingTarget(el: EventTarget | null) {
   if (!(el instanceof HTMLElement)) return false;
@@ -42,7 +43,7 @@ export function KeyboardShortcuts() {
         // Only in app shell routes
         if (!pathname?.startsWith("/app")) return;
         e.preventDefault();
-        const date = new Date().toISOString().slice(0, 10);
+        const date = clientToday();
         router.push(`/app/editor?date=${date}&start=${9 * 60}`);
       }
     };

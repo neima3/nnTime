@@ -38,9 +38,14 @@ afterAll(async () => {
   if (env) await env.teardown();
 }, 60000);
 
+/** Skip (not pass) when Postgres is unavailable — honest CI signal. */
 const itDb = (name: string, fn: () => Promise<void> | void) =>
-  it(name, async () => {
-    if (!dbAvailable || !env) return;
+  it(name, async ({ skip }) => {
+    if (!dbAvailable || !env) {
+      console.warn(`[SKIP] ${name}: Postgres unavailable`);
+      skip(true, "Postgres unavailable");
+      return;
+    }
     await fn();
   });
 
@@ -100,4 +105,67 @@ describe("ADR-004 focus state machine", () => {
     expect(remaining).toBeGreaterThan(19 * 60);
     expect(remaining).toBeLessThan(21 * 60);
   });
+
+  itDb("pause does not inflate accumulatedPauseSec with running time", async () => {
+    const session = await startFocusSession(userId, { targetDurationMin: 25 }, { db: env!.db });
+    // Brief running interval, then pause — accumulated pause must stay ~0.
+    await new Promise((r) => setTimeout(r, 50));
+    const paused = await transitionFocusSession(userId, session.id, "paused", { db: env!.db });
+    expect(paused.state).toBe("paused");
+    expect(paused.accumulatedPauseSec).toBe(0);
+    expect(paused.currentIntervalStartedAt).not.toBeNull();
+  });
 });
+
+describe("getRemainingSec pure derivation", () => {
+  const MIN = 60 * 1000;
+  const t0 = Date.UTC(2026, 0, 1, 12, 0, 0);
+
+  it("running session started 5 min ago, target 25 → remaining ~20 min", () => {
+    const remaining = getRemainingSec(
+      {
+        state: "running",
+        startedAt: new Date(t0),
+        targetDurationMin: 25,
+        accumulatedPauseSec: 0,
+        currentIntervalStartedAt: new Date(t0),
+      },
+      t0 + 5 * MIN,
+    );
+    expect(remaining).toBe(20 * 60);
+  });
+
+  it("paused session freezes remaining and does not decay with later now", () => {
+    // Started at t0; ran 3 min then paused (currentIntervalStartedAt = pause start).
+    // Wall "now" is 10 min after start (7 min into the pause).
+    // effectiveNow freezes at pause start → elapsed 3 min → remaining 22 min.
+    const session = {
+      state: "paused" as const,
+      startedAt: new Date(t0),
+      targetDurationMin: 25,
+      accumulatedPauseSec: 0,
+      currentIntervalStartedAt: new Date(t0 + 3 * MIN),
+    };
+    const remaining = getRemainingSec(session, t0 + 10 * MIN);
+    expect(remaining).toBe(22 * 60);
+    // Still frozen if we call again with a simulated later now.
+    expect(getRemainingSec(session, t0 + 30 * MIN)).toBe(22 * 60);
+  });
+
+  it("after resume accounting: accumulatedPauseSec excluded from elapsed", () => {
+    // 10 min wall since start; 2 min completed pause already in accumulatedPauseSec.
+    // Effective focus elapsed = 10 - 2 = 8 min → remaining 17 min.
+    const remaining = getRemainingSec(
+      {
+        state: "running",
+        startedAt: new Date(t0),
+        targetDurationMin: 25,
+        accumulatedPauseSec: 2 * 60,
+        currentIntervalStartedAt: new Date(t0 + 8 * MIN),
+      },
+      t0 + 10 * MIN,
+    );
+    expect(remaining).toBe(17 * 60);
+  });
+});
+

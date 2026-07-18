@@ -8,12 +8,16 @@ import { listActivitySeries, createActivitySeries } from "@/server/dal";
 import { handleErrors, parseBody } from "@/server/api-errors";
 import { activitySeriesCreate } from "@/server/schemas/activity-series";
 import { checkRateLimit, rateLimitedResponse } from "@/server/ratelimit";
+import { withIdempotency } from "@/server/idempotency";
 
 export async function GET() {
   return handleErrors(async () => {
     const { userId } = await requireSession();
     const series = await listActivitySeries(userId);
-    return Response.json({ items: series }, { headers: { "cache-control": "private, no-store" } });
+    return Response.json(
+      { items: series, nextCursor: null },
+      { headers: { "cache-control": "private, no-store" } },
+    );
   });
 }
 
@@ -25,22 +29,25 @@ export async function POST(request: Request) {
       windowSec: 60,
     });
     if (!rl.allowed) return rateLimitedResponse(rl);
-    const body = await parseBody(request, activitySeriesCreate);
-    if (body instanceof Response) return body;
-    const series = await createActivitySeries(userId, {
-      tz: body.tz,
-      dtstartLocal: new Date(body.dtstartLocal),
-      rrule: body.rrule ?? null,
-      title: body.title,
-      emoji: body.emoji,
-      categoryId: body.categoryId,
-      durationMin: body.durationMin,
-      energy: body.energy ?? null,
-      priority: body.priority,
-      notes: body.notes,
-      source: body.source,
-      checklistTemplate: body.checklistTemplate,
+    const key = request.headers.get("idempotency-key");
+    return withIdempotency(userId, key, "POST", "/api/v1/activities", async () => {
+      const body = await parseBody(request, activitySeriesCreate);
+      if (body instanceof Response) return body;
+      const series = await createActivitySeries(userId, {
+        tz: body.tz,
+        dtstartLocal: new Date(body.dtstartLocal),
+        rrule: body.rrule ?? null,
+        title: body.title,
+        emoji: body.emoji,
+        categoryId: body.categoryId,
+        durationMin: body.durationMin,
+        energy: body.energy ?? null,
+        priority: body.priority,
+        notes: body.notes,
+        source: body.source,
+        checklistTemplate: body.checklistTemplate,
+      });
+      return Response.json(series, { status: 201 });
     });
-    return Response.json(series, { status: 201 });
   });
 }

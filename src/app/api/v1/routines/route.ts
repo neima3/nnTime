@@ -52,7 +52,7 @@ export async function GET() {
       }),
     );
     return Response.json(
-      { items },
+      { items, nextCursor: null },
       { headers: { "cache-control": "private, no-store" } },
     );
   });

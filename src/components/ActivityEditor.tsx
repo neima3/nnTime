@@ -17,6 +17,7 @@ import {
   Zap,
 } from "lucide-react";
 import { localMinutesToInstant } from "@/lib/adapters";
+import { clientToday } from "@/lib/client-date";
 
 const CATEGORY_UI = [
   { key: "peach", fill: "bg-cat-peach", ink: "text-cat-peach-ink", label: "Life" },
@@ -77,7 +78,7 @@ export type ActivityEditorProps = {
 
 export function ActivityEditor(props: ActivityEditorProps) {
   const router = useRouter();
-  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const todayStr = useMemo(() => clientToday(), []);
 
   const [title, setTitle] = useState(props.initialTitle ?? "");
   const [emoji, setEmoji] = useState(props.initialEmoji ?? "📋");

@@ -17,7 +17,7 @@ import dbDefault from "../db";
 import type { Db } from "../dal";
 import * as schema from "../db/schema";
 import { and, eq, inArray } from "drizzle-orm";
-import { appendChangeLog } from "../dal";
+import { appendChangeLog, ConflictError } from "../dal";
 
 export type FocusState = "running" | "paused" | "completed" | "skipped" | "cancelled";
 
@@ -91,49 +91,77 @@ export async function transitionFocusSession(
   const db = opts.db ?? dbDefault;
   const now = new Date();
 
-  const [session] = await db
-    .select()
-    .from(schema.focusSessions)
-    .where(
-      and(
-        eq(schema.focusSessions.id, sessionId),
-        eq(schema.focusSessions.userId, userId),
-      ),
-    )
-    .limit(1);
-  if (!session) throw new Error("focus session not found");
+  return db.transaction(async (tx) => {
+    const tdb = tx as unknown as Db;
+    const [session] = await tdb
+      .select()
+      .from(schema.focusSessions)
+      .where(
+        and(
+          eq(schema.focusSessions.id, sessionId),
+          eq(schema.focusSessions.userId, userId),
+        ),
+      )
+      .limit(1);
+    if (!session) throw new Error("focus session not found");
 
-  // Validate transition.
-  if (!TRANSITIONS[session.state as FocusState]?.includes(newState)) {
-    throw new Error(`illegal transition: ${session.state} → ${newState}`);
-  }
-
-  const updates: Partial<typeof schema.focusSessions.$inferInsert> = {
-    state: newState,
-    updatedAt: now,
-  };
-
-  if (newState === "paused") {
-    // Accumulate the elapsed pause time.
-    const elapsed = now.getTime() - (session.currentIntervalStartedAt ?? session.startedAt).getTime();
-    updates.accumulatedPauseSec = session.accumulatedPauseSec + Math.floor(elapsed / 1000);
-    updates.currentIntervalStartedAt = null;
-  } else if (newState === "running" && session.state === "paused") {
-    updates.currentIntervalStartedAt = now;
-  } else if (newState === "completed" || newState === "skipped" || newState === "cancelled") {
-    updates.currentIntervalStartedAt = null;
-    if (newState === "completed") {
-      updates.completionReason = "manual";
+    // Validate transition.
+    if (!TRANSITIONS[session.state as FocusState]?.includes(newState)) {
+      throw new Error(`illegal transition: ${session.state} → ${newState}`);
     }
-  }
 
-  const [updated] = await db
-    .update(schema.focusSessions)
-    .set({ ...updates, revision: session.revision + 1 })
-    .where(eq(schema.focusSessions.id, sessionId))
-    .returning();
-  await appendChangeLog(db, userId, "focus_sessions", sessionId, "upsert", updated!.revision);
-  return updated!;
+    const updates: Partial<typeof schema.focusSessions.$inferInsert> = {
+      state: newState,
+      updatedAt: now,
+    };
+
+    if (newState === "paused") {
+      // Mark pause start; do not touch accumulatedPauseSec (running time is not pause).
+      updates.currentIntervalStartedAt = now;
+    } else if (newState === "running" && session.state === "paused") {
+      // Fold the completed pause interval into accumulatedPauseSec, then resume.
+      if (session.currentIntervalStartedAt) {
+        const pauseElapsedSec = Math.floor(
+          (now.getTime() - session.currentIntervalStartedAt.getTime()) / 1000,
+        );
+        updates.accumulatedPauseSec = session.accumulatedPauseSec + pauseElapsedSec;
+      }
+      updates.currentIntervalStartedAt = now;
+    } else if (newState === "completed" || newState === "skipped" || newState === "cancelled") {
+      updates.currentIntervalStartedAt = null;
+      if (newState === "completed") {
+        updates.completionReason = "manual";
+      }
+    }
+
+    const [updated] = await tdb
+      .update(schema.focusSessions)
+      .set({ ...updates, revision: session.revision + 1 })
+      .where(
+        and(
+          eq(schema.focusSessions.id, sessionId),
+          eq(schema.focusSessions.userId, userId),
+          eq(schema.focusSessions.revision, session.revision),
+        ),
+      )
+      .returning();
+    if (!updated) {
+      const [current] = await tdb
+        .select()
+        .from(schema.focusSessions)
+        .where(
+          and(
+            eq(schema.focusSessions.id, sessionId),
+            eq(schema.focusSessions.userId, userId),
+          ),
+        )
+        .limit(1);
+      if (!current) throw new Error("focus session not found");
+      throw new ConflictError("revision mismatch", current);
+    }
+    await appendChangeLog(tdb, userId, "focus_sessions", sessionId, "upsert", updated.revision);
+    return updated;
+  });
 }
 
 /**
@@ -168,26 +196,55 @@ export async function extendFocusSession(
       revision: session.revision + 1,
       updatedAt: new Date(),
     })
-    .where(eq(schema.focusSessions.id, sessionId))
+    .where(
+      and(
+        eq(schema.focusSessions.id, sessionId),
+        eq(schema.focusSessions.userId, userId),
+        eq(schema.focusSessions.revision, session.revision),
+      ),
+    )
     .returning();
-  return updated!;
+  if (!updated) {
+    const [current] = await db
+      .select()
+      .from(schema.focusSessions)
+      .where(
+        and(
+          eq(schema.focusSessions.id, sessionId),
+          eq(schema.focusSessions.userId, userId),
+        ),
+      )
+      .limit(1);
+    if (!current) throw new Error("focus session not found");
+    throw new ConflictError("revision mismatch", current);
+  }
+  return updated;
 }
 
 /**
  * Derive the remaining time for a session. Clients call this to display the
  * countdown without persisting it (ADR-004: clients derive, never persist).
+ *
+ * While paused, freezes effective "now" at currentIntervalStartedAt (pause start)
+ * so the countdown does not decay. `nowMs` is injectable for pure unit tests.
  */
-export function getRemainingSec(session: {
-  state: FocusState;
-  startedAt: Date;
-  targetDurationMin: number;
-  accumulatedPauseSec: number;
-  currentIntervalStartedAt: Date | null;
-}): number {
-  const now = Date.now();
+export function getRemainingSec(
+  session: {
+    state: FocusState;
+    startedAt: Date;
+    targetDurationMin: number;
+    accumulatedPauseSec: number;
+    currentIntervalStartedAt: Date | null;
+  },
+  nowMs: number = Date.now(),
+): number {
+  let effectiveNow = nowMs;
+  if (session.state === "paused" && session.currentIntervalStartedAt) {
+    effectiveNow = session.currentIntervalStartedAt.getTime();
+  }
   const startMs = session.startedAt.getTime();
   const pauseMs = session.accumulatedPauseSec * 1000;
-  const elapsedMs = now - startMs - pauseMs;
+  const elapsedMs = effectiveNow - startMs - pauseMs;
   const targetMs = session.targetDurationMin * 60 * 1000;
   return Math.floor((targetMs - elapsedMs) / 1000);
 }

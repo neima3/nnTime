@@ -47,6 +47,10 @@ export function TodayTimeline({
         }
 
         const dtstartLocal = localMinutesToInstant(date, start, zone);
+        const occurrenceKey = act?.occurrenceKey;
+        // Prefer occurrence override so drag/resize only moves this instance
+        // for recurring series (safer than rewriting the master).
+        const editScope = occurrenceKey ? "this" : "all";
 
         const patchRes = await fetch(`/api/v1/activities/${id}`, {
           method: "PATCH",
@@ -54,11 +58,20 @@ export function TodayTimeline({
             "Content-Type": "application/json",
             "If-Match": String(revision),
           },
-          body: JSON.stringify({
-            dtstartLocal,
-            durationMin: duration,
-            editScope: "all",
-          }),
+          body: JSON.stringify(
+            editScope === "this"
+              ? {
+                  editScope,
+                  occurrenceKey,
+                  startAt: dtstartLocal,
+                  durationMin: duration,
+                }
+              : {
+                  editScope,
+                  dtstartLocal,
+                  durationMin: duration,
+                },
+          ),
         });
 
         if (patchRes.status === 409) {
@@ -140,7 +153,7 @@ export function TodayTimeline({
           revision = (await getRes.json()).revision;
         }
 
-        const checklistTemplate = act.checklist.map((c, i) => ({
+        const checklistOverride = act.checklist.map((c, i) => ({
           label: c.label,
           done: i === stepIndex ? !c.done : c.done,
         }));
@@ -151,7 +164,11 @@ export function TodayTimeline({
             "Content-Type": "application/json",
             "If-Match": String(revision),
           },
-          body: JSON.stringify({ editScope: "all", checklistTemplate }),
+          body: JSON.stringify({
+            editScope: "this",
+            occurrenceKey: act.occurrenceKey ?? undefined,
+            checklistOverride,
+          }),
         });
         if (res.status === 409) {
           toast("Conflict — refresh and try again");
@@ -194,6 +211,7 @@ export function TodayTimeline({
       activities={activities}
       nowMin={nowMin}
       showNowLine={isToday}
+      zone={zone}
       onUpdateActivity={handleUpdateActivity}
       onCreateActivity={handleCreateActivity}
       onComplete={authed ? handleComplete : undefined}

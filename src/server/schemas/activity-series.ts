@@ -115,6 +115,11 @@ export const activitySeriesUpdate = z.object({
   status: z.enum(["pending", "completed", "skipped", "cancelled"]).optional(),
   startAt: instant.optional(),
   completedAt: instant.nullable().optional(),
+  /** Per-occurrence checklist (editScope=this); does not rewrite series template. */
+  checklistOverride: z
+    .array(z.object({ label: z.string(), done: z.boolean().optional() }))
+    .nullable()
+    .optional(),
 });
 
 export type ActivitySeriesResponse = z.infer<typeof activitySeriesResponse>;

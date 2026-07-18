@@ -16,6 +16,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { catClasses, type CategoryId } from "@/lib/mock";
+import { clientToday } from "@/lib/client-date";
 import { toast } from "./Toast";
 
 export type InboxItem = {
@@ -202,7 +203,7 @@ export function InboxClient({
     async (item: InboxItem) => {
       if (!authed) return;
       setBusy(item.id);
-      const today = new Date().toISOString().slice(0, 10);
+      const today = clientToday();
       const res = await fetch(`/api/v1/tasks/${item.id}`, {
         method: "PATCH",
         headers: {
@@ -250,7 +251,7 @@ export function InboxClient({
     (item: InboxItem) => {
       const params = new URLSearchParams({
         title: item.title,
-        date: new Date().toISOString().slice(0, 10),
+        date: clientToday(),
         start: String(10 * 60),
       });
       router.push(`/app/editor?${params}`);

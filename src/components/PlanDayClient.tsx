@@ -7,6 +7,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Sparkles } from "lucide-react";
+import { clientToday } from "@/lib/client-date";
 import { toast } from "./Toast";
 
 type Proposal = {
@@ -62,7 +63,7 @@ export function PlanDayClient() {
     const mins = (h ?? 10) * 60 + (m ?? 0);
     const params = new URLSearchParams({
       title: item.title ?? "Planned task",
-      date: new Date().toISOString().slice(0, 10),
+      date: clientToday(),
       start: String(mins),
     });
     toast("Opening editor — confirm to save");

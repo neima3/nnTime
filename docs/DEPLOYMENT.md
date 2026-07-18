@@ -17,8 +17,9 @@ retrieve with `op item get 4apenih3hzviy2o2jjlonbdh54 --fields credential --reve
 (prompts biometrics). NOTE: token contains a `|` — keep it single-quoted in env files.
 
 ## Deploy procedure
-1. Gates: `pnpm lint && pnpm build` green. Commit + push to `main` (Coolify builds
-   from git — pushing alone does NOT deploy unless auto-deploy webhook is enabled).
+1. Gates: `pnpm lint && pnpm typecheck && pnpm test && pnpm build` green. Commit +
+   push to `main` (Coolify builds from git — pushing alone does NOT deploy unless
+   auto-deploy webhook is enabled).
 2. Trigger:
    ```bash
    set -a; source .env.local; set +a
@@ -34,8 +35,16 @@ retrieve with `op item get 4apenih3hzviy2o2jjlonbdh54 --fields credential --reve
 
 ## App env vars
 Set in Coolify UI (app → Environment Variables) AND mirrored in `.env.local`.
-As of Phase 0 none are required at runtime. Phase 1+ adds `DATABASE_URL`,
-`BETTER_AUTH_SECRET`, etc.
+Phase 1+ requires `DATABASE_URL`, `BETTER_AUTH_SECRET`, etc.
+
+| Var | Purpose |
+|-----|---------|
+| `DATABASE_URL` | Postgres connection string |
+| `BETTER_AUTH_SECRET` | Session signing |
+| `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL` | Canonical origin |
+| `TRUSTED_ORIGINS` | Optional comma-separated extra Origins allowed for cookie-auth API mutations (always allows `https://time.neima.me` + `http://localhost:3000`) |
+| `CRON_SECRET` | Bearer secret for `POST /api/v1/jobs/tick` (ADR-004 scheduler). When the tick route is wired, Coolify/external cron must send `Authorization: Bearer $CRON_SECRET`. The Origin/CSRF proxy guard skips this path because it uses bearer, not cookies. |
+| `ANTHROPIC_API_KEY` | Optional; AI co-planner (503 if missing on AI routes) |
 
 ## Postgres provisioning (Phase 1A+)
 

@@ -10,7 +10,6 @@ import { listCategories } from "@/server/dal";
 import {
   buildCategoryMap,
   dateToMinutesFromMidnight,
-  seriesToActivity,
 } from "@/lib/adapters";
 import { instantToDateStr } from "@/server/temporal/zone";
 
@@ -48,12 +47,13 @@ async function loadReview(): Promise<{
     categories as unknown as Parameters<typeof buildCategoryMap>[0],
   );
 
-  const items: ReviewItem[] = (
-    resolved.activities as Parameters<typeof seriesToActivity>[0][]
-  )
+  const items: ReviewItem[] = resolved.activities
     .map((s) => {
-      const status = resolved.occurrenceStatusBySeries[s.id];
-      if (status === "completed" || status === "skipped" || status === "cancelled") {
+      if (
+        s.status === "completed" ||
+        s.status === "skipped" ||
+        s.status === "cancelled"
+      ) {
         return null;
       }
       const startMin = dateToMinutesFromMidnight(s.dtstartLocal, resolved.zone);
@@ -67,7 +67,7 @@ async function loadReview(): Promise<{
         category: cat,
         time: `${fmt(startMin)} – ${fmt(startMin + s.durationMin)}`,
         revision: s.revision,
-        occurrenceKey: s.dtstartLocal.toISOString(),
+        occurrenceKey: s.occurrenceKey.toISOString(),
         startMin,
         durationMin: s.durationMin,
       } satisfies ReviewItem;

@@ -12,7 +12,7 @@ export async function GET() {
     const { userId } = await requireSession();
     const categories = await listCategories(userId);
     return Response.json(
-      { items: categories },
+      { items: categories, nextCursor: null },
       { headers: { "cache-control": "private, no-store" } },
     );
   });

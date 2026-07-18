@@ -29,12 +29,15 @@ export function buildCategoryMap(categories: DbCategory[]): Map<string, Category
  * Convert an activity_series row into the Activity render shape.
  * The series' dtstartLocal (a Date) is converted to minutes-from-midnight
  * in the user's planning zone for timeline positioning.
+ *
+ * For expanded recurrence instances, pass `opts.occurrenceKey` (stable
+ * occurrence identity) so editScope=this targets the right instance.
  */
 export function seriesToActivity(
   series: DbActivitySeries,
   categoryMap: Map<string, CategoryId>,
   planningZone: string,
-  opts: { done?: boolean } = {},
+  opts: { done?: boolean; occurrenceKey?: string } = {},
 ): Activity {
   // Convert the UTC instant to minutes-from-midnight in the planning zone.
   const start = dateToMinutesFromMidnight(series.dtstartLocal, planningZone);
@@ -45,6 +48,7 @@ export function seriesToActivity(
     : "sky";
 
   // Checklist template (jsonb array of {label, done?} or freeform).
+  // Day expansion may already have merged checklistOverride into checklistTemplate.
   let checklist: Activity["checklist"];
   const tmpl = series.checklistTemplate;
   if (Array.isArray(tmpl) && tmpl.length > 0) {
@@ -72,7 +76,8 @@ export function seriesToActivity(
     checklist,
     revision: series.revision,
     categoryId: series.categoryId ?? undefined,
-    occurrenceKey: series.dtstartLocal.toISOString(),
+    occurrenceKey:
+      opts.occurrenceKey ?? series.dtstartLocal.toISOString(),
     notes: series.notes ?? undefined,
     priority: series.priority,
   };

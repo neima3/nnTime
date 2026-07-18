@@ -27,7 +27,7 @@ export async function handleErrors(fn: () => Promise<Response>): Promise<Respons
   } catch (e) {
     if (e instanceof Response) return e;
     if (e instanceof ConflictError) {
-      return errorResponse("conflict", e.message, 409, { retryable: true, details: e.serverState });
+      return errorResponse("conflict", e.message, 409, { retryable: false, details: e.serverState });
     }
     if (e instanceof NotFoundError) {
       return errorResponse("not_found", e.message, 404);

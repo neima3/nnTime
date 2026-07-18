@@ -29,9 +29,12 @@ export async function POST() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : "AI error";
       if (msg.includes("quota")) {
-        return errorResponse("rate_limited", msg, 429, { retryable: true });
+        return errorResponse("rate_limited", "Daily AI quota exceeded", 429, {
+          retryable: true,
+        });
       }
-      return errorResponse("internal", msg, 500);
+      console.error("[ai/group-priority]", e);
+      return errorResponse("internal", "An unexpected error occurred", 500);
     }
   });
 }

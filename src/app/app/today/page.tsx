@@ -74,14 +74,12 @@ async function loadTodayData(dateParam?: string) {
     categories as unknown as Parameters<typeof buildCategoryMap>[0],
   );
 
-  const activities = (
-    resolved.activities as Parameters<typeof seriesToActivity>[0][]
-  ).map((s) => {
-    const status = resolved.occurrenceStatusBySeries[s.id];
-    return seriesToActivity(s, categoryMap, resolved.zone, {
-      done: status === "completed",
-    });
-  });
+  const activities = resolved.activities.map((s) =>
+    seriesToActivity(s, categoryMap, resolved.zone, {
+      done: s.status === "completed",
+      occurrenceKey: s.occurrenceKey.toISOString(),
+    }),
+  );
 
   const inbox = (
     resolved.anytimeTasks as Parameters<typeof taskToInboxItem>[0][]

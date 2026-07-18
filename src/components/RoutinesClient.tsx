@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pause, Play, Plus, Trash2 } from "lucide-react";
+import { clientToday } from "@/lib/client-date";
 import { toast } from "./Toast";
 
 export type RoutineView = {
@@ -141,7 +142,7 @@ export function RoutinesClient({
     (r: RoutineView) => {
       const params = new URLSearchParams({
         title: r.title,
-        date: new Date().toISOString().slice(0, 10),
+        date: clientToday(),
         start: String(8 * 60),
       });
       router.push(`/app/editor?${params}`);

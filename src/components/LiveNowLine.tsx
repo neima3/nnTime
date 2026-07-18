@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { dateToMinutesFromMidnight } from "@/lib/adapters";
 import { fmt } from "@/lib/mock";
 
 const DAY_START = 7 * 60;
@@ -14,29 +15,38 @@ const PX_PER_MIN = 1.7;
 
 const top = (min: number) => (min - DAY_START) * PX_PER_MIN;
 
-function nowMinutes() {
+/** Browser-local minutes from midnight (includes fractional seconds for smooth line). */
+function nowMinutesLocal() {
   const now = new Date();
   return now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
 }
 
+function nowMinutes(zone?: string) {
+  if (zone) return dateToMinutesFromMidnight(new Date(), zone);
+  return nowMinutesLocal();
+}
+
 /** Live minutes from midnight; null until client mount when `live` is true. */
-export function useLiveNowMin(live: boolean): number | null {
+export function useLiveNowMin(live: boolean, zone?: string): number | null {
   const [nowMin, setNowMin] = useState<number | null>(live ? null : 0);
 
   useEffect(() => {
     if (!live) return;
     /* eslint-disable react-hooks/set-state-in-effect */
-    setNowMin(nowMinutes());
+    setNowMin(nowMinutes(zone));
     /* eslint-enable react-hooks/set-state-in-effect */
-    const interval = setInterval(() => setNowMin(nowMinutes()), 1000);
+    const interval = setInterval(() => setNowMin(nowMinutes(zone)), 1000);
     return () => clearInterval(interval);
-  }, [live]);
+  }, [live, zone]);
 
   return live ? nowMin : null;
 }
 
-export function LiveNowLine({ nowMin: external }: { nowMin?: number } = {}) {
-  const internal = useLiveNowMin(external === undefined);
+export function LiveNowLine({
+  nowMin: external,
+  zone,
+}: { nowMin?: number; zone?: string } = {}) {
+  const internal = useLiveNowMin(external === undefined, zone);
   const nowMin = external ?? internal;
   const [mounted, setMounted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);

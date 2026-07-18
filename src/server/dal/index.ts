@@ -90,13 +90,16 @@ export async function createTask(
   opts: { db?: Db } = {},
 ) {
   const db = opts.db ?? dbDefault;
-  const id = crypto.randomUUID();
-  const [task] = await db
-    .insert(schema.tasks)
-    .values({ id, userId, ...input })
-    .returning();
-  await appendChangeLog(db, userId, "tasks", id, "upsert", task!.revision);
-  return task!;
+  return db.transaction(async (tx) => {
+    const tdb = tx as unknown as Db;
+    const id = crypto.randomUUID();
+    const [task] = await tdb
+      .insert(schema.tasks)
+      .values({ id, userId, ...input })
+      .returning();
+    await appendChangeLog(tdb, userId, "tasks", id, "upsert", task!.revision);
+    return task!;
+  });
 }
 
 export async function updateTask(
@@ -116,17 +119,34 @@ export async function updateTask(
   opts: { db?: Db } = {},
 ) {
   const db = opts.db ?? dbDefault;
-  const existing = await getTask(userId, id, opts);
-  if (existing.revision !== ifMatchRevision) {
-    throw new ConflictError("revision mismatch", existing);
-  }
-  const [updated] = await db
-    .update(schema.tasks)
-    .set({ ...input, revision: existing.revision + 1, updatedAt: new Date() })
-    .where(and(eq(schema.tasks.id, id), eq(schema.tasks.userId, userId)))
-    .returning();
-  await appendChangeLog(db, userId, "tasks", id, "upsert", updated!.revision);
-  return updated!;
+  return db.transaction(async (tx) => {
+    const tdb = tx as unknown as Db;
+    const [updated] = await tdb
+      .update(schema.tasks)
+      .set({ ...input, revision: ifMatchRevision + 1, updatedAt: new Date() })
+      .where(
+        and(
+          eq(schema.tasks.id, id),
+          eq(schema.tasks.userId, userId),
+          eq(schema.tasks.revision, ifMatchRevision),
+          isNull(schema.tasks.deletedAt),
+        ),
+      )
+      .returning();
+    if (!updated) {
+      // Distinguish not-found vs conflict.
+      try {
+        const existing = await getTask(userId, id, { db: tdb });
+        throw new ConflictError("revision mismatch", existing);
+      } catch (e) {
+        if (e instanceof ConflictError) throw e;
+        if (e instanceof NotFoundError) throw e;
+        throw e;
+      }
+    }
+    await appendChangeLog(tdb, userId, "tasks", id, "upsert", updated.revision);
+    return updated;
+  });
 }
 
 export async function deleteTask(
@@ -136,15 +156,32 @@ export async function deleteTask(
   opts: { db?: Db } = {},
 ) {
   const db = opts.db ?? dbDefault;
-  const existing = await getTask(userId, id, opts);
-  if (existing.revision !== ifMatchRevision) {
-    throw new ConflictError("revision mismatch", existing);
-  }
-  await db
-    .update(schema.tasks)
-    .set({ deletedAt: new Date(), revision: existing.revision + 1 })
-    .where(and(eq(schema.tasks.id, id), eq(schema.tasks.userId, userId)));
-  await appendChangeLog(db, userId, "tasks", id, "delete", existing.revision + 1);
+  return db.transaction(async (tx) => {
+    const tdb = tx as unknown as Db;
+    const [updated] = await tdb
+      .update(schema.tasks)
+      .set({ deletedAt: new Date(), revision: ifMatchRevision + 1 })
+      .where(
+        and(
+          eq(schema.tasks.id, id),
+          eq(schema.tasks.userId, userId),
+          eq(schema.tasks.revision, ifMatchRevision),
+          isNull(schema.tasks.deletedAt),
+        ),
+      )
+      .returning();
+    if (!updated) {
+      try {
+        const existing = await getTask(userId, id, { db: tdb });
+        throw new ConflictError("revision mismatch", existing);
+      } catch (e) {
+        if (e instanceof ConflictError) throw e;
+        if (e instanceof NotFoundError) throw e;
+        throw e;
+      }
+    }
+    await appendChangeLog(tdb, userId, "tasks", id, "delete", updated.revision);
+  });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -204,28 +241,31 @@ export async function createActivitySeries(
   opts: { db?: Db } = {},
 ) {
   const db = opts.db ?? dbDefault;
-  const id = crypto.randomUUID();
-  const [series] = await db
-    .insert(schema.activitySeries)
-    .values({
-      id,
-      userId,
-      priority: input.priority ?? "none",
-      source: input.source ?? "manual",
-      checklistTemplate: input.checklistTemplate ?? [],
-      tz: input.tz,
-      dtstartLocal: input.dtstartLocal,
-      rrule: input.rrule ?? null,
-      title: input.title,
-      emoji: input.emoji,
-      categoryId: input.categoryId,
-      durationMin: input.durationMin,
-      energy: input.energy ?? null,
-      notes: input.notes,
-    })
-    .returning();
-  await appendChangeLog(db, userId, "activity_series", id, "upsert", series!.revision);
-  return series!;
+  return db.transaction(async (tx) => {
+    const tdb = tx as unknown as Db;
+    const id = crypto.randomUUID();
+    const [series] = await tdb
+      .insert(schema.activitySeries)
+      .values({
+        id,
+        userId,
+        priority: input.priority ?? "none",
+        source: input.source ?? "manual",
+        checklistTemplate: input.checklistTemplate ?? [],
+        tz: input.tz,
+        dtstartLocal: input.dtstartLocal,
+        rrule: input.rrule ?? null,
+        title: input.title,
+        emoji: input.emoji,
+        categoryId: input.categoryId,
+        durationMin: input.durationMin,
+        energy: input.energy ?? null,
+        notes: input.notes,
+      })
+      .returning();
+    await appendChangeLog(tdb, userId, "activity_series", id, "upsert", series!.revision);
+    return series!;
+  });
 }
 
 export async function deleteActivitySeries(
@@ -235,20 +275,32 @@ export async function deleteActivitySeries(
   opts: { db?: Db } = {},
 ) {
   const db = opts.db ?? dbDefault;
-  const existing = await getActivitySeries(userId, id, opts);
-  if (existing.revision !== ifMatchRevision) {
-    throw new ConflictError("revision mismatch", existing);
-  }
-  await db
-    .update(schema.activitySeries)
-    .set({ deletedAt: new Date(), revision: existing.revision + 1 })
-    .where(
-      and(
-        eq(schema.activitySeries.id, id),
-        eq(schema.activitySeries.userId, userId),
-      ),
-    );
-  await appendChangeLog(db, userId, "activity_series", id, "delete", existing.revision + 1);
+  return db.transaction(async (tx) => {
+    const tdb = tx as unknown as Db;
+    const [updated] = await tdb
+      .update(schema.activitySeries)
+      .set({ deletedAt: new Date(), revision: ifMatchRevision + 1 })
+      .where(
+        and(
+          eq(schema.activitySeries.id, id),
+          eq(schema.activitySeries.userId, userId),
+          eq(schema.activitySeries.revision, ifMatchRevision),
+          isNull(schema.activitySeries.deletedAt),
+        ),
+      )
+      .returning();
+    if (!updated) {
+      try {
+        const existing = await getActivitySeries(userId, id, { db: tdb });
+        throw new ConflictError("revision mismatch", existing);
+      } catch (e) {
+        if (e instanceof ConflictError) throw e;
+        if (e instanceof NotFoundError) throw e;
+        throw e;
+      }
+    }
+    await appendChangeLog(tdb, userId, "activity_series", id, "delete", updated.revision);
+  });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -308,23 +360,26 @@ export async function upsertOccurrence(
 ) {
   const db = opts.db ?? dbDefault;
   await getActivitySeries(userId, seriesId, opts);
-  const id = crypto.randomUUID();
-  const [occ] = await db
-    .insert(schema.activityOccurrences)
-    .values({
-      id,
-      userId,
-      seriesId,
-      occurrenceKey,
-      ...input,
-    })
-    .onConflictDoUpdate({
-      target: [schema.activityOccurrences.seriesId, schema.activityOccurrences.occurrenceKey],
-      set: { ...input, revision: sql`activity_occurrences.revision + 1`, updatedAt: new Date() },
-    })
-    .returning();
-  await appendChangeLog(db, userId, "activity_occurrences", occ!.id, "upsert", occ!.revision);
-  return occ!;
+  return db.transaction(async (tx) => {
+    const tdb = tx as unknown as Db;
+    const id = crypto.randomUUID();
+    const [occ] = await tdb
+      .insert(schema.activityOccurrences)
+      .values({
+        id,
+        userId,
+        seriesId,
+        occurrenceKey,
+        ...input,
+      })
+      .onConflictDoUpdate({
+        target: [schema.activityOccurrences.seriesId, schema.activityOccurrences.occurrenceKey],
+        set: { ...input, revision: sql`activity_occurrences.revision + 1`, updatedAt: new Date() },
+      })
+      .returning();
+    await appendChangeLog(tdb, userId, "activity_occurrences", occ!.id, "upsert", occ!.revision);
+    return occ!;
+  });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -346,13 +401,16 @@ export async function createTag(
   opts: { db?: Db } = {},
 ) {
   const db = opts.db ?? dbDefault;
-  const id = crypto.randomUUID();
-  const [tag] = await db
-    .insert(schema.tags)
-    .values({ id, userId, ...input })
-    .returning();
-  await appendChangeLog(db, userId, "tags", id, "upsert", tag!.revision);
-  return tag!;
+  return db.transaction(async (tx) => {
+    const tdb = tx as unknown as Db;
+    const id = crypto.randomUUID();
+    const [tag] = await tdb
+      .insert(schema.tags)
+      .values({ id, userId, ...input })
+      .returning();
+    await appendChangeLog(tdb, userId, "tags", id, "upsert", tag!.revision);
+    return tag!;
+  });
 }
 
 export async function getTag(userId: string, id: string, opts: { db?: Db } = {}) {
@@ -374,17 +432,33 @@ export async function updateTag(
   opts: { db?: Db } = {},
 ) {
   const db = opts.db ?? dbDefault;
-  const existing = await getTag(userId, id, opts);
-  if (existing.revision !== ifMatchRevision) {
-    throw new ConflictError("revision mismatch", existing);
-  }
-  const [updated] = await db
-    .update(schema.tags)
-    .set({ ...input, revision: existing.revision + 1, updatedAt: new Date() })
-    .where(and(eq(schema.tags.id, id), eq(schema.tags.userId, userId)))
-    .returning();
-  await appendChangeLog(db, userId, "tags", id, "upsert", updated!.revision);
-  return updated!;
+  return db.transaction(async (tx) => {
+    const tdb = tx as unknown as Db;
+    const [updated] = await tdb
+      .update(schema.tags)
+      .set({ ...input, revision: ifMatchRevision + 1, updatedAt: new Date() })
+      .where(
+        and(
+          eq(schema.tags.id, id),
+          eq(schema.tags.userId, userId),
+          eq(schema.tags.revision, ifMatchRevision),
+          isNull(schema.tags.deletedAt),
+        ),
+      )
+      .returning();
+    if (!updated) {
+      try {
+        const existing = await getTag(userId, id, { db: tdb });
+        throw new ConflictError("revision mismatch", existing);
+      } catch (e) {
+        if (e instanceof ConflictError) throw e;
+        if (e instanceof NotFoundError) throw e;
+        throw e;
+      }
+    }
+    await appendChangeLog(tdb, userId, "tags", id, "upsert", updated.revision);
+    return updated;
+  });
 }
 
 export async function deleteTag(
@@ -394,15 +468,32 @@ export async function deleteTag(
   opts: { db?: Db } = {},
 ) {
   const db = opts.db ?? dbDefault;
-  const existing = await getTag(userId, id, opts);
-  if (existing.revision !== ifMatchRevision) {
-    throw new ConflictError("revision mismatch", existing);
-  }
-  await db
-    .update(schema.tags)
-    .set({ deletedAt: new Date(), revision: existing.revision + 1 })
-    .where(and(eq(schema.tags.id, id), eq(schema.tags.userId, userId)));
-  await appendChangeLog(db, userId, "tags", id, "delete", existing.revision + 1);
+  return db.transaction(async (tx) => {
+    const tdb = tx as unknown as Db;
+    const [updated] = await tdb
+      .update(schema.tags)
+      .set({ deletedAt: new Date(), revision: ifMatchRevision + 1 })
+      .where(
+        and(
+          eq(schema.tags.id, id),
+          eq(schema.tags.userId, userId),
+          eq(schema.tags.revision, ifMatchRevision),
+          isNull(schema.tags.deletedAt),
+        ),
+      )
+      .returning();
+    if (!updated) {
+      try {
+        const existing = await getTag(userId, id, { db: tdb });
+        throw new ConflictError("revision mismatch", existing);
+      } catch (e) {
+        if (e instanceof ConflictError) throw e;
+        if (e instanceof NotFoundError) throw e;
+        throw e;
+      }
+    }
+    await appendChangeLog(tdb, userId, "tags", id, "delete", updated.revision);
+  });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -507,16 +598,24 @@ export async function updateSettings(
   opts: { db?: Db } = {},
 ) {
   const db = opts.db ?? dbDefault;
-  const existing = await getOrCreateSettings(userId, opts);
-  if (existing.revision !== ifMatchRevision) {
-    throw new ConflictError("revision mismatch", existing);
-  }
+  // Ensure row exists (settings has no tombstone; create-on-missing).
+  // No change_log for settings (entity_id is uuid; settings PK is text userId).
+  await getOrCreateSettings(userId, opts);
   const [updated] = await db
     .update(schema.userSettings)
-    .set({ ...input, revision: existing.revision + 1, updatedAt: new Date() })
-    .where(eq(schema.userSettings.userId, userId))
+    .set({ ...input, revision: ifMatchRevision + 1, updatedAt: new Date() })
+    .where(
+      and(
+        eq(schema.userSettings.userId, userId),
+        eq(schema.userSettings.revision, ifMatchRevision),
+      ),
+    )
     .returning();
-  return updated!;
+  if (!updated) {
+    const existing = await getOrCreateSettings(userId, opts);
+    throw new ConflictError("revision mismatch", existing);
+  }
+  return updated;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -586,32 +685,35 @@ export async function createRoutine(
   opts: { db?: Db } = {},
 ) {
   const db = opts.db ?? dbDefault;
-  const id = crypto.randomUUID();
-  const [routine] = await db
-    .insert(schema.routines)
-    .values({
-      id,
-      userId,
-      title: input.title,
-      emoji: input.emoji,
-      categoryId: input.categoryId,
-      notes: input.notes,
-    })
-    .returning();
-  const steps = input.steps ?? [];
-  for (let i = 0; i < steps.length; i++) {
-    const s = steps[i]!;
-    await db.insert(schema.routineSteps).values({
-      id: crypto.randomUUID(),
-      userId,
-      routineId: id,
-      title: s.title,
-      durationMin: s.durationMin ?? null,
-      sortOrder: i,
-    });
-  }
-  await appendChangeLog(db, userId, "routines", id, "upsert", routine!.revision);
-  return routine!;
+  return db.transaction(async (tx) => {
+    const tdb = tx as unknown as Db;
+    const id = crypto.randomUUID();
+    const [routine] = await tdb
+      .insert(schema.routines)
+      .values({
+        id,
+        userId,
+        title: input.title,
+        emoji: input.emoji,
+        categoryId: input.categoryId,
+        notes: input.notes,
+      })
+      .returning();
+    const steps = input.steps ?? [];
+    for (let i = 0; i < steps.length; i++) {
+      const s = steps[i]!;
+      await tdb.insert(schema.routineSteps).values({
+        id: crypto.randomUUID(),
+        userId,
+        routineId: id,
+        title: s.title,
+        durationMin: s.durationMin ?? null,
+        sortOrder: i,
+      });
+    }
+    await appendChangeLog(tdb, userId, "routines", id, "upsert", routine!.revision);
+    return routine!;
+  });
 }
 
 export async function updateRoutine(
@@ -627,17 +729,33 @@ export async function updateRoutine(
   opts: { db?: Db } = {},
 ) {
   const db = opts.db ?? dbDefault;
-  const existing = await getRoutine(userId, id, opts);
-  if (existing.revision !== ifMatchRevision) {
-    throw new ConflictError("revision mismatch", existing);
-  }
-  const [updated] = await db
-    .update(schema.routines)
-    .set({ ...input, revision: existing.revision + 1, updatedAt: new Date() })
-    .where(and(eq(schema.routines.id, id), eq(schema.routines.userId, userId)))
-    .returning();
-  await appendChangeLog(db, userId, "routines", id, "upsert", updated!.revision);
-  return updated!;
+  return db.transaction(async (tx) => {
+    const tdb = tx as unknown as Db;
+    const [updated] = await tdb
+      .update(schema.routines)
+      .set({ ...input, revision: ifMatchRevision + 1, updatedAt: new Date() })
+      .where(
+        and(
+          eq(schema.routines.id, id),
+          eq(schema.routines.userId, userId),
+          eq(schema.routines.revision, ifMatchRevision),
+          isNull(schema.routines.deletedAt),
+        ),
+      )
+      .returning();
+    if (!updated) {
+      try {
+        const existing = await getRoutine(userId, id, { db: tdb });
+        throw new ConflictError("revision mismatch", existing);
+      } catch (e) {
+        if (e instanceof ConflictError) throw e;
+        if (e instanceof NotFoundError) throw e;
+        throw e;
+      }
+    }
+    await appendChangeLog(tdb, userId, "routines", id, "upsert", updated.revision);
+    return updated;
+  });
 }
 
 export async function deleteRoutine(
@@ -647,15 +765,32 @@ export async function deleteRoutine(
   opts: { db?: Db } = {},
 ) {
   const db = opts.db ?? dbDefault;
-  const existing = await getRoutine(userId, id, opts);
-  if (existing.revision !== ifMatchRevision) {
-    throw new ConflictError("revision mismatch", existing);
-  }
-  await db
-    .update(schema.routines)
-    .set({ deletedAt: new Date(), revision: existing.revision + 1 })
-    .where(and(eq(schema.routines.id, id), eq(schema.routines.userId, userId)));
-  await appendChangeLog(db, userId, "routines", id, "delete", existing.revision + 1);
+  return db.transaction(async (tx) => {
+    const tdb = tx as unknown as Db;
+    const [updated] = await tdb
+      .update(schema.routines)
+      .set({ deletedAt: new Date(), revision: ifMatchRevision + 1 })
+      .where(
+        and(
+          eq(schema.routines.id, id),
+          eq(schema.routines.userId, userId),
+          eq(schema.routines.revision, ifMatchRevision),
+          isNull(schema.routines.deletedAt),
+        ),
+      )
+      .returning();
+    if (!updated) {
+      try {
+        const existing = await getRoutine(userId, id, { db: tdb });
+        throw new ConflictError("revision mismatch", existing);
+      } catch (e) {
+        if (e instanceof ConflictError) throw e;
+        if (e instanceof NotFoundError) throw e;
+        throw e;
+      }
+    }
+    await appendChangeLog(tdb, userId, "routines", id, "delete", updated.revision);
+  });
 }
 
 export async function listRoutineSteps(
@@ -709,20 +844,23 @@ export async function createRoutineSchedule(
 ) {
   const db = opts.db ?? dbDefault;
   await getRoutine(userId, input.routineId, opts);
-  const id = crypto.randomUUID();
-  const [sched] = await db
-    .insert(schema.routineSchedules)
-    .values({
-      id,
-      userId,
-      routineId: input.routineId,
-      tz: input.tz,
-      rrule: input.rrule ?? null,
-      paused: input.paused ?? false,
-    })
-    .returning();
-  await appendChangeLog(db, userId, "routine_schedules", id, "upsert", sched!.revision);
-  return sched!;
+  return db.transaction(async (tx) => {
+    const tdb = tx as unknown as Db;
+    const id = crypto.randomUUID();
+    const [sched] = await tdb
+      .insert(schema.routineSchedules)
+      .values({
+        id,
+        userId,
+        routineId: input.routineId,
+        tz: input.tz,
+        rrule: input.rrule ?? null,
+        paused: input.paused ?? false,
+      })
+      .returning();
+    await appendChangeLog(tdb, userId, "routine_schedules", id, "upsert", sched!.revision);
+    return sched!;
+  });
 }
 
 export async function updateRoutineSchedule(
@@ -733,32 +871,37 @@ export async function updateRoutineSchedule(
   opts: { db?: Db } = {},
 ) {
   const db = opts.db ?? dbDefault;
-  const [existing] = await db
-    .select()
-    .from(schema.routineSchedules)
-    .where(
-      and(
-        eq(schema.routineSchedules.id, id),
-        eq(schema.routineSchedules.userId, userId),
-      ),
-    )
-    .limit(1);
-  if (!existing || existing.deletedAt) throw new NotFoundError("routine_schedule");
-  if (existing.revision !== ifMatchRevision) {
-    throw new ConflictError("revision mismatch", existing);
-  }
-  const [updated] = await db
-    .update(schema.routineSchedules)
-    .set({ ...input, revision: existing.revision + 1, updatedAt: new Date() })
-    .where(
-      and(
-        eq(schema.routineSchedules.id, id),
-        eq(schema.routineSchedules.userId, userId),
-      ),
-    )
-    .returning();
-  await appendChangeLog(db, userId, "routine_schedules", id, "upsert", updated!.revision);
-  return updated!;
+  return db.transaction(async (tx) => {
+    const tdb = tx as unknown as Db;
+    const [updated] = await tdb
+      .update(schema.routineSchedules)
+      .set({ ...input, revision: ifMatchRevision + 1, updatedAt: new Date() })
+      .where(
+        and(
+          eq(schema.routineSchedules.id, id),
+          eq(schema.routineSchedules.userId, userId),
+          eq(schema.routineSchedules.revision, ifMatchRevision),
+          isNull(schema.routineSchedules.deletedAt),
+        ),
+      )
+      .returning();
+    if (!updated) {
+      const [existing] = await tdb
+        .select()
+        .from(schema.routineSchedules)
+        .where(
+          and(
+            eq(schema.routineSchedules.id, id),
+            eq(schema.routineSchedules.userId, userId),
+          ),
+        )
+        .limit(1);
+      if (!existing || existing.deletedAt) throw new NotFoundError("routine_schedule");
+      throw new ConflictError("revision mismatch", existing);
+    }
+    await appendChangeLog(tdb, userId, "routine_schedules", id, "upsert", updated.revision);
+    return updated;
+  });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -819,18 +962,13 @@ export async function appendChangeLog(
   op: "upsert" | "delete",
   revision: number,
 ) {
-  try {
-    await db.insert(schema.changeLog).values({
-      userId,
-      entityType,
-      entityId,
-      op,
-      revision,
-    });
-  } catch (e) {
-    // Log but don't crash the mutation — the change_log is for sync, not
-    // transactional integrity. A missing change_log row means the client
-    // won't see the change via incremental sync, but the data itself is saved.
-    console.error("[dal] appendChangeLog failed:", e instanceof Error ? e.message : e);
-  }
+  // Fail the mutation if change_log insert fails (callers wrap in transactions
+  // so entity write + change_log stay atomic).
+  await db.insert(schema.changeLog).values({
+    userId,
+    entityType,
+    entityId,
+    op,
+    revision,
+  });
 }

@@ -70,11 +70,11 @@ export function ReviewClient({
             return;
           }
         } else {
-          // Move to tomorrow: shift dtstart by +1 day.
+          // Move this occurrence only (occurrence override), not the whole series.
           const [y, m, d] = date.split("-").map(Number);
           const next = new Date(Date.UTC(y!, m! - 1, d! + 1));
           const nextDate = next.toISOString().slice(0, 10);
-          const dtstartLocal = localMinutesToInstant(
+          const startAt = localMinutesToInstant(
             nextDate,
             current.startMin,
             zone,
@@ -86,8 +86,9 @@ export function ReviewClient({
               "If-Match": String(current.revision),
             },
             body: JSON.stringify({
-              editScope: "all",
-              dtstartLocal,
+              editScope: "this",
+              occurrenceKey: current.occurrenceKey,
+              startAt,
             }),
           });
           if (!res.ok) {

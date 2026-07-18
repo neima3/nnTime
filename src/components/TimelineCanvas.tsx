@@ -40,6 +40,8 @@ interface TimelineCanvasProps {
   nowMin: number;
   /** When false, hide the live now-line (viewing another day). */
   showNowLine?: boolean;
+  /** Planning IANA zone for the live now-line (falls back to browser local). */
+  zone?: string;
   onUpdateActivity: (id: string, start: number, duration: number) => Promise<{ ok: boolean }>;
   onCreateActivity?: (start: number) => void;
   onComplete?: (id: string) => Promise<{ ok: boolean }>;
@@ -104,6 +106,7 @@ export function TimelineCanvas({
   activities,
   nowMin,
   showNowLine = true,
+  zone,
   onUpdateActivity,
   onCreateActivity,
   onComplete,
@@ -120,8 +123,8 @@ export function TimelineCanvas({
   const [stepOptimistic, setStepOptimistic] = useState<Map<string, boolean>>(new Map());
   const [conflictId, setConflictId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  // Live clock drives past/current styling when viewing today (Phase 18).
-  const liveNow = useLiveNowMin(showNowLine);
+  // Live clock in planning zone (falls back to browser local) when viewing today.
+  const liveNow = useLiveNowMin(showNowLine, zone);
   const effectiveNow = showNowLine && liveNow != null ? liveNow : nowMin;
 
   // Merge optimistic overrides into the activity list.
@@ -308,7 +311,7 @@ export function TimelineCanvas({
       )}
 
       {/* Now line — live only when viewing today */}
-      {showNowLine && liveNow != null && <LiveNowLine nowMin={liveNow} />}
+      {showNowLine && liveNow != null && <LiveNowLine nowMin={liveNow} zone={zone} />}
 
       {/* Activities */}
       <div

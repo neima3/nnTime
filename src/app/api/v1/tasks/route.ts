@@ -7,6 +7,7 @@ import { listTasks, createTask } from "@/server/dal";
 import { handleErrors, parseBody } from "@/server/api-errors";
 import { taskCreate } from "@/server/schemas/task";
 import { checkRateLimit, rateLimitedResponse } from "@/server/ratelimit";
+import { withIdempotency } from "@/server/idempotency";
 
 export async function GET(request: Request) {
   return handleErrors(async () => {
@@ -16,7 +17,10 @@ export async function GET(request: Request) {
     const tasks = await listTasks(userId, {
       ...(bucket === "inbox" || bucket === "anytime" ? { bucket } : {}),
     });
-    return Response.json({ items: tasks }, { headers: { "cache-control": "private, no-store" } });
+    return Response.json(
+      { items: tasks, nextCursor: null },
+      { headers: { "cache-control": "private, no-store" } },
+    );
   });
 }
 
@@ -28,13 +32,16 @@ export async function POST(request: Request) {
       windowSec: 60,
     });
     if (!rl.allowed) return rateLimitedResponse(rl);
-    const body = await parseBody(request, taskCreate);
-    if (body instanceof Response) return body;
-    // zod dateStr is a string; the DAL expects a Date for the `date` column.
-    const task = await createTask(userId, {
-      ...body,
-      ...(body.date ? { date: new Date(body.date) } : { date: null }),
+    const key = request.headers.get("idempotency-key");
+    return withIdempotency(userId, key, "POST", "/api/v1/tasks", async () => {
+      const body = await parseBody(request, taskCreate);
+      if (body instanceof Response) return body;
+      // zod dateStr is a string; the DAL expects a Date for the `date` column.
+      const task = await createTask(userId, {
+        ...body,
+        ...(body.date ? { date: new Date(body.date) } : { date: null }),
+      });
+      return Response.json(task, { status: 201 });
     });
-    return Response.json(task, { status: 201 });
   });
 }

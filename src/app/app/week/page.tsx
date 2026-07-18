@@ -3,9 +3,15 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { catClasses, fmt, type CategoryId } from "@/lib/mock";
 import { getSession } from "@/server/auth-session";
-import { listActivitySeries, listCategories, getOrCreateSettings } from "@/server/dal";
+import {
+  listActivitySeries,
+  listCategories,
+  getOrCreateSettings,
+  listUserOccurrences,
+} from "@/server/dal";
 import { buildCategoryMap, dateToMinutesFromMidnight } from "@/lib/adapters";
-import { instantToDateStr } from "@/server/temporal/zone";
+import { expandActivitiesForDay } from "@/server/services/day";
+import { instantToDateStr, resolveDayBounds } from "@/server/temporal/zone";
 
 type Block = {
   id: string;
@@ -106,6 +112,7 @@ async function loadWeek(weekParam?: string) {
   const weekStart = mondayOf(weekParam && /^\d{4}-\d{2}-\d{2}$/.test(weekParam) ? weekParam : todayStr);
 
   const series = await listActivitySeries(session.userId);
+  const occurrences = await listUserOccurrences(session.userId);
   const categories = await listCategories(session.userId).catch(() => []);
   const categoryMap = buildCategoryMap(
     categories as unknown as Parameters<typeof buildCategoryMap>[0],
@@ -115,27 +122,27 @@ async function loadWeek(weekParam?: string) {
   const days: DayCol[] = [];
   for (let i = 0; i < 7; i++) {
     const dateStr = shiftDate(weekStart, i);
-    const dayBlocks: Block[] = series
-      .filter((s) => {
-        try {
-          return instantToDateStr(s.dtstartLocal, s.tz || zone) === dateStr;
-        } catch {
-          return false;
-        }
-      })
-      .map((s) => {
-        const startMin = dateToMinutesFromMidnight(s.dtstartLocal, zone);
-        const cat = s.categoryId
-          ? categoryMap.get(s.categoryId) ?? "sky"
-          : "sky";
-        return {
-          id: s.id,
-          emoji: s.emoji ?? "📋",
-          title: s.title,
-          time: fmt(startMin),
-          category: cat,
-        };
-      });
+    const expanded = expandActivitiesForDay(
+      series,
+      occurrences,
+      resolveDayBounds(dateStr, zone),
+    );
+    const dayBlocks: Block[] = expanded.map((s) => {
+      const startMin = dateToMinutesFromMidnight(s.dtstartLocal, zone);
+      const cat = s.categoryId
+        ? categoryMap.get(s.categoryId) ?? "sky"
+        : "sky";
+      const occKey = s.occurrenceKey.toISOString();
+      return {
+        // Occurrence-aware id for React key uniqueness when a series
+        // expands to multiple instances (or same series appears once per day).
+        id: `${s.id}:${occKey}`,
+        emoji: s.emoji ?? "📋",
+        title: s.title,
+        time: fmt(startMin),
+        category: cat,
+      };
+    });
     days.push({
       day: dayNames[i]!,
       date: Number(dateStr.slice(8, 10)),
@@ -241,10 +248,12 @@ export default async function WeekPage({
               </header>
               {d.blocks.map((b) => {
                 const cat = catClasses[b.category];
+                // id is `${seriesId}:${occurrenceKey}`; editor needs series UUID only.
+                const seriesId = b.id.split(":")[0]!;
                 return (
                   <Link
                     key={b.id}
-                    href={`/app/editor?id=${b.id}&date=${d.dateStr}`}
+                    href={`/app/editor?id=${seriesId}&date=${d.dateStr}`}
                     className={`flex items-center gap-2 rounded-xl px-2.5 py-2 ${cat.fill} focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none`}
                   >
                     <span className="text-sm" aria-hidden>

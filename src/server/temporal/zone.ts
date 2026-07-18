@@ -63,8 +63,11 @@ export function isValidZone(tz: string): boolean {
   }
 }
 
-/** Project a UTC instant into wall-clock fields for `tz`. */
-function wallClock(instant: Date, tz: string) {
+/**
+ * Project a UTC instant into wall-clock fields for `tz`.
+ * `month` is 0-indexed (matches `wallClockToInstant` / `expandSeries` dtstart).
+ */
+export function instantToWallFields(instant: Date, tz: string) {
   const parts = formatter(tz).formatToParts(instant);
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "0";
   let hour = Number(get("hour"));
@@ -77,6 +80,11 @@ function wallClock(instant: Date, tz: string) {
     minute: Number(get("minute")),
     second: Number(get("second")),
   };
+}
+
+/** Internal alias used by offset / DST helpers. */
+function wallClock(instant: Date, tz: string) {
+  return instantToWallFields(instant, tz);
 }
 
 /**

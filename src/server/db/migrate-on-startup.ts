@@ -5,19 +5,34 @@
  *
  * Runs once per process (guarded by a module-level promise). If DATABASE_URL is
  * not set, it's a no-op (the app serves mock-data fallback).
+ *
+ * Failure is tracked honestly: getMigrationStatus() reports ok=false so health
+ * can 503. We still resolve the promise (process stays up) but never remount
+ * migratePromise as a silent success.
  */
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { resolve, join } from "node:path";
 import postgres from "postgres";
 
 let migratePromise: Promise<void> | null = null;
+let migrateOk = true;
+let lastError: string | null = null;
+
+/** Readiness for /api/health — do not treat failed migrate as success. */
+export function getMigrationStatus(): { ok: boolean; error?: string } {
+  if (migrateOk) return { ok: true };
+  return { ok: false, error: lastError ?? "migration failed" };
+}
 
 export function ensureMigrated(): Promise<void> {
   if (!migratePromise) {
     migratePromise = runMigrations().catch((e) => {
-      // Log but don't crash — the app degrades to mock data.
-      console.error("[migrate] FAILED:", e instanceof Error ? e.message : e);
-      migratePromise = Promise.resolve();
+      lastError = e instanceof Error ? e.message : String(e);
+      migrateOk = false;
+      // Log but don't crash — health/status reflects failure; app may degrade.
+      console.error("[migrate] FAILED:", lastError);
+      // Resolve so callers awaiting ensureMigrated() don't get uncaught rejection.
+      // Status remains failed via getMigrationStatus() — do NOT remount as success.
     });
   }
   return migratePromise;

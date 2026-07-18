@@ -31,11 +31,8 @@ export async function POST(request: Request) {
     try {
       ics = await fetchIcs(body.url);
     } catch (e) {
-      return errorResponse(
-        "bad_request",
-        e instanceof Error ? e.message : "ICS fetch failed",
-        400,
-      );
+      console.error("[calendar/ics] fetch failed:", e);
+      return errorResponse("bad_request", "Unable to import calendar", 400);
     }
 
     const events = parseIcs(ics).slice(0, body.maxEvents ?? 30);

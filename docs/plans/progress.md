@@ -1,5 +1,50 @@
 # Progress log
 
+## 2026-07-18 — Review Wave 2 COMPLETE (hardening) + ship
+
+**Plan:** `docs/superpowers/plans/2026-07-18-review-wave2-hard-hardening.md`
+
+**Shipped:**
+1. **Atomic If-Match** — all DAL update/delete + focus transitions use `WHERE revision = ?`; zero rows → ConflictError
+2. **Transactional change_log** — mutations wrap write + log in `db.transaction`; `appendChangeLog` no longer swallows
+3. **Routine materializer** — stable sourceRef dedupe, nextRunAt advance, zone wall fields, step duration sum; double-run test green
+4. **Jobs tick** — `POST /api/v1/jobs/tick` with `CRON_SECRET`; health `checks.scheduler`
+5. **Idempotency-Key** — 48h store/replay on POST tasks + activities
+6. **OpenAPI inventory test** — path ↔ handler allowlists; list GETs return `nextCursor: null`
+7. **Origin/CSRF** — proxy rejects cross-site Sec-Fetch-Site + mismatched Origin on `/api/v1` mutations
+8. **Migrate honesty** — failed migrate tracked; health 503; batch rate limit
+9. **Client editScope** — drag/review tomorrow use `this` + occurrenceKey; `clientToday(zone)`; week/month RRULE expand
+
+**Gates:** lint, typecheck, **155 tests**, build green.
+
+**Ops residual (env, not code):** set `CRON_SECRET` in Coolify + schedule cron → `/api/v1/jobs/tick`; optional `TRUSTED_ORIGINS`.
+
+---
+
+## 2026-07-18 — Full-app code review + Wave 1 critical fixes
+
+**Review:** 4 domain agents (security/API, DAL/services, UI/client, contracts/iOS).
+- Master: `docs/plans/2026-07-18-full-app-code-review.md`
+- Domains: `docs/plans/2026-07-18-full-review-*.md`
+- Plans: `docs/superpowers/plans/2026-07-18-review-wave1-critical-fixes.md`,
+  `…-wave2-hard-hardening.md`
+
+**Wave 1 shipped (executed with subagents):**
+1. **Focus pause math** — pause no longer credits running time; remaining freezes while paused (`focus.ts` + pure tests).
+2. **ICS SSRF (SEC-04)** — `isPublicIp`, DNS public-IP check, manual redirects max 3 (`calendar.ts` + 15 IP tests).
+3. **Batch denylist** — reject nested `/api/v1/batch`; path normalize (`batch/path.ts` + tests).
+4. **409 retryable: false** — conflicts are terminal for offline clients.
+5. **AI/ICS error hygiene** — no raw exception messages to clients.
+6. **Day RRULE expansion** — `expandActivitiesForDay` + `getResolvedDay` (DAILY/WEEKLY appear on later days; checklist overrides merge).
+7. **Checklist toggle** — `editScope: "this"` + `checklistOverride` (no longer rewrites series template for all future days).
+8. **Live now-line** — uses planning zone via `dateToMinutesFromMidnight`.
+
+**Gates:** lint, typecheck, **145 tests**, build — all green.
+
+**Not fixed (Wave 2+):** atomic `WHERE revision=?` TOCTOU, routine materializer, Idempotency-Key store, OpenAPI↔handler inventory, batch self-HTTP→in-process, week/month RRULE expansion, email verification, Origin CSRF, offline queue wiring, ADR-004 cron, iOS scaffold gaps.
+
+---
+
 ## 2026-07-18 — Wave 5: daily-driver interactions (Fable)
 
 **Shipped:**

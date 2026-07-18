@@ -3,9 +3,15 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { catClasses, monthDays as mockMonthDays, type CategoryId } from "@/lib/mock";
 import { getSession } from "@/server/auth-session";
-import { listActivitySeries, listCategories, getOrCreateSettings } from "@/server/dal";
+import {
+  listActivitySeries,
+  listCategories,
+  getOrCreateSettings,
+  listUserOccurrences,
+} from "@/server/dal";
 import { buildCategoryMap } from "@/lib/adapters";
-import { instantToDateStr } from "@/server/temporal/zone";
+import { expandActivitiesForDay } from "@/server/services/day";
+import { instantToDateStr, resolveDayBounds } from "@/server/temporal/zone";
 
 const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
@@ -49,6 +55,7 @@ async function loadMonth(year: number, month: number): Promise<{
   const zone = settings.timezone;
   const todayStr = instantToDateStr(new Date(), zone);
   const series = await listActivitySeries(session.userId);
+  const occurrences = await listUserOccurrences(session.userId);
   const categories = await listCategories(session.userId).catch(() => []);
   const categoryMap = buildCategoryMap(
     categories as unknown as Parameters<typeof buildCategoryMap>[0],
@@ -59,23 +66,24 @@ async function loadMonth(year: number, month: number): Promise<{
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const prevMonthDays = new Date(year, month, 0).getDate();
 
+  // Expand RRULE series per day so recurring blocks show as dots (not only
+  // the series dtstart day). Cap at 4 categories for the cell UI.
   const dotsByDay = new Map<number, CategoryId[]>();
-  for (const s of series) {
-    let dateStr: string;
-    try {
-      dateStr = instantToDateStr(s.dtstartLocal, s.tz || zone);
-    } catch {
-      continue;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const expanded = expandActivitiesForDay(
+      series,
+      occurrences,
+      resolveDayBounds(dateStr, zone),
+    );
+    const cats: CategoryId[] = [];
+    for (const s of expanded) {
+      if (cats.length >= 4) break;
+      cats.push(
+        s.categoryId ? categoryMap.get(s.categoryId) ?? "sky" : "sky",
+      );
     }
-    const [y, m, d] = dateStr.split("-").map(Number);
-    if (y === year && m === month + 1) {
-      const cat = s.categoryId
-        ? categoryMap.get(s.categoryId) ?? "sky"
-        : "sky";
-      const existing = dotsByDay.get(d!) ?? [];
-      if (existing.length < 4) existing.push(cat);
-      dotsByDay.set(d!, existing);
-    }
+    if (cats.length) dotsByDay.set(d, cats);
   }
 
   const result: DayCell[] = [];

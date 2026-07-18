@@ -11,7 +11,10 @@ export async function GET() {
   return handleErrors(async () => {
     const { userId } = await requireSession();
     const tags = await listTags(userId);
-    return Response.json({ items: tags }, { headers: { "cache-control": "private, no-store" } });
+    return Response.json(
+      { items: tags, nextCursor: null },
+      { headers: { "cache-control": "private, no-store" } },
+    );
   });
 }
 

@@ -51,9 +51,14 @@ afterAll(async () => {
   if (env) await env.teardown();
 }, 60000);
 
+/** Skip (not pass) when Postgres is unavailable — honest CI signal. */
 const itDb = (name: string, fn: () => Promise<void> | void) =>
-  it(name, async () => {
-    if (!dbAvailable || !env) return;
+  it(name, async ({ skip }) => {
+    if (!dbAvailable || !env) {
+      console.warn(`[SKIP] ${name}: Postgres unavailable`);
+      skip(true, "Postgres unavailable");
+      return;
+    }
     await fn();
   });
 
@@ -138,6 +143,28 @@ describe("ADR-002: revision conflict", () => {
     await expect(
       deleteTask(userA, task.id, task.revision, { db: env!.db }),
     ).rejects.toThrow(ConflictError);
+  });
+
+  itDb("two sequential updates with same revision — second throws ConflictError", async () => {
+    const task = await createTask(
+      userA,
+      { bucket: "inbox", title: "race" },
+      { db: env!.db },
+    );
+    const rev = task.revision;
+    // First writer wins with the atomic WHERE revision = ifMatch.
+    const first = await updateTask(userA, task.id, { title: "writer-1" }, rev, {
+      db: env!.db,
+    });
+    expect(first.revision).toBe(rev + 1);
+    // Second writer reuses the same revision → atomic UPDATE matches 0 rows → ConflictError.
+    await expect(
+      updateTask(userA, task.id, { title: "writer-2" }, rev, { db: env!.db }),
+    ).rejects.toThrow(ConflictError);
+    // Server state is first writer's value.
+    const still = await getTask(userA, task.id, { db: env!.db });
+    expect(still.title).toBe("writer-1");
+    expect(still.revision).toBe(rev + 1);
   });
 });
 

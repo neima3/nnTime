@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { catClasses, type CategoryId } from "@/lib/mock";
 import { localMinutesToInstant } from "@/lib/adapters";
+import { clientToday } from "@/lib/client-date";
 
 export type TemplateCard = {
   id: string;
@@ -43,7 +44,7 @@ export function TemplatesClient({
       const tz =
         settings?.timezone ??
         Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const date = new Date().toISOString().slice(0, 10);
+      const date = clientToday(tz);
       const catRes = await fetch("/api/v1/categories");
       const cats = catRes.ok ? (await catRes.json()).items ?? [] : [];
       const cat = cats.find((c: { key: string }) => c.key === t.category);
