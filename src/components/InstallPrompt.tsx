@@ -3,6 +3,7 @@
 /**
  * PWA install prompt — shows a dismissible banner when the browser
  * supports installation and the app hasn't been installed yet.
+ * Persists dismissal in localStorage so it doesn't annoy users.
  */
 import { useEffect, useState } from "react";
 import { Download, X } from "lucide-react";
@@ -12,6 +13,10 @@ export function InstallPrompt() {
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
+    // Check if previously dismissed
+    try {
+      if (localStorage.getItem("kairo-install-dismissed") === "1") return;
+    } catch {}
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as unknown as { prompt: () => Promise<void> });
@@ -19,6 +24,11 @@ export function InstallPrompt() {
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
+
+  const dismiss = () => {
+    setDismissed(true);
+    try { localStorage.setItem("kairo-install-dismissed", "1"); } catch {}
+  };
 
   if (!deferredPrompt || dismissed) return null;
 
@@ -38,7 +48,7 @@ export function InstallPrompt() {
               onClick={async () => {
                 await deferredPrompt.prompt();
                 setDeferredPrompt(null);
-                setDismissed(true);
+                dismiss();
               }}
               className="inline-flex items-center gap-1.5 rounded-xl bg-iris px-3 py-1.5 text-[13px] font-semibold text-ink-inverse"
             >
@@ -46,18 +56,14 @@ export function InstallPrompt() {
               Install
             </button>
             <button
-              onClick={() => setDismissed(true)}
+              onClick={dismiss}
               className="rounded-xl px-3 py-1.5 text-[13px] font-semibold text-ink-soft hover:bg-surface-sunken"
             >
               Not now
             </button>
           </div>
         </div>
-        <button
-          onClick={() => setDismissed(true)}
-          className="text-ink-faint hover:text-ink"
-          aria-label="Dismiss"
-        >
+        <button onClick={dismiss} className="text-ink-faint hover:text-ink" aria-label="Dismiss">
           <X size={16} />
         </button>
       </div>
