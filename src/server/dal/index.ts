@@ -540,7 +540,9 @@ export async function listCategories(userId: string, opts: { db?: Db } = {}) {
   }));
   if (toInsert.length === 0) return [];
 
-  await db.insert(schema.categories).values(toInsert);
+  // Concurrent first-loads both reach the seed path — the partial unique
+  // index on (user_id, key) makes the losing insert a no-op instead of a crash.
+  await db.insert(schema.categories).values(toInsert).onConflictDoNothing();
   return db
     .select()
     .from(schema.categories)
@@ -576,11 +578,21 @@ export async function getOrCreateSettings(
   if (row) return row;
 
   const timezone = opts.timezoneHint || "UTC";
+  // Concurrent first-loads race here (e.g. two parallel Server Component
+  // renders after signup) — on conflict, another request already created the
+  // row; re-read it instead of failing.
   const [created] = await db
     .insert(schema.userSettings)
     .values({ userId, timezone })
+    .onConflictDoNothing({ target: schema.userSettings.userId })
     .returning();
-  return created!;
+  if (created) return created;
+  const [existing] = await db
+    .select()
+    .from(schema.userSettings)
+    .where(eq(schema.userSettings.userId, userId))
+    .limit(1);
+  return existing!;
 }
 
 export async function updateSettings(

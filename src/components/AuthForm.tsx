@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowRight, Loader2, Mail } from "lucide-react";
 import { signIn, signUp } from "@/lib/auth-client";
+import { detectTimezone } from "@/lib/timezone";
 
 type Mode = "sign-in" | "sign-up";
 
@@ -43,6 +44,13 @@ export function AuthForm({ mode }: { mode: Mode }) {
         setPending(false);
         return;
       }
+      // Seed the planning timezone before Today first renders — settings are
+      // created on first touch, and without this hint new accounts plan in UTC.
+      try {
+        await fetch("/api/v1/settings", {
+          headers: { "x-timezone": detectTimezone() },
+        });
+      } catch {}
       router.push("/app/today");
       router.refresh();
     } catch {

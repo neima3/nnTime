@@ -49,7 +49,7 @@ export function LiveNowLine({
   const internal = useLiveNowMin(external === undefined, zone);
   const nowMin = external ?? internal;
   const [mounted, setMounted] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const lineRef = useRef<HTMLDivElement>(null);
   const scrolled = useRef(false);
 
   useEffect(() => {
@@ -58,17 +58,20 @@ export function LiveNowLine({
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
+  // Bring the current time into view on first load. scrollIntoView walks every
+  // scrollable ancestor (the page scrolls at the window level, not a wrapper
+  // div), so this works wherever the timeline is embedded.
   useEffect(() => {
     if (!mounted || nowMin == null || scrolled.current) return;
-    const el = containerRef.current?.closest(".timeline-scroll-container");
-    if (el) {
-      const nowTop = top(nowMin);
-      el.scrollTo({
-        top: Math.max(0, nowTop - el.clientHeight / 2),
-        behavior: "smooth",
-      });
-      scrolled.current = true;
-    }
+    const el = lineRef.current;
+    if (!el) return;
+    scrolled.current = true;
+    const rect = el.getBoundingClientRect();
+    const vh = window.innerHeight || 0;
+    // Already comfortably in view — don't yank the page.
+    if (rect.top >= vh * 0.1 && rect.top <= vh * 0.7) return;
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ block: "center", behavior: reduceMotion ? "auto" : "smooth" });
   }, [mounted, nowMin]);
 
   if (!mounted || nowMin == null) return null;
@@ -76,8 +79,9 @@ export function LiveNowLine({
   const clampedMin = Math.max(DAY_START, Math.min(DAY_END, nowMin));
 
   return (
-    <div ref={containerRef}>
+    <div>
       <div
+        ref={lineRef}
         className="absolute inset-x-0 z-20 flex items-center gap-2"
         style={{ top: top(clampedMin) }}
       >

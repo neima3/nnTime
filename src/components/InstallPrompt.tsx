@@ -6,11 +6,16 @@
  * Persists dismissal in localStorage so it doesn't annoy users.
  */
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Download, X } from "lucide-react";
 
 export function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<{ prompt: () => Promise<void> } | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  const pathname = usePathname();
+  // Only offer installation inside the product — on auth/onboarding pages the
+  // centered banner can cover the primary CTA.
+  const inApp = pathname?.startsWith("/app");
 
   useEffect(() => {
     // Check if previously dismissed
@@ -30,7 +35,7 @@ export function InstallPrompt() {
     try { localStorage.setItem("kairo-install-dismissed", "1"); } catch {}
   };
 
-  if (!deferredPrompt || dismissed) return null;
+  if (!deferredPrompt || dismissed || !inApp) return null;
 
   return (
     <div className="fixed bottom-20 left-1/2 z-40 w-[90%] max-w-sm -translate-x-1/2 rounded-2xl border border-border bg-surface p-4 shadow-float md:bottom-4">

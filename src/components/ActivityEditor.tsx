@@ -412,7 +412,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
               >
                 {[15, 30, 45, 60, 90, 120, 180].map((d) => (
                   <option key={d} value={d}>
-                    {d < 60 ? `${d} min` : `${d / 60} h${d % 60 ? ` ${d % 60}m` : ""}`}
+                    {d < 60 ? `${d} min` : `${Math.floor(d / 60)} h${d % 60 ? ` ${d % 60} min` : ""}`}
                   </option>
                 ))}
               </select>

@@ -23,6 +23,7 @@ import {
   taskToInboxItem,
 } from "@/lib/adapters";
 import { TodayTimeline } from "@/components/TodayTimeline";
+import { TimezoneNudge } from "@/components/TimezoneNudge";
 import { SoftStreaks } from "@/components/SoftStreaks";
 import { AmbientSounds } from "@/components/AmbientSounds";
 import { ToastHost } from "@/components/Toast";
@@ -63,7 +64,9 @@ async function loadTodayData(dateParam?: string) {
       dayLabel: DAY.label,
       dayDate: DAY.date,
       date: "mock",
-      zone: "UTC",
+      // Empty zone → live now-line falls back to the visitor's browser clock
+      // (a fixed zone would show the demo's "now" at the wrong time of day).
+      zone: "",
       authed: false,
       isToday: true,
       nowMin: NOW_MIN,
@@ -257,6 +260,8 @@ export default async function TodayPage({
               )}
             </div>
           </header>
+
+          {authed && <TimezoneNudge zone={zone} />}
 
           {emptyDay ? (
             <div className="grid place-items-center rounded-3xl border border-dashed border-border bg-surface/60 px-6 py-20 text-center">

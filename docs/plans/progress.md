@@ -1,5 +1,38 @@
 # Progress log
 
+## 2026-07-18 — Polish pass: first-run crash, timezone correctness, auto-scroll (Fable)
+
+**Found by dogfooding a brand-new account in agent-browser:**
+1. **P0 first-load crash** — `getOrCreateSettings` get-then-insert raced when two
+   Server Component renders hit a fresh account simultaneously; second insert
+   violated the PK and Today rendered the error boundary as the user's very
+   first screen. Fixed with `onConflictDoNothing` + re-read. Same guard added
+   to the `listCategories` six-category seed (partial unique index made the
+   loser crash there too).
+2. **New accounts planned in UTC** — `detectTimezone()` existed but was never
+   called; settings rows were created with `timezone: "UTC"` so the now-line,
+   day bounds and "Up next" ran in the wrong zone until Settings was touched.
+   Fixes: (a) `AuthForm` seeds `x-timezone` via `GET /api/v1/settings` before
+   redirecting into the app; (b) new `TimezoneNudge` banner on Today offers a
+   one-tap switch (PATCH with If-Match) for accounts already stuck on UTC,
+   with a persisted "Keep UTC" dismissal.
+3. **Auto-scroll to now finally works** — `LiveNowLine`'s scroll effect
+   targeted a `.timeline-scroll-container` div that was never scrollable (the
+   window scrolls), so Today always opened at 7:00 AM. Now `scrollIntoView` on
+   the line itself (skips when already in view; instant under reduced motion).
+4. **Install banner covered the auth CTA** — the PWA prompt overlapped
+   "Create planner" on sign-up; it now only renders inside `/app`.
+5. **Copy** — duration option "1.5 h 30m" → "1 h 30 min".
+6. **Signed-out demo now-line** showed UTC time; mock path passes empty zone
+   so the live line uses the visitor's browser clock.
+
+**Verified (agent-browser, local dev):** fresh signup → clean empty state (was
+crash); nudge rendered + "Use New York" applied (now-line 19:38 local, ring
+19:40 = browser clock on the mock view); auto-scroll centered the line on
+desktop + 375px mobile; auth pages banner-free.
+
+**Gates:** lint, typecheck, 155 tests, build — green.
+
 ## 2026-07-18 — Review Wave 2 COMPLETE (hardening) + ship
 
 **Plan:** `docs/superpowers/plans/2026-07-18-review-wave2-hard-hardening.md`
