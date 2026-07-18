@@ -1,6 +1,33 @@
 # Progress log
 
-## 2026-07-18 — Design elevation pass (Fable)
+## 2026-07-18 — Design elevation pass, round 2 (Fable)
+
+**Audited previously-unseen surfaces** (sign-in/up, onboarding, more, month,
+planner, templates, review, editor) **+ dark mode across landing/today/editor.**
+
+**Shipped:**
+1. Review screen: fixed "3 thingsdidn't happen" — compiled JSX was eating the
+   space between the plural expression and the text node; headline is now a
+   single template literal (also upgraded to a proper apostrophe).
+2. Templates: six full-width `bg-iris` "Apply to Today" buttons downgraded to
+   quiet `iris-soft` chips (hover fills iris); step lists `flex-1` so buttons
+   bottom-align across cards. Content now leads the page.
+3. Editor: selected Priority chip `bg-ink` (near-black, off-system) → `bg-iris`;
+   Energy chips `whitespace-nowrap` (Medium no longer wrapped under its icon).
+4. Dark mode: past timeline blocks were muddy-olive (`saturate-50` on deep
+   fills) — new `.timeline-past` class in globals.css keeps light behavior,
+   switches dark to opacity-only.
+5. Motion: `--ease-spring` was defined but unused — added `kairo-rise`
+   entrance (from-only keyframe so dimmed blocks never flash to full opacity;
+   collapsed by the global reduced-motion rule) on timeline blocks (30ms
+   stagger, 240ms cap) + Today right rail.
+
+**Verified:** review headline text via DOM, templates/editor/today (light+dark)
+screenshots, full landing at 1280×1700, iris-button contrast in dark measured
+4.9:1 (AA pass). Lint + build green. Note: the in-app browser pane served
+stale blank frames when scrolled below the fold on the landing page — page
+confirmed healthy via DOM inspection + tall-viewport capture; pane glitch, not
+an app bug.
 
 **Shipped (all Soft Focus tokens, no new colors):**
 1. `TimelineCanvas`: fixed checklist overflow bleeding into the next block

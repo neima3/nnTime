@@ -145,6 +145,32 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Past (incomplete) timeline blocks — desaturated in light, opacity-only in
+   dark where saturate() turns the deep category fills muddy. */
+.timeline-past {
+  opacity: 0.55;
+  filter: saturate(0.5);
+}
+.dark .timeline-past {
+  opacity: 0.45;
+  filter: none;
+}
+
+/* Gentle entrance for timeline blocks + cards (collapsed by the global
+   prefers-reduced-motion rule below). Opacity-only keyframe so it can't
+   fight the transform-based hover/drag styles. */
+@keyframes kairo-rise {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+  /* no `to` — settles into each element's own opacity/translate,
+     so dimmed past-blocks don't flash to full opacity first */
+}
+.rise-in {
+  animation: kairo-rise 0.32s var(--ease-spring) backwards;
+}
+
 ::selection {
   background: var(--iris);
   color: var(--ink-inverse);

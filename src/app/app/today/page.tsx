@@ -260,7 +260,7 @@ export default async function TodayPage({
           )}
         </section>
 
-        <aside className="hidden w-72 shrink-0 flex-col gap-4 lg:flex">
+        <aside className="rise-in hidden w-72 shrink-0 flex-col gap-4 lg:flex" style={{ animationDelay: "120ms" }}>
           <AnytimeRail
             items={inbox.map((t) => ({
               id: t.id,

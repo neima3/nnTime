@@ -133,7 +133,7 @@ export function ReviewClient({
         Review today
       </p>
       <h1 className="mt-1 font-display text-3xl font-bold tracking-tight">
-        {remaining} thing{remaining === 1 ? "" : "s"} didn&apos;t happen
+        {`${remaining} ${remaining === 1 ? "thing" : "things"} didn’t happen`}
       </h1>
       <p className="mt-1.5 text-[14px] text-ink-soft">
         Totally fine. Let&apos;s decide what they become.

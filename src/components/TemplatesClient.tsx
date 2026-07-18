@@ -109,7 +109,7 @@ export function TemplatesClient({
                   </p>
                 </div>
               </div>
-              <ul className="mt-3 space-y-1 text-[13px] text-ink-soft">
+              <ul className="mt-3 flex-1 space-y-1 text-[13px] text-ink-soft">
                 {t.steps.slice(0, 3).map((s) => (
                   <li key={s}>· {s}</li>
                 ))}
@@ -118,7 +118,7 @@ export function TemplatesClient({
                 type="button"
                 disabled={busy === t.id}
                 onClick={() => void apply(t)}
-                className="mt-4 rounded-xl bg-iris px-4 py-2.5 text-[13px] font-semibold text-ink-inverse shadow-card hover:bg-iris-deep disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+                className="mt-4 inline-flex items-center gap-1.5 self-start rounded-xl bg-iris-soft px-4 py-2 text-[13px] font-semibold text-iris transition-colors hover:bg-iris hover:text-ink-inverse disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
               >
                 {busy === t.id ? "Applying…" : "Apply to Today"}
               </button>

@@ -312,7 +312,7 @@ export function TimelineCanvas({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
       >
-        {displayActivities.map((a) => {
+        {displayActivities.map((a, blockIdx) => {
           const cat = catClasses[a.category];
           const past = a.start + a.duration <= effectiveNow;
           const current =
@@ -340,16 +340,17 @@ export function TimelineCanvas({
               aria-label={`${a.title}, ${fmt(a.start)} to ${fmt(a.start + a.duration)}, ${fmtDuration(a.duration)}. Use arrow keys to move, plus or minus to resize. Enter to edit.`}
               aria-keyshortcuts="ArrowUp ArrowDown + - Enter"
               className={`group absolute flex gap-3 overflow-hidden rounded-2xl px-3.5 outline-none transition-transform hover:-translate-y-px hover:shadow-card focus-visible:ring-2 focus-visible:ring-iris ${cat.fill} ${
-                past && !a.done ? "opacity-55 saturate-50" : ""
+                past && !a.done ? "timeline-past" : ""
               } ${a.done ? "opacity-70" : ""} ${current ? "shadow-float ring-2 ring-now/70" : ""} ${
                 compact ? "items-center py-1.5" : "py-3"
-              } ${hasConflict ? "ring-2 ring-danger animate-pulse" : ""} cursor-grab active:cursor-grabbing`}
+              } ${hasConflict ? "ring-2 ring-danger animate-pulse" : ""} rise-in cursor-grab active:cursor-grabbing`}
               style={{
                 top: top(a.start),
                 height: h,
                 width: widthPct,
                 left: leftPct,
                 touchAction: "none",
+                animationDelay: `${Math.min(blockIdx * 30, 240)}ms`,
               }}
               onPointerDown={(e) => handlePointerDown(e, a.id, "move", a)}
               onKeyDown={(e) => {

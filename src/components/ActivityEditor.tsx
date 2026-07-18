@@ -426,7 +426,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
                     key={e}
                     type="button"
                     onClick={() => setEnergy(energy === e ? null : e)}
-                    className={`flex-1 rounded-xl px-2 py-2 text-[13px] font-semibold capitalize transition-colors ${
+                    className={`flex-1 whitespace-nowrap rounded-xl px-2 py-2 text-[13px] font-semibold capitalize transition-colors ${
                       energy === e
                         ? "bg-iris text-ink-inverse"
                         : "border border-border bg-surface text-ink-soft"
@@ -447,7 +447,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
                     onClick={() => setPriority(p)}
                     className={`flex-1 rounded-xl px-2 py-2 text-[13px] font-semibold capitalize transition-colors ${
                       priority === p
-                        ? "bg-ink text-ink-inverse"
+                        ? "bg-iris text-ink-inverse"
                         : "border border-border bg-surface text-ink-soft"
                     }`}
                   >
