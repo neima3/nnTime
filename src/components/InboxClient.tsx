@@ -34,7 +34,7 @@ function PriorityFlag({ level }: { level: "none" | "low" | "high" }) {
     <span
       className={`inline-flex items-center gap-1 rounded-lg px-1.5 py-0.5 text-[11px] font-bold ${
         level === "high"
-          ? "bg-danger-soft text-danger"
+          ? "bg-cat-peach text-cat-peach-ink"
           : "bg-surface-sunken text-ink-soft"
       }`}
     >

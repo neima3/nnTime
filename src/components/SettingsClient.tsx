@@ -14,6 +14,7 @@ import {
   Palette,
   User,
 } from "lucide-react";
+import { SignedOutCard, SkeletonRows } from "./EmptyState";
 
 type Settings = {
   timezone: string;
@@ -268,19 +269,16 @@ export function SettingsClient() {
 
   if (!authed) {
     return (
-      <p className="rounded-2xl border border-border bg-surface px-5 py-8 text-center text-[14px] text-ink-soft">
-        <a href="/sign-in" className="font-semibold text-iris">
-          Sign in
-        </a>{" "}
-        to sync personalization across devices.
-      </p>
+      <SignedOutCard
+        icon={Palette}
+        title="Make Kairo yours"
+        body="Theme, quiet notifications, reduced stimulation, calendars — sign in to personalize and sync across your devices."
+      />
     );
   }
 
   if (!settings) {
-    return (
-      <p className="text-[14px] text-ink-soft">Loading settings…</p>
-    );
+    return <SkeletonRows count={6} />;
   }
 
   return (

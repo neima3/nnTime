@@ -172,6 +172,9 @@ export default async function WeekPage({
             <h1 className="font-display text-3xl font-bold tracking-tight">
               {label}
             </h1>
+            <p className="tnum mt-0.5 text-[13px] font-medium text-ink-soft">
+              {days.reduce((n, d) => n + d.blocks.length, 0)} planned this week
+            </p>
           </div>
           <div className="flex items-center rounded-2xl border border-border bg-surface p-1 shadow-card">
             <span className="rounded-xl bg-iris-soft px-3.5 py-1.5 text-sm font-semibold text-iris">
@@ -212,7 +215,7 @@ export default async function WeekPage({
           {days.map((d) => (
             <section
               key={d.dateStr}
-              className={`flex flex-col gap-2 rounded-3xl border p-3 ${
+              className={`group flex min-h-44 flex-col gap-2 rounded-3xl border p-3 transition-shadow hover:shadow-card lg:min-h-64 ${
                 d.isToday
                   ? "border-iris bg-iris-ghost shadow-card"
                   : "border-border bg-surface"
@@ -262,10 +265,17 @@ export default async function WeekPage({
                   </Link>
                 );
               })}
-              {d.blocks.length === 0 && (
+              {d.blocks.length === 0 ? (
                 <Link
                   href={`/app/editor?date=${d.dateStr}&start=${9 * 60}`}
-                  className="rounded-xl border border-dashed border-border px-2 py-3 text-center text-[11px] font-semibold text-ink-faint hover:text-ink-soft"
+                  className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-border px-2 py-3 text-[11px] font-semibold text-ink-faint transition-colors hover:border-border-strong hover:text-ink-soft"
+                >
+                  + Add
+                </Link>
+              ) : (
+                <Link
+                  href={`/app/editor?date=${d.dateStr}&start=${9 * 60}`}
+                  className="mt-auto rounded-xl px-2 py-1.5 text-center text-[11px] font-semibold text-ink-faint transition-opacity hover:text-ink-soft md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
                 >
                   + Add
                 </Link>

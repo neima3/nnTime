@@ -1,5 +1,30 @@
 # Progress log
 
+## 2026-07-18 — Design elevation pass (Fable)
+
+**Shipped (all Soft Focus tokens, no new colors):**
+1. `TimelineCanvas`: fixed checklist overflow bleeding into the next block
+   (`overflow-hidden` + height-aware `checklistRows` — lines only render when
+   the block is tall enough).
+2. `FocusClient`: skeleton ghost-ring loading state (was bare text); idle setup
+   redesigned — 15/25/45/60 min segmented pill (live ring + header update),
+   Play-icon start button, emoji+title composer card; ring progress now
+   animates (`stroke-dashoffset` 1s linear).
+3. Week view: day columns `min-h-44/lg:min-h-64` (no more stubby cards),
+   "n planned this week" subline, hover-reveal "+ Add" on filled days,
+   centered dashed add-zone on empty days.
+4. Inbox: High-priority flag danger-red → peach (honors "Nothing here ever
+   turns red").
+5. New `src/components/EmptyState.tsx`: `SignedOutCard` (icon tile, display
+   headline, CTA + create-account link), `SkeletonCards`, `SkeletonRows`.
+   Wired into Stats (signed-out + loading) and Settings (signed-out + loading).
+6. Routines: tiles now id-hashed across the six category pastels (was all
+   butter); designed empty state.
+
+**Verified:** real browser, desktop + mobile (375px) — today/focus/week/inbox/
+stats/settings/routines screenshotted; duration chips click-tested; lint +
+build green. Not deployed (not requested).
+
 ## 2026-07-15 — 10× Wave 4 COMPLETE: PWA icons, ICS import, Resend, keyboard UX
 
 **Program:** `docs/plans/2026-07-15-10x-wave4-roadmap.md` — all 10 phases.

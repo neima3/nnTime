@@ -18,6 +18,22 @@ export type RoutineView = {
   rruleLabel: string;
 };
 
+/* Deterministic pastel per routine — id-hashed so cards vary but stay stable. */
+const TILE_FILLS = [
+  "bg-cat-peach",
+  "bg-cat-butter",
+  "bg-cat-mint",
+  "bg-cat-sky",
+  "bg-cat-lilac",
+  "bg-cat-rose",
+];
+
+function tileFill(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return TILE_FILLS[h % TILE_FILLS.length]!;
+}
+
 export function RoutinesClient({
   initial,
   authed,
@@ -204,7 +220,7 @@ export function RoutinesClient({
             className="rounded-3xl border border-border bg-surface p-5 shadow-card"
           >
             <div className="flex items-start gap-3">
-              <span className="grid size-12 place-items-center rounded-2xl bg-cat-butter text-xl">
+              <span className={`grid size-12 place-items-center rounded-2xl text-xl ${tileFill(r.id)}`}>
                 {r.emoji}
               </span>
               <div className="min-w-0 flex-1">
@@ -248,9 +264,15 @@ export function RoutinesClient({
           </article>
         ))}
         {items.length === 0 && (
-          <p className="text-[14px] text-ink-soft sm:col-span-2">
-            No routines yet. Create one or apply a template.
-          </p>
+          <div className="rounded-3xl border border-dashed border-border px-6 py-12 text-center sm:col-span-2">
+            <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-iris-ghost text-xl" aria-hidden>
+              🔁
+            </span>
+            <p className="mt-3 text-[15px] font-semibold">No routines yet</p>
+            <p className="mx-auto mt-1 max-w-xs text-[13px] leading-relaxed text-ink-soft">
+              A routine is a sequence you can drop into any day — mornings, wind-downs, gym blocks.
+            </p>
+          </div>
         )}
       </div>
     </>

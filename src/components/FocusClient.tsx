@@ -58,6 +58,7 @@ function FocusRing({
           strokeLinecap="round"
           strokeDasharray={c}
           strokeDashoffset={c * Math.min(1, Math.max(0, elapsedPct))}
+          style={{ transition: "stroke-dashoffset 1s linear" }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -93,6 +94,7 @@ export function FocusClient({
   const [remainingSec, setRemainingSec] = useState(defaultDurationMin * 60);
   const [title, setTitle] = useState(defaultTitle);
   const [emoji, setEmoji] = useState(defaultEmoji);
+  const [durationMin, setDurationMin] = useState(defaultDurationMin);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -166,7 +168,7 @@ export function FocusClient({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        targetDurationMin: defaultDurationMin,
+        targetDurationMin: durationMin,
         title,
         emoji,
       }),
@@ -182,7 +184,7 @@ export function FocusClient({
     const data = await res.json();
     setSession(data.session);
     setRemainingSec(data.remainingSec);
-  }, [defaultDurationMin, title, emoji]);
+  }, [durationMin, title, emoji]);
 
   const patch = useCallback(
     async (body: Record<string, unknown>) => {
@@ -213,8 +215,15 @@ export function FocusClient({
 
   if (loading) {
     return (
-      <div className="grid min-h-[40vh] place-items-center text-ink-soft">
-        Loading focus…
+      <div
+        className="mx-auto flex min-h-[calc(100dvh-6rem)] max-w-2xl flex-col items-center px-4 py-10 md:min-h-dvh md:justify-center"
+        aria-busy="true"
+        aria-label="Loading focus"
+      >
+        <div className="h-4 w-16 animate-pulse rounded-lg bg-surface-sunken" />
+        <div className="mt-3 h-8 w-48 animate-pulse rounded-xl bg-surface-sunken" />
+        <div className="mt-10 size-[300px] animate-pulse rounded-full border-[18px] border-surface-sunken" />
+        <div className="mt-10 h-12 w-40 animate-pulse rounded-2xl bg-surface-sunken" />
       </div>
     );
   }
@@ -229,15 +238,38 @@ export function FocusClient({
           {title}
         </h1>
         <p className="tnum mt-1 text-sm font-medium text-ink-soft">
-          {defaultDurationMin} min session
+          {durationMin} min session
         </p>
         <div className="mt-10 opacity-80">
           <FocusRing
-            remainingSec={defaultDurationMin * 60}
-            targetMin={defaultDurationMin}
+            remainingSec={durationMin * 60}
+            targetMin={durationMin}
             emoji={emoji}
           />
         </div>
+
+        <div
+          className="mt-8 flex items-center gap-1.5 rounded-full border border-border bg-surface p-1 shadow-card"
+          role="group"
+          aria-label="Session length"
+        >
+          {[15, 25, 45, 60].map((m) => (
+            <button
+              key={m}
+              type="button"
+              aria-pressed={durationMin === m}
+              onClick={() => setDurationMin(m)}
+              className={`tnum rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none ${
+                durationMin === m
+                  ? "bg-iris-soft text-iris"
+                  : "text-ink-soft hover:text-ink"
+              }`}
+            >
+              {m} min
+            </button>
+          ))}
+        </div>
+
         {error && (
           <p role="alert" className="mt-4 text-[13px] font-semibold text-danger">
             {error}
@@ -246,8 +278,9 @@ export function FocusClient({
         <button
           type="button"
           onClick={() => void start()}
-          className="mt-10 rounded-2xl bg-iris px-8 py-3.5 text-[15px] font-semibold text-ink-inverse shadow-float transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+          className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-iris px-8 py-3.5 text-[15px] font-semibold text-ink-inverse shadow-float transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
         >
+          <Play size={17} fill="currentColor" />
           Start focus
         </button>
         {activityId && (
@@ -255,23 +288,21 @@ export function FocusClient({
             Linked activity · {activityId.slice(0, 8)}…
           </p>
         )}
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <label className="text-[12px] font-semibold text-ink-soft">
-            Title
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="ml-2 rounded-lg border border-border bg-surface px-2 py-1 text-[13px] font-medium text-ink"
-            />
-          </label>
-          <label className="text-[12px] font-semibold text-ink-soft">
-            Emoji
-            <input
-              value={emoji}
-              onChange={(e) => setEmoji(e.target.value)}
-              className="ml-2 w-12 rounded-lg border border-border bg-surface px-2 py-1 text-center text-[13px]"
-            />
-          </label>
+
+        <div className="mt-8 flex w-full max-w-sm items-center gap-2 rounded-2xl border border-border bg-surface p-2 shadow-card focus-within:ring-2 focus-within:ring-iris">
+          <input
+            value={emoji}
+            onChange={(e) => setEmoji(e.target.value)}
+            aria-label="Session emoji"
+            className="w-12 shrink-0 rounded-xl bg-surface-sunken py-2 text-center text-lg outline-none"
+          />
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            aria-label="Session title"
+            placeholder="What are you focusing on?"
+            className="w-full bg-transparent px-1 text-[15px] font-medium outline-none placeholder:text-ink-faint"
+          />
         </div>
       </div>
     );

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Flame } from "lucide-react";
+import { BarChart3, Flame } from "lucide-react";
 import { toast } from "./Toast";
+import { SignedOutCard, SkeletonCards } from "./EmptyState";
 
 type Stats = {
   byDate: Record<string, { completed: number; focusMin: number; mood: string | null }>;
@@ -87,17 +88,16 @@ export function StatsClient() {
 
   if (!authed) {
     return (
-      <p className="text-[14px] text-ink-soft">
-        <a href="/sign-in" className="font-semibold text-iris">
-          Sign in
-        </a>{" "}
-        to see your personal insights.
-      </p>
+      <SignedOutCard
+        icon={BarChart3}
+        title="See your gentle numbers"
+        body="Completions, focus time, soft streaks, and mood — described, never judged. Sign in to start collecting yours."
+      />
     );
   }
 
   if (!stats) {
-    return <p className="text-[14px] text-ink-soft">Loading insights…</p>;
+    return <SkeletonCards count={4} />;
   }
 
   const last7 = Array.from({ length: 7 }, (_, i) => {

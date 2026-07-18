@@ -321,6 +321,10 @@ export function TimelineCanvas({
             effectiveNow < a.start + a.duration;
           const h = a.duration * PX_PER_MIN;
           const compact = h < 76;
+          // Checklist lines only when the block is tall enough to hold them.
+          const checklistRows = compact
+            ? 0
+            : Math.max(0, Math.min(3, Math.floor((h - 72) / 18)));
           const laneInfo = lanes.get(a.id);
           const lane = laneInfo?.lane ?? 0;
           const laneCount = laneInfo?.laneCount ?? 0;
@@ -335,7 +339,7 @@ export function TimelineCanvas({
               tabIndex={0}
               aria-label={`${a.title}, ${fmt(a.start)} to ${fmt(a.start + a.duration)}, ${fmtDuration(a.duration)}. Use arrow keys to move, plus or minus to resize. Enter to edit.`}
               aria-keyshortcuts="ArrowUp ArrowDown + - Enter"
-              className={`group absolute flex gap-3 rounded-2xl px-3.5 outline-none transition-transform hover:-translate-y-px hover:shadow-card focus-visible:ring-2 focus-visible:ring-iris ${cat.fill} ${
+              className={`group absolute flex gap-3 overflow-hidden rounded-2xl px-3.5 outline-none transition-transform hover:-translate-y-px hover:shadow-card focus-visible:ring-2 focus-visible:ring-iris ${cat.fill} ${
                 past && !a.done ? "opacity-55 saturate-50" : ""
               } ${a.done ? "opacity-70" : ""} ${current ? "shadow-float ring-2 ring-now/70" : ""} ${
                 compact ? "items-center py-1.5" : "py-3"
@@ -381,9 +385,9 @@ export function TimelineCanvas({
                     ? ` · ${a.checklist.filter((c) => c.done).length}/${a.checklist.length} steps`
                     : ""}
                 </p>
-                {!compact && a.checklist && a.checklist.length > 0 && (
+                {checklistRows > 0 && a.checklist && a.checklist.length > 0 && (
                   <ul className="mt-1 space-y-0.5">
-                    {a.checklist.slice(0, 3).map((c, i) => (
+                    {a.checklist.slice(0, checklistRows).map((c, i) => (
                       <li
                         key={i}
                         className={`truncate text-[11px] font-medium ${cat.ink} opacity-60 ${
