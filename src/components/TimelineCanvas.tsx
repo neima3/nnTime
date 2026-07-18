@@ -45,6 +45,7 @@ interface TimelineCanvasProps {
   onComplete?: (id: string) => Promise<{ ok: boolean }>;
   onOpen?: (id: string) => void;
   onFocus?: (id: string) => void;
+  onToggleStep?: (id: string, stepIndex: number) => Promise<{ ok: boolean }>;
 }
 
 /** Compute overlap lanes for side-by-side layout (design-spec addendum 1). */
@@ -108,12 +109,15 @@ export function TimelineCanvas({
   onComplete,
   onOpen,
   onFocus,
+  onToggleStep,
 }: TimelineCanvasProps) {
   const [drag, setDrag] = useState<DragState | null>(null);
   const [optimistic, setOptimistic] = useState<Map<string, { start: number; duration: number }>>(
     new Map(),
   );
   const [doneOptimistic, setDoneOptimistic] = useState<Map<string, boolean>>(new Map());
+  /** Optimistic checklist-step overrides, keyed `${activityId}:${stepIndex}`. */
+  const [stepOptimistic, setStepOptimistic] = useState<Map<string, boolean>>(new Map());
   const [conflictId, setConflictId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   // Live clock drives past/current styling when viewing today (Phase 18).
@@ -388,16 +392,56 @@ export function TimelineCanvas({
                 </p>
                 {checklistRows > 0 && a.checklist && a.checklist.length > 0 && (
                   <ul className="mt-1 space-y-0.5">
-                    {a.checklist.slice(0, checklistRows).map((c, i) => (
-                      <li
-                        key={i}
-                        className={`truncate text-[11px] font-medium ${cat.ink} opacity-60 ${
-                          c.done ? "line-through" : ""
-                        }`}
-                      >
-                        {c.done ? "✓" : "○"} {c.label}
-                      </li>
-                    ))}
+                    {a.checklist.slice(0, checklistRows).map((c, i) => {
+                      const stepKey = `${a.id}:${i}`;
+                      const stepDone = stepOptimistic.get(stepKey) ?? c.done;
+                      const row = (
+                        <>
+                          {stepDone ? "✓" : "○"} {c.label}
+                        </>
+                      );
+                      return (
+                        <li key={i} className="truncate">
+                          {onToggleStep ? (
+                            <button
+                              type="button"
+                              aria-pressed={stepDone}
+                              aria-label={`${stepDone ? "Uncheck" : "Check"} step: ${c.label}`}
+                              className={`max-w-full truncate rounded text-left text-[11px] font-medium ${cat.ink} opacity-60 transition-opacity hover:opacity-100 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none ${
+                                stepDone ? "line-through" : ""
+                              }`}
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                setStepOptimistic((prev) => {
+                                  const m = new Map(prev);
+                                  m.set(stepKey, !stepDone);
+                                  return m;
+                                });
+                                const result = await onToggleStep(a.id, i);
+                                if (!result.ok) {
+                                  setStepOptimistic((prev) => {
+                                    const m = new Map(prev);
+                                    m.delete(stepKey);
+                                    return m;
+                                  });
+                                }
+                              }}
+                            >
+                              {row}
+                            </button>
+                          ) : (
+                            <span
+                              className={`text-[11px] font-medium ${cat.ink} opacity-60 ${
+                                stepDone ? "line-through" : ""
+                              }`}
+                            >
+                              {row}
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>

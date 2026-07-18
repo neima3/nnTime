@@ -1,5 +1,33 @@
 # Progress log
 
+## 2026-07-18 — Wave 5: daily-driver interactions (Fable)
+
+**Shipped:**
+1. **Real "Up next" rail card for authed users** (`/app/today`): server
+   computes the earliest not-done, not-fully-past activity in the user's zone
+   (today only); card shows "Up next"/"Happening now", `start · in N min` /
+   `N min left`, and a Start focus link carrying
+   title/emoji/duration/activityId into `/app/focus`. Signed-out keeps the
+   mock card.
+2. **Tappable checklist steps on the timeline**: steps in non-compact blocks
+   are now buttons (aria-pressed, optimistic toggle, drag-safe via pointer
+   stopPropagation). `TodayTimeline.handleToggleStep` PATCHes the full
+   `checklistTemplate` with If-Match; conflict → toast + revert.
+3. **Undo for inbox delete**: `Toast` now supports an action button
+   (`toast(msg, {actionLabel, onAction, durationMs})`); delete shows
+   "Deleted 'X' [Undo]" for 8 s; undo re-creates the task (same
+   title/emoji/priority — id/revision change).
+
+**Verified (local dev, synthetic account `qa-wave5@kairo.test` in kairo_dev):**
+sign-up via Better Auth API; Up next card rendered with correct meta + focus
+link (DOM-verified); checklist toggle exercised with a trusted browser click —
+server persisted `[true,false,false]` rev 4 and UI flipped to "Uncheck step";
+inbox delete + undo toast rendered (screenshot). Known gap: the Undo button's
+click wasn't exercised end-to-end — the 8 s toast outpaces browser-pane round
+trips; its POST path was verified directly 3×. Browser pane also served 0×0 /
+stale frames after navigations this session (screenshot-first unwedges it).
+
+**Gates:** lint, typecheck, 113 tests, build — all green.
 ## 2026-07-18 — Design elevation pass, round 2 (Fable)
 
 **Audited previously-unseen surfaces** (sign-in/up, onboarding, more, month,

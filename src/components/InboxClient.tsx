@@ -158,6 +158,38 @@ export function InboxClient({
       if (res.ok || res.status === 204) {
         setItems((prev) => prev.filter((i) => i.id !== item.id));
         router.refresh();
+        toast(`Deleted “${item.title}”`, {
+          durationMs: 8000,
+          actionLabel: "Undo",
+          onAction: () => {
+            void (async () => {
+              const recreate = await fetch("/api/v1/tasks", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  bucket: "inbox",
+                  title: item.title,
+                  emoji: item.emoji,
+                  priority: item.priority,
+                }),
+              });
+              if (!recreate.ok) {
+                toast("Could not restore item");
+                return;
+              }
+              const task = await recreate.json();
+              setItems((prev) => [
+                {
+                  ...item,
+                  id: task.id,
+                  revision: task.revision ?? 1,
+                },
+                ...prev,
+              ]);
+              router.refresh();
+            })();
+          },
+        });
       } else {
         setError("Could not delete.");
       }

@@ -9,13 +9,19 @@ import { AppShell } from "@/components/AppShell";
 import {
   activities as mockActivities,
   DAY,
+  fmt,
   inbox as mockInbox,
   NOW_MIN,
   type Activity,
 } from "@/lib/mock";
 import { getResolvedDay } from "@/server/services/day";
 import { listCategories } from "@/server/dal";
-import { buildCategoryMap, seriesToActivity, taskToInboxItem } from "@/lib/adapters";
+import {
+  buildCategoryMap,
+  dateToMinutesFromMidnight,
+  seriesToActivity,
+  taskToInboxItem,
+} from "@/lib/adapters";
 import { TodayTimeline } from "@/components/TodayTimeline";
 import { SoftStreaks } from "@/components/SoftStreaks";
 import { AmbientSounds } from "@/components/AmbientSounds";
@@ -152,6 +158,33 @@ export default async function TodayPage({
   const prevDate = date !== "mock" ? shiftDate(date, -1) : undefined;
   const nextDate = date !== "mock" ? shiftDate(date, 1) : undefined;
 
+  // Real "Up next" rail card (authed, viewing today): the earliest activity
+  // that is not done and hasn't fully passed. Mock card covers signed-out.
+  const nowMinutes =
+    authed && isToday ? dateToMinutesFromMidnight(new Date(), zone) : null;
+  const upNext =
+    nowMinutes != null
+      ? [...activities]
+          .filter((a) => !a.done && a.start + a.duration > nowMinutes)
+          .sort((a, b) => a.start - b.start)[0]
+      : undefined;
+  const upNextIsCurrent =
+    upNext != null && nowMinutes != null && upNext.start <= nowMinutes;
+  const upNextMeta =
+    upNext != null && nowMinutes != null
+      ? upNextIsCurrent
+        ? `${fmt(upNext.start)} · ${upNext.start + upNext.duration - nowMinutes} min left`
+        : `${fmt(upNext.start)} · in ${upNext.start - nowMinutes} min`
+      : "";
+  const focusParams = upNext
+    ? new URLSearchParams({
+        title: upNext.title,
+        emoji: upNext.emoji,
+        duration: String(upNext.duration),
+        activityId: upNext.id,
+      }).toString()
+    : "";
+
   return (
     <AppShell active="today">
       <ToastHost />
@@ -272,6 +305,24 @@ export default async function TodayPage({
             date={date === "mock" ? new Date().toISOString().slice(0, 10) : date}
             authed={authed}
           />
+
+          {authed && upNext && (
+            <div className="rounded-3xl bg-iris p-5 text-ink-inverse shadow-float">
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] opacity-80">
+                {upNextIsCurrent ? "Happening now" : "Up next"}
+              </p>
+              <p className="mt-1 font-display text-lg font-bold leading-snug">
+                <span aria-hidden>{upNext.emoji}</span> {upNext.title}
+              </p>
+              <p className="tnum mt-1 text-sm opacity-80">{upNextMeta}</p>
+              <Link
+                href={`/app/focus?${focusParams}`}
+                className="mt-4 block w-full rounded-xl bg-surface-raised/20 py-2.5 text-center text-sm font-semibold backdrop-blur transition-colors hover:bg-surface-raised/30 focus-visible:ring-2 focus-visible:ring-now focus-visible:outline-none"
+              >
+                Start focus
+              </Link>
+            </div>
+          )}
 
           {!authed && (
             <div className="rounded-3xl bg-iris p-5 text-ink-inverse shadow-float">

@@ -126,6 +126,47 @@ export function TodayTimeline({
     [activities, authed, router],
   );
 
+  const handleToggleStep = useCallback(
+    async (id: string, stepIndex: number): Promise<{ ok: boolean }> => {
+      if (!authed) return { ok: false };
+      try {
+        const act = activities.find((a) => a.id === id);
+        if (!act?.checklist || !act.checklist[stepIndex]) return { ok: false };
+
+        let revision = act.revision;
+        if (revision == null) {
+          const getRes = await fetch(`/api/v1/activities/${id}`);
+          if (!getRes.ok) return { ok: false };
+          revision = (await getRes.json()).revision;
+        }
+
+        const checklistTemplate = act.checklist.map((c, i) => ({
+          label: c.label,
+          done: i === stepIndex ? !c.done : c.done,
+        }));
+
+        const res = await fetch(`/api/v1/activities/${id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "If-Match": String(revision),
+          },
+          body: JSON.stringify({ editScope: "all", checklistTemplate }),
+        });
+        if (res.status === 409) {
+          toast("Conflict — refresh and try again");
+          return { ok: false };
+        }
+        if (!res.ok) return { ok: false };
+        router.refresh();
+        return { ok: true };
+      } catch {
+        return { ok: false };
+      }
+    },
+    [activities, authed, router],
+  );
+
   const handleOpen = useCallback(
     (id: string) => {
       router.push(`/app/editor?id=${id}&date=${date}`);
@@ -158,6 +199,7 @@ export function TodayTimeline({
       onComplete={authed ? handleComplete : undefined}
       onOpen={handleOpen}
       onFocus={handleFocus}
+      onToggleStep={authed ? handleToggleStep : undefined}
     />
   );
 }
