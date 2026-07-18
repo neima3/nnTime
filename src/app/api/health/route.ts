@@ -1,22 +1,36 @@
 /**
- * Health endpoint — Coolify healthcheck target (roadmap 1B).
- *
- * Returns 200 `{status:"ok"}` with a short max-age cache-control so probes
- * stay cheap. This is NOT auth-gated (it must be reachable for the healthcheck)
- * and leaks no user data.
- *
- * A deeper liveness check (DB roundtrip, scheduler lag per ADR-004) is added
- * once those subsystems exist (1C/2B). For 1B the endpoint confirms the app
- * process is up and serving.
+ * Enhanced health endpoint — checks DB connectivity for deeper monitoring.
+ * Returns 503 if DB is unreachable (Coolify healthcheck will restart).
  */
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
-export function GET() {
+export async function GET() {
+  const checks: Record<string, string> = {};
+  let allOk = true;
+
+  // Check DB connectivity
+  try {
+    const { default: db } = await import("@/server/db");
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`SELECT 1`);
+    checks.db = "ok";
+  } catch {
+    checks.db = "fail";
+    allOk = false;
+  }
+
+  // Check AI config
+  checks.ai = process.env.ANTHROPIC_API_KEY ? "ok" : "unconfigured";
+
   return Response.json(
-    { status: "ok", timestamp: new Date().toISOString() },
     {
-      status: 200,
-      headers: { "cache-control": "public, max-age=5" },
+      status: allOk ? "ok" : "degraded",
+      timestamp: new Date().toISOString(),
+      checks,
+    },
+    {
+      status: allOk ? 200 : 503,
+      headers: { "cache-control": "no-store" },
     },
   );
 }
