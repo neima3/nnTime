@@ -9,7 +9,6 @@ import {
   Accessibility,
   Bell,
   Calendar,
-  ChevronRight,
   Moon,
   Palette,
   User,
@@ -22,6 +21,7 @@ type Settings = {
   reducedStimulation: boolean;
   hourCycle: "h12" | "h24";
   weekStart: number;
+  notificationPrefs: Record<string, unknown>;
   revision: number;
 };
 
@@ -137,6 +137,8 @@ export function SettingsClient() {
           reducedStimulation: Boolean(data.reducedStimulation),
           hourCycle: data.hourCycle ?? "h12",
           weekStart: data.weekStart ?? 0,
+          notificationPrefs:
+            (data.notificationPrefs as Record<string, unknown>) ?? {},
           revision: data.revision,
         };
         setSettings(s);
@@ -165,6 +167,8 @@ export function SettingsClient() {
       if (partial.hourCycle !== undefined) body.hourCycle = partial.hourCycle;
       if (partial.weekStart !== undefined) body.weekStart = partial.weekStart;
       if (partial.timezone !== undefined) body.timezone = partial.timezone;
+      if (partial.notificationPrefs !== undefined)
+        body.notificationPrefs = partial.notificationPrefs;
 
       const res = await fetch("/api/v1/settings", {
         method: "PATCH",
@@ -185,6 +189,8 @@ export function SettingsClient() {
         reducedStimulation: next.reducedStimulation,
         hourCycle: next.hourCycle,
         weekStart: next.weekStart,
+        notificationPrefs:
+          (next.notificationPrefs as Record<string, unknown>) ?? {},
         revision: next.revision,
       };
       setSettings(s);
@@ -380,9 +386,40 @@ export function SettingsClient() {
 
       <Section icon={Bell} title="Notifications">
         <Row
-          label="Push reminders"
-          hint="Configure sounds after Web Push is enabled on this device"
-          right={<ChevronRight size={18} className="text-ink-faint" />}
+          label="Transition warnings"
+          hint="A gentle heads-up when an activity starts, and 5 min before it ends — only while Kairo is open"
+          right={
+            <Toggle
+              label="Transition warnings"
+              on={Boolean(settings.notificationPrefs.transitionWarnings)}
+              onChange={(v) => {
+                void (async () => {
+                  if (
+                    v &&
+                    typeof Notification !== "undefined" &&
+                    Notification.permission === "default"
+                  ) {
+                    // Ask only on opt-in, never on load. In-app nudges work
+                    // regardless of the browser's answer.
+                    try {
+                      await Notification.requestPermission();
+                    } catch {}
+                  }
+                  await patch({
+                    notificationPrefs: {
+                      ...settings.notificationPrefs,
+                      transitionWarnings: v,
+                    },
+                  });
+                  window.dispatchEvent(
+                    new CustomEvent("kairo:transition-warnings", {
+                      detail: { enabled: v },
+                    }),
+                  );
+                })();
+              }}
+            />
+          }
         />
       </Section>
 

@@ -24,9 +24,9 @@ import {
 } from "@/lib/adapters";
 import { TodayTimeline } from "@/components/TodayTimeline";
 import { TimezoneNudge } from "@/components/TimezoneNudge";
+import { PickForMe, type PickCandidate } from "@/components/PickForMe";
 import { SoftStreaks } from "@/components/SoftStreaks";
 import { AmbientSounds } from "@/components/AmbientSounds";
-import { ToastHost } from "@/components/Toast";
 import { AnytimeRail } from "@/components/AnytimeRail";
 import { instantToDateStr } from "@/server/temporal/zone";
 
@@ -105,13 +105,72 @@ async function loadTodayData(dateParam?: string) {
   };
 }
 
+/**
+ * Day-load meter (10× ADHD Phase 8 — pre-commitment over post-hoc nagging).
+ * Planned minutes vs the 7:00–23:00 waking window, three honest bands, and a
+ * gentle escape hatch to the review flow when the day feels full.
+ */
+function DayLoadMeter({ activities }: { activities: Activity[] }) {
+  const plannedMin = activities.reduce((sum, a) => sum + a.duration, 0);
+  if (plannedMin === 0) return null;
+  const windowMin = 16 * 60;
+  const pct = Math.min(100, Math.round((plannedMin / windowMin) * 100));
+  const band = pct < 40 ? "light" : pct <= 70 ? "comfortable" : "full";
+  const hours =
+    plannedMin % 60 === 0
+      ? `${plannedMin / 60} h`
+      : `${(plannedMin / 60).toFixed(1)} h`;
+  const label =
+    band === "light"
+      ? `${hours} planned · a light day`
+      : band === "comfortable"
+        ? `${hours} planned · a comfortable day`
+        : `${hours} planned · that's a lot for one day`;
+  return (
+    <div className="mb-5 flex items-center gap-3">
+      <div
+        className="h-1.5 max-w-48 flex-1 overflow-hidden rounded-full bg-surface-sunken"
+        role="meter"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`Day load: ${label}`}
+      >
+        <div
+          className={`h-full rounded-full ${
+            band === "full" ? "bg-cat-butter-ink" : "bg-iris"
+          }`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="text-[12.5px] font-medium text-ink-soft">{label}</p>
+      {band === "full" && (
+        <Link
+          href="/app/review"
+          className="text-[12.5px] font-bold text-iris hover:underline"
+        >
+          Lighten it →
+        </Link>
+      )}
+    </div>
+  );
+}
+
 function DayProgress({ activities }: { activities: Activity[] }) {
   const done = activities.filter((a) => a.done).length;
   const pct = activities.length ? Math.round((done / activities.length) * 100) : 0;
+  const complete = pct === 100;
+  const halfway = pct >= 50 && !complete;
   const r = 15;
   const c = 2 * Math.PI * r;
   return (
-    <div className="flex items-center gap-2.5 rounded-2xl border border-border bg-surface px-3.5 py-2 shadow-card">
+    <div
+      className={`flex items-center gap-2.5 rounded-2xl border px-3.5 py-2 shadow-card ${
+        complete
+          ? "border-success/30 bg-success-soft"
+          : "border-border bg-surface"
+      }`}
+    >
       <svg width="38" height="38" viewBox="0 0 38 38" className="-rotate-90">
         <circle cx="19" cy="19" r={r} fill="none" stroke="var(--border)" strokeWidth="5" />
         <circle
@@ -119,17 +178,28 @@ function DayProgress({ activities }: { activities: Activity[] }) {
           cy="19"
           r={r}
           fill="none"
-          stroke="var(--iris)"
+          stroke={complete ? "var(--success)" : "var(--iris)"}
           strokeWidth="5"
           strokeLinecap="round"
           strokeDasharray={c}
           strokeDashoffset={c * (1 - pct / 100)}
+          style={{ transition: "stroke-dashoffset 0.6s var(--ease-spring)" }}
         />
       </svg>
       <div>
-        <p className="tnum text-sm font-bold leading-none">{pct}%</p>
+        <p
+          className={`tnum text-sm font-bold leading-none ${
+            complete ? "text-success" : ""
+          }`}
+        >
+          {complete ? "Done!" : `${pct}%`}
+        </p>
         <p className="mt-0.5 text-[11px] font-medium text-ink-soft">
-          {done} of {activities.length} done
+          {complete
+            ? `all ${activities.length} done`
+            : halfway
+              ? `${done} of ${activities.length} · halfway there`
+              : `${done} of ${activities.length} done`}
         </p>
       </div>
     </div>
@@ -186,9 +256,42 @@ export default async function TodayPage({
       }).toString()
     : "";
 
+  // "Pick for me" candidates: now → next → slipped-today → loose tasks.
+  const pickCandidates: PickCandidate[] =
+    nowMinutes != null
+      ? [
+          ...activities
+            .filter((a) => !a.done)
+            .map((a): PickCandidate => {
+              const end = a.start + a.duration;
+              const kind =
+                a.start <= nowMinutes && nowMinutes < end
+                  ? ("now" as const)
+                  : a.start > nowMinutes
+                    ? ("next" as const)
+                    : ("slipped" as const);
+              return {
+                id: a.id,
+                title: a.title,
+                emoji: a.emoji,
+                kind,
+                durationMin: Math.min(a.duration, 60),
+              };
+            }),
+          ...inbox.map(
+            (t): PickCandidate => ({
+              id: t.id,
+              title: t.title,
+              emoji: t.emoji,
+              kind: "task",
+              durationMin: 25,
+            }),
+          ),
+        ]
+      : [];
+
   return (
     <AppShell active="today">
-      <ToastHost />
       <div className="timeline-scroll-container mx-auto flex max-w-5xl gap-8 px-4 py-6 md:px-8">
         <section className="min-w-0 flex-1">
           <header className="mb-6 flex flex-wrap items-center gap-3">
@@ -202,6 +305,7 @@ export default async function TodayPage({
             </div>
             {!emptyDay && <DayProgress activities={activities} />}
             <SoftStreaks />
+            {authed && isToday && <PickForMe candidates={pickCandidates} />}
             {authed && (
               <Link
                 href="/app/review"
@@ -262,6 +366,28 @@ export default async function TodayPage({
           </header>
 
           {authed && <TimezoneNudge zone={zone} />}
+
+          {authed && !activities.every((a) => a.done) && (
+            <DayLoadMeter activities={activities} />
+          )}
+
+          {authed &&
+            activities.length > 0 &&
+            activities.every((a) => a.done) && (
+              <div className="mb-5 flex items-center gap-3 rounded-2xl border border-success/30 bg-success-soft px-4 py-3.5">
+                <span className="text-xl" aria-hidden>
+                  🎉
+                </span>
+                <div>
+                  <p className="text-[14.5px] font-bold text-success">
+                    Day done — everything happened.
+                  </p>
+                  <p className="text-[13px] font-medium text-ink-soft">
+                    Nothing left to carry. Go be free.
+                  </p>
+                </div>
+              </div>
+            )}
 
           {emptyDay ? (
             <div className="grid place-items-center rounded-3xl border border-dashed border-border bg-surface/60 px-6 py-20 text-center">

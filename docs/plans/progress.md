@@ -1,5 +1,59 @@
 # Progress log
 
+## 2026-07-19 — 10× ADHD program: all 10 phases shipped (Fable)
+
+**Plan:** `docs/plans/2026-07-18-10x-adhd-roadmap.md` (all boxes ticked) +
+research `docs/research/adhd-features-2026.md` (subagent, competitor mechanics
++ pitfalls). Executor prompt: `docs/plans/10x-adhd-agent-prompt.md`.
+
+**Shipped (all browser-verified locally, light+dark, desktop+375px):**
+1. **NowBar** (`NowBar.tsx`): NowProvider context in AppShell fetches
+   `/api/v1/day/{today}` (5-min refresh + visibilitychange + `kairo:day-changed`
+   event), 30 s clock tick. Desktop sidebar Now card (live red dot, countdown)
+   + mobile strip above tab bar; both link to Today; hidden on /app/focus and
+   when nothing's left. ⛶ button / `o` opens One Thing.
+2. **Celebration** (`Celebration.tsx` + `kairo-burst` keyframes): particle
+   burst at the completion point (timeline complete + review "I did it");
+   skipped under reduced-motion/reduced-stimulation. DayProgress: halfway copy,
+   100% → success "Done!" chip; Today all-done banner ("Day done — everything
+   happened."). ToastHost moved to AppShell (per-page mounts removed).
+3. **QuickCapture** (`QuickCapture.tsx`): `c` anywhere / ✎ mobile button →
+   sheet; Enter saves to inbox (Undo toast), Shift+Enter chain-dumps with
+   counter; Web Speech dictation when the browser has it (not testable
+   headless — code path guarded).
+4. **Focus 10×** (`FocusClient.tsx`): overtime guard (+count-up ring, butter
+   banner "Good stopping point?", Wrap up / +5), Session-done state (focused
+   minutes + break/keep-going/done), local 5-min break timer with break-over
+   state, live tab title (mm:ss · title / +N min over / ☕ break). Verified
+   E2E with a 1-min session.
+5. **PickForMe** (`PickForMe.tsx`): Today header + Inbox; deterministic order
+   now → next → slipped → tasks (priority-weighted); "Just this" card with
+   Start-focus link + shuffle.
+6. **Time truth** (subagent, verified): focus_stop payload now logs
+   targetDurationMin + elapsedMin; `computeEstimateCalibration` (≥5 sessions,
+   14 d window, <3 min excluded) + 6 unit tests; Stats card + editor hint
+   (ratio ≥1.3).
+7. **Transition warnings**: Settings toggle (notificationPrefs, permission
+   asked only on opt-in) → NowProvider boundary scheduler (start + 5-min-
+   before-end, in-app toast always, system Notification only when granted and
+   not reduced-stim). Verified live: toast fired at a real activity boundary.
+8. **Overwhelm tools**: DayLoadMeter (planned vs 16 h window, 3 bands, "Lighten
+   it →" → review) + OneThing full-screen mode (`o`/⛶, current/next/next-step,
+   Focus link, empty state "Rest counts too").
+9. **Polish**: install banner → bottom-right on desktop / above FABs on mobile
+   (it was covering primary CTAs); dynamic timeline canvas hours (5 AM block
+   now on-canvas — fixed off-canvas unclickable blocks); LiveNowLine
+   pointer-events fix (was swallowing clicks on blocks under it); shortcuts
+   help updated (c/o).
+
+**Gates:** lint, typecheck, **161 tests**, build — green.
+
+**Known follow-ups:** Stats week bars may bucket completions to the wrong
+weekday for non-UTC zones (pre-existing; investigate `getStats` bucketing);
+editor bottom-sheet animation + inbox swipe actions deferred; voice capture
+needs a manual mic test on a real device; Web Push/server cron still gated on
+CRON_SECRET env.
+
 ## 2026-07-18 — Polish pass: first-run crash, timezone correctness, auto-scroll (Fable)
 
 **Found by dogfooding a brand-new account in agent-browser:**

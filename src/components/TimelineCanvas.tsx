@@ -18,14 +18,12 @@ import { useCallback, useRef, useState } from "react";
 import { Check, Timer } from "lucide-react";
 import { catClasses, fmt, fmtDuration, type Activity } from "@/lib/mock";
 import { LiveNowLine, useLiveNowMin } from "./LiveNowLine";
+import { celebrate } from "./Celebration";
 
-const DAY_START = 7 * 60; // 07:00
-const DAY_END = 23 * 60; // 23:00
+const DAY_START_DEFAULT = 7 * 60; // 07:00
+const DAY_END_DEFAULT = 23 * 60; // 23:00
 const PX_PER_MIN = 1.7;
 const SNAP_MIN = 15; // 15-minute snap
-
-const top = (min: number) => (min - DAY_START) * PX_PER_MIN;
-const minFromY = (y: number) => Math.round((y / PX_PER_MIN + DAY_START) / SNAP_MIN) * SNAP_MIN;
 
 interface DragState {
   id: string;
@@ -140,6 +138,22 @@ export function TimelineCanvas({
 
   const lanes = computeLanes(displayActivities);
 
+  // Canvas hours adapt to the actual day: a 5 AM routine or a midnight block
+  // extends the grid instead of rendering off-canvas (whole hours only).
+  const dayStart = Math.min(
+    DAY_START_DEFAULT,
+    ...displayActivities.map((a) => Math.floor(a.start / 60) * 60),
+  );
+  const dayEnd = Math.max(
+    DAY_END_DEFAULT,
+    ...displayActivities.map(
+      (a) => Math.ceil((a.start + a.duration) / 60) * 60,
+    ),
+  );
+  const top = (min: number) => (min - dayStart) * PX_PER_MIN;
+  const minFromY = (y: number) =>
+    Math.round((y / PX_PER_MIN + dayStart) / SNAP_MIN) * SNAP_MIN;
+
   const handlePointerDown = useCallback(
     (e: React.PointerEvent, id: string, mode: DragState["mode"], act: Activity) => {
       e.preventDefault();
@@ -164,8 +178,8 @@ export function TimelineCanvas({
 
       if (drag.mode === "move") {
         const newStart = Math.max(
-          DAY_START,
-          Math.min(DAY_END - drag.origDuration, drag.origStart + deltaMin),
+          dayStart,
+          Math.min(dayEnd - drag.origDuration, drag.origStart + deltaMin),
         );
         setOptimistic((prev) => {
           const next = new Map(prev);
@@ -180,7 +194,7 @@ export function TimelineCanvas({
           return next;
         });
       } else if (drag.mode === "resize-top") {
-        const newStart = Math.max(DAY_START, Math.min(DAY_END - SNAP_MIN, drag.origStart + deltaMin));
+        const newStart = Math.max(dayStart, Math.min(dayEnd - SNAP_MIN, drag.origStart + deltaMin));
         const newDuration = Math.max(SNAP_MIN, drag.origDuration - deltaMin);
         setOptimistic((prev) => {
           const next = new Map(prev);
@@ -189,7 +203,7 @@ export function TimelineCanvas({
         });
       }
     },
-    [drag],
+    [drag, dayStart, dayEnd],
   );
 
   const handlePointerUp = useCallback(async () => {
@@ -237,10 +251,10 @@ export function TimelineCanvas({
 
       switch (e.key) {
         case "ArrowUp":
-          newStart = Math.max(DAY_START, act.start - delta);
+          newStart = Math.max(dayStart, act.start - delta);
           break;
         case "ArrowDown":
-          newStart = Math.min(DAY_END - act.duration, act.start + delta);
+          newStart = Math.min(dayEnd - act.duration, act.start + delta);
           break;
         case "ArrowUp+Shift":
         case "+":
@@ -269,7 +283,7 @@ export function TimelineCanvas({
         return next;
       });
     },
-    [onUpdateActivity],
+    [onUpdateActivity, dayStart, dayEnd],
   );
 
   // Tap empty slot to create.
@@ -280,22 +294,23 @@ export function TimelineCanvas({
       const rect = containerRef.current!.getBoundingClientRect();
       const y = e.clientY - rect.top;
       const startMin = minFromY(y);
-      if (startMin >= DAY_START && startMin < DAY_END) {
+      if (startMin >= dayStart && startMin < dayEnd) {
         onCreateActivity(startMin);
       }
     },
-    [onCreateActivity],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- minFromY derives from dayStart (already listed)
+    [onCreateActivity, dayStart, dayEnd],
   );
 
   return (
     <div
       ref={containerRef}
       className="relative cursor-crosshair"
-      style={{ height: (DAY_END - DAY_START) * PX_PER_MIN }}
+      style={{ height: (dayEnd - dayStart) * PX_PER_MIN }}
       onClick={handleContainerClick}
     >
       {/* Hour grid */}
-      {Array.from({ length: (DAY_END - DAY_START) / 60 + 1 }, (_, i) => DAY_START / 60 + i).map(
+      {Array.from({ length: (dayEnd - dayStart) / 60 + 1 }, (_, i) => dayStart / 60 + i).map(
         (h) => (
           <div
             key={h}
@@ -311,7 +326,14 @@ export function TimelineCanvas({
       )}
 
       {/* Now line — live only when viewing today */}
-      {showNowLine && liveNow != null && <LiveNowLine nowMin={liveNow} zone={zone} />}
+      {showNowLine && liveNow != null && (
+        <LiveNowLine
+          nowMin={liveNow}
+          zone={zone}
+          dayStartMin={dayStart}
+          dayEndMin={dayEnd}
+        />
+      )}
 
       {/* Activities */}
       <div
@@ -481,6 +503,7 @@ export function TimelineCanvas({
                     onClick={async (e) => {
                       e.stopPropagation();
                       const next = !a.done;
+                      if (next) celebrate(e.clientX, e.clientY);
                       setDoneOptimistic((prev) => {
                         const m = new Map(prev);
                         m.set(a.id, next);

@@ -1,6 +1,5 @@
 import { AppShell } from "@/components/AppShell";
 import { InboxClient, type InboxItem } from "@/components/InboxClient";
-import { ToastHost } from "@/components/Toast";
 import { inboxItems as mockInboxItems } from "@/lib/mock";
 import { getSession } from "@/server/auth-session";
 import { listTasks, listCategories } from "@/server/dal";
@@ -48,7 +47,6 @@ export default async function InboxPage() {
   const { items, authed } = await loadInbox();
   return (
     <AppShell active="inbox">
-      <ToastHost />
       <div className="mx-auto max-w-2xl px-4 py-6 md:px-8">
         <header className="mb-1 flex items-center justify-between">
           <h1 className="font-display text-3xl font-bold tracking-tight">

@@ -103,6 +103,24 @@ export function ActivityEditor(props: ActivityEditorProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
+  const [estimateRatio, setEstimateRatio] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/v1/stats?days=14")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data?.estimate) return;
+        const ratio = data.estimate.ratio as number;
+        if (ratio >= 1.3) setEstimateRatio(ratio);
+      })
+      .catch(() => {
+        /* silent — hint is a nice-to-have, never blocks editing */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -417,6 +435,11 @@ export function ActivityEditor(props: ActivityEditorProps) {
                 ))}
               </select>
             </div>
+            {estimateRatio != null && (
+              <p className="mt-1.5 text-[12px] text-ink-faint">
+                Similar plans usually run ~×{estimateRatio} longer than expected
+              </p>
+            )}
           </Field>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

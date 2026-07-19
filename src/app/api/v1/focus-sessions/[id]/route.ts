@@ -43,6 +43,20 @@ export async function PATCH(
           body.state === "skipped" ||
           body.state === "cancelled"
         ) {
+          // Reuse the same elapsed-time math the countdown uses (ADR-004:
+          // clients derive, never persist) to log actual vs. target minutes
+          // for time-estimation calibration (Phase 6).
+          const remainingSecAtStop = getRemainingSec({
+            state: session.state as FocusState,
+            startedAt: session.startedAt,
+            targetDurationMin: session.targetDurationMin,
+            accumulatedPauseSec: session.accumulatedPauseSec,
+            currentIntervalStartedAt: session.currentIntervalStartedAt,
+          });
+          const elapsedMin = Math.max(
+            0,
+            Math.round((session.targetDurationMin * 60 - remainingSecAtStop) / 60),
+          );
           await appendPlannerEvent(userId, {
             entityType: "focus_session",
             entityId: id,
@@ -50,6 +64,8 @@ export async function PATCH(
             payload: {
               state: body.state,
               durationMin: session.targetDurationMin,
+              targetDurationMin: session.targetDurationMin,
+              elapsedMin,
             },
           }).catch(() => {});
         }

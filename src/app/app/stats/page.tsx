@@ -1,11 +1,9 @@
 import { AppShell } from "@/components/AppShell";
 import { StatsClient } from "@/components/StatsClient";
-import { ToastHost } from "@/components/Toast";
 
 export default function StatsPage() {
   return (
     <AppShell active="stats">
-      <ToastHost />
       <div className="mx-auto max-w-3xl px-4 py-6 md:px-8">
         <header className="mb-6">
           <h1 className="font-display text-3xl font-bold tracking-tight">

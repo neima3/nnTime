@@ -9,6 +9,8 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Check, SkipForward } from "lucide-react";
 import { catClasses, type CategoryId } from "@/lib/mock";
 import { localMinutesToInstant } from "@/lib/adapters";
+import { celebrate } from "./Celebration";
+import { notifyDayChanged } from "./NowBar";
 
 export type ReviewItem = {
   id: string;
@@ -101,6 +103,7 @@ export function ReviewClient({
         // index stays; next item slides into place
         setBusy(false);
         router.refresh();
+        notifyDayChanged();
       } catch {
         setError("Network error.");
         setBusy(false);
@@ -184,7 +187,10 @@ export function ReviewClient({
         <button
           type="button"
           disabled={busy || !authed}
-          onClick={() => void act("complete")}
+          onClick={(e) => {
+            celebrate(e.clientX, e.clientY);
+            void act("complete");
+          }}
           className="flex items-center justify-center gap-2 rounded-2xl bg-success-soft py-3.5 text-[15px] font-semibold text-success focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:opacity-50"
         >
           <Check size={18} strokeWidth={3} />

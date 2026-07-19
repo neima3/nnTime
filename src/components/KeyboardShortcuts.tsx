@@ -86,6 +86,18 @@ export function KeyboardShortcuts() {
             </kbd>
           </li>
           <li className="flex justify-between gap-4">
+            <span className="text-ink-soft">Quick capture a thought</span>
+            <kbd className="rounded-lg bg-surface-sunken px-2 py-0.5 font-mono text-[12px] font-bold">
+              c
+            </kbd>
+          </li>
+          <li className="flex justify-between gap-4">
+            <span className="text-ink-soft">One-thing view</span>
+            <kbd className="rounded-lg bg-surface-sunken px-2 py-0.5 font-mono text-[12px] font-bold">
+              o
+            </kbd>
+          </li>
+          <li className="flex justify-between gap-4">
             <span className="text-ink-soft">This help</span>
             <kbd className="rounded-lg bg-surface-sunken px-2 py-0.5 font-mono text-[12px] font-bold">
               ?

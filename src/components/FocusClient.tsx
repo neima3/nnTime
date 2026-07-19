@@ -5,9 +5,10 @@
  * Server-authoritative remaining time; pause/resume/complete/extend.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Pause, Play, Plus, SkipForward } from "lucide-react";
+import { Check, Coffee, Pause, Play, Plus, SkipForward } from "lucide-react";
+import { celebrate } from "./Celebration";
 
 type Session = {
   id: string;
@@ -27,16 +28,25 @@ function FocusRing({
   remainingSec,
   targetMin,
   emoji,
+  tone = "sky",
+  subline,
+  displaySec,
 }: {
   remainingSec: number;
   targetMin: number;
   emoji: string;
+  tone?: "sky" | "mint";
+  subline?: string;
+  /** Override the big number (e.g. overtime counting up) without moving the ring. */
+  displaySec?: number;
 }) {
   const targetSec = targetMin * 60;
   const elapsedPct = targetSec > 0 ? 1 - remainingSec / targetSec : 0;
   const size = 300;
   const r = 128;
   const c = 2 * Math.PI * r;
+  const track = tone === "mint" ? "var(--cat-mint)" : "var(--cat-sky)";
+  const stroke = tone === "mint" ? "var(--cat-mint-ink)" : "var(--cat-sky-ink)";
   return (
     <div className="relative">
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
@@ -45,7 +55,7 @@ function FocusRing({
           cy={size / 2}
           r={r}
           fill="none"
-          stroke="var(--cat-sky)"
+          stroke={track}
           strokeWidth="18"
         />
         <circle
@@ -53,7 +63,7 @@ function FocusRing({
           cy={size / 2}
           r={r}
           fill="none"
-          stroke="var(--cat-sky-ink)"
+          stroke={stroke}
           strokeWidth="18"
           strokeLinecap="round"
           strokeDasharray={c}
@@ -66,10 +76,10 @@ function FocusRing({
           {emoji}
         </span>
         <p className="tnum mt-3 font-mono text-5xl font-semibold tracking-tight">
-          {fmtRemain(remainingSec)}
+          {displaySec != null ? `+${fmtRemain(displaySec)}` : fmtRemain(remainingSec)}
         </p>
         <p className="mt-1 text-sm font-medium text-ink-soft">
-          remaining of {targetMin} min
+          {subline ?? `remaining of ${targetMin} min`}
         </p>
       </div>
     </div>
@@ -97,6 +107,12 @@ export function FocusClient({
   const [durationMin, setDurationMin] = useState(defaultDurationMin);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  /** Seconds past the target while the session keeps running (hyperfocus guard). */
+  const [overtimeSec, setOvertimeSec] = useState(0);
+  /** Post-session flow: null = none, else the finished session's focused minutes. */
+  const [finished, setFinished] = useState<{ focusedMin: number } | null>(null);
+  /** Local break countdown (no server session): seconds left, null = no break. */
+  const [breakSec, setBreakSec] = useState<number | null>(null);
 
   const hydrate = useCallback(async () => {
     try {
@@ -148,10 +164,18 @@ export function FocusClient({
   }, []);
 
   // Local tick while running (server is source of truth; rehydrate periodically).
+  // When remaining hits zero and the session keeps running, count overtime up
+  // instead of sitting silently on 00:00.
   useEffect(() => {
     if (!session || session.state !== "running") return;
     const tick = setInterval(() => {
-      setRemainingSec((s) => Math.max(0, s - 1));
+      setRemainingSec((s) => {
+        if (s <= 1) {
+          setOvertimeSec((o) => o + 1);
+          return 0;
+        }
+        return s - 1;
+      });
     }, 1000);
     const rehydrate = setInterval(() => {
       void hydrate();
@@ -162,13 +186,53 @@ export function FocusClient({
     };
   }, [session, hydrate]);
 
-  const start = useCallback(async () => {
+  // Reset overtime when a different session takes over (render-time state
+  // adjustment — the React-endorsed pattern, no effect needed).
+  const [overtimeForId, setOvertimeForId] = useState<string | null>(null);
+  if (session && session.id !== overtimeForId) {
+    setOvertimeForId(session.id);
+    setOvertimeSec(0);
+  }
+
+  // Glanceable tab title while a session (or break) runs.
+  const baseTitleRef = useRef<string | null>(null);
+  useEffect(() => {
+    baseTitleRef.current = document.title;
+  }, []);
+  useEffect(() => {
+    if (session && (session.state === "running" || session.state === "paused")) {
+      document.title =
+        overtimeSec > 0
+          ? `+${Math.ceil(overtimeSec / 60)} min over · ${title}`
+          : `${fmtRemain(remainingSec)} · ${title}`;
+    } else if (breakSec != null && breakSec > 0) {
+      document.title = `☕ ${fmtRemain(breakSec)} break`;
+    } else if (baseTitleRef.current) {
+      document.title = baseTitleRef.current;
+    }
+    return () => {
+      if (baseTitleRef.current) document.title = baseTitleRef.current;
+    };
+  }, [session, remainingSec, overtimeSec, breakSec, title]);
+
+  // Local break countdown.
+  useEffect(() => {
+    if (breakSec == null || breakSec <= 0) return;
+    const t = setInterval(() => {
+      setBreakSec((s) => (s == null ? null : Math.max(0, s - 1)));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [breakSec]);
+
+  const start = useCallback(async (minutes?: number) => {
     setError(null);
+    setFinished(null);
+    setBreakSec(null);
     const res = await fetch("/api/v1/focus-sessions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        targetDurationMin: durationMin,
+        targetDurationMin: minutes ?? durationMin,
         title,
         emoji,
       }),
@@ -200,17 +264,33 @@ export function FocusClient({
         return;
       }
       const data = await res.json();
+      if (data.session.state === "completed") {
+        // Post-session flow: celebrate, then offer a break / keep going / done.
+        const focusedMin = Math.max(
+          1,
+          Math.round(
+            (session.targetDurationMin * 60 - remainingSec + overtimeSec) / 60,
+          ),
+        );
+        celebrate(window.innerWidth / 2, window.innerHeight / 2 - 80);
+        setFinished({ focusedMin });
+        setSession(null);
+        setRemainingSec(durationMin * 60);
+        router.refresh();
+        return;
+      }
       setSession(data.session);
       setRemainingSec(data.remainingSec ?? 0);
       if (
-        data.session.state === "completed" ||
         data.session.state === "skipped" ||
         data.session.state === "cancelled"
       ) {
+        setSession(null);
+        setRemainingSec(durationMin * 60);
         router.refresh();
       }
     },
-    [session, router],
+    [session, router, remainingSec, overtimeSec, durationMin],
   );
 
   if (loading) {
@@ -224,6 +304,128 @@ export function FocusClient({
         <div className="mt-3 h-8 w-48 animate-pulse rounded-xl bg-surface-sunken" />
         <div className="mt-10 size-[300px] animate-pulse rounded-full border-[18px] border-surface-sunken" />
         <div className="mt-10 h-12 w-40 animate-pulse rounded-2xl bg-surface-sunken" />
+      </div>
+    );
+  }
+
+  // ---- Break flow (local, no server session) ----
+  if (breakSec != null) {
+    if (breakSec > 0) {
+      return (
+        <div className="mx-auto flex min-h-[calc(100dvh-6rem)] max-w-2xl flex-col items-center px-4 py-10 md:min-h-dvh md:justify-center">
+          <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
+            Break
+          </p>
+          <h1 className="mt-1 font-display text-3xl font-bold tracking-tight">
+            Step away for a moment
+          </h1>
+          <p className="mt-1 text-sm font-medium text-ink-soft">
+            Water, stretch, look far away. The timer&apos;s got this.
+          </p>
+          <div className="mt-10">
+            <FocusRing
+              remainingSec={breakSec}
+              targetMin={Math.ceil(breakSec / 60) <= 5 ? 5 : 10}
+              emoji="☕"
+              tone="mint"
+              subline="of break left"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setBreakSec(0)}
+            className="mt-10 rounded-2xl border border-border bg-surface px-6 py-3 text-[14px] font-semibold text-ink-soft shadow-card transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+          >
+            I&apos;m ready now
+          </button>
+        </div>
+      );
+    }
+    return (
+      <div className="mx-auto flex min-h-[calc(100dvh-6rem)] max-w-2xl flex-col items-center px-4 py-10 md:min-h-dvh md:justify-center">
+        <span className="grid size-16 place-items-center rounded-3xl bg-cat-mint text-3xl" aria-hidden>
+          🌿
+        </span>
+        <h1 className="mt-5 font-display text-3xl font-bold tracking-tight">
+          Break&apos;s over — no rush.
+        </h1>
+        <p className="mt-2 text-[14.5px] text-ink-soft">
+          Ready for the next thing when you are.
+        </p>
+        <div className="mt-8 grid w-full max-w-sm gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setBreakSec(null);
+            }}
+            className="rounded-2xl bg-iris py-3.5 text-[15px] font-semibold text-ink-inverse shadow-card transition-colors hover:bg-iris-deep focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+          >
+            Set up the next focus
+          </button>
+          <button
+            type="button"
+            onClick={() => setBreakSec(5 * 60)}
+            className="rounded-2xl border border-border bg-surface py-3.5 text-[15px] font-semibold text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+          >
+            <span className="inline-flex items-center gap-2">
+              <Coffee size={16} /> Another 5 minutes
+            </span>
+          </button>
+          <a
+            href="/app/today"
+            className="rounded-2xl py-3 text-center text-[14px] font-semibold text-ink-soft hover:bg-surface-sunken"
+          >
+            Back to Today
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Post-session flow ----
+  if (finished) {
+    return (
+      <div className="mx-auto flex min-h-[calc(100dvh-6rem)] max-w-2xl flex-col items-center px-4 py-10 md:min-h-dvh md:justify-center">
+        <span className="grid size-16 place-items-center rounded-3xl bg-success-soft text-3xl" aria-hidden>
+          ✓
+        </span>
+        <p className="mt-5 text-[13px] font-semibold uppercase tracking-[0.14em] text-success">
+          Session done
+        </p>
+        <h1 className="mt-1 font-display text-3xl font-bold tracking-tight">
+          {finished.focusedMin} min of real focus.
+        </h1>
+        <p className="mt-2 text-[14.5px] text-ink-soft">
+          That counted. What now?
+        </p>
+        <div className="mt-8 grid w-full max-w-sm gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setFinished(null);
+              setBreakSec(5 * 60);
+            }}
+            className="rounded-2xl bg-iris py-3.5 text-[15px] font-semibold text-ink-inverse shadow-card transition-colors hover:bg-iris-deep focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+          >
+            <span className="inline-flex items-center gap-2">
+              <Coffee size={16} /> Take a 5-min break
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => void start(10)}
+            className="rounded-2xl border border-border bg-surface py-3.5 text-[15px] font-semibold text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+          >
+            Keep going +10 min
+          </button>
+          <button
+            type="button"
+            onClick={() => setFinished(null)}
+            className="rounded-2xl py-3 text-[14px] font-semibold text-ink-soft hover:bg-surface-sunken focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+          >
+            Done for now
+          </button>
+        </div>
       </div>
     );
   }
@@ -309,11 +511,13 @@ export function FocusClient({
   }
 
   const isPaused = session.state === "paused";
+  const inOvertime = overtimeSec > 0 && !isPaused;
+  const overtimeMin = Math.max(1, Math.ceil(overtimeSec / 60));
 
   return (
     <div className="mx-auto flex min-h-[calc(100dvh-6rem)] max-w-2xl flex-col items-center px-4 py-10 md:min-h-dvh md:justify-center">
       <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
-        {isPaused ? "Paused" : "Now focusing"}
+        {isPaused ? "Paused" : inOvertime ? "Still going" : "Now focusing"}
       </p>
       <h1 className="mt-1 font-display text-3xl font-bold tracking-tight">{title}</h1>
       <p className="tnum mt-1 text-sm font-medium text-ink-soft">
@@ -322,11 +526,44 @@ export function FocusClient({
 
       <div className="mt-10">
         <FocusRing
-          remainingSec={remainingSec}
+          remainingSec={inOvertime ? 0 : remainingSec}
           targetMin={session.targetDurationMin}
           emoji={emoji}
+          displaySec={inOvertime ? overtimeSec : undefined}
+          subline={
+            inOvertime ? "past your target — that's okay" : undefined
+          }
         />
       </div>
+
+      {inOvertime && (
+        <div className="mt-6 flex w-full max-w-sm flex-wrap items-center gap-3 rounded-2xl border border-cat-butter-ink/25 bg-cat-butter px-4 py-3">
+          <p className="min-w-0 flex-1 text-[13.5px] font-semibold text-cat-butter-ink">
+            {overtimeMin} min past your target. Good stopping point?
+          </p>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                void patch({ action: "transition", state: "completed" })
+              }
+              className="rounded-xl bg-cat-butter-ink px-3 py-1.5 text-[13px] font-bold text-cat-butter"
+            >
+              Wrap up
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setOvertimeSec(0);
+                void patch({ action: "extend", addMinutes: 5 });
+              }}
+              className="rounded-xl px-2.5 py-1.5 text-[13px] font-bold text-cat-butter-ink hover:bg-cat-butter-ink/10"
+            >
+              +5 more
+            </button>
+          </div>
+        </div>
+      )}
 
       {steps.length > 0 && (
         <ul className="mt-6 w-full max-w-sm space-y-1.5 rounded-2xl border border-border bg-surface p-4 shadow-card">

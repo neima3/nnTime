@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { RoutinesClient, type RoutineView } from "@/components/RoutinesClient";
-import { ToastHost } from "@/components/Toast";
 import { getSession } from "@/server/auth-session";
 import {
   listRoutines,
@@ -65,7 +64,6 @@ export default async function RoutinesPage() {
   const { items, authed } = await load();
   return (
     <AppShell active="routines">
-      <ToastHost />
       <div className="mx-auto max-w-5xl px-4 py-6 md:px-8">
         <header className="mb-2 flex flex-wrap items-center gap-3">
           <div className="mr-auto">

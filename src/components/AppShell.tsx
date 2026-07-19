@@ -15,6 +15,11 @@ import {
 } from "lucide-react";
 import { UserMenu } from "./UserMenu";
 import { OfflineShell } from "./OfflineShell";
+import { NowCard, NowProvider, NowStrip } from "./NowBar";
+import { CelebrationHost } from "./Celebration";
+import { QuickCapture } from "./QuickCapture";
+import { OneThing } from "./OneThing";
+import { ToastHost } from "./Toast";
 
 const sidebarNav = [
   { href: "/app/today", label: "Today", key: "today", icon: CalendarDays },
@@ -59,6 +64,7 @@ export function AppShell({
   }, []);
 
   return (
+    <NowProvider>
     <div className="flex min-h-dvh w-full bg-canvas">
       {/* Skip to content — keyboard accessibility */}
       <a
@@ -103,6 +109,8 @@ export function AppShell({
           })}
         </nav>
 
+        <NowCard active={active} />
+
         <div className="mt-auto rounded-2xl border border-border bg-iris-ghost p-4">
           <div className="flex items-center gap-2 text-sm font-semibold text-iris">
             <Sparkles size={16} />
@@ -128,6 +136,11 @@ export function AppShell({
       {/* main */}
       <main id="main-content" className="min-w-0 flex-1 pb-24 md:pb-0">{children}</main>
       <OfflineShell />
+      <NowStrip active={active} />
+      <CelebrationHost />
+      <QuickCapture />
+      <OneThing />
+      <ToastHost />
 
       {/* mobile bottom bar */}
       <nav
@@ -153,6 +166,7 @@ export function AppShell({
         })}
       </nav>
     </div>
+    </NowProvider>
   );
 }
 
@@ -162,10 +176,12 @@ export function ShortcutsHint() {
       <p className="font-semibold uppercase tracking-wide">Shortcuts</p>
       <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5">
         <span><kbd className="rounded bg-surface px-1 font-mono">N</kbd> New</span>
+        <span><kbd className="rounded bg-surface px-1 font-mono">C</kbd> Capture</span>
         <span><kbd className="rounded bg-surface px-1 font-mono">T</kbd> Today</span>
         <span><kbd className="rounded bg-surface px-1 font-mono">I</kbd> Inbox</span>
         <span><kbd className="rounded bg-surface px-1 font-mono">W</kbd> Week</span>
         <span><kbd className="rounded bg-surface px-1 font-mono">F</kbd> Focus</span>
+        <span><kbd className="rounded bg-surface px-1 font-mono">O</kbd> One thing</span>
         <span><kbd className="rounded bg-surface px-1 font-mono">S</kbd> Settings</span>
       </div>
     </div>

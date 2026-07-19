@@ -5,12 +5,20 @@ import { BarChart3, Flame } from "lucide-react";
 import { toast } from "./Toast";
 import { SignedOutCard, SkeletonCards } from "./EmptyState";
 
+type EstimateCalibration = {
+  sessions: number;
+  avgTargetMin: number;
+  avgActualMin: number;
+  ratio: number;
+};
+
 type Stats = {
   byDate: Record<string, { completed: number; focusMin: number; mood: string | null }>;
   streak: { current: number; best: number };
   totalCompleted: number;
   totalFocusMin: number;
   days: number;
+  estimate: EstimateCalibration | null;
 };
 
 const MOODS = [
@@ -161,6 +169,25 @@ export function StatsClient() {
           </div>
         </dl>
       </Card>
+
+      {stats.estimate && (
+        <Card title="Time truth" hint="From your own focus sessions · last 14 days">
+          <p className="text-[14px] leading-relaxed text-ink">
+            {stats.estimate.ratio >= 1.15 ? (
+              <>
+                Your {stats.estimate.avgTargetMin}-min focus plans actually run
+                about {stats.estimate.avgActualMin} min. That&apos;s normal —
+                plan ×{stats.estimate.ratio} and you&apos;ll land on time.
+              </>
+            ) : (
+              <>
+                Your time estimates are landing — plans and reality match. Rare
+                skill. Keep it.
+              </>
+            )}
+          </p>
+        </Card>
+      )}
 
       <Card title="Mood check-in" hint="One tap · private">
         <div className="flex flex-wrap gap-2">

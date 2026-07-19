@@ -11,6 +11,7 @@ import { TimelineCanvas } from "./TimelineCanvas";
 import type { Activity } from "@/lib/mock";
 import { localMinutesToInstant } from "@/lib/adapters";
 import { toast } from "./Toast";
+import { notifyDayChanged } from "./NowBar";
 
 interface TodayTimelineProps {
   activities: Activity[];
@@ -81,6 +82,7 @@ export function TodayTimeline({
         if (!patchRes.ok) return { ok: false };
         toast("Saved");
         router.refresh();
+        notifyDayChanged();
         return { ok: true };
       } catch {
         return { ok: false };
@@ -131,6 +133,7 @@ export function TodayTimeline({
         if (!res.ok) return { ok: false };
         toast(nextStatus === "completed" ? "Nice — marked done" : "Restored");
         router.refresh();
+        notifyDayChanged();
         return { ok: true };
       } catch {
         return { ok: false };
@@ -176,6 +179,7 @@ export function TodayTimeline({
         }
         if (!res.ok) return { ok: false };
         router.refresh();
+        notifyDayChanged();
         return { ok: true };
       } catch {
         return { ok: false };

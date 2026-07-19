@@ -18,6 +18,7 @@ import {
 import { catClasses, type CategoryId } from "@/lib/mock";
 import { clientToday } from "@/lib/client-date";
 import { toast } from "./Toast";
+import { PickForMe, type PickCandidate } from "./PickForMe";
 
 export type InboxItem = {
   id: string;
@@ -259,9 +260,19 @@ export function InboxClient({
     [router],
   );
 
+  const pickCandidates: PickCandidate[] = items.map((it) => ({
+    id: it.id,
+    title: it.title,
+    emoji: it.emoji,
+    kind: "task" as const,
+    durationMin: 25,
+    weight: it.priority === "high" ? 2 : it.priority === "low" ? 1 : 0,
+  }));
+
   return (
     <>
-      <div className="mb-3 flex justify-end">
+      <div className="mb-3 flex justify-end gap-2">
+        <PickForMe candidates={pickCandidates} />
         <button
           type="button"
           disabled={!authed || busy === "group" || items.length === 0}

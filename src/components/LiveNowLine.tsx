@@ -13,8 +13,6 @@ const DAY_START = 7 * 60;
 const DAY_END = 23 * 60;
 const PX_PER_MIN = 1.7;
 
-const top = (min: number) => (min - DAY_START) * PX_PER_MIN;
-
 /** Browser-local minutes from midnight (includes fractional seconds for smooth line). */
 function nowMinutesLocal() {
   const now = new Date();
@@ -45,7 +43,16 @@ export function useLiveNowMin(live: boolean, zone?: string): number | null {
 export function LiveNowLine({
   nowMin: external,
   zone,
-}: { nowMin?: number; zone?: string } = {}) {
+  dayStartMin = DAY_START,
+  dayEndMin = DAY_END,
+}: {
+  nowMin?: number;
+  zone?: string;
+  /** Canvas bounds — must match the hosting timeline's grid. */
+  dayStartMin?: number;
+  dayEndMin?: number;
+} = {}) {
+  const top = (min: number) => (min - dayStartMin) * PX_PER_MIN;
   const internal = useLiveNowMin(external === undefined, zone);
   const nowMin = external ?? internal;
   const [mounted, setMounted] = useState(false);
@@ -76,13 +83,13 @@ export function LiveNowLine({
 
   if (!mounted || nowMin == null) return null;
 
-  const clampedMin = Math.max(DAY_START, Math.min(DAY_END, nowMin));
+  const clampedMin = Math.max(dayStartMin, Math.min(dayEndMin, nowMin));
 
   return (
     <div>
       <div
         ref={lineRef}
-        className="absolute inset-x-0 z-20 flex items-center gap-2"
+        className="pointer-events-none absolute inset-x-0 z-20 flex items-center gap-2"
         style={{ top: top(clampedMin) }}
       >
         <span className="tnum w-10 -translate-y-1/2 rounded-md bg-now text-center text-[11px] font-bold text-now-ink">

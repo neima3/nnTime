@@ -75,7 +75,68 @@ export async function getStats(
     totalFocusMin: events
       .filter((e) => e.eventType === "focus_stop")
       .reduce((sum, e) => sum + ((e.payload as { durationMin?: number })?.durationMin ?? 0), 0),
+    estimate: computeEstimateCalibration(events),
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Time-estimation calibration (Phase 6)                                      */
+/* -------------------------------------------------------------------------- */
+
+export interface EstimateCalibration {
+  sessions: number;
+  avgTargetMin: number;
+  avgActualMin: number;
+  ratio: number;
+}
+
+const CALIBRATION_WINDOW_DAYS = 14;
+const CALIBRATION_MIN_SESSIONS = 5;
+const CALIBRATION_ABANDONED_MIN = 3;
+
+/**
+ * Pure aggregation over planner_events: average target vs. actual focus-session
+ * minutes for the last 14 days, so we can show a kind, data-driven "you tend to
+ * under-plan by Nx" signal. Needs both `targetDurationMin` and `elapsedMin` on
+ * the focus_stop payload (see the focus-sessions PATCH route). Sessions under
+ * 3 actual minutes are treated as abandoned and excluded. Returns null when
+ * fewer than 5 qualifying sessions exist — not enough signal to be useful.
+ */
+export function computeEstimateCalibration(
+  events: Array<{ eventType: string; occurredAt: Date; payload: unknown }>,
+  opts: { now?: Date } = {},
+): EstimateCalibration | null {
+  const now = opts.now ?? new Date();
+  const windowStart = new Date(now.getTime() - CALIBRATION_WINDOW_DAYS * 86400000);
+
+  const qualifying = events.filter((ev) => {
+    if (ev.eventType !== "focus_stop") return false;
+    if (ev.occurredAt < windowStart || ev.occurredAt > now) return false;
+    const payload = ev.payload as { targetDurationMin?: number; elapsedMin?: number };
+    if (typeof payload?.targetDurationMin !== "number") return false;
+    if (typeof payload?.elapsedMin !== "number") return false;
+    if (payload.elapsedMin < CALIBRATION_ABANDONED_MIN) return false;
+    return true;
+  });
+
+  if (qualifying.length < CALIBRATION_MIN_SESSIONS) return null;
+
+  const totals = qualifying.reduce(
+    (acc, ev) => {
+      const payload = ev.payload as { targetDurationMin: number; elapsedMin: number };
+      acc.target += payload.targetDurationMin;
+      acc.actual += payload.elapsedMin;
+      return acc;
+    },
+    { target: 0, actual: 0 },
+  );
+
+  const avgTargetMin = Math.round(totals.target / qualifying.length);
+  const avgActualMin = Math.round(totals.actual / qualifying.length);
+  if (avgTargetMin <= 0) return null;
+  const ratio = Math.round((avgActualMin / avgTargetMin) * 10) / 10;
+
+  return { sessions: qualifying.length, avgTargetMin, avgActualMin, ratio };
 }
 
 /**

@@ -2,12 +2,10 @@ import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { PlanDayClient } from "@/components/PlanDayClient";
-import { ToastHost } from "@/components/Toast";
 
 export default function PlannerPage() {
   return (
     <AppShell active="today">
-      <ToastHost />
       <div className="mx-auto max-w-2xl space-y-8 px-4 py-8 md:px-8">
         <header>
           <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-iris-soft px-3 py-1 text-[13px] font-bold text-iris">
