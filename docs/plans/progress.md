@@ -1,5 +1,27 @@
 # Progress log
 
+## 2026-07-19 — iOS round 2: Week tab, day nav, context actions, launch polish (Fable)
+
+- **Week tab** (5-tab layout now matches the ios-adaptation spec): next 7
+  days fetched concurrently as gentle cards — TODAY chip, per-day planned
+  total, compact category-tinted rows, "Nothing planned — space is
+  allowed." empty copy.
+- **Today day navigation:** chevrons page ±days (branded title updates,
+  tap title to jump back to today); now-line/"now" affordances only on the
+  real today.
+- **Block context menu** (long-press): "Focus on this" — switches to the
+  Focus tab with title/emoji/duration prefilled via NotificationCenter —
+  and destructive "Delete activity" (If-Match delete + haptic).
+- **Launch screen** now uses a canvas-colored LaunchBackground asset
+  (light+dark) instead of default white.
+- **Test hygiene:** the E2E flight is now self-cleaning — it deletes its
+  own "iOS flight check" through the context menu (exercising the delete
+  path); purged 7 leftover duplicates from earlier runs off the live QA
+  account; FAB label made distinct ("New activity") after the empty-state
+  collision surfaced.
+- **Full XCUITest suite passes against production** (flow 40 s + tour);
+  fresh per-screen evidence exported (browser-qa/ios-0*.png incl. Week).
+
 ## 2026-07-19 — Kairo for iOS: native SwiftUI app, live-API verified (Fable)
 
 **New:** `ios/App` — a production-quality native iOS app (iOS 17+, XcodeGen,

@@ -91,17 +91,34 @@ struct RootView: View {
     }
 }
 
+extension Notification.Name {
+    /// Posted from a block's context menu: switch to Focus prefilled.
+    static let kairoStartFocus = Notification.Name("kairoStartFocus")
+}
+
 struct MainTabs: View {
+    @State private var selection = 0
+
     var body: some View {
-        TabView {
+        TabView(selection: $selection) {
             TodayView()
                 .tabItem { Label("Today", systemImage: "calendar.day.timeline.left") }
+                .tag(0)
             InboxView()
                 .tabItem { Label("Inbox", systemImage: "tray") }
+                .tag(1)
+            WeekView()
+                .tabItem { Label("Week", systemImage: "calendar") }
+                .tag(2)
             FocusView()
                 .tabItem { Label("Focus", systemImage: "timer") }
+                .tag(3)
             MoreView()
                 .tabItem { Label("More", systemImage: "square.grid.2x2") }
+                .tag(4)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .kairoStartFocus)) { _ in
+            selection = 3
         }
     }
 }

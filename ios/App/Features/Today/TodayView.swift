@@ -11,6 +11,8 @@ struct TodayView: View {
     @State private var showEditor = false
     @State private var editorStart = 9 * 60
     @State private var loadError: String?
+    /// 0 = today, ±n days.
+    @State private var dayOffset = 0
 
     private let tick = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
@@ -32,7 +34,15 @@ struct TodayView: View {
                             TimelineCanvas(
                                 blocks: blocks,
                                 nowMin: nowMin,
-                                onComplete: { block in Task { await toggle(block) } }
+                                onComplete: { block in Task { await toggle(block) } },
+                                onDelete: { block in Task { await remove(block) } },
+                                onFocus: { block in
+                                    NotificationCenter.default.post(
+                                        name: .kairoStartFocus,
+                                        object: nil,
+                                        userInfo: ["title": block.title, "emoji": block.emoji, "duration": block.durationMin]
+                                    )
+                                }
                             )
                             .padding(.horizontal, 16)
                             .padding(.bottom, 120)
@@ -51,16 +61,45 @@ struct TodayView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .principal) {
-                    VStack(spacing: 0) {
-                        Text(weekdayText.uppercased())
-                            .font(.kBody(11, weight: .bold))
-                            .kerning(1.4)
-                            .foregroundStyle(Color.kIris)
-                        Text(titleText)
-                            .font(.kDisplay(17, relativeTo: .headline))
-                            .foregroundStyle(Color.kInk)
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        dayOffset -= 1
+                        Task { await load() }
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.kInkSoft)
                     }
+                    .accessibilityLabel("Previous day")
+                }
+                ToolbarItem(placement: .principal) {
+                    Button {
+                        guard dayOffset != 0 else { return }
+                        dayOffset = 0
+                        Task { await load() }
+                    } label: {
+                        VStack(spacing: 0) {
+                            Text(weekdayText.uppercased())
+                                .font(.kBody(11, weight: .bold))
+                                .kerning(1.4)
+                                .foregroundStyle(Color.kIris)
+                            Text(titleText)
+                                .font(.kDisplay(17, relativeTo: .headline))
+                                .foregroundStyle(Color.kInk)
+                        }
+                    }
+                    .accessibilityLabel(dayOffset == 0 ? "Today" : "Back to today")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        dayOffset += 1
+                        Task { await load() }
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.kInkSoft)
+                    }
+                    .accessibilityLabel("Next day")
                 }
             }
             .toolbarBackground(Color.kCanvas, for: .navigationBar)
@@ -73,18 +112,24 @@ struct TodayView: View {
         .onReceive(tick) { _ in nowMin = KTime.nowMinutes(in: app.timezone) }
     }
 
+    private var viewedDate: Date {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = app.timezone
+        return cal.date(byAdding: .day, value: dayOffset, to: Date()) ?? Date()
+    }
+
     private var titleText: String {
         let df = DateFormatter()
         df.dateFormat = "MMMM d"
         df.timeZone = app.timezone
-        return df.string(from: Date())
+        return df.string(from: viewedDate)
     }
 
     private var weekdayText: String {
         let df = DateFormatter()
         df.dateFormat = "EEEE"
         df.timeZone = app.timezone
-        return df.string(from: Date())
+        return df.string(from: viewedDate)
     }
 
     private var doneCount: Int { blocks.filter(\.done).count }
@@ -155,14 +200,14 @@ struct TodayView: View {
         .kFloatShadow()
         .padding(.trailing, 20)
         .padding(.bottom, 16)
-        .accessibilityLabel("Add activity")
+        .accessibilityLabel("New activity")
     }
 
     // MARK: Data
 
     private func load() async {
-        nowMin = KTime.nowMinutes(in: app.timezone)
-        let dateStr = KTime.dateString(zone: app.timezone)
+        nowMin = dayOffset == 0 ? KTime.nowMinutes(in: app.timezone) : -1
+        let dateStr = KTime.dateString(viewedDate, zone: app.timezone)
         date = dateStr
         do {
             let day = try await KairoAPI.shared.day(dateStr)
@@ -175,6 +220,16 @@ struct TodayView: View {
             loadError = (error as? APIError)?.errorDescription
         }
         loading = false
+    }
+
+    private func remove(_ block: DayBlock) async {
+        do {
+            try await KairoAPI.shared.deleteActivity(activityId: block.id, revision: block.revision)
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            await load()
+        } catch {
+            await load()
+        }
     }
 
     private func toggle(_ block: DayBlock) async {
@@ -221,6 +276,8 @@ struct TimelineCanvas: View {
     let blocks: [DayBlock]
     let nowMin: Int
     let onComplete: (DayBlock) -> Void
+    let onDelete: (DayBlock) -> Void
+    let onFocus: (DayBlock) -> Void
 
     private let ptPerMin: CGFloat = 1.7
 
@@ -270,7 +327,13 @@ struct TimelineCanvas: View {
 
             // Blocks
             ForEach(blocks) { block in
-                BlockCard(block: block, nowMin: nowMin, onComplete: { onComplete(block) })
+                BlockCard(
+                    block: block,
+                    nowMin: nowMin,
+                    onComplete: { onComplete(block) },
+                    onDelete: { onDelete(block) },
+                    onFocus: { onFocus(block) }
+                )
                     .frame(height: max(34, CGFloat(block.durationMin) * ptPerMin))
                     .padding(.leading, 52)
                     .offset(y: y(block.startMin))
@@ -286,6 +349,8 @@ struct BlockCard: View {
     let block: DayBlock
     let nowMin: Int
     let onComplete: () -> Void
+    let onDelete: () -> Void
+    let onFocus: () -> Void
 
     private var isPast: Bool { block.endMin <= nowMin && !block.done }
     private var isCurrent: Bool { block.startMin <= nowMin && nowMin < block.endMin && !block.done }
@@ -352,6 +417,18 @@ struct BlockCard: View {
         .saturation(isPast ? 0.5 : 1)
         .compositingGroup()
         .kCardShadow()
+        .contextMenu {
+            Button {
+                onFocus()
+            } label: {
+                Label("Focus on this", systemImage: "timer")
+            }
+            Button(role: .destructive) {
+                onDelete()
+            } label: {
+                Label("Delete activity", systemImage: "trash")
+            }
+        }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(block.title), \(KTime.hhmm(block.startMin)) to \(KTime.hhmm(block.endMin)), \(block.done ? "done" : "not done")")
     }

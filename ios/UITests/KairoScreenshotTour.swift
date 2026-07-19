@@ -15,11 +15,11 @@ final class KairoScreenshotTour: XCTestCase {
             password.typeText("kairo-qa-live-2026!")
             app.buttons["Sign in"].tap()
         }
-        XCTAssertTrue(app.buttons["Add activity"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["New activity"].waitForExistence(timeout: 20))
         sleep(2)
         snap(app, "01-today")
 
-        app.buttons["Add activity"].tap()
+        app.buttons["New activity"].tap()
         XCTAssertTrue(app.textFields["What are you doing?"].waitForExistence(timeout: 6))
         sleep(1)
         snap(app, "02-editor")
@@ -28,6 +28,10 @@ final class KairoScreenshotTour: XCTestCase {
         app.tabBars.buttons["Inbox"].tap()
         sleep(2)
         snap(app, "03-inbox")
+
+        app.tabBars.buttons["Week"].tap()
+        sleep(3)
+        snap(app, "06-week")
 
         app.tabBars.buttons["Focus"].tap()
         sleep(2)

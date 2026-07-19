@@ -23,7 +23,7 @@ final class KairoFlowUITests: XCTestCase {
         }
 
         // Today loads with the add FAB.
-        let fab = app.buttons["Add activity"]
+        let fab = app.buttons["New activity"]
         XCTAssertTrue(fab.waitForExistence(timeout: 20), "Today should show after sign-in")
 
         // Create an activity via the editor sheet.
@@ -45,9 +45,18 @@ final class KairoFlowUITests: XCTestCase {
         let undo = app.buttons["Mark iOS flight check incomplete"]
         XCTAssertTrue(undo.waitForExistence(timeout: 10), "block should flip to done")
 
+        // Clean up through the product itself: context menu → delete.
+        block.press(forDuration: 1.2)
+        let delete = app.buttons["Delete activity"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 6), "context menu should offer delete")
+        delete.tap()
+        XCTAssertTrue(block.waitForNonExistence(timeout: 10), "deleted block should leave the timeline")
+
         // Tabs all render.
         app.tabBars.buttons["Inbox"].tap()
         XCTAssertTrue(app.textFields["Get it out of your head…"].waitForExistence(timeout: 8), "Inbox composer should render")
+        app.tabBars.buttons["Week"].tap()
+        XCTAssertTrue(app.staticTexts["TODAY"].waitForExistence(timeout: 12), "Week should mark today")
         app.tabBars.buttons["Focus"].tap()
         XCTAssertTrue(app.buttons["Start focus"].waitForExistence(timeout: 8))
         app.tabBars.buttons["More"].tap()

@@ -10,6 +10,8 @@ struct FocusView: View {
     @State private var duration = 25
     @State private var loading = true
     @State private var finishedMin: Int?
+    @State private var pendingTitle = "Deep focus"
+    @State private var pendingEmoji = "🎯"
 
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private let resync = Timer.publish(every: 15, on: .main, in: .common).autoconnect()
@@ -43,6 +45,16 @@ struct FocusView: View {
             guard session?.state == "running" else { return }
             if remaining > 0 { remaining -= 1 } else { overtime += 1 }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .kairoStartFocus)) { note in
+            guard session == nil else { return }
+            if let title = note.userInfo?["title"] as? String { pendingTitle = title }
+            if let emoji = note.userInfo?["emoji"] as? String { pendingEmoji = emoji }
+            if let mins = note.userInfo?["duration"] as? Int {
+                duration = min(60, max(5, mins))
+                remaining = duration * 60
+            }
+            finishedMin = nil
+        }
         .onReceive(resync) { _ in
             guard session != nil else { return }
             Task { await hydrate(silent: true) }
@@ -55,11 +67,11 @@ struct FocusView: View {
         VStack(spacing: 26) {
             FocusRing(progress: 0, overtime: false) {
                 VStack(spacing: 6) {
-                    Text("🎯").font(.system(size: 40))
+                    Text(pendingEmoji).font(.system(size: 40))
                     Text(KTime.mmss(duration * 60))
                         .font(.kMono(44))
                         .foregroundStyle(Color.kInk)
-                    Text("ready when you are")
+                    Text(pendingTitle == "Deep focus" ? "ready when you are" : pendingTitle)
                         .font(.kBody(13))
                         .foregroundStyle(Color.kInkSoft)
                 }
@@ -210,7 +222,7 @@ struct FocusView: View {
 
     private func start() async {
         do {
-            let state = try await KairoAPI.shared.startFocus(minutes: duration, title: "Deep focus", emoji: "🎯")
+            let state = try await KairoAPI.shared.startFocus(minutes: duration, title: pendingTitle, emoji: pendingEmoji)
             session = state.session
             remaining = state.remainingSec ?? duration * 60
             overtime = 0
