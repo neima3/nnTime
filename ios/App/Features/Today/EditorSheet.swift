@@ -17,15 +17,23 @@ struct EditorSheet: View {
     @State private var repeats: Repeat = .none
     @State private var busy = false
     @State private var error: String?
+    @State private var steps: [(label: String, done: Bool)] = []
+    @State private var stepDraft = ""
 
-    init(date: String, startMin: Int, editing: DayBlock? = nil) {
+    /// Fired after a successful create (used by Inbox promotion).
+    var onCreated: (() -> Void)? = nil
+
+    init(date: String, startMin: Int, editing: DayBlock? = nil,
+         initialTitle: String = "", onCreated: (() -> Void)? = nil) {
         self.date = date
         self.editing = editing
+        self.onCreated = onCreated
         _startMin = State(initialValue: editing?.startMin ?? startMin)
-        _title = State(initialValue: editing?.title ?? "")
+        _title = State(initialValue: editing?.title ?? initialTitle)
         _emoji = State(initialValue: editing?.emoji ?? "📋")
         _durationMin = State(initialValue: editing?.durationMin ?? 45)
         if let cat = editing?.category { _category = State(initialValue: cat) }
+        _steps = State(initialValue: editing?.checklist ?? [])
     }
 
     enum Repeat: String, CaseIterable, Identifiable {
@@ -126,6 +134,42 @@ struct EditorSheet: View {
                                 }
                             }
                         }
+                        }
+
+                        section("Steps") {
+                            VStack(alignment: .leading, spacing: 8) {
+                                ForEach(steps.indices, id: \.self) { i in
+                                    Button {
+                                        steps[i].done.toggle()
+                                        if editing != nil { Task { await persistSteps() } }
+                                    } label: {
+                                        HStack(spacing: 8) {
+                                            Image(systemName: steps[i].done ? "checkmark.circle.fill" : "circle")
+                                                .foregroundStyle(steps[i].done ? Color.kSuccess : Color.kInkFaint)
+                                            Text(steps[i].label)
+                                                .font(.kBody(14, weight: .medium))
+                                                .strikethrough(steps[i].done)
+                                                .foregroundStyle(steps[i].done ? Color.kInkFaint : Color.kInk)
+                                            Spacer()
+                                        }
+                                    }
+                                }
+                                HStack(spacing: 8) {
+                                    TextField("Add a step…", text: $stepDraft)
+                                        .font(.kBody(14))
+                                        .onSubmit { addStep() }
+                                    Button {
+                                        addStep()
+                                    } label: {
+                                        Image(systemName: "plus")
+                                            .font(.system(size: 13, weight: .bold))
+                                            .foregroundStyle(Color.kIris)
+                                    }
+                                    .disabled(stepDraft.trimmingCharacters(in: .whitespaces).isEmpty)
+                                }
+                                .padding(.horizontal, 12).padding(.vertical, 9)
+                                .background(RoundedRectangle(cornerRadius: 12).fill(Color.kSurfaceSunken))
+                            }
                         }
 
                         if editing != nil {
@@ -234,6 +278,31 @@ struct EditorSheet: View {
         )
     }
 
+    private func addStep() {
+        let label = stepDraft.trimmingCharacters(in: .whitespaces)
+        guard !label.isEmpty else { return }
+        steps.append((label, false))
+        stepDraft = ""
+        if editing != nil { Task { await persistSteps() } }
+    }
+
+    /// Edit mode: step changes save immediately (occurrence override).
+    @State private var stepsRevision: Int?
+    private func persistSteps() async {
+        guard let editing else { return }
+        do {
+            let updated = try await KairoAPI.shared.setChecklist(
+                activityId: editing.id,
+                revision: stepsRevision ?? editing.revision,
+                occurrenceKey: editing.occurrenceKey,
+                checklist: steps.map { ["label": $0.label, "done": $0.done] }
+            )
+            stepsRevision = updated.revision
+        } catch {
+            self.error = (error as? APIError)?.errorDescription
+        }
+    }
+
     private func deleteEditing() async {
         guard let editing else { return }
         busy = true
@@ -280,9 +349,11 @@ struct EditorSheet: View {
                 emoji: emoji,
                 durationMin: durationMin,
                 rrule: repeats.rrule,
-                categoryId: categoryId
+                categoryId: categoryId,
+                checklist: steps.isEmpty ? nil : steps.map { ["label": $0.label, "done": false] }
             )
             UINotificationFeedbackGenerator().notificationOccurred(.success)
+            onCreated?()
             dismiss()
         } catch let apiError as APIError {
             error = apiError.errorDescription

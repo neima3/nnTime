@@ -19,11 +19,20 @@ targets:
       - path: App
         excludes:
           - "Info.plist"
+      - path: Shared
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: me.neima.kairo
         INFOPLIST_FILE: App/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    entitlements:
+      path: App/Kairo.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.me.neima.kairo
+    dependencies:
+      - target: KairoWidget
+        embed: true
         TARGETED_DEVICE_FAMILY: "1"
         ENABLE_PREVIEWS: "YES"
   KairoUITests:
@@ -37,6 +46,24 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: me.neima.kairo.uitests
         TEST_TARGET_NAME: Kairo
+  KairoWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Widget
+        excludes:
+          - "Info.plist"
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: me.neima.kairo.widgets
+        INFOPLIST_FILE: Widget/Info.plist
+        SKIP_INSTALL: "YES"
+    entitlements:
+      path: Widget/KairoWidget.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.me.neima.kairo
 schemes:
   Kairo:
     build:

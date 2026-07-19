@@ -1,5 +1,26 @@
 # Progress log
 
+## 2026-07-19 — iOS round 4: checklists, inbox promotion, Next-up widget (Fable)
+
+- **Checklist steps everywhere:** timeline blocks show up to 3 step lines
+  when tall enough (+ "n/m steps" in the meta line); the editor gets a
+  Steps section — tickable circles that persist immediately in edit mode
+  (checklistOverride PATCH with revision chaining), add-step field, and
+  new activities can be created with a checklist template.
+- **Inbox → schedule:** swipe an inbox thought right → editor sheet opens
+  prefilled at the next quarter-hour+30; saving creates the activity and
+  clears the task (onCreated hook).
+- **"Next up" widget** (WidgetKit, small — per ios-adaptation §3): app
+  writes a day snapshot to a shared cache on every Today load and reloads
+  widget timelines; the provider re-renders at every block boundary with
+  no network — NOW dot for current, category-fill card, honest empty
+  state ("Nothing planned — add something kind."). Cache write verified
+  in the simulator container. Caveat (documented in ios/README): without
+  signing, simulator processes use fallback containers, so live widget
+  data needs the app-group entitlement active (files committed, wired in
+  project.yml).
+- Full XCUITest suite green against production after every step.
+
 ## 2026-07-19 — iOS round 3: edit, drag-to-reschedule, cleaner gestures (Fable)
 
 - **Tap to edit:** tapping a block opens the editor sheet prefilled

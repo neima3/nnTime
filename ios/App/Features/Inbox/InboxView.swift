@@ -6,6 +6,7 @@ struct InboxView: View {
     @State private var items: [TaskItem] = []
     @State private var draft = ""
     @State private var loading = true
+    @State private var scheduling: TaskItem?
     @FocusState private var composing: Bool
 
     var body: some View {
@@ -40,6 +41,14 @@ struct InboxView: View {
                                     .listRowBackground(Color.clear)
                                     .listRowSeparator(.hidden)
                                     .listRowInsets(EdgeInsets(top: 5, leading: 20, bottom: 5, trailing: 20))
+                                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                                        Button {
+                                            scheduling = item
+                                        } label: {
+                                            Label("Schedule", systemImage: "calendar.badge.plus")
+                                        }
+                                        .tint(.kIris)
+                                    }
                             }
                             .onDelete { indexSet in
                                 Task { await delete(indexSet) }
@@ -60,6 +69,19 @@ struct InboxView: View {
                 }
             }
             .toolbarBackground(Color.kCanvas, for: .navigationBar)
+            .sheet(item: $scheduling) { item in
+                EditorSheet(
+                    date: KTime.dateString(zone: .current),
+                    startMin: nextQuarterHour(),
+                    initialTitle: item.title,
+                    onCreated: {
+                        Task {
+                            try? await KairoAPI.shared.deleteTask(id: item.id, revision: item.revision)
+                            await load()
+                        }
+                    }
+                )
+            }
         }
         .task { await load() }
     }
@@ -115,6 +137,12 @@ struct InboxView: View {
     private func ageDays(_ item: TaskItem) -> Int? {
         guard let created = item.createdAt else { return nil }
         return Calendar.current.dateComponents([.day], from: created, to: Date()).day
+    }
+
+    private func nextQuarterHour() -> Int {
+        let now = Calendar.current.dateComponents([.hour, .minute], from: Date())
+        let minutes = (now.hour ?? 9) * 60 + (now.minute ?? 0) + 30
+        return min(23 * 60, ((minutes + 14) / 15) * 15)
     }
 
     private func load() async {

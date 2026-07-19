@@ -36,5 +36,9 @@ per-screen attachments for design review.
 ## Ship checklist (needs Neima's Apple account)
 - Set a development team + enable signing in project.yml
 - Product → Archive → TestFlight
-- Next phases per ios-adaptation.md: widgets (8A), Live Activity focus
-  timer, drag-to-reschedule on the timeline, VoiceOver rotor pass
+- App-group note: the "Next up" widget reads a shared day cache; on the
+  unsigned simulator each process falls back to its own container, so the
+  widget shows real data only once signing + the group.me.neima.kairo
+  entitlement are active (files already in place)
+- Next phases per ios-adaptation.md: medium/large widgets, Live Activity
+  focus timer, VoiceOver rotor pass

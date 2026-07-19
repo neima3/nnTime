@@ -1,4 +1,5 @@
 import SwiftUI
+import WidgetKit
 
 // MARK: - Today: proportional timeline (1 min = 1.7 pt), now-line, gentle header
 
@@ -249,6 +250,18 @@ struct TodayView: View {
                 .map { $0.block(in: zone, category: app.category(for: $0.categoryId)) }
                 .sorted { $0.startMin < $1.startMin }
             loadError = nil
+            if dayOffset == 0 {
+                DayCache.write(
+                    date: day.date,
+                    zone: day.zone,
+                    blocks: blocks.map {
+                        CachedBlock(title: $0.title, emoji: $0.emoji, startMin: $0.startMin,
+                                    durationMin: $0.durationMin, done: $0.done,
+                                    category: $0.category.rawValue)
+                    }
+                )
+                WidgetCenter.shared.reloadAllTimelines()
+            }
         } catch {
             loadError = (error as? APIError)?.errorDescription
         }
@@ -416,6 +429,18 @@ struct BlockCard: View {
     private var isCurrent: Bool { block.startMin <= nowMin && nowMin < block.endMin && !block.done }
     private var compact: Bool { CGFloat(block.durationMin) * 1.7 < 66 }
 
+    /// Checklist lines only when the block is tall enough to hold them.
+    private var stepRows: Int {
+        guard !compact, !block.checklist.isEmpty else { return 0 }
+        let h = CGFloat(block.durationMin) * 1.7
+        return max(0, min(3, Int((h - 64) / 16)))
+    }
+
+    private var stepsSuffix: String {
+        guard !block.checklist.isEmpty else { return "" }
+        return " · \(block.checklist.filter(\.done).count)/\(block.checklist.count) steps"
+    }
+
     var body: some View {
         HStack(spacing: 10) {
             Text(block.emoji)
@@ -432,11 +457,23 @@ struct BlockCard: View {
                     if block.recurring {
                         Image(systemName: "repeat").font(.system(size: 9, weight: .bold))
                     }
-                    Text("\(KTime.hhmm(block.startMin)) – \(KTime.hhmm(block.endMin)) · \(KTime.duration(block.durationMin))")
+                    Text("\(KTime.hhmm(block.startMin)) – \(KTime.hhmm(block.endMin)) · \(KTime.duration(block.durationMin))\(stepsSuffix)")
                         .font(.kMono(11, weight: .medium))
                 }
                 .opacity(0.7)
                 .lineLimit(1)
+                if stepRows > 0 {
+                    VStack(alignment: .leading, spacing: 1) {
+                        ForEach(Array(block.checklist.prefix(stepRows)).indices, id: \.self) { i in
+                            let step = block.checklist[i]
+                            Text("\(step.done ? "✓" : "○") \(step.label)")
+                                .font(.kBody(11, weight: .medium))
+                                .strikethrough(step.done)
+                                .opacity(0.65)
+                                .lineLimit(1)
+                        }
+                    }
+                }
             }
             .foregroundStyle(block.category.ink)
 

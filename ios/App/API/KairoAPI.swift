@@ -146,12 +146,14 @@ actor KairoAPI {
 
     func createActivity(
         tz: String, dtstartLocal: String, title: String, emoji: String,
-        durationMin: Int, rrule: String?, categoryId: String?
+        durationMin: Int, rrule: String?, categoryId: String?,
+        checklist: [[String: Any]]? = nil
     ) async throws -> Activity {
         try await request("POST", "/api/v1/activities", body: [
             "tz": tz, "dtstartLocal": dtstartLocal, "title": title,
             "emoji": emoji, "durationMin": durationMin, "rrule": rrule,
             "categoryId": categoryId, "source": "manual",
+            "checklistTemplate": checklist,
         ], as: Activity.self)
     }
 
@@ -179,6 +181,17 @@ actor KairoAPI {
     ) async throws -> Activity {
         try await request("PATCH", "/api/v1/activities/\(activityId)", body: [
             "editScope": "this", "occurrenceKey": occurrenceKey, "startAt": startAt,
+        ], ifMatch: revision, as: Activity.self)
+    }
+
+    /// Persist a checklist state for one occurrence.
+    func setChecklist(
+        activityId: String, revision: Int, occurrenceKey: String?,
+        checklist: [[String: Any]]
+    ) async throws -> Activity {
+        try await request("PATCH", "/api/v1/activities/\(activityId)", body: [
+            "editScope": "this", "occurrenceKey": occurrenceKey,
+            "checklistOverride": checklist,
         ], ifMatch: revision, as: Activity.self)
     }
 
