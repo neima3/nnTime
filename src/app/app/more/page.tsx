@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  Gamepad2,
   BarChart3,
   ChevronRight,
   LayoutTemplate,
@@ -15,6 +16,7 @@ import { AppShell } from "@/components/AppShell";
 const items = [
   { href: "/app/routines", label: "Routines", hint: "Your repeatable sequences", icon: Repeat, tint: "bg-cat-lilac text-cat-lilac-ink" },
   { href: "/app/templates", label: "Templates", hint: "Ready-made routines by Kairo", icon: LayoutTemplate, tint: "bg-cat-butter text-cat-butter-ink" },
+  { href: "/app/play", label: "Play", hint: "Brain breaks — quick games between things", icon: Gamepad2, tint: "bg-cat-rose text-cat-rose-ink" },
   { href: "/app/stats", label: "Stats", hint: "Your week in a gentle mirror", icon: BarChart3, tint: "bg-cat-mint text-cat-mint-ink" },
   { href: "/app/planner", label: "AI co-planner", hint: "Break down, plan, re-plan", icon: Sparkles, tint: "bg-iris-soft text-iris" },
   { href: "/app/review", label: "Review today", hint: "Let go, move, or complete leftovers", icon: Sparkles, tint: "bg-cat-peach text-cat-peach-ink" },

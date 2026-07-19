@@ -1,5 +1,46 @@
 # Progress log
 
+## 2026-07-19 — 10× ADHD wave 3: Brain breaks arcade (Fable)
+
+**Plan:** `docs/plans/2026-07-19-10x-adhd-wave3-roadmap.md` (all ticked).
+**Research:** `docs/research/adhd-brain-games-2026.md` (subagent): time-
+reproduction deficits are among ADHD's most replicated findings (5–60 s
+tasks) → Time Feel is legitimate + on-brand; personal-best framing, hard
+session caps, contextual offering; Lumosity's FTC fine = the overclaim
+cautionary tale (hence the "Honesty corner" copy).
+
+**Shipped:**
+1. **/app/play arcade** (`PlayClient` + `games/GameShell`): four pastel game
+   cards with localStorage bests, honesty-corner footer ("breaks, not brain
+   training"). Nav: sidebar Play item, More tile, `g` shortcut.
+2. **Time Feel** — signature game: reproduce 5/8/12/20 s without a clock;
+   kind per-round feedback ("felt shorter — a fast-running brain"), score
+   100−mean|error|%, ties back to the product ("your timeline does the
+   feeling for you").
+3. **Quick Tap** — 5 reaction rounds, early-tap forgiveness, avg ms best,
+   space-bar playable.
+4. **Emoji Match** — 8 category-emoji pairs, fewest-moves best, scripted
+   full-solve E2E verified (8-move perfect game → "New personal best").
+5. **Steady Breath** — box breathing 4-4-4-4, 1 or 2 min, expanding square
+   (static under reduced motion/stim), cycle counter, zero grading.
+6. **Integration:** focus break + break-over states link "play a brain
+   break →"; Stats gets a client-only "Brain breaks" bests card.
+7. **Delight:** DayDoneRain — first all-done moment of a day fires a 6-burst
+   particle cascade (once per date, reduced-motion safe). Existing branded
+   404 kept (already good).
+8. **Tests:** `src/lib/games.ts` pure logic + `games.test.ts` (24 tests,
+   subagent) — scoring, deck validity, delay bounds, localStorage bests.
+
+**Verified in browser:** hub, Time Feel round ("5.2s — spot on"), Quick Tap
+round (1085 ms), match grid + scripted win, breath cycle running; light
+mode; nav + shortcut. **Gates:** lint 0/0, typecheck, **196 tests** (21
+files), build — green.
+
+**Residuals:** games are this-device only by design (no server surface);
+dark-mode game screenshots not captured individually (all token-based);
+dev server on this machine keeps getting reaped between commands — restart
+with nohup + health check before browser QA.
+
 ## 2026-07-19 — 10× ADHD wave 2: all 10 phases shipped (Fable)
 
 **Plan:** `docs/plans/2026-07-19-10x-adhd-wave2-roadmap.md` (all ticked).

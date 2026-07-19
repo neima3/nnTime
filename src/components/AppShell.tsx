@@ -6,6 +6,7 @@ import {
   BarChart3,
   CalendarDays,
   CalendarRange,
+  Gamepad2,
   Inbox,
   LayoutGrid,
   Repeat,
@@ -27,6 +28,7 @@ const sidebarNav = [
   { href: "/app/week", label: "Week", key: "week", icon: CalendarRange },
   { href: "/app/focus", label: "Focus", key: "focus", icon: Timer },
   { href: "/app/routines", label: "Routines", key: "routines", icon: Repeat },
+  { href: "/app/play", label: "Play", key: "play", icon: Gamepad2 },
   { href: "/app/stats", label: "Stats", key: "stats", icon: BarChart3 },
   { href: "/app/settings", label: "Settings", key: "settings", icon: Settings },
 ];
@@ -40,7 +42,7 @@ const mobileNav = [
   { href: "/app/more", label: "More", key: "more", icon: LayoutGrid },
 ];
 
-const moreKeys = new Set(["routines", "stats", "settings", "templates", "more"]);
+const moreKeys = new Set(["routines", "stats", "settings", "templates", "more", "play"]);
 
 export function AppShell({
   active,
@@ -55,7 +57,7 @@ export function AppShell({
       const target = e.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable || target.tagName === "SELECT") return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const routes: Record<string, string> = { n: "/app/editor", t: "/app/today", i: "/app/inbox", w: "/app/week", f: "/app/focus", s: "/app/settings" };
+      const routes: Record<string, string> = { n: "/app/editor", t: "/app/today", i: "/app/inbox", w: "/app/week", f: "/app/focus", s: "/app/settings", g: "/app/play" };
       const route = routes[e.key.toLowerCase()];
       if (route) { e.preventDefault(); window.location.href = route; }
     }

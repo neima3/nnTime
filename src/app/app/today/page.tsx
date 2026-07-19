@@ -27,6 +27,7 @@ import { TimezoneNudge } from "@/components/TimezoneNudge";
 import { PickForMe, type PickCandidate } from "@/components/PickForMe";
 import { DayRituals } from "@/components/DayRituals";
 import { LowBatteryNote, LowBatteryToggle } from "@/components/LowBattery";
+import { DayDoneRain } from "@/components/DayDoneRain";
 import { SoftStreaks } from "@/components/SoftStreaks";
 import { AmbientSounds } from "@/components/AmbientSounds";
 import { AnytimeRail } from "@/components/AnytimeRail";
@@ -398,6 +399,8 @@ export default async function TodayPage({
           {authed &&
             activities.length > 0 &&
             activities.every((a) => a.done) && (
+              <>
+              <DayDoneRain date={date} />
               <div className="mb-5 flex items-center gap-3 rounded-2xl border border-success/30 bg-success-soft px-4 py-3.5">
                 <span className="text-xl" aria-hidden>
                   🎉
@@ -411,6 +414,7 @@ export default async function TodayPage({
                   </p>
                 </div>
               </div>
+              </>
             )}
 
           {emptyDay ? (

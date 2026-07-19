@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/AppShell";
 import { StatsClient } from "@/components/StatsClient";
+import { BrainBreaksCard } from "@/components/BrainBreaksCard";
 
 export default function StatsPage() {
   return (
@@ -14,6 +15,9 @@ export default function StatsPage() {
           </p>
         </header>
         <StatsClient />
+        <div className="mt-4">
+          <BrainBreaksCard />
+        </div>
       </div>
     </AppShell>
   );

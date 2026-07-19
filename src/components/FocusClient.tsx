@@ -338,6 +338,12 @@ export function FocusClient({
           >
             I&apos;m ready now
           </button>
+          <a
+            href="/app/play"
+            className="mt-3 text-[13px] font-semibold text-iris hover:underline"
+          >
+            or play a brain break →
+          </a>
         </div>
       );
     }
@@ -376,6 +382,12 @@ export function FocusClient({
             className="rounded-2xl py-3 text-center text-[14px] font-semibold text-ink-soft hover:bg-surface-sunken"
           >
             Back to Today
+          </a>
+          <a
+            href="/app/play"
+            className="rounded-2xl py-2 text-center text-[13px] font-semibold text-iris hover:underline"
+          >
+            or a quick brain break →
           </a>
         </div>
       </div>
