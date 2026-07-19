@@ -20,6 +20,7 @@ import {
 import { clientToday } from "@/lib/client-date";
 import { dateToMinutesFromMidnight } from "@/lib/adapters";
 import { fmt } from "@/lib/mock";
+import { getSettingsCached } from "@/lib/settings-cache";
 import { toast } from "./Toast";
 
 interface DayActivity {
@@ -141,18 +142,10 @@ export function NowProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/v1/settings")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((s) => {
-        if (cancelled || !s) return;
-        setWarningsEnabled(
-          Boolean(
-            (s.notificationPrefs as Record<string, unknown> | null)
-              ?.transitionWarnings,
-          ),
-        );
-      })
-      .catch(() => {});
+    getSettingsCached().then((s) => {
+      if (cancelled || !s) return;
+      setWarningsEnabled(Boolean(s.notificationPrefs?.transitionWarnings));
+    });
     const onToggle = (e: Event) => {
       setWarningsEnabled(
         Boolean((e as CustomEvent<{ enabled: boolean }>).detail?.enabled),

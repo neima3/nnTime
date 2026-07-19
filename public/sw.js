@@ -11,7 +11,7 @@
  * This is a minimal SW; the full ADR-002 offline mutation queue lands with 6B's
  * complete enablement.
  */
-const CACHE_VERSION = "kairo-v3-wave4";
+const CACHE_VERSION = "kairo-v3-wave2adhd";
 const APP_SHELL = ["/", "/app/today", "/manifest.json", "/icon-192.png"];
 
 self.addEventListener("install", (event) => {
@@ -32,8 +32,11 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
-  // Never intercept auth or API data requests.
-  if (url.pathname.startsWith("/api/")) return;
+  // API/auth data: always network-first, never served from the SW cache.
+  if (url.pathname.startsWith("/api/")) {
+    event.respondWith(fetch(event.request, { cache: "no-store" }));
+    return;
+  }
 
   // Network-first for navigation requests (fresh HTML).
   if (event.request.mode === "navigate") {

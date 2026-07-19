@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Globe, Loader2 } from "lucide-react";
 import { detectTimezone } from "@/lib/timezone";
+import { getSettingsCached, invalidateSettingsCache } from "@/lib/settings-cache";
 import { notifyDayChanged } from "./NowBar";
 
 const DISMISS_KEY = "kairo-tz-nudge-dismissed";
@@ -43,9 +44,7 @@ export function TimezoneNudge({ zone }: { zone: string }) {
   const apply = async () => {
     setPending(true);
     try {
-      const current = await fetch("/api/v1/settings").then((r) =>
-        r.ok ? r.json() : null,
-      );
+      const current = await getSettingsCached();
       if (!current) {
         setPending(false);
         return;
@@ -59,6 +58,7 @@ export function TimezoneNudge({ zone }: { zone: string }) {
         body: JSON.stringify({ timezone: browserZone }),
       });
       if (res.ok) {
+        invalidateSettingsCache();
         setHidden(true);
         // The NowBar caches the day in the old zone — tell it to refetch.
         notifyDayChanged();

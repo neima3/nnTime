@@ -12,6 +12,7 @@ import type { Activity } from "@/lib/mock";
 import { localMinutesToInstant } from "@/lib/adapters";
 import { toast } from "./Toast";
 import { notifyDayChanged } from "./NowBar";
+import { useLowBattery } from "./LowBattery";
 
 interface TodayTimelineProps {
   activities: Activity[];
@@ -32,6 +33,7 @@ export function TodayTimeline({
   authed,
 }: TodayTimelineProps) {
   const router = useRouter();
+  const lowBattery = useLowBattery(date);
 
   const handleUpdateActivity = useCallback(
     async (id: string, start: number, duration: number): Promise<{ ok: boolean }> => {
@@ -213,6 +215,7 @@ export function TodayTimeline({
   return (
     <TimelineCanvas
       activities={activities}
+      lowBattery={lowBattery}
       nowMin={nowMin}
       showNowLine={isToday}
       zone={zone}

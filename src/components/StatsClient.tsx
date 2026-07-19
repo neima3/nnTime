@@ -12,6 +12,11 @@ type EstimateCalibration = {
   ratio: number;
 };
 
+type FocusHours = {
+  hours: number[];
+  peakHour: number;
+};
+
 type Stats = {
   byDate: Record<string, { completed: number; focusMin: number; mood: string | null }>;
   streak: { current: number; best: number };
@@ -19,6 +24,7 @@ type Stats = {
   totalFocusMin: number;
   days: number;
   estimate: EstimateCalibration | null;
+  focusHours: FocusHours | null;
 };
 
 const MOODS = [
@@ -185,6 +191,33 @@ export function StatsClient() {
                 skill. Keep it.
               </>
             )}
+          </p>
+        </Card>
+      )}
+
+      {stats.focusHours && (
+        <Card title="Your focus hours" hint="Focus sessions by time of day · last 30 days" wide>
+          <div className="grid grid-cols-[repeat(24,minmax(0,1fr))] gap-[2px]">
+            {stats.focusHours.hours.map((count, hour) => {
+              const max = Math.max(1, ...stats.focusHours!.hours);
+              const intensity = count > 0 ? 0.18 + (count / max) * 0.82 : 0.08;
+              return (
+                <div
+                  key={hour}
+                  className="h-5 rounded-sm bg-iris"
+                  style={{ opacity: intensity }}
+                  title={`${hour}:00 — ${count} session${count === 1 ? "" : "s"}`}
+                />
+              );
+            })}
+          </div>
+          <div className="relative mt-1 h-3.5 text-[10px] font-semibold text-ink-faint">
+            <span className="absolute left-1/4 -translate-x-1/2">6a</span>
+            <span className="absolute left-1/2 -translate-x-1/2">12p</span>
+            <span className="absolute left-3/4 -translate-x-1/2">6p</span>
+          </div>
+          <p className="mt-2 text-[13px] text-ink-soft">
+            Focus lands most often around {stats.focusHours.peakHour}:00.
           </p>
         </Card>
       )}

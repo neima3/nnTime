@@ -197,8 +197,158 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* the five ADHD problems Kairo actually attacks */}
+      <section className="border-y border-border bg-surface">
+        <div className="mx-auto w-full max-w-6xl px-5 py-20">
+          <p className="text-[13px] font-bold uppercase tracking-[0.14em] text-iris">
+            Built for ADHD brains — honestly
+          </p>
+          <h2 className="mt-3 max-w-2xl font-display text-3xl font-bold tracking-tight md:text-4xl">
+            Planners fail ADHD in five specific ways. Kairo has an answer for
+            each one.
+          </h2>
+          <div className="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <article className="rounded-3xl border border-border bg-canvas p-6">
+              <p className="text-[12px] font-bold uppercase tracking-wide text-ink-faint">
+                Time blindness
+              </p>
+              <h3 className="mt-1.5 font-display text-lg font-bold">
+                &ldquo;Now&rdquo; follows you everywhere
+              </h3>
+              <div className="mt-4 rounded-2xl border border-now/30 bg-surface p-3.5 shadow-card">
+                <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-now">
+                  <span className="size-2 rounded-full bg-now" aria-hidden /> Now
+                </p>
+                <p className="mt-1 text-[14px] font-semibold">🎨 Deep work</p>
+                <p className="tnum text-[12px] font-medium text-ink-soft">23 min left</p>
+              </div>
+              <p className="mt-4 text-[13.5px] leading-relaxed text-ink-soft">
+                A live now-line on the timeline, a countdown card on every
+                screen, and the time left in your browser tab. You can&apos;t
+                lose the thread of the day.
+              </p>
+            </article>
+
+            <article className="rounded-3xl border border-border bg-canvas p-6">
+              <p className="text-[12px] font-bold uppercase tracking-wide text-ink-faint">
+                Task paralysis
+              </p>
+              <h3 className="mt-1.5 font-display text-lg font-bold">
+                One button decides for you
+              </h3>
+              <div className="mt-4 rounded-2xl border border-border bg-surface p-3.5 text-center shadow-card">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-iris">
+                  Just this — nothing else
+                </p>
+                <p className="mt-1.5 text-[14px] font-semibold">🦷 Call the dentist</p>
+                <span className="mt-2 inline-block rounded-lg bg-iris px-2.5 py-1 text-[11px] font-bold text-ink-inverse">
+                  Start 25 min on this
+                </span>
+              </div>
+              <p className="mt-4 text-[13.5px] leading-relaxed text-ink-soft">
+                &ldquo;Pick for me&rdquo; chooses exactly one thing — what&apos;s
+                on now, what slipped, or one loose end — so starting stops being
+                a decision.
+              </p>
+            </article>
+
+            <article className="rounded-3xl border border-border bg-canvas p-6">
+              <p className="text-[12px] font-bold uppercase tracking-wide text-ink-faint">
+                Hyperfocus
+              </p>
+              <h3 className="mt-1.5 font-display text-lg font-bold">
+                A soft landing, not a jolt
+              </h3>
+              <div className="mt-4 rounded-2xl border border-cat-butter-ink/25 bg-cat-butter p-3.5 shadow-card">
+                <p className="text-[13px] font-semibold text-cat-butter-ink">
+                  12 min past your target. Good stopping point?
+                </p>
+                <div className="mt-2 flex gap-1.5">
+                  <span className="rounded-lg bg-cat-butter-ink px-2 py-0.5 text-[11px] font-bold text-cat-butter">
+                    Wrap up
+                  </span>
+                  <span className="rounded-lg px-2 py-0.5 text-[11px] font-bold text-cat-butter-ink">
+                    +5 more
+                  </span>
+                </div>
+              </div>
+              <p className="mt-4 text-[13.5px] leading-relaxed text-ink-soft">
+                The focus timer counts overtime up instead of going silent,
+                nudges transitions 5 minutes early, and always offers a break.
+              </p>
+            </article>
+
+            <article className="rounded-3xl border border-border bg-canvas p-6">
+              <p className="text-[12px] font-bold uppercase tracking-wide text-ink-faint">
+                Working memory
+              </p>
+              <h3 className="mt-1.5 font-display text-lg font-bold">
+                Out of your head in 3 seconds
+              </h3>
+              <div className="mt-4 flex items-center gap-2 rounded-2xl border border-border bg-surface p-2.5 shadow-card">
+                <span className="flex-1 rounded-xl bg-surface-sunken px-3 py-2 text-[13px] text-ink-faint">
+                  tuesday 3pm dentist…
+                </span>
+                <span className="rounded-xl bg-iris px-2.5 py-2 text-[11px] font-bold text-ink-inverse">
+                  Save
+                </span>
+              </div>
+              <p className="mt-4 text-[13.5px] leading-relaxed text-ink-soft">
+                Press <kbd className="rounded bg-surface-sunken px-1 font-mono text-[12px]">C</kbd>{" "}
+                anywhere — type or dictate — and it&apos;s captured. AI can read
+                &ldquo;tuesday 3pm&rdquo; and offer to schedule it for you.
+              </p>
+            </article>
+
+            <article className="rounded-3xl border border-border bg-canvas p-6">
+              <p className="text-[12px] font-bold uppercase tracking-wide text-ink-faint">
+                Overwhelm
+              </p>
+              <h3 className="mt-1.5 font-display text-lg font-bold">
+                One thing at a time, literally
+              </h3>
+              <div className="mt-4 rounded-2xl border border-border bg-surface p-4 text-center shadow-card">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-now">
+                  This is the only thing
+                </p>
+                <p className="mt-1.5 text-[15px] font-bold">🧘 Stretch break</p>
+                <p className="tnum text-[11.5px] font-medium text-ink-soft">
+                  17 min left — no rush
+                </p>
+              </div>
+              <p className="mt-4 text-[13.5px] leading-relaxed text-ink-soft">
+                One-thing mode blanks everything but the current activity. A
+                day-load meter warns <em>before</em> you overplan, not after.
+              </p>
+            </article>
+
+            <article className="rounded-3xl border border-border bg-canvas p-6">
+              <p className="text-[12px] font-bold uppercase tracking-wide text-ink-faint">
+                Shame spirals
+              </p>
+              <h3 className="mt-1.5 font-display text-lg font-bold">
+                Nothing here ever turns red
+              </h3>
+              <div className="mt-4 rounded-2xl border border-success/30 bg-success-soft p-3.5 shadow-card">
+                <p className="text-[13px] font-bold text-success">
+                  3 things didn&apos;t happen. Totally fine.
+                </p>
+                <p className="text-[12px] font-medium text-ink-soft">
+                  Move them, keep them, or let them go.
+                </p>
+              </div>
+              <p className="mt-4 text-[13.5px] leading-relaxed text-ink-soft">
+                No overdue red, no broken-streak guilt — a 1-day grace streak
+                and an end-of-day review that treats unfinished plans as
+                information, not failure.
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
       {/* features */}
-      <section className="mx-auto w-full max-w-6xl px-5 pb-24">
+      <section className="mx-auto w-full max-w-6xl px-5 pb-24 pt-20">
         <h2 className="font-display text-3xl font-bold tracking-tight md:text-4xl">
           Everything a day needs.
           <br />
@@ -227,7 +377,7 @@ export default function LandingPage() {
       <footer className="border-t border-border bg-surface">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-8 text-sm text-ink-soft">
           <p className="font-semibold">Kairo — a nnTime project</p>
-          <p>Design preview · features in development</p>
+          <p>Made with care for ADHD brains. No shame mechanics, ever.</p>
         </div>
       </footer>
     </div>

@@ -13,6 +13,7 @@ import {
   Palette,
   User,
 } from "lucide-react";
+import { invalidateSettingsCache } from "@/lib/settings-cache";
 import { SignedOutCard, SkeletonRows } from "./EmptyState";
 
 type Settings = {
@@ -182,6 +183,7 @@ export function SettingsClient() {
         setStatus("Could not save settings.");
         return;
       }
+      invalidateSettingsCache();
       const next = await res.json();
       const s: Settings = {
         timezone: next.timezone,

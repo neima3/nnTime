@@ -8,7 +8,7 @@
  * disappears. Open with `o` from anywhere in the app or the ⛶ button on the
  * Now card; Esc or ✕ closes. Focus's calmer sibling — no timer mechanics.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Timer, X } from "lucide-react";
 import { useNowInfo } from "./NowBar";
@@ -24,6 +24,11 @@ export function openOneThing() {
 export function OneThing() {
   const [open, setOpen] = useState(false);
   const info = useNowInfo();
+  const primaryRef = useRef<HTMLAnchorElement>(null);
+
+  useEffect(() => {
+    if (open) primaryRef.current?.focus();
+  }, [open]);
 
   useEffect(() => {
     const onOpen = () => setOpen(true);
@@ -100,6 +105,7 @@ export function OneThing() {
           )}
           <div className="mt-10 flex items-center gap-3">
             <Link
+              ref={primaryRef}
               href={`/app/focus?${new URLSearchParams({
                 title: subject.title,
                 emoji: subject.emoji,
@@ -107,7 +113,7 @@ export function OneThing() {
                   Math.min(60, Math.max(5, subject.endMin - subject.startMin)),
                 ),
               })}`}
-              className="inline-flex items-center gap-2 rounded-2xl bg-iris px-6 py-3 text-[15px] font-semibold text-ink-inverse shadow-card transition-colors hover:bg-iris-deep focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+              className="inline-flex items-center gap-2 rounded-2xl bg-iris px-6 py-3 text-[15px] font-semibold text-ink-inverse shadow-card transition-all hover:bg-iris-deep focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none active:scale-[0.98]"
               onClick={() => setOpen(false)}
             >
               <Timer size={17} />

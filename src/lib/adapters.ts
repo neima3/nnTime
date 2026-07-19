@@ -80,6 +80,7 @@ export function seriesToActivity(
       opts.occurrenceKey ?? series.dtstartLocal.toISOString(),
     notes: series.notes ?? undefined,
     priority: series.priority,
+    recurring: Boolean(series.rrule),
   };
 }
 
@@ -89,7 +90,7 @@ export function dateToMinutesFromMidnight(date: Date, zone: string): number {
     timeZone: zone,
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,
+    hourCycle: "h23",
   });
   const parts = dtf.formatToParts(date);
   const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
@@ -122,7 +123,7 @@ export function localMinutesToInstant(
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
-      hour12: false,
+      hourCycle: "h23",
     }).formatToParts(guess);
     const get = (t: string) =>
       Number(parts.find((p) => p.type === t)?.value ?? "0");

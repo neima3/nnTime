@@ -9,8 +9,22 @@
  * chain-dumping. Voice uses the Web Speech API where the browser has it.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, Mic, MicOff, PenLine, X } from "lucide-react";
+import { Loader2, Mic, MicOff, PenLine, Sparkles, X } from "lucide-react";
 import { toast } from "./Toast";
+import { notifyDayChanged } from "./NowBar";
+import { localMinutesToInstant } from "@/lib/adapters";
+import { clientToday } from "@/lib/client-date";
+import { fmt } from "@/lib/mock";
+
+/** AI-parsed draft (SEC-05: suggestion only — nothing saves until accepted). */
+interface Proposal {
+  title: string;
+  emoji?: string;
+  durationMin?: number;
+  energy?: "low" | "medium" | "high";
+  date?: string;
+  startMin?: number;
+}
 
 interface SpeechRecognitionLike {
   lang: string;
@@ -44,9 +58,26 @@ export function QuickCapture() {
   const [saving, setSaving] = useState(false);
   const [captured, setCaptured] = useState(0);
   const [listening, setListening] = useState(false);
+  const [aiOk, setAiOk] = useState(false);
+  const [parsing, setParsing] = useState(false);
+  const [proposal, setProposal] = useState<Proposal | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const voiceSupported = getSpeechRecognition() != null;
+
+  // Probe AI availability once per mount (drives the Magic add button only).
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/health")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((h) => {
+        if (!cancelled && h?.checks?.ai === "ok") setAiOk(true);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // `c` opens capture from anywhere (outside inputs).
   useEffect(() => {
@@ -84,7 +115,90 @@ export function QuickCapture() {
     setOpen(false);
     setText("");
     setCaptured(0);
+    setProposal(null);
+    setParsing(false);
   }, [stopListening]);
+
+  /** "Magic add": parse the text; render a confirm chip. Never auto-saves. */
+  const magicParse = useCallback(async () => {
+    const input = text.trim();
+    if (!input || parsing) return;
+    setParsing(true);
+    setProposal(null);
+    try {
+      const res = await fetch("/api/v1/ai/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input }),
+      });
+      if (!res.ok) {
+        toast("Magic add is resting — captured as plain text instead");
+        setParsing(false);
+        return;
+      }
+      const draft = (await res.json()) as Proposal;
+      setProposal(draft);
+    } catch {
+      toast("Magic add is resting — captured as plain text instead");
+    }
+    setParsing(false);
+  }, [text, parsing]);
+
+  /** Accept the AI proposal → scheduled activity or dated/loose task. */
+  const acceptProposal = useCallback(async () => {
+    if (!proposal || saving) return;
+    setSaving(true);
+    try {
+      let zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      try {
+        const s = await fetch("/api/v1/settings").then((r) =>
+          r.ok ? r.json() : null,
+        );
+        if (s?.timezone) zone = s.timezone;
+      } catch {}
+
+      if (proposal.startMin != null) {
+        const date = proposal.date ?? clientToday(zone);
+        const res = await fetch("/api/v1/activities", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tz: zone,
+            dtstartLocal: localMinutesToInstant(date, proposal.startMin, zone),
+            title: proposal.title,
+            emoji: proposal.emoji ?? "📋",
+            durationMin: proposal.durationMin ?? 30,
+            energy: proposal.energy ?? null,
+            source: "manual",
+          }),
+        });
+        if (!res.ok) throw new Error("create failed");
+        toast(`On the timeline — ${date === clientToday(zone) ? "today" : date} ${fmt(proposal.startMin)}`);
+      } else {
+        const res = await fetch("/api/v1/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            bucket: proposal.date ? "anytime" : "inbox",
+            date: proposal.date ?? undefined,
+            title: proposal.title,
+            emoji: proposal.emoji,
+            energy: proposal.energy ?? undefined,
+          }),
+        });
+        if (!res.ok) throw new Error("create failed");
+        toast(proposal.date ? `Planned for ${proposal.date}` : "Captured — it's in your inbox");
+      }
+      notifyDayChanged();
+      setProposal(null);
+      setText("");
+      setCaptured((n) => n + 1);
+      inputRef.current?.focus();
+    } catch {
+      toast("Couldn't save — try again");
+    }
+    setSaving(false);
+  }, [proposal, saving]);
 
   const toggleVoice = useCallback(() => {
     if (listening) {
@@ -237,11 +351,27 @@ export function QuickCapture() {
                   {listening ? <MicOff size={18} /> : <Mic size={18} />}
                 </button>
               )}
+              {aiOk && (
+                <button
+                  type="button"
+                  aria-label="Magic add — understand date and time"
+                  title="Magic add (AI): understands dates & times"
+                  disabled={!text.trim() || parsing}
+                  onClick={() => void magicParse()}
+                  className="grid size-11 shrink-0 place-items-center rounded-2xl border border-iris/40 bg-iris-ghost text-iris transition-colors hover:bg-iris-soft disabled:opacity-50"
+                >
+                  {parsing ? (
+                    <Loader2 size={17} className="animate-spin" />
+                  ) : (
+                    <Sparkles size={17} />
+                  )}
+                </button>
+              )}
               <button
                 type="button"
                 disabled={!text.trim() || saving}
                 onClick={() => void save(false)}
-                className="grid h-11 shrink-0 place-items-center rounded-2xl bg-iris px-4 text-[14px] font-semibold text-ink-inverse transition-colors hover:bg-iris-deep disabled:opacity-50"
+                className="grid h-11 shrink-0 place-items-center rounded-2xl bg-iris px-4 text-[14px] font-semibold text-ink-inverse transition-all hover:bg-iris-deep active:scale-[0.98] disabled:opacity-50"
               >
                 {saving ? (
                   <Loader2 size={16} className="animate-spin" />
@@ -250,6 +380,43 @@ export function QuickCapture() {
                 )}
               </button>
             </div>
+
+            {proposal && (
+              <div className="rise-in mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-iris/30 bg-iris-ghost px-3.5 py-3">
+                <span className="text-lg" aria-hidden>
+                  {proposal.emoji ?? "📋"}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[14px] font-semibold">
+                    {proposal.title}
+                  </p>
+                  <p className="tnum text-[12px] font-medium text-ink-soft">
+                    {proposal.startMin != null
+                      ? `${proposal.date ?? "today"} · ${fmt(proposal.startMin)} · ${proposal.durationMin ?? 30} min`
+                      : proposal.date
+                        ? `${proposal.date} · anytime`
+                        : "no date — goes to inbox"}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-1.5">
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => void acceptProposal()}
+                    className="rounded-xl bg-iris px-3 py-1.5 text-[12.5px] font-bold text-ink-inverse hover:bg-iris-deep disabled:opacity-50"
+                  >
+                    {proposal.startMin != null ? "Add to timeline" : "Add it"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProposal(null)}
+                    className="rounded-xl px-2.5 py-1.5 text-[12.5px] font-semibold text-ink-soft hover:bg-surface-sunken"
+                  >
+                    Never mind
+                  </button>
+                </div>
+              </div>
+            )}
             <p className="mt-2 text-[12px] text-ink-faint">
               <kbd className="rounded bg-surface-sunken px-1 font-mono">Enter</kbd>{" "}
               saves ·{" "}

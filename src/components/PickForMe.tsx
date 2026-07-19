@@ -9,9 +9,11 @@
  * loose task (oldest first). Shuffle re-rolls among the runners-up. No AI, no
  * config — it works offline on whatever the page already knows.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Dices, Play, X } from "lucide-react";
+import { useLowBattery } from "./LowBattery";
+import { clientToday } from "@/lib/client-date";
 
 export interface PickCandidate {
   id: string;
@@ -23,6 +25,8 @@ export interface PickCandidate {
   durationMin: number;
   /** Priority weight for tasks (2 high, 1 low, 0 none). */
   weight?: number;
+  /** Energy cost, when known — low-battery days prefer lighter picks. */
+  energy?: "low" | "medium" | "high" | null;
 }
 
 const KIND_LABEL: Record<PickCandidate["kind"], string> = {
@@ -35,12 +39,29 @@ const KIND_LABEL: Record<PickCandidate["kind"], string> = {
 export function PickForMe({
   candidates,
   className = "",
+  date,
 }: {
   candidates: PickCandidate[];
   className?: string;
+  /** Calendar date for low-battery awareness (defaults to today). */
+  date?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
+  const [todayStr] = useState(() => clientToday());
+  const lowBattery = useLowBattery(date ?? todayStr);
+  const primaryRef = useRef<HTMLAnchorElement>(null);
+
+  // Esc closes; focus lands on the primary action when the card opens.
+  useEffect(() => {
+    if (!open) return;
+    primaryRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   const ordered = useMemo(() => {
     const rank: Record<PickCandidate["kind"], number> = {
@@ -49,10 +70,18 @@ export function PickForMe({
       slipped: 2,
       task: 3,
     };
-    return [...candidates].sort(
+    const adjusted = candidates.map((c) => {
+      let weight = c.weight ?? 0;
+      if (lowBattery) {
+        if (c.energy === "high") weight -= 3;
+        else if (c.energy === "low") weight += 1;
+      }
+      return { ...c, weight };
+    });
+    return adjusted.sort(
       (a, b) => rank[a.kind] - rank[b.kind] || (b.weight ?? 0) - (a.weight ?? 0),
     );
-  }, [candidates]);
+  }, [candidates, lowBattery]);
 
   if (ordered.length === 0) return null;
   const pick = ordered[index % ordered.length];
@@ -119,8 +148,9 @@ export function PickForMe({
             </p>
             <div className="mt-6 grid gap-2">
               <Link
+                ref={primaryRef}
                 href={focusHref}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-iris py-3 text-[15px] font-semibold text-ink-inverse shadow-card transition-colors hover:bg-iris-deep focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-iris py-3 text-[15px] font-semibold text-ink-inverse shadow-card transition-all hover:bg-iris-deep focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none active:scale-[0.98]"
               >
                 <Play size={16} fill="currentColor" />
                 Start {pick.durationMin} min on this

@@ -12,7 +12,14 @@ import type { Db } from "../dal";
 import * as schema from "../db/schema";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { getOrCreateSettings } from "../dal";
-import { instantToDateStr } from "../temporal/zone";
+import { instantToDateStr, instantToWallFields } from "../temporal/zone";
+
+/** Minimal shape the pure stats helpers need — matches DbPlannerEvent. */
+export interface PlannerEventLike {
+  eventType: string;
+  occurredAt: Date;
+  payload: unknown;
+}
 
 /**
  * Get stats for a date range. All times bucketed in the user's planning zone.
@@ -20,13 +27,14 @@ import { instantToDateStr } from "../temporal/zone";
 export async function getStats(
   userId: string,
   range: { from: Date; to: Date },
-  opts: { db?: Db } = {},
+  opts: { db?: Db; now?: Date } = {},
 ) {
   const db = opts.db ?? dbDefault;
   const settings = await getOrCreateSettings(userId, opts);
   const zone = settings.timezone;
+  const now = opts.now ?? new Date();
 
-  // Read all planner_events in the range.
+  // Read all planner_events in the requested range.
   const events = await db
     .select()
     .from(schema.plannerEvents)
@@ -38,25 +46,31 @@ export async function getStats(
       ),
     );
 
+  // "Your focus hours" always looks at a fixed 30-day window, independent of
+  // the requested `range` (which may be as short as 1 day) — pull it
+  // separately when the requested range doesn't already cover it.
+  const focusWindowStart = new Date(now.getTime() - FOCUS_HOURS_WINDOW_DAYS * 86400000);
+  const focusEvents =
+    range.from <= focusWindowStart && range.to >= now
+      ? events.filter((e) => e.eventType === "focus_stop")
+      : await db
+          .select()
+          .from(schema.plannerEvents)
+          .where(
+            and(
+              eq(schema.plannerEvents.userId, userId),
+              eq(schema.plannerEvents.eventType, "focus_stop"),
+              gte(schema.plannerEvents.occurredAt, focusWindowStart),
+              lte(schema.plannerEvents.occurredAt, now),
+            ),
+          );
+
   // Bucket by planning-zone date.
-  const byDate: Record<string, { completed: number; focusMin: number; mood: string | null }> = {};
-  for (const ev of events) {
-    const dateStr = instantToDateStr(ev.occurredAt, zone);
-    if (!byDate[dateStr]) byDate[dateStr] = { completed: 0, focusMin: 0, mood: null };
-    if (ev.eventType === "complete") byDate[dateStr].completed++;
-    if (ev.eventType === "focus_stop") {
-      const payload = ev.payload as { durationMin?: number };
-      if (payload?.durationMin) byDate[dateStr].focusMin += payload.durationMin;
-    }
-    if (ev.eventType === "mood_checkin") {
-      const payload = ev.payload as { mood?: string };
-      byDate[dateStr].mood = payload?.mood ?? null;
-    }
-  }
+  const byDate = bucketEventsByZoneDate(events, zone);
 
   // Compute streak: consecutive days (in planning zone) with ≥1 completion,
-  // 1-day grace, ending today or yesterday.
-  const streak = computeStreak(byDate);
+  // 1-day grace, ending today or yesterday (also planning-zone "today").
+  const streak = computeStreak(byDate, zone, now);
 
   // Energy balance.
   const energyCounts = { low: 0, medium: 0, high: 0 };
@@ -76,7 +90,37 @@ export async function getStats(
       .filter((e) => e.eventType === "focus_stop")
       .reduce((sum, e) => sum + ((e.payload as { durationMin?: number })?.durationMin ?? 0), 0),
     estimate: computeEstimateCalibration(events),
+    focusHours: computeFocusHours(focusEvents, zone, { now }),
   };
+}
+
+/**
+ * Pure: bucket planner_events into planning-zone calendar dates. Split out
+ * of `getStats` so it (and the streak calc built on top of it) can be unit
+ * tested without a DB. Uses `instantToDateStr`, which projects the UTC
+ * `occurredAt` instant into the given IANA zone's wall-clock date — so an
+ * event stored at 01:30Z lands on the *previous* local day for a zone west
+ * of UTC (e.g. America/New_York), matching what the user actually saw.
+ */
+export function bucketEventsByZoneDate(
+  events: PlannerEventLike[],
+  zone: string,
+): Record<string, { completed: number; focusMin: number; mood: string | null }> {
+  const byDate: Record<string, { completed: number; focusMin: number; mood: string | null }> = {};
+  for (const ev of events) {
+    const dateStr = instantToDateStr(ev.occurredAt, zone);
+    if (!byDate[dateStr]) byDate[dateStr] = { completed: 0, focusMin: 0, mood: null };
+    if (ev.eventType === "complete") byDate[dateStr].completed++;
+    if (ev.eventType === "focus_stop") {
+      const payload = ev.payload as { durationMin?: number };
+      if (payload?.durationMin) byDate[dateStr].focusMin += payload.durationMin;
+    }
+    if (ev.eventType === "mood_checkin") {
+      const payload = ev.payload as { mood?: string };
+      byDate[dateStr].mood = payload?.mood ?? null;
+    }
+  }
+  return byDate;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -164,10 +208,15 @@ export async function recordMoodCheckin(
 }
 
 /**
- * Compute a soft streak: consecutive days with ≥1 completion, 1-day grace.
+ * Compute a soft streak: consecutive days (in the planning zone) with ≥1
+ * completion, 1-day grace. `today`/`yesterday` are resolved in `zone`
+ * (not the server's UTC clock) so a late-evening completion near a UTC
+ * date rollover still counts toward the right day's streak.
  */
-function computeStreak(
+export function computeStreak(
   byDate: Record<string, { completed: number }>,
+  zone: string,
+  now: Date = new Date(),
 ): { current: number; best: number } {
   const dates = Object.keys(byDate)
     .filter((d) => byDate[d].completed > 0)
@@ -176,8 +225,8 @@ function computeStreak(
 
   let best = 1;
   let currentRun = 1;
-  const today = new Date().toISOString().slice(0, 10);
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const today = instantToDateStr(now, zone);
+  const yesterday = instantToDateStr(new Date(now.getTime() - 86400000), zone);
 
   for (let i = 1; i < dates.length; i++) {
     const prev = new Date(dates[i - 1]);
@@ -200,4 +249,61 @@ function computeStreak(
   const current = lastDate === today || lastDate === yesterday ? currentRun : 0;
 
   return { current, best };
+}
+
+/* -------------------------------------------------------------------------- */
+/* "Your focus hours" strip (Wave 2 Phase 6)                                  */
+/* -------------------------------------------------------------------------- */
+
+export interface FocusHours {
+  /** Session counts by zone-local start hour, index 0–23. */
+  hours: number[];
+  /** Hour (0–23) with the most sessions. */
+  peakHour: number;
+}
+
+const FOCUS_HOURS_WINDOW_DAYS = 30;
+const FOCUS_HOURS_MIN_EVENTS = 5;
+
+/**
+ * Pure aggregation over planner_events: a 24-bucket histogram of focus_stop
+ * sessions by the zone-local hour the session *started*. Start is derived by
+ * subtracting the session's elapsed minutes from `occurredAt` (the stop
+ * time) when available; falls back to the stop instant's own hour otherwise.
+ * Only the last 30 days count. Returns null under 5 qualifying sessions —
+ * not enough signal for a peak-hour claim to be honest.
+ */
+export function computeFocusHours(
+  events: PlannerEventLike[],
+  zone: string,
+  opts: { now?: Date } = {},
+): FocusHours | null {
+  const now = opts.now ?? new Date();
+  const windowStart = new Date(now.getTime() - FOCUS_HOURS_WINDOW_DAYS * 86400000);
+
+  const qualifying = events.filter((ev) => {
+    if (ev.eventType !== "focus_stop") return false;
+    if (ev.occurredAt < windowStart || ev.occurredAt > now) return false;
+    return true;
+  });
+
+  if (qualifying.length < FOCUS_HOURS_MIN_EVENTS) return null;
+
+  const hours = new Array(24).fill(0) as number[];
+  for (const ev of qualifying) {
+    const payload = ev.payload as { elapsedMin?: number };
+    const start =
+      typeof payload?.elapsedMin === "number" && payload.elapsedMin > 0
+        ? new Date(ev.occurredAt.getTime() - payload.elapsedMin * 60_000)
+        : ev.occurredAt;
+    const { hour } = instantToWallFields(start, zone);
+    hours[hour]++;
+  }
+
+  let peakHour = 0;
+  for (let h = 1; h < 24; h++) {
+    if (hours[h] > hours[peakHour]) peakHour = h;
+  }
+
+  return { hours, peakHour };
 }

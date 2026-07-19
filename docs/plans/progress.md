@@ -1,5 +1,57 @@
 # Progress log
 
+## 2026-07-19 — 10× ADHD wave 2: all 10 phases shipped (Fable)
+
+**Plan:** `docs/plans/2026-07-19-10x-adhd-wave2-roadmap.md` (all ticked).
+
+**Shipped (browser-verified locally):**
+1. **Repeat control in the editor** — five friendly chips (none/daily/
+   weekdays/weekly-on-day/every-N) building real RRULEs; edit mode parses the
+   rule back (unknown shapes preserved as "Custom"); ↻ glyph on recurring
+   timeline blocks. Verified: daily appears tomorrow; weekday rule created on
+   Sunday skips Sunday, lands Monday; edit-mode chip aria-pressed.
+2. **RoutinePlayer** — full-screen step runner (per-step countdown ring,
+   auto-advance with 2 s "next up" beat, pause/+1 min/skip/Esc, done state
+   with celebration + honest skipped-count). Play button on routine cards.
+3. **NL magic capture** — parse service now grounds relative dates in the
+   user's zone and returns date/startMin; QuickCapture ✨ button (only when
+   health.checks.ai=ok) → confirm chip → accept creates a scheduled activity
+   or dated task (SEC-05: never auto-saves). E2E verified with the LLM call
+   mocked in-page: chip → "Add to timeline" → activity at 2026-07-20 15:00 NY.
+   NOTE: live LLM blocked — Anthropic key has no credit balance (fallback
+   toast path verified live).
+4. **Day rituals** — morning kickoff (<11:00, <2 activities: Plan with AI /
+   template / copy-yesterday) + evening shutdown (≥19:00, unfinished: review /
+   carry-all-to-tomorrow); per-day dismissal; ?ritualDebug=(morning|evening)
+   override on localhost only. Copy-yesterday round-trip verified (4 one-offs
+   cloned, recurring excluded).
+5. **Low-battery mode** — per-day toggle (localStorage + window event): high-
+   energy blocks dim + "heavy for today" tag, PickForMe deprioritizes heavy
+   picks, softened header note. Verified: dim+tag+persistence.
+6. **Stats truth** (subagent) — real bug found: computeStreak used UTC
+   "today" against zone-bucketed keys (late-evening completions could zero
+   the streak); fixed + extracted pure bucketEventsByZoneDate; new
+   computeFocusHours 24-cell heat strip card (≥5 sessions, 30 d); 12 new
+   tests (172 total).
+7. **Mobile motion** — editor is a true bottom sheet on mobile (sheet-up
+   keyframe, drag handle, 94dvh scroll); Esc + focus-primary on PickForMe/
+   OneThing; active:scale press states on primary CTAs.
+8. **Offline/perf** (subagent) — SW cache kairo-v3-wave2adhd + explicit
+   no-store for /api; new settings-cache (60 s TTL, invalidated on PATCH)
+   used by NowBar/TimezoneNudge; measured exactly 1 settings GET per page
+   view (was 2–3).
+9. **Landing ADHD story** — new "five ways planners fail ADHD" section with
+   six mini product mocks in pure tokens (now card, pick card, overtime
+   banner, capture input, one-thing, no-red review); footer honesty line.
+10. **Also fixed:** Intl hour parsing hardened to hourCycle:"h23"
+    (hour12:false has env-dependent quirks).
+
+**Gates:** lint 0/0, typecheck, **172 tests** (20 files), build — green.
+
+**Residuals:** live LLM parse needs Anthropic credits (Neima); routine player
+logs no planner_events yet (deliberate — no events API for it); ritualDebug
+param is localhost-gated by hostname.
+
 ## 2026-07-19 — agent-browser QA sweep of the 10x ADHD program (Fable)
 
 Full signed-in dogfood of commit 95e1e28's features using the agent-browser

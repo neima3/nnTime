@@ -2,9 +2,10 @@
 
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pause, Play, Plus, Trash2 } from "lucide-react";
+import { Pause, Play, PlayCircle, Plus, Trash2 } from "lucide-react";
 import { clientToday } from "@/lib/client-date";
 import { toast } from "./Toast";
+import { RoutinePlayer } from "./RoutinePlayer";
 
 export type RoutineView = {
   id: string;
@@ -49,6 +50,7 @@ export function RoutinesClient({
   const [emoji, setEmoji] = useState("🔁");
   const [stepsText, setStepsText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [playing, setPlaying] = useState<RoutineView | null>(null);
 
   const create = useCallback(async () => {
     if (!authed) {
@@ -235,6 +237,15 @@ export function RoutinesClient({
             <div className="mt-4 flex flex-wrap gap-2">
               <button
                 type="button"
+                onClick={() => setPlaying(r)}
+                disabled={r.stepCount === 0}
+                className="inline-flex items-center gap-1 rounded-xl bg-iris px-3 py-1.5 text-[12px] font-semibold text-ink-inverse transition-colors hover:bg-iris-deep disabled:opacity-40"
+              >
+                <PlayCircle size={13} />
+                Play
+              </button>
+              <button
+                type="button"
                 onClick={() => scheduleToday(r)}
                 className="inline-flex items-center gap-1 rounded-xl bg-iris-soft px-3 py-1.5 text-[12px] font-semibold text-iris"
               >
@@ -276,6 +287,15 @@ export function RoutinesClient({
           </div>
         )}
       </div>
+
+      {playing && (
+        <RoutinePlayer
+          routineId={playing.id}
+          title={playing.title}
+          emoji={playing.emoji}
+          onExit={() => setPlaying(null)}
+        />
+      )}
     </>
   );
 }

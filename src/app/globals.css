@@ -190,6 +190,18 @@ body {
   animation: kairo-burst 0.7s cubic-bezier(0.12, 0.8, 0.32, 1) forwards;
 }
 
+/* Bottom-sheet entrance (mobile editor & friends). Collapsed by the global
+   reduced-motion rule. */
+@keyframes kairo-sheet-up {
+  from {
+    translate: 0 28px;
+    opacity: 0.5;
+  }
+}
+.sheet-up {
+  animation: kairo-sheet-up 0.28s var(--ease-spring) backwards;
+}
+
 ::selection {
   background: var(--iris);
   color: var(--ink-inverse);

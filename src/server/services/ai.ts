@@ -48,6 +48,13 @@ export const nlAddSchema = z.object({
   durationMin: z.number().int().min(5).max(480).optional(),
   energy: z.enum(["low", "medium", "high"]).optional(),
   bucket: z.enum(["inbox", "anytime"]).optional(),
+  /** Calendar date when the input names one ("tomorrow 3pm"). */
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  /** Minutes-from-midnight local start when the input names a time. */
+  startMin: z.number().int().min(0).max(1439).optional(),
 });
 
 export const planDayItemSchema = z.object({
@@ -114,10 +121,21 @@ export async function parseNaturalLanguage(input: string, userId: string) {
   const quota = await checkAiQuota(userId);
   if (!quota.allowed) throw new Error("AI daily quota exceeded");
 
+  // Ground relative dates ("tomorrow", "tuesday") in the user's planning zone.
+  const { getOrCreateSettings } = await import("../dal");
+  const settings = await getOrCreateSettings(userId);
+  const zone = settings.timezone || "UTC";
+  const todayStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: zone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
   const response = await getClient().messages.create({
     model: "claude-haiku-4-5",
     max_tokens: 300,
-    system: `You parse natural language into a task draft. Respond ONLY with JSON matching: {"title":"...","emoji":"...","durationMin":N,"energy":"low|medium|high","bucket":"inbox|anytime"}. Duration in minutes (5-480). If unclear, omit optional fields.`,
+    system: `You parse natural language into a task draft. Today is ${todayStr} (${zone}). Respond ONLY with JSON matching: {"title":"...","emoji":"...","durationMin":N,"energy":"low|medium|high","bucket":"inbox|anytime","date":"YYYY-MM-DD","startMin":N}. Duration in minutes (5-480). Include "date" only when the input names or implies a calendar day (tomorrow, tuesday, jul 30); include "startMin" (minutes from local midnight, e.g. 3pm=900) only when a time is named. If unclear, omit optional fields.`,
     messages: [{ role: "user", content: `<input>${input}</input>` }],
   });
 

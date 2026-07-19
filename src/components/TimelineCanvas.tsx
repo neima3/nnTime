@@ -35,6 +35,8 @@ interface DragState {
 
 interface TimelineCanvasProps {
   activities: Activity[];
+  /** Low-battery day: dim high-energy blocks + tag them "heavy". */
+  lowBattery?: boolean;
   nowMin: number;
   /** When false, hide the live now-line (viewing another day). */
   showNowLine?: boolean;
@@ -102,6 +104,7 @@ function computeLanes(activities: Activity[]): Map<string, { lane: number; laneC
 
 export function TimelineCanvas({
   activities,
+  lowBattery = false,
   nowMin,
   showNowLine = true,
   zone,
@@ -354,6 +357,7 @@ export function TimelineCanvas({
           const checklistRows = compact
             ? 0
             : Math.max(0, Math.min(3, Math.floor((h - 72) / 18)));
+          const heavy = lowBattery && a.energy === "high" && !a.done;
           const laneInfo = lanes.get(a.id);
           const lane = laneInfo?.lane ?? 0;
           const laneCount = laneInfo?.laneCount ?? 0;
@@ -370,7 +374,7 @@ export function TimelineCanvas({
               aria-keyshortcuts="ArrowUp ArrowDown + - Enter"
               className={`group absolute flex gap-3 overflow-hidden rounded-2xl px-3.5 outline-none transition-transform hover:-translate-y-px hover:shadow-card focus-visible:ring-2 focus-visible:ring-iris ${cat.fill} ${
                 past && !a.done ? "timeline-past" : ""
-              } ${a.done ? "opacity-70" : ""} ${current ? "shadow-float ring-2 ring-now/70" : ""} ${
+              } ${a.done ? "opacity-70" : ""} ${heavy ? "opacity-55" : ""} ${current ? "shadow-float ring-2 ring-now/70" : ""} ${
                 compact ? "items-center py-1.5" : "py-3"
               } ${hasConflict ? "ring-2 ring-danger animate-pulse" : ""} rise-in cursor-grab active:cursor-grabbing`}
               style={{
@@ -410,10 +414,16 @@ export function TimelineCanvas({
                   {a.title}
                 </p>
                 <p className={`tnum mt-0.5 truncate text-[12px] font-medium ${cat.ink} opacity-70`}>
+                  {a.recurring && (
+                    <span title="Repeats" aria-label="Repeats">
+                      ↻{" "}
+                    </span>
+                  )}
                   {fmt(a.start)} – {fmt(a.start + a.duration)} · {fmtDuration(a.duration)}
                   {a.checklist && a.checklist.length > 0
                     ? ` · ${a.checklist.filter((c) => c.done).length}/${a.checklist.length} steps`
                     : ""}
+                  {heavy ? " · heavy for today" : ""}
                 </p>
                 {checklistRows > 0 && a.checklist && a.checklist.length > 0 && (
                   <ul className="mt-1 space-y-0.5">

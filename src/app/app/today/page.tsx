@@ -25,6 +25,8 @@ import {
 import { TodayTimeline } from "@/components/TodayTimeline";
 import { TimezoneNudge } from "@/components/TimezoneNudge";
 import { PickForMe, type PickCandidate } from "@/components/PickForMe";
+import { DayRituals } from "@/components/DayRituals";
+import { LowBatteryNote, LowBatteryToggle } from "@/components/LowBattery";
 import { SoftStreaks } from "@/components/SoftStreaks";
 import { AmbientSounds } from "@/components/AmbientSounds";
 import { AnytimeRail } from "@/components/AnytimeRail";
@@ -276,6 +278,7 @@ export default async function TodayPage({
                 emoji: a.emoji,
                 kind,
                 durationMin: Math.min(a.duration, 60),
+                energy: a.energy ?? null,
               };
             }),
           ...inbox.map(
@@ -305,7 +308,10 @@ export default async function TodayPage({
             </div>
             {!emptyDay && <DayProgress activities={activities} />}
             <SoftStreaks />
-            {authed && isToday && <PickForMe candidates={pickCandidates} />}
+            {authed && isToday && <LowBatteryToggle date={date} />}
+            {authed && isToday && (
+              <PickForMe candidates={pickCandidates} date={date} />
+            )}
             {authed && (
               <Link
                 href="/app/review"
@@ -367,8 +373,26 @@ export default async function TodayPage({
 
           {authed && <TimezoneNudge zone={zone} />}
 
+          {authed && isToday && <LowBatteryNote date={date} />}
+
           {authed && !activities.every((a) => a.done) && (
             <DayLoadMeter activities={activities} />
+          )}
+
+          {authed && isToday && (
+            <DayRituals
+              zone={zone}
+              date={date}
+              activityCount={activities.length}
+              unfinished={activities
+                .filter((a) => !a.done)
+                .map((a) => ({
+                  id: a.id,
+                  revision: a.revision ?? 1,
+                  occurrenceKey: a.occurrenceKey ?? "",
+                  startMin: a.start,
+                }))}
+            />
           )}
 
           {authed &&
@@ -481,7 +505,7 @@ export default async function TodayPage({
             : "/app/editor"
         }
         aria-label="Add activity"
-        className="fixed bottom-24 right-5 z-40 grid size-14 place-items-center rounded-2xl bg-iris text-ink-inverse shadow-float transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none md:bottom-8 md:right-8"
+        className="fixed bottom-24 right-5 z-40 grid size-14 place-items-center rounded-2xl bg-iris text-ink-inverse shadow-float transition-transform hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none md:bottom-8 md:right-8"
       >
         <Plus size={26} strokeWidth={2.5} />
       </Link>

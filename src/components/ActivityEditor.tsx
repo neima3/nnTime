@@ -47,6 +47,57 @@ function pad2(n: number) {
   return String(n).padStart(2, "0");
 }
 
+/* ---- Recurrence (Phase 1 wave 2): five friendly repeat choices ---------- */
+
+type RepeatKind = "none" | "daily" | "weekdays" | "weekly" | "everyN" | "custom";
+
+const BYDAY = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"] as const;
+const WEEKDAY_RULE = "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR";
+
+/** Weekday label ("Saturday") for a YYYY-MM-DD calendar date. */
+function weekdayOf(dateStr: string): { code: string; label: string } {
+  const d = new Date(`${dateStr}T12:00:00`);
+  return {
+    code: BYDAY[d.getDay()] ?? "MO",
+    label: d.toLocaleDateString("en-US", { weekday: "long" }),
+  };
+}
+
+function buildRrule(kind: RepeatKind, dateStr: string, n: number): string | null {
+  switch (kind) {
+    case "daily":
+      return "FREQ=DAILY";
+    case "weekdays":
+      return WEEKDAY_RULE;
+    case "weekly":
+      return `FREQ=WEEKLY;BYDAY=${weekdayOf(dateStr).code}`;
+    case "everyN":
+      return `FREQ=DAILY;INTERVAL=${n}`;
+    default:
+      return null;
+  }
+}
+
+/** Map an existing RRULE back onto the chip row (unknown shapes → custom). */
+function parseRrule(rrule: string | null | undefined): {
+  kind: RepeatKind;
+  n: number;
+} {
+  if (!rrule) return { kind: "none", n: 2 };
+  const r = rrule.toUpperCase();
+  if (r === WEEKDAY_RULE) return { kind: "weekdays", n: 2 };
+  const interval = /INTERVAL=(\d+)/.exec(r);
+  if (r.startsWith("FREQ=DAILY")) {
+    const n = interval ? Number(interval[1]) : 1;
+    if (n <= 1) return { kind: "daily", n: 2 };
+    if (n >= 2 && n <= 14 && !r.includes("BYDAY")) return { kind: "everyN", n };
+    return { kind: "custom", n: 2 };
+  }
+  if (/^FREQ=WEEKLY;BYDAY=[A-Z]{2}$/.test(r) && !interval)
+    return { kind: "weekly", n: 2 };
+  return { kind: "custom", n: 2 };
+}
+
 function minutesToTimeInput(min: number) {
   return `${pad2(Math.floor(min / 60))}:${pad2(min % 60)}`;
 }
@@ -104,6 +155,10 @@ export function ActivityEditor(props: ActivityEditorProps) {
   const [error, setError] = useState<string | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
   const [estimateRatio, setEstimateRatio] = useState<number | null>(null);
+  const [repeat, setRepeat] = useState<RepeatKind>("none");
+  const [repeatN, setRepeatN] = useState(2);
+  /** Preserved verbatim when the existing rule doesn't fit the chip row. */
+  const [customRrule, setCustomRrule] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -165,6 +220,10 @@ export function ActivityEditor(props: ActivityEditorProps) {
       setNotes(a.notes ?? "");
       setRevision(a.revision);
       setTz(a.tz ?? tz);
+      const parsed = parseRrule(a.rrule);
+      setRepeat(parsed.kind);
+      setRepeatN(parsed.n);
+      setCustomRrule(parsed.kind === "custom" ? a.rrule : null);
       if (Array.isArray(a.checklistTemplate)) {
         setSteps(
           a.checklistTemplate.map((x: { label?: string } | string) =>
@@ -209,6 +268,8 @@ export function ActivityEditor(props: ActivityEditorProps) {
       const checklistTemplate = steps
         .filter(Boolean)
         .map((label) => ({ label, done: false }));
+      const rrule =
+        repeat === "custom" ? customRrule : buildRrule(repeat, date, repeatN);
 
       if (props.mode === "create") {
         const res = await fetch("/api/v1/activities", {
@@ -217,6 +278,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
           body: JSON.stringify({
             tz,
             dtstartLocal,
+            rrule,
             title: trimmed,
             emoji,
             categoryId,
@@ -257,6 +319,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
             editScope: "all",
             tz,
             dtstartLocal,
+            rrule,
             title: trimmed,
             emoji,
             categoryId: categoryId ?? null,
@@ -302,6 +365,9 @@ export function ActivityEditor(props: ActivityEditorProps) {
     notes,
     revision,
     router,
+    repeat,
+    repeatN,
+    customRrule,
   ]);
 
   const remove = useCallback(async () => {
@@ -322,12 +388,12 @@ export function ActivityEditor(props: ActivityEditorProps) {
   }, [props.mode, props.activityId, revision, router, date]);
 
   return (
-    <div className="relative min-h-dvh bg-surface-sunken/60 px-4 py-8">
+    <div className="relative flex min-h-dvh items-end bg-surface-sunken/60 md:block md:px-4 md:py-8">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="activity-editor-title"
-        className="mx-auto w-full max-w-[560px] overflow-hidden rounded-3xl border border-border bg-surface shadow-float"
+        className="sheet-up mx-auto max-h-[94dvh] w-full max-w-[560px] overflow-y-auto rounded-t-3xl border border-border bg-surface shadow-float md:max-h-none md:overflow-hidden md:rounded-3xl"
       >
         <div className="flex justify-center pt-2.5 md:hidden" aria-hidden>
           <span className="h-1 w-9 rounded-full bg-border-strong" />
@@ -438,6 +504,70 @@ export function ActivityEditor(props: ActivityEditorProps) {
             {estimateRatio != null && (
               <p className="mt-1.5 text-[12px] text-ink-faint">
                 Similar plans usually run ~×{estimateRatio} longer than expected
+              </p>
+            )}
+          </Field>
+
+          <Field label="Repeats">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(
+                [
+                  { kind: "none" as const, label: "Doesn't repeat" },
+                  { kind: "daily" as const, label: "Daily" },
+                  { kind: "weekdays" as const, label: "Weekdays" },
+                  {
+                    kind: "weekly" as const,
+                    label: `Weekly on ${weekdayOf(date).label}`,
+                  },
+                  { kind: "everyN" as const, label: "Every N days" },
+                ] as { kind: RepeatKind; label: string }[]
+              ).map(({ kind, label }) => (
+                <button
+                  key={kind}
+                  type="button"
+                  aria-pressed={repeat === kind}
+                  onClick={() => setRepeat(kind)}
+                  className={`rounded-xl border px-3 py-1.5 text-[13px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none ${
+                    repeat === kind
+                      ? "border-iris bg-iris-soft text-iris"
+                      : "border-border bg-surface text-ink-soft hover:text-ink"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+              {repeat === "custom" && (
+                <span className="rounded-xl border border-iris bg-iris-soft px-3 py-1.5 text-[13px] font-semibold text-iris">
+                  Custom schedule (kept as-is)
+                </span>
+              )}
+              {repeat === "everyN" && (
+                <span className="inline-flex items-center gap-1 rounded-xl border border-border bg-surface-sunken px-2 py-1">
+                  <button
+                    type="button"
+                    aria-label="Fewer days between repeats"
+                    onClick={() => setRepeatN((n) => Math.max(2, n - 1))}
+                    className="grid size-6 place-items-center rounded-lg text-ink-soft hover:bg-surface hover:text-ink"
+                  >
+                    −
+                  </button>
+                  <span className="tnum min-w-14 text-center text-[13px] font-semibold">
+                    {repeatN} days
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="More days between repeats"
+                    onClick={() => setRepeatN((n) => Math.min(14, n + 1))}
+                    className="grid size-6 place-items-center rounded-lg text-ink-soft hover:bg-surface hover:text-ink"
+                  >
+                    +
+                  </button>
+                </span>
+              )}
+            </div>
+            {props.mode === "edit" && repeat !== "none" && (
+              <p className="mt-1.5 text-[12px] text-ink-faint">
+                Saving updates every occurrence of this activity.
               </p>
             )}
           </Field>

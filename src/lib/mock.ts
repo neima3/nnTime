@@ -26,6 +26,8 @@ export type Activity = {
   occurrenceKey?: string;
   notes?: string;
   priority?: "none" | "low" | "high";
+  /** True when the activity comes from a recurring series (has an RRULE). */
+  recurring?: boolean;
 };
 
 export const NOW_MIN = 13 * 60; // 13:00
