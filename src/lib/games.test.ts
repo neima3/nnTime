@@ -4,20 +4,48 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildMatchDeck,
+  clearMiss,
   GRAMMAR_BANK,
   MATCH_EMOJI,
+  missedItems,
   pickQuizRounds,
   QUIZ_ROUNDS,
   quickTapAverage,
   quickTapDelayMs,
   readBest,
+  readMisses,
+  recordMiss,
   recordResult,
   SPELLING_BANK,
   timeFeelFeeling,
   timeFeelRoundError,
   timeFeelScore,
+  type GameId,
   type QuizItem,
 } from "./games";
+
+/** Fake localStorage for tests that need to observe reads/writes. */
+class FakeStorage implements Storage {
+  private store = new Map<string, string>();
+  get length() {
+    return this.store.size;
+  }
+  clear(): void {
+    this.store.clear();
+  }
+  getItem(key: string): string | null {
+    return this.store.has(key) ? this.store.get(key)! : null;
+  }
+  key(index: number): string | null {
+    return Array.from(this.store.keys())[index] ?? null;
+  }
+  removeItem(key: string): void {
+    this.store.delete(key);
+  }
+  setItem(key: string, value: string): void {
+    this.store.set(key, value);
+  }
+}
 
 describe("timeFeelRoundError", () => {
   it("returns the exact absolute error percentage", () => {
@@ -156,28 +184,6 @@ describe("buildMatchDeck", () => {
 });
 
 describe("readBest / recordResult (mocked localStorage)", () => {
-  class FakeStorage implements Storage {
-    private store = new Map<string, string>();
-    get length() {
-      return this.store.size;
-    }
-    clear(): void {
-      this.store.clear();
-    }
-    getItem(key: string): string | null {
-      return this.store.has(key) ? this.store.get(key)! : null;
-    }
-    key(index: number): string | null {
-      return Array.from(this.store.keys())[index] ?? null;
-    }
-    removeItem(key: string): void {
-      this.store.delete(key);
-    }
-    setItem(key: string, value: string): void {
-      this.store.set(key, value);
-    }
-  }
-
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -295,6 +301,35 @@ describe("SPELLING_BANK spot check", () => {
   });
 });
 
+describe("GRAMMAR_BANK expanded shape", () => {
+  it("has at least 60 items", () => {
+    expect(GRAMMAR_BANK.length).toBeGreaterThanOrEqual(60);
+  });
+
+  it("gives every item a topic", () => {
+    for (const item of GRAMMAR_BANK) {
+      expect(item.topic).toBeTruthy();
+    }
+  });
+
+  it("spans at least 8 distinct topics", () => {
+    const topics = new Set(GRAMMAR_BANK.map((item) => item.topic));
+    expect(topics.size).toBeGreaterThanOrEqual(8);
+  });
+
+  it("has unique prompts (miss tracking keys off prompt identity)", () => {
+    const prompts = GRAMMAR_BANK.map((item) => item.prompt);
+    expect(new Set(prompts).size).toBe(prompts.length);
+  });
+});
+
+describe("SPELLING_BANK prompts", () => {
+  it("has unique prompts", () => {
+    const prompts = SPELLING_BANK.map((item) => item.prompt);
+    expect(new Set(prompts).size).toBe(prompts.length);
+  });
+});
+
 describe("pickQuizRounds", () => {
   /** Deterministic fake RNG: replays a fixed roll sequence. */
   function fakeRandom(rolls: number[]): () => number {
@@ -355,5 +390,140 @@ describe("pickQuizRounds", () => {
     pickQuizRounds(SPELLING_BANK, SPELLING_BANK.length, fakeRandom(rollsA));
     expect(JSON.stringify(GRAMMAR_BANK)).toBe(beforeGrammar);
     expect(JSON.stringify(SPELLING_BANK)).toBe(beforeSpelling);
+  });
+
+  function topicCounts(rounds: QuizItem[]): number[] {
+    const counts = new Map<string, number>();
+    for (const r of rounds) {
+      const topic = r.topic ?? "general";
+      counts.set(topic, (counts.get(topic) ?? 0) + 1);
+    }
+    return [...counts.values()];
+  }
+
+  it("never draws more than the default cap (2) of one topic — several seeded randoms and live Math.random", () => {
+    const seeds: number[][] = [
+      rollsA,
+      [0.05, 0.9, 0.2, 0.85, 0.1, 0.7, 0.15, 0.75, 0.3, 0.6, 0.4, 0.5, 0.95, 0.65, 0.8],
+      [0.99, 0.01, 0.5, 0.33, 0.67, 0.1, 0.9, 0.4, 0.6, 0.2],
+      [0.123, 0.456, 0.789, 0.234, 0.567, 0.891, 0.012, 0.345],
+    ];
+    for (const rolls of seeds) {
+      const rounds = pickQuizRounds(GRAMMAR_BANK, QUIZ_ROUNDS, fakeRandom(rolls));
+      expect(rounds).toHaveLength(QUIZ_ROUNDS);
+      expect(Math.max(...topicCounts(rounds))).toBeLessThanOrEqual(2);
+    }
+
+    // Live Math.random, repeated — the guarantee has to hold for any draw,
+    // not just seeded ones.
+    for (let i = 0; i < 20; i++) {
+      const rounds = pickQuizRounds(GRAMMAR_BANK);
+      expect(rounds).toHaveLength(QUIZ_ROUNDS);
+      expect(Math.max(...topicCounts(rounds))).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("does not enforce the topic cap when maxPerTopic is set high", () => {
+    // random() => 0 always turns the Fisher-Yates shuffle into a fixed
+    // rotate-by-one, so the first 8 picks are GRAMMAR_BANK[1..8] — all
+    // "homophones" (indices 0-15). With maxPerTopic: 99 nothing stops that.
+    const zeroRandom = () => 0;
+    const rounds = pickQuizRounds(GRAMMAR_BANK, QUIZ_ROUNDS, zeroRandom, { maxPerTopic: 99 });
+    expect(rounds).toHaveLength(QUIZ_ROUNDS);
+    expect(Math.max(...topicCounts(rounds))).toBeGreaterThan(2);
+  });
+
+  it("fills any shortfall so the draw still hits the requested count", () => {
+    // Synthetic pool: one topic with 7 items (over the default cap of 2)
+    // and one topic with a single item — 8 items total.
+    const syntheticBank: QuizItem[] = [
+      ...Array.from({ length: 7 }, (_, i) => ({
+        topic: "a",
+        prompt: `synthetic a${i}`,
+        options: ["x", "y"],
+        answer: "x",
+        note: "n",
+      })),
+      { topic: "b", prompt: "synthetic b0", options: ["x", "y"], answer: "x", note: "n" },
+    ];
+    const rounds = pickQuizRounds(syntheticBank, 8, fakeRandom(rollsA));
+    expect(rounds).toHaveLength(8);
+    // The cap-respecting first pass alone could only supply 3 (2 of "a" + 1
+    // of "b"); the shortfall-fill pass must have topped up the rest from "a".
+    const aCount = rounds.filter((r) => r.topic === "a").length;
+    expect(aCount).toBeGreaterThan(2);
+  });
+});
+
+describe("miss tracking (recordMiss / clearMiss / readMisses / missedItems)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const id: GameId = "grammar-snap";
+
+  it("dedupes a re-missed prompt and keeps it newest-last", () => {
+    vi.stubGlobal("localStorage", new FakeStorage());
+    recordMiss(id, "A");
+    recordMiss(id, "B");
+    expect(readMisses(id)).toEqual(["A", "B"]);
+
+    recordMiss(id, "A"); // re-miss: moves to the end, no duplicate entry
+    expect(readMisses(id)).toEqual(["B", "A"]);
+  });
+
+  it("caps the miss list at 40, dropping the oldest first", () => {
+    vi.stubGlobal("localStorage", new FakeStorage());
+    for (let i = 0; i < 45; i++) {
+      recordMiss(id, `prompt-${i}`);
+    }
+    const misses = readMisses(id);
+    expect(misses).toHaveLength(40);
+    expect(misses[0]).toBe("prompt-5");
+    expect(misses[misses.length - 1]).toBe("prompt-44");
+    expect(misses).not.toContain("prompt-0");
+  });
+
+  it("clearMiss removes a redeemed prompt", () => {
+    vi.stubGlobal("localStorage", new FakeStorage());
+    recordMiss(id, "A");
+    recordMiss(id, "B");
+    clearMiss(id, "A");
+    expect(readMisses(id)).toEqual(["B"]);
+  });
+
+  it("readMisses returns [] on invalid JSON", () => {
+    const storage = new FakeStorage();
+    storage.setItem("kairo-play-misses-grammar-snap", "not json{{{");
+    vi.stubGlobal("localStorage", storage);
+    expect(readMisses(id)).toEqual([]);
+  });
+
+  it("readMisses returns [] when storage throws", () => {
+    const throwing: Storage = {
+      length: 0,
+      clear: () => {
+        throw new Error("blocked");
+      },
+      getItem: () => {
+        throw new Error("blocked");
+      },
+      key: () => null,
+      removeItem: () => {
+        throw new Error("blocked");
+      },
+      setItem: () => {
+        throw new Error("blocked");
+      },
+    };
+    vi.stubGlobal("localStorage", throwing);
+    expect(readMisses(id)).toEqual([]);
+  });
+
+  it("missedItems maps stored prompts back to bank items in stored order, skipping unknowns", () => {
+    const p0 = GRAMMAR_BANK[0]!.prompt;
+    const p5 = GRAMMAR_BANK[5]!.prompt;
+    const items = missedItems(GRAMMAR_BANK, [p5, "not-a-real-prompt", p0]);
+    expect(items.map((i) => i.prompt)).toEqual([p5, p0]);
   });
 });

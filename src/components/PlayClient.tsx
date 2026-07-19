@@ -49,7 +49,7 @@ const GAMES: {
     id: "grammar-snap",
     emoji: "📝",
     title: "Grammar Snap",
-    hook: "Your vs. you're — settle it once and for all.",
+    hook: "60+ classic snags across ten topics — it remembers the ones that get you.",
     tint: "bg-cat-sky",
     bestLabel: (v) => `best ${v}/8`,
   },

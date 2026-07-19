@@ -1,5 +1,31 @@
 # Progress log
 
+## 2026-07-19 — Grammar Snap 10×: 66-item topic bank + tricky-ones practice (Fable)
+
+**Bank:** GRAMMAR_BANK grew 16 → 66 items across ten topics (sound-alikes,
+apostrophes, agreement, pronouns, comparisons, tricky verb pairs, past
+tense, word choice, double negatives), each with a kind memory-hook note.
+`QuizItem` gained `topic`; `QUIZ_TOPIC_LABELS` renders a small chip on
+questions.
+
+**Picker:** `pickQuizRounds` now guarantees topic spread (≤2 per topic per
+draw, shortfall fill) so a run never becomes eight rounds of its/it's.
+
+**Practice loop (the real 10× move, engine-level so Spell Check gets it
+free):** wrong answers are remembered per game (localStorage, deduped,
+capped 40); once ≥3 pile up the game opens with a chooser — "My tricky
+ones (N)" vs "Fresh eight". Practice runs replay exactly the missed
+prompts; a correct answer redeems it off the list ("Redeemed — off the
+tricky list it goes"), practice never touches the personal best, and full
+clears get "Full redemption — every one of those had beaten you before.
+Not anymore."
+
+**Verified in browser:** fresh run 5/8 → 3 misses recorded → chooser
+rendered with count + best chip → practice run → "3 of 3, Full
+redemption" → localStorage miss list = 0; mobile question layout with
+topic chip. Gates: lint 0/0, typecheck, tests (subagent extending
+games.test.ts), build.
+
 ## 2026-07-19 — Word games: Grammar Snap + Spell Check (Fable)
 
 Extended the Brain Breaks arcade (wave 3) with two language games built on
