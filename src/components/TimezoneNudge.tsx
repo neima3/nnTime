@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Globe, Loader2 } from "lucide-react";
 import { detectTimezone } from "@/lib/timezone";
+import { notifyDayChanged } from "./NowBar";
 
 const DISMISS_KEY = "kairo-tz-nudge-dismissed";
 
@@ -59,6 +60,8 @@ export function TimezoneNudge({ zone }: { zone: string }) {
       });
       if (res.ok) {
         setHidden(true);
+        // The NowBar caches the day in the old zone — tell it to refetch.
+        notifyDayChanged();
         router.refresh();
         return;
       }

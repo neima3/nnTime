@@ -1,5 +1,37 @@
 # Progress log
 
+## 2026-07-19 — agent-browser QA sweep of the 10x ADHD program (Fable)
+
+Full signed-in dogfood of commit 95e1e28's features using the agent-browser
+CLI (real Chrome, trusted clicks) against local dev + kairo_dev.
+
+**Verified working end-to-end:** sign-in; TimezoneNudge UTC→America/New_York
+(day re-resolves, header/date/now-line all correct across the zone change);
+adaptive timeline hours (4 AM block on-canvas + clickable); checklist step
+persistence; QuickCapture (`c` → type → Enter → task in inbox, sheet UI);
+completion celebration (10 particles + persisted done); DayLoadMeter ("3.8 h
+planned · a light day"); PickForMe (ranking, "Something else" re-roll, honest
+slipped-copy); focus flow (linked session start, live tab-title countdown
+"59:57 · …", session-done "N min of real focus" screen, 5-min break timer
+with "☕ 04:58 break" tab title); OneThing empty state.
+
+**Bugs found & fixed:**
+1. PickForMe's "Start N min" link dropped `activityId` — focus sessions from
+   a pick weren't linked to the activity (breaks time-truth logging). Now
+   passes it for activity candidates (verified via HMR: href carries the id).
+2. TimezoneNudge didn't refresh the NowBar after switching zones — the bar
+   kept showing the old-zone day until reload. Now fires `notifyDayChanged()`.
+3. InstallPrompt covered the last timeline block's Complete button
+   (agent-browser's covered-element check caught it). Desktop position moved
+   bottom-left + 15 s session-only auto-hide (re-offers next visit;
+   permanent dismissal unchanged).
+
+**Tooling notes:** agent-browser daemon needed one restart (wedged snapshot);
+`find role button click` intermittently misses — ref-clicks via `snapshot -i`
+are reliable. Claude's in-app browser pane remains flaky (0×0 viewport after
+navigation; screenshot-first unwedges).
+
+**Gates:** lint, typecheck, 161 tests (20 files), build — green.
 ## 2026-07-19 — 10× ADHD program: all 10 phases shipped (Fable)
 
 **Plan:** `docs/plans/2026-07-18-10x-adhd-roadmap.md` (all boxes ticked) +

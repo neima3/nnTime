@@ -61,6 +61,9 @@ export function PickForMe({
     title: pick.title,
     emoji: pick.emoji,
     duration: String(pick.durationMin),
+    // Activities carry their id so the session links back for time-truth
+    // logging; loose tasks have no activity to link.
+    ...(pick.kind !== "task" ? { activityId: pick.id } : {}),
   })}`;
 
   return (

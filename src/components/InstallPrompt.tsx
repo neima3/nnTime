@@ -35,10 +35,18 @@ export function InstallPrompt() {
     try { localStorage.setItem("kairo-install-dismissed", "1"); } catch {}
   };
 
+  // Auto-hide (session-only, no persistence) so the card never sits over
+  // timeline controls indefinitely — it re-offers on the next visit.
+  useEffect(() => {
+    if (!deferredPrompt) return;
+    const t = window.setTimeout(() => setDismissed(true), 15000);
+    return () => window.clearTimeout(t);
+  }, [deferredPrompt]);
+
   if (!deferredPrompt || dismissed || !inApp) return null;
 
   return (
-    <div className="fixed bottom-[10rem] left-1/2 z-40 w-[90%] max-w-sm -translate-x-1/2 rounded-2xl border border-border bg-surface p-4 shadow-float md:bottom-6 md:left-auto md:right-6 md:translate-x-0">
+    <div className="fixed bottom-[10rem] left-1/2 z-40 w-[90%] max-w-sm -translate-x-1/2 rounded-2xl border border-border bg-surface p-4 shadow-float md:bottom-6 md:left-6 md:right-auto md:translate-x-0">
       <div className="flex items-start gap-3">
         <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-iris-ghost text-xl">
           ◔
