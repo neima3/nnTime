@@ -91,12 +91,15 @@ export function FocusClient({
   defaultEmoji,
   defaultDurationMin,
   activityId,
+  occurrenceKey,
   steps = [],
 }: {
   defaultTitle: string;
   defaultEmoji: string;
   defaultDurationMin: number;
   activityId?: string;
+  /** Occurrence identity for checklist writes on recurring series. */
+  occurrenceKey?: string;
   steps?: string[];
 }) {
   const router = useRouter();
@@ -113,6 +116,63 @@ export function FocusClient({
   const [finished, setFinished] = useState<{ focusedMin: number } | null>(null);
   /** Local break countdown (no server session): seconds left, null = no break. */
   const [breakSec, setBreakSec] = useState<number | null>(null);
+  /** Linked activity's checklist (wave 4: tick steps mid-session). */
+  const [checklist, setChecklist] = useState<{ label: string; done: boolean }[] | null>(null);
+  const [checklistRev, setChecklistRev] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!activityId) return;
+    let cancelled = false;
+    fetch(`/api/v1/activities/${activityId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((a) => {
+        if (cancelled || !a) return;
+        if (Array.isArray(a.checklistTemplate) && a.checklistTemplate.length > 0) {
+          setChecklist(
+            a.checklistTemplate.map((x: { label?: string; done?: boolean }) => ({
+              label: String(x?.label ?? ""),
+              done: Boolean(x?.done),
+            })),
+          );
+          setChecklistRev(a.revision);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [activityId]);
+
+  const toggleStep = useCallback(
+    async (i: number) => {
+      if (!activityId || !checklist || checklistRev == null) return;
+      const next = checklist.map((c, k) => (k === i ? { ...c, done: !c.done } : c));
+      setChecklist(next);
+      try {
+        const res = await fetch(`/api/v1/activities/${activityId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "If-Match": String(checklistRev),
+          },
+          body: JSON.stringify({
+            editScope: "this",
+            occurrenceKey: occurrenceKey || undefined,
+            checklistOverride: next,
+          }),
+        });
+        if (!res.ok) {
+          setChecklist(checklist);
+          return;
+        }
+        const updated = await res.json();
+        if (updated?.revision != null) setChecklistRev(updated.revision);
+      } catch {
+        setChecklist(checklist);
+      }
+    },
+    [activityId, checklist, checklistRev, occurrenceKey],
+  );
 
   const hydrate = useCallback(async () => {
     try {
@@ -577,14 +637,29 @@ export function FocusClient({
         </div>
       )}
 
-      {steps.length > 0 && (
-        <ul className="mt-6 w-full max-w-sm space-y-1.5 rounded-2xl border border-border bg-surface p-4 shadow-card">
+      {(checklist ?? steps.map((s) => ({ label: s, done: false }))).length > 0 && (
+        <ul className="mt-6 w-full max-w-sm space-y-1 rounded-2xl border border-border bg-surface p-4 shadow-card">
           <li className="mb-1 text-[11px] font-bold uppercase tracking-wide text-ink-faint">
             Steps
           </li>
-          {steps.map((s, i) => (
-            <li key={i} className="text-[14px] font-medium text-ink-soft">
-              ○ {s}
+          {(checklist ?? steps.map((s) => ({ label: s, done: false }))).map((s, i) => (
+            <li key={i}>
+              {checklist ? (
+                <button
+                  type="button"
+                  aria-pressed={s.done}
+                  onClick={() => void toggleStep(i)}
+                  className={`w-full rounded-lg px-1.5 py-1 text-left text-[14px] font-medium transition-colors hover:bg-surface-sunken ${
+                    s.done ? "text-ink-faint line-through" : "text-ink-soft"
+                  }`}
+                >
+                  {s.done ? "✓" : "○"} {s.label}
+                </button>
+              ) : (
+                <span className="text-[14px] font-medium text-ink-soft">
+                  ○ {s.label}
+                </span>
+              )}
             </li>
           ))}
         </ul>

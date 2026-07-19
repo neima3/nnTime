@@ -1,345 +1,319 @@
 "use client";
 
 /**
- * Onboarding — Phase 6A.
- *
- * Four-step flow that sets real user defaults via the DAL:
- * 1. Welcome → sign-up if not logged in
- * 2. Planning-feel quiz → sets notification preferences (reduced_stimulation,
- *    wrap-up nudges default ON, etc.)
- * 3. First routine pick → creates a routine from the templates library
- * 4. Notification opt-in → requests browser permission (user gesture required
- *    for iOS PWA push per ADR-004)
- *
- * Each step is skippable. On finish, redirects to /app/today.
+ * Onboarding 2.0 (wave 4) — build a real first day in under a minute.
+ * Three steps, all skippable, zero configuration dumps (research:
+ * over-configured onboarding is a top ADHD-app complaint):
+ *   1. Hello — name (optional) + auto-detected timezone confirm
+ *   2. Anchors — tap starter blocks; one Create makes real activities
+ *   3. Superpowers — the three things to remember, then into Today
+ * Signed-out users are sent to sign-up first (their day needs an account).
  */
-
 import { useEffect, useState } from "react";
-import { ArrowRight, Bell, Check } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ArrowRight, Check, Loader2 } from "lucide-react";
+import { detectTimezone } from "@/lib/timezone";
+import { clientToday } from "@/lib/client-date";
+import { localMinutesToInstant } from "@/lib/adapters";
 
-function StepFrame({ step, children }: { step: number; children: React.ReactNode }) {
-  return (
-    <section className="mx-auto w-full max-w-md">
-      <p className="mb-3 text-center text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
-        Step {step} of 4
-      </p>
-      <div className="rounded-[2rem] border border-border bg-surface p-8 shadow-float">
-        <div className="mb-7 flex justify-center gap-2" aria-hidden>
-          {[1, 2, 3, 4].map((i) => (
-            <span
-              key={i}
-              className={`h-2 rounded-full transition-all ${
-                i === step ? "w-6 bg-iris" : "w-2 bg-border-strong"
-              }`}
-            />
-          ))}
-        </div>
-        {children}
-      </div>
-    </section>
-  );
+interface Anchor {
+  emoji: string;
+  title: string;
+  startMin: number;
+  durationMin: number;
+  /** Daily anchors repeat; one-offs don't. */
+  daily: boolean;
+  hint: string;
 }
 
-const quizOptions = [
-  { id: "slip", emoji: "🌊", label: "Plans slip away from me" },
-  { id: "start", emoji: "🚪", label: "Starting is the hardest part" },
-  { id: "time", emoji: "⏳", label: "I lose track of time completely" },
-  { id: "chaos", emoji: "🌪️", label: "Too many thoughts, no order" },
+const ANCHORS: Anchor[] = [
+  { emoji: "🌤", title: "Morning reset", startMin: 8 * 60, durationMin: 30, daily: true, hint: "8:00 · every day" },
+  { emoji: "💊", title: "Meds + breakfast", startMin: 8 * 60 + 30, durationMin: 15, daily: true, hint: "8:30 · every day" },
+  { emoji: "🎨", title: "Deep work block", startMin: 9 * 60 + 30, durationMin: 90, daily: false, hint: "9:30 · today" },
+  { emoji: "🍜", title: "Real lunch, no desk", startMin: 12 * 60 + 30, durationMin: 45, daily: false, hint: "12:30 · today" },
+  { emoji: "🏃", title: "Move a little", startMin: 17 * 60, durationMin: 30, daily: false, hint: "17:00 · today" },
+  { emoji: "🌙", title: "Wind-down", startMin: 21 * 60 + 30, durationMin: 30, daily: true, hint: "21:30 · every day" },
 ];
 
-const templatePick = [
-  { id: "tpl_morning_gentle", emoji: "🌤️", title: "Gentle morning", meta: "3 steps · 40 min" },
-  { id: "tpl_work_launch", emoji: "🚀", title: "Launch into work", meta: "3 steps · 1 h" },
-  { id: "tpl_soft_landing", emoji: "🌙", title: "Soft landing", meta: "3 steps · 45 min" },
-];
+function StepDots({ step }: { step: number }) {
+  return (
+    <div className="mb-6 flex items-center justify-center gap-2" aria-label={`Step ${step} of 3`}>
+      {[1, 2, 3].map((s) => (
+        <span
+          key={s}
+          className={
+            s === step
+              ? "h-2 w-6 rounded-full bg-iris"
+              : "size-2 rounded-full bg-border-strong"
+          }
+        />
+      ))}
+    </div>
+  );
+}
 
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
-  const [quizPicks, setQuizPicks] = useState<Set<string>>(new Set());
-  const [templateId, setTemplateId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [name, setName] = useState("");
+  const [authed, setAuthed] = useState<boolean | null>(null);
+  const [picked, setPicked] = useState<Set<number>>(() => new Set([0, 2, 5]));
+  const [busy, setBusy] = useState(false);
+  const [createdCount, setCreatedCount] = useState<number | null>(null);
+  const [zone, setZone] = useState("UTC");
 
-  // Check auth on mount — redirect to sign-up if not logged in.
   useEffect(() => {
-    fetch("/api/auth/get-session")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data?.user?.id) {
-          router.push("/sign-up?next=/onboarding");
-        }
+    /* eslint-disable react-hooks/set-state-in-effect */
+    const z = detectTimezone();
+    setZone(z);
+    /* eslint-enable react-hooks/set-state-in-effect */
+    let cancelled = false;
+    // Seed timezone on the settings row while we're here (idempotent).
+    fetch("/api/v1/settings", { headers: { "x-timezone": z } })
+      .then((r) => {
+        if (!cancelled) setAuthed(r.ok);
       })
       .catch(() => {
-        // Not logged in — let them see the welcome step.
+        if (!cancelled) setAuthed(false);
       });
-  }, [router]);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  const toggleQuiz = (id: string) => {
-    setQuizPicks((prev) => {
+  const toggle = (i: number) => {
+    setPicked((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
       return next;
     });
   };
 
-  const saveSettings = async () => {
-    setSaving(true);
-    try {
-      // Save quiz-derived preferences via the settings endpoint.
-      const prefs: Record<string, unknown> = {};
-      if (quizPicks.has("time")) prefs.wrapUpNudges = true;
-      if (quizPicks.has("start")) prefs.breakItDownDefault = true;
-      if (quizPicks.has("chaos")) prefs.reducedStimulation = true;
-
-      // GET current settings to get revision, then PATCH.
-      const getRes = await fetch("/api/v1/settings");
-      if (getRes.ok) {
-        const settings = await getRes.json();
-        await fetch("/api/v1/settings", {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "If-Match": String(settings.revision ?? 1),
-          },
-          body: JSON.stringify({
-            notificationPrefs: prefs,
-            ...(quizPicks.has("chaos") ? { reducedStimulation: true } : {}),
-          }),
-        });
-      }
-    } catch {
-      // Settings save is best-effort; onboarding continues regardless.
-    }
-    setSaving(false);
-  };
-
-  const saveTemplate = async () => {
-    if (!templateId) return;
-    setSaving(true);
-    try {
-      // Create a routine from the picked template via the API.
-      const templates: Record<string, { title: string; emoji: string }> = {
-        tpl_morning_gentle: { title: "Gentle morning", emoji: "🌤️" },
-        tpl_work_launch: { title: "Launch into work", emoji: "🚀" },
-        tpl_soft_landing: { title: "Soft landing", emoji: "🌙" },
-      };
-      const tpl = templates[templateId];
-      if (tpl) {
-        await fetch("/api/v1/activities", {
+  const createAnchors = async () => {
+    setBusy(true);
+    const today = clientToday(zone);
+    let created = 0;
+    for (const i of [...picked].sort((a, b) => a - b)) {
+      const a = ANCHORS[i]!;
+      try {
+        const res = await fetch("/api/v1/activities", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            tz: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-            dtstartLocal: new Date().toISOString(),
-            title: tpl.title,
-            emoji: tpl.emoji,
-            durationMin: 40,
+            tz: zone,
+            dtstartLocal: localMinutesToInstant(today, a.startMin, zone),
+            rrule: a.daily ? "FREQ=DAILY" : null,
+            title: a.title,
+            emoji: a.emoji,
+            durationMin: a.durationMin,
             source: "manual",
           }),
         });
-      }
-    } catch {
-      // Best-effort; onboarding continues.
+        if (res.ok) created++;
+      } catch {}
     }
-    setSaving(false);
-  };
-
-  const requestNotifications = async () => {
-    try {
-      if ("Notification" in window) {
-        await Notification.requestPermission();
-      }
-    } catch {
-      // Permission request failed — not critical.
-    }
-    router.push("/app/today");
+    setCreatedCount(created);
+    setBusy(false);
+    setStep(3);
   };
 
   return (
-    <div className="min-h-dvh bg-canvas px-4 py-12">
-      {step === 1 && (
-        <StepFrame step={1}>
-          <div className="text-center">
-            <span className="mx-auto grid size-16 place-items-center rounded-3xl bg-iris text-3xl text-ink-inverse shadow-float">
-              ◔
-            </span>
-            <h2 className="mt-6 font-display text-3xl font-bold leading-tight">
-              Time you can see.
-            </h2>
-            <p className="mx-auto mt-3 max-w-xs text-[15px] leading-relaxed text-ink-soft">
-              Kairo turns your day into shapes and colors your brain can actually
-              hold onto. No shame, no streak-guilt, no 47 features on day one.
-            </p>
-            <button
-              onClick={() => setStep(2)}
-              className="mt-7 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-iris py-3.5 text-[15px] font-semibold text-ink-inverse shadow-card"
-            >
-              Let&apos;s set you up
-              <ArrowRight size={17} />
-            </button>
-            <button
-              onClick={() => router.push("/app/today")}
-              className="mt-2.5 w-full py-2 text-[13px] font-semibold text-ink-faint"
-            >
-              I&apos;ll explore on my own
-            </button>
-          </div>
-        </StepFrame>
-      )}
-
-      {step === 2 && (
-        <StepFrame step={2}>
-          <h2 className="font-display text-2xl font-bold leading-tight">
-            What does planning usually feel like?
-          </h2>
-          <p className="mt-1.5 text-[14px] text-ink-soft">
-            Pick any that ring true — this tunes your defaults, nothing else.
-          </p>
-          <div className="mt-5 space-y-2">
-            {quizOptions.map((o) => (
-              <button
-                key={o.id}
-                onClick={() => toggleQuiz(o.id)}
-                className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition-all ${
-                  quizPicks.has(o.id)
-                    ? "border-iris bg-iris-ghost"
-                    : "border-border bg-surface hover:border-border-strong"
-                }`}
-              >
-                <span className="text-xl" aria-hidden>
-                  {o.emoji}
-                </span>
-                <span className="flex-1 text-[14.5px] font-semibold">{o.label}</span>
-                <span
-                  className={`grid size-6 place-items-center rounded-full ${
-                    quizPicks.has(o.id)
-                      ? "bg-iris text-ink-inverse"
-                      : "border-2 border-border-strong"
-                  }`}
-                >
-                  {quizPicks.has(o.id) && <Check size={13} strokeWidth={3} />}
-                </span>
-              </button>
-            ))}
-          </div>
-          <p className="mt-3 rounded-xl bg-surface-sunken px-3 py-2 text-[12px] leading-snug text-ink-soft">
-            e.g. &ldquo;Starting is hardest&rdquo; → AI break-it-down is surfaced
-            on every task; &ldquo;lose track of time&rdquo; → wrap-up nudges
-            default ON.
-          </p>
-          <button
-            onClick={async () => {
-              await saveSettings();
-              setStep(3);
-            }}
-            disabled={saving}
-            className="mt-5 w-full rounded-2xl bg-iris py-3.5 text-[15px] font-semibold text-ink-inverse shadow-card disabled:opacity-50"
-          >
-            {saving ? "Saving…" : "Continue"}
-          </button>
-        </StepFrame>
-      )}
-
-      {step === 3 && (
-        <StepFrame step={3}>
-          <h2 className="font-display text-2xl font-bold leading-tight">
-            Start with one routine
-          </h2>
-          <p className="mt-1.5 text-[14px] text-ink-soft">
-            Something small that happens most days. You can change everything later.
-          </p>
-          <div className="mt-5 space-y-2">
-            {templatePick.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setTemplateId(t.id)}
-                className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition-all ${
-                  templateId === t.id
-                    ? "border-iris bg-iris-ghost"
-                    : "border-border bg-surface hover:border-border-strong"
-                }`}
-              >
-                <span className="grid size-11 place-items-center rounded-2xl bg-surface-sunken text-xl">
-                  {t.emoji}
-                </span>
-                <span className="flex-1">
-                  <span className="block text-[14.5px] font-semibold">{t.title}</span>
-                  <span className="tnum block text-[12px] font-medium text-ink-soft">
-                    {t.meta}
-                  </span>
-                </span>
-                {templateId === t.id && (
-                  <span className="grid size-6 place-items-center rounded-full bg-iris text-ink-inverse">
-                    <Check size={13} strokeWidth={3} />
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={async () => {
-              await saveTemplate();
-              setStep(4);
-            }}
-            disabled={saving || !templateId}
-            className="mt-5 w-full rounded-2xl bg-iris py-3.5 text-[15px] font-semibold text-ink-inverse shadow-card disabled:opacity-50"
-          >
-            {saving ? "Adding…" : "Add to my mornings"}
-          </button>
-          <button
-            onClick={() => setStep(4)}
-            className="mt-2.5 w-full py-2 text-[13px] font-semibold text-ink-faint"
-          >
-            Skip — start from a blank day
-          </button>
-        </StepFrame>
-      )}
-
-      {step === 4 && (
-        <StepFrame step={4}>
-          <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-iris-soft text-iris">
-            <Bell size={26} />
+    <main className="grid min-h-dvh place-items-center bg-canvas px-5 py-10">
+      <div className="w-full max-w-md">
+        <Link href="/" className="mb-8 flex items-center justify-center gap-2.5">
+          <span className="grid size-9 place-items-center rounded-xl bg-iris text-lg text-ink-inverse shadow-card">
+            ◔
           </span>
-          <h2 className="mt-5 text-center font-display text-2xl font-bold leading-tight">
-            Gentle nudges, only if you want them
-          </h2>
-          <p className="mx-auto mt-1.5 max-w-xs text-center text-[14px] leading-relaxed text-ink-soft">
-            A soft chime when something starts, a heads-up before it ends. Never
-            a guilt trip. Change any of it in Settings.
-          </p>
-          <div className="mt-5 space-y-2 text-[14px] font-semibold">
-            {["When an activity starts", "5 minutes before it ends"].map((l) => (
-              <div
-                key={l}
-                className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3"
-              >
-                {l}
-                <span className="relative inline-flex h-7 w-12 rounded-full bg-iris">
-                  <span className="absolute top-0.5 size-6 translate-x-[22px] rounded-full bg-surface-raised shadow-card" />
+          <span className="font-display text-xl font-bold tracking-tight">Kairo</span>
+        </Link>
+
+        <div className="rounded-3xl border border-border bg-surface p-7 shadow-float">
+          <StepDots step={step} />
+
+          {step === 1 && (
+            <div className="rise-in">
+              <h1 className="font-display text-2xl font-bold tracking-tight">
+                A minute of setup. Genuinely one minute.
+              </h1>
+              <p className="mt-2 text-[14.5px] leading-relaxed text-ink-soft">
+                No 20-question quiz — planners that start with homework never
+                get opened twice.
+              </p>
+              <label className="mt-5 block">
+                <span className="mb-1.5 block text-[13px] font-semibold text-ink-soft">
+                  What should we call you? (optional)
                 </span>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Just a first name is plenty"
+                  className="w-full rounded-xl border border-border bg-surface-sunken px-3.5 py-2.5 text-[15px] outline-none transition-colors placeholder:text-ink-faint focus:border-iris focus:bg-surface focus:ring-2 focus:ring-iris/30"
+                />
+              </label>
+              <p className="mt-3 text-[13px] text-ink-soft">
+                Planning timezone:{" "}
+                <span className="font-semibold text-ink">{zone}</span>{" "}
+                <span className="text-ink-faint">
+                  (auto-detected — change anytime in Settings)
+                </span>
+              </p>
+              <button
+                type="button"
+                onClick={() => setStep(2)}
+                className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-iris py-3 text-[15px] font-semibold text-ink-inverse shadow-card transition-all hover:bg-iris-deep active:scale-[0.98]"
+              >
+                Next <ArrowRight size={16} />
+              </button>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div className="rise-in">
+              <h1 className="font-display text-2xl font-bold tracking-tight">
+                {name.trim() ? `${name.trim()}, pick` : "Pick"} your anchors.
+              </h1>
+              <p className="mt-2 text-[14.5px] leading-relaxed text-ink-soft">
+                A day with two or three anchors already has a shape. Tap what
+                fits — times are just starting points, drag them later.
+              </p>
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                {ANCHORS.map((a, i) => {
+                  const on = picked.has(i);
+                  return (
+                    <button
+                      key={a.title}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => toggle(i)}
+                      className={`rounded-2xl border p-3 text-left transition-all active:scale-[0.98] ${
+                        on
+                          ? "border-iris bg-iris-soft shadow-card"
+                          : "border-border bg-surface hover:bg-surface-sunken"
+                      }`}
+                    >
+                      <span className="flex items-start justify-between">
+                        <span className="text-xl" aria-hidden>
+                          {a.emoji}
+                        </span>
+                        {on && (
+                          <Check size={15} className="text-iris" strokeWidth={3} />
+                        )}
+                      </span>
+                      <span className="mt-1.5 block text-[13.5px] font-bold leading-tight">
+                        {a.title}
+                      </span>
+                      <span className="tnum mt-0.5 block text-[11.5px] font-medium text-ink-soft">
+                        {a.hint}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-          <button
-            onClick={requestNotifications}
-            className="mt-5 w-full rounded-2xl bg-iris py-3.5 text-[15px] font-semibold text-ink-inverse shadow-card"
-          >
-            Turn on notifications
-          </button>
-          <button
-            onClick={() => router.push("/app/today")}
-            className="mt-2.5 w-full py-2 text-[13px] font-semibold text-ink-faint"
-          >
-            Maybe later — take me to Today
-          </button>
-          <p className="mt-3 text-center text-[11.5px] text-ink-soft">
-            The browser permission prompt fires only after this button (user
-            gesture — required for iOS PWA push).
-          </p>
-        </StepFrame>
-      )}
-    </div>
+
+              {authed === false ? (
+                <div className="mt-6">
+                  <p className="text-[13px] text-ink-soft">
+                    You&apos;ll need a (free) planner to save these:
+                  </p>
+                  <Link
+                    href="/sign-up"
+                    className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-iris py-3 text-[15px] font-semibold text-ink-inverse shadow-card transition-all hover:bg-iris-deep"
+                  >
+                    Create my planner <ArrowRight size={16} />
+                  </Link>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  disabled={busy || picked.size === 0 || authed == null}
+                  onClick={() => void createAnchors()}
+                  className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-iris py-3 text-[15px] font-semibold text-ink-inverse shadow-card transition-all hover:bg-iris-deep active:scale-[0.98] disabled:opacity-60"
+                >
+                  {busy ? (
+                    <Loader2 size={17} className="animate-spin" />
+                  ) : (
+                    <>
+                      Create {picked.size} anchor{picked.size === 1 ? "" : "s"}
+                      <ArrowRight size={16} />
+                    </>
+                  )}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setStep(3)}
+                className="mt-2 w-full rounded-2xl py-2.5 text-[13px] font-semibold text-ink-faint hover:bg-surface-sunken"
+              >
+                Skip — I&apos;ll build my own
+              </button>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="rise-in">
+              <h1 className="font-display text-2xl font-bold tracking-tight">
+                {createdCount != null && createdCount > 0
+                  ? `${createdCount} anchor${createdCount === 1 ? "" : "s"} on your timeline.`
+                  : "You're in."}
+              </h1>
+              <p className="mt-2 text-[14.5px] text-ink-soft">
+                Three superpowers worth remembering:
+              </p>
+              <ul className="mt-4 space-y-3">
+                <li className="flex items-start gap-3 rounded-2xl border border-border bg-surface-sunken p-3.5">
+                  <kbd className="rounded-lg bg-surface px-2 py-1 font-mono text-[13px] font-bold shadow-card">
+                    C
+                  </kbd>
+                  <div>
+                    <p className="text-[14px] font-bold">Capture anything, anywhere</p>
+                    <p className="text-[12.5px] text-ink-soft">
+                      A thought lands in your inbox in three seconds — head stays clear.
+                    </p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3 rounded-2xl border border-border bg-surface-sunken p-3.5">
+                  <span className="text-lg" aria-hidden>
+                    🎲
+                  </span>
+                  <div>
+                    <p className="text-[14px] font-bold">&ldquo;Pick for me&rdquo; when stuck</p>
+                    <p className="text-[12.5px] text-ink-soft">
+                      One button chooses your next thing. Starting stops being a decision.
+                    </p>
+                  </div>
+                </li>
+                <li className="flex items-start gap-3 rounded-2xl border border-border bg-surface-sunken p-3.5">
+                  <span className="text-lg" aria-hidden>
+                    🃏
+                  </span>
+                  <div>
+                    <p className="text-[14px] font-bold">Brain breaks are built in</p>
+                    <p className="text-[12.5px] text-ink-soft">
+                      Two-minute games between things — rest that actually ends.
+                    </p>
+                  </div>
+                </li>
+              </ul>
+              <button
+                type="button"
+                onClick={() => {
+                  router.push("/app/today");
+                  router.refresh();
+                }}
+                className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-iris py-3 text-[15px] font-semibold text-ink-inverse shadow-card transition-all hover:bg-iris-deep active:scale-[0.98]"
+              >
+                See my day <ArrowRight size={16} />
+              </button>
+            </div>
+          )}
+        </div>
+
+        <p className="mt-5 text-center text-[13px] text-ink-faint">
+          Every step is skippable. Nothing here is a commitment.
+        </p>
+      </div>
+    </main>
   );
 }

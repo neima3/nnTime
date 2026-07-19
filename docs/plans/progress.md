@@ -1,5 +1,45 @@
 # Progress log
 
+## 2026-07-19 — 10× ADHD wave 4: first-run & frictionless (Fable)
+
+**Plan:** `docs/plans/2026-07-19-10x-adhd-wave4-roadmap.md`.
+
+**Shipped (all browser-verified on a fresh account, qa-w4@kairo.test):**
+1. **Onboarding 2.0** — 3 skippable steps, ≤60 s: name+auto-timezone →
+   "pick your anchors" (6 starter blocks, tap-to-toggle, one Create makes
+   real activities; daily ones get FREQ=DAILY) → superpowers card (C /
+   Pick-for-me / brain breaks). Verified: fresh account → 3 anchors on
+   Today with NowBar/Up-next live.
+2. **Command palette** — ⌘K/Ctrl+K, fuzzy subsequence across nav + actions
+   (capture, one-thing, new activity, review, play…), keyboard-first.
+   Verified: "cap" → Quick capture opens via Enter.
+3. **Inbox gardening** — "resting N days" butter chips at ≥7 d; ≥3 old →
+   "🪴 Tend the garden?" card with one-by-one Keep/Schedule/Let-go flow
+   (deletion verified server-side, tombstoned).
+4. **Editor friction** — free minute input (5–480) + duration chips
+   (15/25/45/60/90) + start chips Now/+30/Tonight 20:00. Verified: Tonight
+   + 35 min → block at 20:00 local.
+5. **Focus checklist ticks** — linked sessions fetch the activity checklist
+   and steps are checkable mid-session (checklistOverride PATCH with
+   If-Match + occurrenceKey threaded through all focus links). Verified:
+   tick persisted to the day's occurrence.
+6. **PWA shortcuts** (subagent) — manifest shortcuts: New activity /
+   Quick capture (?capture=1 opens the sheet) / Focus / Brain breaks.
+7. **Slot it** — wand button on Anytime items: `firstFreeSlot` (pure,
+   exported) finds the first ≥30 min gap from now before 22:00 honoring
+   15-min snapping; creates the activity, clears the task. Verified:
+   "Slotted at 16:45" — correctly skipped a 15-min sliver and a busy block.
+
+**Phases 8–9 (subagent):** a11y fixes applied — nav landmark moved off the
+aside onto the real <nav>, Play card headings h3→h2, <main> landmarks on
+landing + onboarding. Deferred honestly: token-driven contrast (needs a
+design-token pass), TimelineCanvas nested-interactive pattern (needs an
+interaction redesign, flagged). Lighthouse mobile (dev server): / = 93,
+CLS 0; /app/today unmeasurable under next dev (dev-runtime artifact — re-
+measure on prod build). **Gates: lint 0/0, typecheck, 234 tests, build.**
+7 new firstFreeSlot tests (moved to src/lib/slots.ts).
+
+
 ## 2026-07-19 — Grammar Snap 10×: 66-item topic bank + tricky-ones practice (Fable)
 
 **Bank:** GRAMMAR_BANK grew 16 → 66 items across ten topics (sound-alikes,

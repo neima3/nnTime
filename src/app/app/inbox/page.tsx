@@ -39,6 +39,9 @@ async function loadInbox(): Promise<{ items: InboxItem[]; authed: boolean }> {
       tags: [] as string[],
       priority: (t.priority ?? "none") as "none" | "low" | "high",
       revision: t.revision,
+      ageDays: Math.floor(
+        (Date.now() - new Date(t.createdAt).getTime()) / 86400000,
+      ),
     })),
   };
 }

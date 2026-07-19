@@ -6,9 +6,13 @@
 
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarPlus, Check } from "lucide-react";
-import { catClasses, type CategoryId } from "@/lib/mock";
+import { CalendarPlus, Check, Wand2 } from "lucide-react";
+import { catClasses, fmt, type CategoryId } from "@/lib/mock";
+import { localMinutesToInstant } from "@/lib/adapters";
 import { toast } from "./Toast";
+import { firstFreeSlot } from "@/lib/slots";
+import { notifyDayChanged } from "./NowBar";
+
 
 export type AnytimeItem = {
   id: string;
@@ -22,13 +26,62 @@ export function AnytimeRail({
   items: initial,
   date,
   authed,
+  busy = [],
+  zone,
 }: {
   items: AnytimeItem[];
   date: string;
   authed: boolean;
+  /** Today's occupied [start,end) minute ranges, for Slot it. */
+  busy?: { start: number; end: number }[];
+  zone?: string;
 }) {
   const router = useRouter();
   const [items, setItems] = useState(initial);
+  const [slotting, setSlotting] = useState<string | null>(null);
+
+  /** Zero decisions: drop the task into the first real gap of the day. */
+  const slotIt = useCallback(
+    async (item: AnytimeItem) => {
+      if (!authed || !zone) return;
+      setSlotting(item.id);
+      try {
+        const now = new Date();
+        const nowMin = now.getHours() * 60 + now.getMinutes();
+        const start = firstFreeSlot(busy, nowMin, 30);
+        if (start == null) {
+          toast("Today's pretty full — tomorrow-you can have this one");
+          setSlotting(null);
+          return;
+        }
+        const res = await fetch("/api/v1/activities", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tz: zone,
+            dtstartLocal: localMinutesToInstant(date, start, zone),
+            title: item.title,
+            emoji: item.emoji,
+            durationMin: 30,
+            source: "manual",
+          }),
+        });
+        if (!res.ok) throw new Error();
+        await fetch(`/api/v1/tasks/${item.id}`, {
+          method: "DELETE",
+          headers: { "If-Match": String(item.revision) },
+        });
+        setItems((prev) => prev.filter((x) => x.id !== item.id));
+        toast(`Slotted at ${fmt(start)} — no deciding required`);
+        notifyDayChanged();
+        router.refresh();
+      } catch {
+        toast("Couldn't slot it — try Schedule instead");
+      }
+      setSlotting(null);
+    },
+    [authed, zone, busy, date, router],
+  );
 
   const schedule = useCallback(
     (item: AnytimeItem) => {
@@ -90,6 +143,16 @@ export function AnytimeRail({
               </span>
               {authed && (
                 <div className="flex shrink-0 items-center gap-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+                  <button
+                    type="button"
+                    aria-label={`Slot ${t.title} into the next free gap`}
+                    title="Slot it — first free gap"
+                    disabled={slotting === t.id}
+                    onClick={() => void slotIt(t)}
+                    className={`grid size-7 place-items-center rounded-lg ${cat.ink} hover:bg-surface-raised/50 disabled:opacity-50`}
+                  >
+                    <Wand2 size={14} />
+                  </button>
                   <button
                     type="button"
                     aria-label={`Schedule ${t.title}`}

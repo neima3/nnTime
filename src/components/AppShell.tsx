@@ -20,6 +20,7 @@ import { NowCard, NowProvider, NowStrip } from "./NowBar";
 import { CelebrationHost } from "./Celebration";
 import { QuickCapture } from "./QuickCapture";
 import { OneThing } from "./OneThing";
+import { CommandPalette } from "./CommandPalette";
 import { ToastHost } from "./Toast";
 
 const sidebarNav = [
@@ -76,11 +77,7 @@ export function AppShell({
         Skip to content
       </a>
       {/* desktop sidebar */}
-      <aside
-        className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-border bg-surface px-4 py-6 md:flex"
-        role="navigation"
-        aria-label="Main navigation"
-      >
+      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-border bg-surface px-4 py-6 md:flex">
         <Link href="/" className="flex items-center gap-2.5 px-2">
           <span className="grid size-9 place-items-center rounded-xl bg-iris text-lg text-ink-inverse shadow-card">
             ◔
@@ -90,7 +87,7 @@ export function AppShell({
           </span>
         </Link>
 
-        <nav className="mt-8 flex flex-col gap-1">
+        <nav aria-label="Main navigation" className="mt-8 flex flex-col gap-1">
           {sidebarNav.map(({ href, label, key, icon: Icon }) => {
             const isActive = key === active;
             return (
@@ -142,6 +139,7 @@ export function AppShell({
       <CelebrationHost />
       <QuickCapture />
       <OneThing />
+      <CommandPalette />
       <ToastHost />
 
       {/* mobile bottom bar */}

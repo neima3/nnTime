@@ -85,6 +85,7 @@ export default function LandingPage() {
         </div>
       </header>
 
+      <main>
       {/* hero */}
       <section className="mx-auto grid w-full max-w-6xl items-center gap-12 px-5 py-14 md:grid-cols-2 md:py-24">
         <div>
@@ -373,6 +374,7 @@ export default function LandingPage() {
           ))}
         </div>
       </section>
+      </main>
 
       <footer className="border-t border-border bg-surface">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-8 text-sm text-ink-soft">

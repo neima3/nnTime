@@ -157,7 +157,7 @@ export function PlayClient() {
                 </span>
               )}
             </div>
-            <h3 className="mt-3.5 font-display text-lg font-bold">{g.title}</h3>
+            <h2 className="mt-3.5 font-display text-lg font-bold">{g.title}</h2>
             <p className="mt-1 text-[13.5px] leading-relaxed text-ink-soft">
               {g.hook}
             </p>

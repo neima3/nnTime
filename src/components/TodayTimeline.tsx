@@ -206,6 +206,7 @@ export function TodayTimeline({
         emoji: act.emoji,
         duration: String(act.duration),
         activityId: act.id,
+        ...(act.occurrenceKey ? { occurrenceKey: act.occurrenceKey } : {}),
       });
       router.push(`/app/focus?${params}`);
     },

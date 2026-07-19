@@ -16,6 +16,8 @@ export default async function FocusPage({
       : 25;
   const activityId =
     typeof sp.activityId === "string" ? sp.activityId : undefined;
+  const occurrenceKey =
+    typeof sp.occurrenceKey === "string" ? sp.occurrenceKey : undefined;
 
   return (
     <AppShell active="focus">
@@ -24,6 +26,7 @@ export default async function FocusPage({
         defaultEmoji={emoji}
         defaultDurationMin={duration}
         activityId={activityId}
+        occurrenceKey={occurrenceKey}
       />
     </AppShell>
   );

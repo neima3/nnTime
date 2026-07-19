@@ -79,6 +79,20 @@ export function QuickCapture() {
     };
   }, []);
 
+  // Programmatic opens: command palette event + PWA shortcut (?capture=1).
+  useEffect(() => {
+    const onOpen = () => setOpen(true);
+    window.addEventListener("kairo:quick-capture", onOpen);
+    try {
+      if (new URLSearchParams(window.location.search).get("capture") === "1") {
+        /* eslint-disable react-hooks/set-state-in-effect */
+        setOpen(true);
+        /* eslint-enable react-hooks/set-state-in-effect */
+      }
+    } catch {}
+    return () => window.removeEventListener("kairo:quick-capture", onOpen);
+  }, []);
+
   // `c` opens capture from anywhere (outside inputs).
   useEffect(() => {
     function handler(e: KeyboardEvent) {

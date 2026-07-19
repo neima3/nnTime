@@ -256,6 +256,7 @@ export default async function TodayPage({
         emoji: upNext.emoji,
         duration: String(upNext.duration),
         activityId: upNext.id,
+        ...(upNext.occurrenceKey ? { occurrenceKey: upNext.occurrenceKey } : {}),
       }).toString()
     : "";
 
@@ -461,6 +462,11 @@ export default async function TodayPage({
             }))}
             date={date === "mock" ? new Date().toISOString().slice(0, 10) : date}
             authed={authed}
+            zone={zone || undefined}
+            busy={activities.map((a) => ({
+              start: a.start,
+              end: a.start + a.duration,
+            }))}
           />
 
           {authed && upNext && (

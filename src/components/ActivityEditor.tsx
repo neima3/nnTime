@@ -488,18 +488,71 @@ export function ActivityEditor(props: ActivityEditorProps) {
                 onChange={(e) => setStartMin(timeInputToMinutes(e.target.value))}
                 className="tnum rounded-xl border border-border bg-surface px-3 py-2 text-[14px] font-semibold text-ink"
               />
-              <select
-                value={durationMin}
-                onChange={(e) => setDurationMin(Number(e.target.value))}
-                className="tnum rounded-xl border border-border bg-surface px-3 py-2 text-[14px] font-semibold text-ink"
-                aria-label="Duration"
-              >
-                {[15, 30, 45, 60, 90, 120, 180].map((d) => (
-                  <option key={d} value={d}>
-                    {d < 60 ? `${d} min` : `${Math.floor(d / 60)} h${d % 60 ? ` ${d % 60} min` : ""}`}
-                  </option>
-                ))}
-              </select>
+              <span className="inline-flex items-center gap-1 rounded-xl border border-border bg-surface px-2 py-1">
+                <input
+                  type="number"
+                  min={5}
+                  max={480}
+                  step={5}
+                  value={durationMin}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    if (Number.isFinite(v)) setDurationMin(Math.max(5, Math.min(480, v)));
+                  }}
+                  aria-label="Duration in minutes"
+                  className="tnum w-14 bg-transparent py-1 text-right text-[14px] font-semibold text-ink outline-none"
+                />
+                <span className="text-[13px] font-medium text-ink-soft">min</span>
+              </span>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {/* Zero-decision helpers: start-time + duration one-taps. */}
+              {(
+                [
+                  {
+                    label: "Now",
+                    apply: () => {
+                      setDate(clientToday());
+                      const nowM = new Date().getHours() * 60 + new Date().getMinutes();
+                      setStartMin(Math.min(1425, Math.ceil(nowM / 15) * 15));
+                    },
+                  },
+                  {
+                    label: "+30 min",
+                    apply: () => {
+                      setDate(clientToday());
+                      const nowM = new Date().getHours() * 60 + new Date().getMinutes() + 30;
+                      setStartMin(Math.min(1425, Math.ceil(nowM / 15) * 15));
+                    },
+                  },
+                  { label: "Tonight 20:00", apply: () => setStartMin(20 * 60) },
+                ] as { label: string; apply: () => void }[]
+              ).map((c) => (
+                <button
+                  key={c.label}
+                  type="button"
+                  onClick={c.apply}
+                  className="rounded-lg bg-surface-sunken px-2.5 py-1 text-[12px] font-semibold text-ink-soft transition-colors hover:bg-iris-ghost hover:text-iris"
+                >
+                  {c.label}
+                </button>
+              ))}
+              <span className="mx-1 h-4 w-px bg-border" aria-hidden />
+              {[15, 25, 45, 60, 90].map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  aria-pressed={durationMin === d}
+                  onClick={() => setDurationMin(d)}
+                  className={`tnum rounded-lg px-2.5 py-1 text-[12px] font-semibold transition-colors ${
+                    durationMin === d
+                      ? "bg-iris-soft text-iris"
+                      : "bg-surface-sunken text-ink-soft hover:text-ink"
+                  }`}
+                >
+                  {d}m
+                </button>
+              ))}
             </div>
             {estimateRatio != null && (
               <p className="mt-1.5 text-[12px] text-ink-faint">
