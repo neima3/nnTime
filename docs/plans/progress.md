@@ -1,5 +1,38 @@
 # Progress log
 
+## 2026-07-19 — Kairo for iOS: native SwiftUI app, live-API verified (Fable)
+
+**New:** `ios/App` — a production-quality native iOS app (iOS 17+, XcodeGen,
+no signing yet) implementing the core loop against https://time.neima.me:
+- **Theme** (`KairoTheme.swift`): every Soft Focus token as exact light/dark
+  dynamic colors; Bricolage Grotesque / Onest / Spline Sans Mono bundled
+  (variable TTFs + OFL licenses, fetched by subagent); card/float shadows,
+  category palette enum.
+- **API client** (`KairoAPI.swift` actor): Better-Auth cookie sessions,
+  If-Match revisions, x-timezone seeding, typed errors; day/activities/
+  tasks/focus/settings endpoints.
+- **Screens:** SignIn (brand card, sign-up toggle), Today (proportional
+  timeline 1min=1.7pt, hour rules, now-line, adaptive day bounds, progress
+  ring header, branded Bricolage title, FAB), Editor sheet (emoji menu,
+  category dots, steppers + duration chips, repeat chips), Inbox (composer,
+  aging chips, swipe-to-delete), Focus (server-authoritative ring timer,
+  overtime counts up in butter, done state), More (timezone, web
+  superpowers, sign out).
+- **App icon** generated (iris field, ◔ mark).
+- **Tests:** XCUITest E2E flight — sign in with the labeled prod QA account,
+  create "iOS flight check", complete it, visit all tabs — **passes against
+  production** (30 s); screenshot tour test exports per-screen evidence
+  (browser-qa/ios-0*.png, light + dark captured).
+- Pre-existing Phase-7A SPM contract library left intact at `ios/Kairo`.
+
+**Fixed along the way:** XcodeGen Info.plist duplicate-task trap; SwiftUI
+`.frame(height:)` centering the timeline canvas (needed `alignment: .top`);
+`FocusState` name collision with SwiftUI's property wrapper.
+
+**Honest gaps:** no signing/TestFlight (needs Neima's Apple account);
+widgets/Live Activity/drag-reschedule are next per ios-adaptation.md;
+week view not in v1 (tab layout: Today/Inbox/Focus/More).
+
 ## 2026-07-19 — 10× ADHD wave 4: first-run & frictionless (Fable)
 
 **Plan:** `docs/plans/2026-07-19-10x-adhd-wave4-roadmap.md`.
