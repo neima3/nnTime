@@ -7,6 +7,8 @@ struct EditorSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     let date: String
+    /// When set, the sheet edits this block instead of creating.
+    let editing: DayBlock?
     @State var startMin: Int
     @State private var title = ""
     @State private var emoji = "📋"
@@ -16,9 +18,14 @@ struct EditorSheet: View {
     @State private var busy = false
     @State private var error: String?
 
-    init(date: String, startMin: Int) {
+    init(date: String, startMin: Int, editing: DayBlock? = nil) {
         self.date = date
-        _startMin = State(initialValue: startMin)
+        self.editing = editing
+        _startMin = State(initialValue: editing?.startMin ?? startMin)
+        _title = State(initialValue: editing?.title ?? "")
+        _emoji = State(initialValue: editing?.emoji ?? "📋")
+        _durationMin = State(initialValue: editing?.durationMin ?? 45)
+        if let cat = editing?.category { _category = State(initialValue: cat) }
     }
 
     enum Repeat: String, CaseIterable, Identifiable {
@@ -110,13 +117,47 @@ struct EditorSheet: View {
                             }
                         }
 
-                        // Repeats
+                        // Repeats (series-level; hidden while editing one block)
+                        if editing == nil {
                         section("Repeats") {
                             HStack(spacing: 6) {
                                 ForEach(Repeat.allCases) { r in
                                     chip(r.rawValue, selected: repeats == r) { repeats = r }
                                 }
                             }
+                        }
+                        }
+
+                        if editing != nil {
+                            VStack(spacing: 10) {
+                                Button {
+                                    guard let editing else { return }
+                                    NotificationCenter.default.post(
+                                        name: .kairoStartFocus,
+                                        object: nil,
+                                        userInfo: ["title": editing.title, "emoji": editing.emoji, "duration": editing.durationMin]
+                                    )
+                                    dismiss()
+                                } label: {
+                                    Label("Focus on this", systemImage: "timer")
+                                        .font(.kBody(15, weight: .semibold))
+                                        .foregroundStyle(Color.kIris)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 13)
+                                        .background(RoundedRectangle(cornerRadius: 14).fill(Color.kIrisGhost))
+                                }
+                                Button(role: .destructive) {
+                                    Task { await deleteEditing() }
+                                } label: {
+                                    Label("Delete activity", systemImage: "trash")
+                                        .font(.kBody(15, weight: .semibold))
+                                        .foregroundStyle(Color.kDanger)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 13)
+                                        .background(RoundedRectangle(cornerRadius: 14).fill(Color.kDangerSoft))
+                                }
+                            }
+                            .padding(.top, 4)
                         }
 
                         if let error {
@@ -128,7 +169,7 @@ struct EditorSheet: View {
                     .padding(20)
                 }
             }
-            .navigationTitle("New activity")
+            .navigationTitle(editing == nil ? "New activity" : "Edit activity")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -193,11 +234,45 @@ struct EditorSheet: View {
         )
     }
 
+    private func deleteEditing() async {
+        guard let editing else { return }
+        busy = true
+        do {
+            try await KairoAPI.shared.deleteActivity(activityId: editing.id, revision: editing.revision)
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            dismiss()
+        } catch let apiError as APIError {
+            error = apiError.errorDescription
+            busy = false
+        } catch {
+            self.error = "Couldn't delete — try again."
+            busy = false
+        }
+    }
+
     private func save() async {
         busy = true
         error = nil
         let categoryId = app.categoryMap.first(where: { $0.value == category })?.key
         do {
+            if let editing {
+                _ = try await KairoAPI.shared.updateActivity(
+                    activityId: editing.id,
+                    revision: editing.revision,
+                    patch: [
+                        "title": title.trimmingCharacters(in: .whitespaces),
+                        "emoji": emoji,
+                        "categoryId": categoryId,
+                        "durationMin": durationMin,
+                        "dtstartLocal": KTime.instant(date: date, minutes: startMin, zone: app.timezone),
+                        "tz": app.timezone.identifier,
+                    ]
+                )
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                dismiss()
+                busy = false
+                return
+            }
             _ = try await KairoAPI.shared.createActivity(
                 tz: app.timezone.identifier,
                 dtstartLocal: KTime.instant(date: date, minutes: startMin, zone: app.timezone),

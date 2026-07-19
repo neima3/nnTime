@@ -1,5 +1,23 @@
 # Progress log
 
+## 2026-07-19 — iOS round 3: edit, drag-to-reschedule, cleaner gestures (Fable)
+
+- **Tap to edit:** tapping a block opens the editor sheet prefilled
+  (title/emoji/category/time/duration); saving PATCHes with If-Match.
+  Repeat chips hidden in edit mode (occurrence edits keep the series rule).
+- **Drag-to-reschedule** (the ios-adaptation marquee interaction):
+  long-press lifts the block (scale + medium haptic), drag moves it,
+  release snaps to 15 minutes and PATCHes `editScope: this` + `startAt`
+  (success haptic). Long-press now means drag ONLY — the old context menu
+  conflicted, so Delete + "Focus on this" moved into the edit sheet as
+  proper actions (danger-soft delete, iris-ghost focus).
+- **Up next** line in the Today header card (emoji, title, "in N min").
+- **Test flight extended and self-healing:** asserts editor prefill, drags
+  the block ~60 min and verifies the accessibility label changed, then
+  deletes through the edit sheet in a loop that also sweeps leftovers from
+  any aborted runs (a real leak this session — purged server-side too).
+- Full XCUITest suite green against production (flow 57 s + tour).
+
 ## 2026-07-19 — iOS round 2: Week tab, day nav, context actions, launch polish (Fable)
 
 - **Week tab** (5-tab layout now matches the ios-adaptation spec): next 7

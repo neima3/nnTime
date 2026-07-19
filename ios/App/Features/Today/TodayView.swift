@@ -9,6 +9,7 @@ struct TodayView: View {
     @State private var loading = true
     @State private var nowMin = 0
     @State private var showEditor = false
+    @State private var editingBlock: DayBlock?
     @State private var editorStart = 9 * 60
     @State private var loadError: String?
     /// 0 = today, ±n days.
@@ -42,7 +43,9 @@ struct TodayView: View {
                                         object: nil,
                                         userInfo: ["title": block.title, "emoji": block.emoji, "duration": block.durationMin]
                                     )
-                                }
+                                },
+                                onOpen: { block in editingBlock = block },
+                                onMove: { block, newStart in Task { await move(block, to: newStart) } }
                             )
                             .padding(.horizontal, 16)
                             .padding(.bottom, 120)
@@ -106,6 +109,9 @@ struct TodayView: View {
             .sheet(isPresented: $showEditor, onDismiss: { Task { await load() } }) {
                 EditorSheet(date: date, startMin: editorStart)
             }
+            .sheet(item: $editingBlock, onDismiss: { Task { await load() } }) { block in
+                EditorSheet(date: date, startMin: block.startMin, editing: block)
+            }
             .refreshable { await load() }
         }
         .task { await load() }
@@ -134,6 +140,18 @@ struct TodayView: View {
 
     private var doneCount: Int { blocks.filter(\.done).count }
 
+    /// Earliest not-done block still ahead of now (today only).
+    private var upNext: DayBlock? {
+        blocks
+            .filter { !$0.done && $0.endMin > nowMin && $0.startMin > nowMin }
+            .min { $0.startMin < $1.startMin }
+    }
+
+    private func upNextMeta(_ block: DayBlock) -> String {
+        let inMin = block.startMin - nowMin
+        return inMin <= 90 ? "in \(inMin) min" : "at \(KTime.hhmm(block.startMin))"
+    }
+
     private var header: some View {
         HStack(spacing: 10) {
             if !blocks.isEmpty {
@@ -149,6 +167,21 @@ struct TodayView: View {
                 }
             }
             Spacer()
+            if dayOffset == 0, let next = upNext {
+                VStack(alignment: .trailing, spacing: 1) {
+                    Text("UP NEXT")
+                        .font(.kBody(9.5, weight: .bold))
+                        .kerning(1.1)
+                        .foregroundStyle(Color.kIris)
+                    Text("\(next.emoji) \(next.title)")
+                        .font(.kBody(12.5, weight: .semibold))
+                        .foregroundStyle(Color.kInk)
+                        .lineLimit(1)
+                    Text(upNextMeta(next))
+                        .font(.kMono(10.5, weight: .medium))
+                        .foregroundStyle(Color.kInkSoft)
+                }
+            }
         }
         .padding(14)
         .kCard(radius: 18)
@@ -222,6 +255,19 @@ struct TodayView: View {
         loading = false
     }
 
+    private func move(_ block: DayBlock, to newStartMin: Int) async {
+        do {
+            _ = try await KairoAPI.shared.moveActivity(
+                activityId: block.id,
+                revision: block.revision,
+                occurrenceKey: block.occurrenceKey,
+                startAt: KTime.instant(date: date, minutes: newStartMin, zone: app.timezone)
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        } catch {}
+        await load()
+    }
+
     private func remove(_ block: DayBlock) async {
         do {
             try await KairoAPI.shared.deleteActivity(activityId: block.id, revision: block.revision)
@@ -278,6 +324,8 @@ struct TimelineCanvas: View {
     let onComplete: (DayBlock) -> Void
     let onDelete: (DayBlock) -> Void
     let onFocus: (DayBlock) -> Void
+    let onOpen: (DayBlock) -> Void
+    let onMove: (DayBlock, Int) -> Void
 
     private let ptPerMin: CGFloat = 1.7
 
@@ -332,7 +380,13 @@ struct TimelineCanvas: View {
                     nowMin: nowMin,
                     onComplete: { onComplete(block) },
                     onDelete: { onDelete(block) },
-                    onFocus: { onFocus(block) }
+                    onFocus: { onFocus(block) },
+                    onOpen: { onOpen(block) },
+                    onMove: { delta in
+                        let snapped = ((block.startMin + delta + 7) / 15) * 15
+                        let clamped = max(0, min(23 * 60 + 45 - block.durationMin, snapped))
+                        if clamped != block.startMin { onMove(block, clamped) }
+                    }
                 )
                     .frame(height: max(34, CGFloat(block.durationMin) * ptPerMin))
                     .padding(.leading, 52)
@@ -351,6 +405,12 @@ struct BlockCard: View {
     let onComplete: () -> Void
     let onDelete: () -> Void
     let onFocus: () -> Void
+    let onOpen: () -> Void
+    /// Called with the dragged minute delta (positive = later).
+    let onMove: (Int) -> Void
+
+    @State private var dragOffset: CGFloat = 0
+    @State private var lifting = false
 
     private var isPast: Bool { block.endMin <= nowMin && !block.done }
     private var isCurrent: Bool { block.startMin <= nowMin && nowMin < block.endMin && !block.done }
@@ -417,18 +477,32 @@ struct BlockCard: View {
         .saturation(isPast ? 0.5 : 1)
         .compositingGroup()
         .kCardShadow()
-        .contextMenu {
-            Button {
-                onFocus()
-            } label: {
-                Label("Focus on this", systemImage: "timer")
-            }
-            Button(role: .destructive) {
-                onDelete()
-            } label: {
-                Label("Delete activity", systemImage: "trash")
-            }
-        }
+        .offset(y: dragOffset)
+        .scaleEffect(lifting ? 1.03 : 1)
+        .zIndex(lifting ? 10 : 0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.75), value: lifting)
+        .onTapGesture { onOpen() }
+        .gesture(
+            LongPressGesture(minimumDuration: 0.35)
+                .onEnded { _ in
+                    lifting = true
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                }
+                .sequenced(before: DragGesture())
+                .onChanged { value in
+                    if case .second(true, let drag?) = value {
+                        dragOffset = drag.translation.height
+                    }
+                }
+                .onEnded { value in
+                    if case .second(true, let drag?) = value {
+                        let deltaMin = Int((drag.translation.height / 1.7).rounded())
+                        onMove(deltaMin)
+                    }
+                    dragOffset = 0
+                    lifting = false
+                }
+        )
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(block.title), \(KTime.hhmm(block.startMin)) to \(KTime.hhmm(block.endMin)), \(block.done ? "done" : "not done")")
     }

@@ -35,22 +35,52 @@ final class KairoFlowUITests: XCTestCase {
         app.buttons["Save"].tap()
 
         // The new block appears on the timeline.
-        let block = app.staticTexts["iOS flight check"]
+        let block = app.staticTexts["iOS flight check"].firstMatch
         XCTAssertTrue(block.waitForExistence(timeout: 15), "created block should render")
 
+        // Tap opens the editor prefilled; cancel out.
+        block.tap()
+        let editTitle = app.textFields["What are you doing?"]
+        XCTAssertTrue(editTitle.waitForExistence(timeout: 6), "tap should open the editor")
+        XCTAssertEqual(editTitle.value as? String, "iOS flight check", "editor should be prefilled")
+        app.buttons["Cancel"].tap()
+        XCTAssertTrue(block.waitForExistence(timeout: 6))
+
         // Complete it.
-        let complete = app.buttons["Complete iOS flight check"]
+        let complete = app.buttons["Complete iOS flight check"].firstMatch
         XCTAssertTrue(complete.waitForExistence(timeout: 8))
         complete.tap()
-        let undo = app.buttons["Mark iOS flight check incomplete"]
+        let undo = app.buttons["Mark iOS flight check incomplete"].firstMatch
         XCTAssertTrue(undo.waitForExistence(timeout: 10), "block should flip to done")
 
-        // Clean up through the product itself: context menu → delete.
-        block.press(forDuration: 1.2)
-        let delete = app.buttons["Delete activity"]
-        XCTAssertTrue(delete.waitForExistence(timeout: 6), "context menu should offer delete")
-        delete.tap()
-        XCTAssertTrue(block.waitForNonExistence(timeout: 10), "deleted block should leave the timeline")
+        // Drag-to-reschedule: long-press lift then pull down; label's time changes.
+        let cardQuery = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label BEGINSWITH %@", "iOS flight check,")
+        ).firstMatch
+        XCTAssertTrue(cardQuery.waitForExistence(timeout: 6))
+        let labelBefore = cardQuery.label
+        let from = cardQuery.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.5))
+        let to = from.withOffset(CGVector(dx: 0, dy: 102)) // ≈ +60 min at 1.7pt/min
+        from.press(forDuration: 0.7, thenDragTo: to)
+        sleep(3)
+        let labelAfter = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label BEGINSWITH %@", "iOS flight check,")
+        ).firstMatch.label
+        XCTAssertNotEqual(labelBefore, labelAfter, "drag should reschedule the block")
+
+        // Clean up through the product itself: edit sheet → delete.
+        // Loop handles leftovers from any earlier aborted runs too.
+        var deletions = 0
+        while app.staticTexts["iOS flight check"].firstMatch.waitForExistence(timeout: 4), deletions < 5 {
+            app.staticTexts["iOS flight check"].firstMatch.tap()
+            let delete = app.buttons["Delete activity"]
+            XCTAssertTrue(delete.waitForExistence(timeout: 6), "edit sheet should offer delete")
+            delete.tap()
+            deletions += 1
+            sleep(2)
+        }
+        XCTAssertGreaterThan(deletions, 0, "should have deleted the created block")
+        XCTAssertTrue(app.staticTexts["iOS flight check"].firstMatch.waitForNonExistence(timeout: 8), "timeline should be clean")
 
         // Tabs all render.
         app.tabBars.buttons["Inbox"].tap()

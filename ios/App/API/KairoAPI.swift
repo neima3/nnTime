@@ -173,6 +173,15 @@ actor KairoAPI {
         return try await request("PATCH", "/api/v1/activities/\(activityId)", body: body, ifMatch: revision, as: Activity.self)
     }
 
+    /// Move one occurrence to a new start instant (15-min snapped upstream).
+    func moveActivity(
+        activityId: String, revision: Int, occurrenceKey: String?, startAt: String
+    ) async throws -> Activity {
+        try await request("PATCH", "/api/v1/activities/\(activityId)", body: [
+            "editScope": "this", "occurrenceKey": occurrenceKey, "startAt": startAt,
+        ], ifMatch: revision, as: Activity.self)
+    }
+
     func deleteActivity(activityId: String, revision: Int) async throws {
         _ = try await request("DELETE", "/api/v1/activities/\(activityId)",
                               ifMatch: revision, as: EmptyResponse.self)
