@@ -7,6 +7,8 @@
 import { useEffect, useState } from "react";
 import { readBest, type GameId } from "@/lib/games";
 import { TimeFeel } from "./games/TimeFeel";
+import { QuizGame } from "./games/QuizGame";
+import { GRAMMAR_BANK, SPELLING_BANK } from "@/lib/games";
 import { QuickTap } from "./games/QuickTap";
 import { EmojiMatch } from "./games/EmojiMatch";
 import { SteadyBreath } from "./games/SteadyBreath";
@@ -44,6 +46,22 @@ const GAMES: {
     bestLabel: (v) => `best ${v} moves`,
   },
   {
+    id: "grammar-snap",
+    emoji: "📝",
+    title: "Grammar Snap",
+    hook: "Your vs. you're — settle it once and for all.",
+    tint: "bg-cat-sky",
+    bestLabel: (v) => `best ${v}/8`,
+  },
+  {
+    id: "spell-check",
+    emoji: "🔤",
+    title: "Spell Check",
+    hook: "Definitely? Definately? One of these is real.",
+    tint: "bg-cat-rose",
+    bestLabel: (v) => `best ${v}/8`,
+  },
+  {
     id: "steady-breath",
     emoji: "🫧",
     title: "Steady Breath",
@@ -78,6 +96,42 @@ export function PlayClient() {
   if (active === "quick-tap") return <QuickTap onExit={exit} />;
   if (active === "emoji-match") return <EmojiMatch onExit={exit} />;
   if (active === "steady-breath") return <SteadyBreath onExit={exit} />;
+  if (active === "grammar-snap")
+    return (
+      <QuizGame
+        id="grammar-snap"
+        title="Grammar Snap"
+        emoji="📝"
+        howTo="Tap the word that fits. No red pens here."
+        bank={GRAMMAR_BANK}
+        endDetail={(score) =>
+          score >= 7
+            ? "Basically an editor. English fears you."
+            : score >= 4
+              ? "Solid — and every miss came with a memory hook."
+              : "These pairs trip up native speakers daily. Now you know their tricks."
+        }
+        onExit={exit}
+      />
+    );
+  if (active === "spell-check")
+    return (
+      <QuizGame
+        id="spell-check"
+        title="Spell Check"
+        emoji="🔤"
+        howTo="Tap the real spelling among the impostors."
+        bank={SPELLING_BANK}
+        endDetail={(score) =>
+          score >= 7
+            ? "Spelling bee champion energy."
+            : score >= 4
+              ? "Good eye — the impostors are convincing on purpose."
+              : "These are the most-misspelled words in English. You're in excellent company."
+        }
+        onExit={exit}
+      />
+    );
 
   return (
     <div className="grid gap-3 sm:grid-cols-2">

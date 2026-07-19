@@ -1,5 +1,30 @@
 # Progress log
 
+## 2026-07-19 — Word games: Grammar Snap + Spell Check (Fable)
+
+Extended the Brain Breaks arcade (wave 3) with two language games built on
+one shared engine:
+- **`games/QuizGame.tsx`** — generic 8-round tap-a-choice engine: instant
+  kind feedback (wrong answers get butter, never red, plus a one-line
+  memory hook), score /8, personal best, celebration on new best.
+- **`GRAMMAR_BANK`** (16 items: your/you're, its/it's, their/there/they're,
+  then/than, affect/effect, whose/who's, lose/loose, should-have, etc.) and
+  **`SPELLING_BANK`** (16 famously slippery words with convincing impostor
+  spellings + mnemonic notes) in `src/lib/games.ts`, plus `pickQuizRounds`
+  (seeded bank shuffle + per-item option shuffle so the answer position
+  varies).
+- Hub now has 6 cards (sky Grammar Snap 📝, rose Spell Check 🔤); Stats
+  Brain-breaks card shows both bests.
+- Tests (subagent): bank validity (answer∈options, unique options, 2–3
+  choices, ≥8 items) + picker determinism/no-mutation/permutation — 17 new,
+  **213 total**.
+
+**Verified in browser:** Grammar Snap full 8-round scripted run → "3 of 8"
+end state with kind copy + new-best badge (first-option strategy scoring 3
+proves option shuffling works); Spell Check question render (recieve/
+receive/receeve) + full run; hub cards + best chips. Gates: lint 0/0,
+typecheck, 213 tests, build — green.
+
 ## 2026-07-19 — 10× ADHD wave 3: Brain breaks arcade (Fable)
 
 **Plan:** `docs/plans/2026-07-19-10x-adhd-wave3-roadmap.md` (all ticked).

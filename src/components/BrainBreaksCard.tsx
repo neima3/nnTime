@@ -12,6 +12,8 @@ export function BrainBreaksCard() {
   const [bests, setBests] = useState<{
     timeFeel: number | null;
     quickTap: number | null;
+    grammar: number | null;
+    spelling: number | null;
     match: number | null;
     breaths: number | null;
   } | null>(null);
@@ -21,6 +23,8 @@ export function BrainBreaksCard() {
     setBests({
       timeFeel: readBest("time-feel"),
       quickTap: readBest("quick-tap"),
+      grammar: readBest("grammar-snap"),
+      spelling: readBest("spell-check"),
       match: readBest("emoji-match"),
       breaths: readBest("steady-breath"),
     });
@@ -31,6 +35,8 @@ export function BrainBreaksCard() {
     !bests ||
     (bests.timeFeel == null &&
       bests.quickTap == null &&
+      bests.grammar == null &&
+      bests.spelling == null &&
       bests.match == null &&
       bests.breaths == null)
   )
@@ -46,6 +52,16 @@ export function BrainBreaksCard() {
       emoji: "⚡",
       label: "Quick Tap — best average",
       value: `${bests.quickTap} ms`,
+    },
+    bests.grammar != null && {
+      emoji: "📝",
+      label: "Grammar Snap — best round",
+      value: `${bests.grammar}/8`,
+    },
+    bests.spelling != null && {
+      emoji: "🔤",
+      label: "Spell Check — best round",
+      value: `${bests.spelling}/8`,
     },
     bests.match != null && {
       emoji: "🃏",

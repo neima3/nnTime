@@ -4,14 +4,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildMatchDeck,
+  GRAMMAR_BANK,
   MATCH_EMOJI,
+  pickQuizRounds,
+  QUIZ_ROUNDS,
   quickTapAverage,
   quickTapDelayMs,
   readBest,
   recordResult,
+  SPELLING_BANK,
   timeFeelFeeling,
   timeFeelRoundError,
   timeFeelScore,
+  type QuizItem,
 } from "./games";
 
 describe("timeFeelRoundError", () => {
@@ -237,5 +242,118 @@ describe("readBest / recordResult (mocked localStorage)", () => {
     vi.stubGlobal("localStorage", throwing);
     expect(readBest("time-feel")).toBeNull();
     expect(recordResult("time-feel", 50, "high")).toBe(false);
+  });
+});
+
+describe("word quiz banks (GRAMMAR_BANK / SPELLING_BANK)", () => {
+  const banks: [string, QuizItem[]][] = [
+    ["GRAMMAR_BANK", GRAMMAR_BANK],
+    ["SPELLING_BANK", SPELLING_BANK],
+  ];
+
+  it.each(banks)("%s is at least QUIZ_ROUNDS long", (_name, bank) => {
+    expect(bank.length).toBeGreaterThanOrEqual(QUIZ_ROUNDS);
+  });
+
+  it.each(banks)("%s: every item's answer is included in its options", (_name, bank) => {
+    for (const item of bank) {
+      expect(item.options).toContain(item.answer);
+    }
+  });
+
+  it.each(banks)("%s: every item's options are unique", (_name, bank) => {
+    for (const item of bank) {
+      expect(new Set(item.options).size).toBe(item.options.length);
+    }
+  });
+
+  it.each(banks)("%s: every item has 2–3 options", (_name, bank) => {
+    for (const item of bank) {
+      expect(item.options.length).toBeGreaterThanOrEqual(2);
+      expect(item.options.length).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it.each(banks)("%s: every item has a non-empty prompt and note", (_name, bank) => {
+    for (const item of bank) {
+      expect(item.prompt.trim().length).toBeGreaterThan(0);
+      expect(item.note.trim().length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("SPELLING_BANK spot check", () => {
+  it("has exactly one option per item that matches the answer string (impostors differ)", () => {
+    for (const item of SPELLING_BANK) {
+      const matches = item.options.filter((opt) => opt === item.answer);
+      expect(matches).toHaveLength(1);
+      const impostors = item.options.filter((opt) => opt !== item.answer);
+      for (const impostor of impostors) {
+        expect(impostor).not.toBe(item.answer);
+      }
+    }
+  });
+});
+
+describe("pickQuizRounds", () => {
+  /** Deterministic fake RNG: replays a fixed roll sequence. */
+  function fakeRandom(rolls: number[]): () => number {
+    let i = 0;
+    return () => {
+      const v = rolls[i % rolls.length]!;
+      i += 1;
+      return v;
+    };
+  }
+
+  const rollsA = [
+    0.9, 0.1, 0.7, 0.05, 0.55, 0.3, 0.8, 0.2, 0.65, 0.4, 0.15, 0.95, 0.5, 0.25,
+    0.6, 0.35, 0.75, 0.45, 0.85, 0.05,
+  ];
+
+  function multiset(values: string[]): string[] {
+    return [...values].sort();
+  }
+
+  it("returns QUIZ_ROUNDS items by default", () => {
+    const rounds = pickQuizRounds(GRAMMAR_BANK, undefined, fakeRandom(rollsA));
+    expect(rounds).toHaveLength(QUIZ_ROUNDS);
+  });
+
+  it("draws no duplicate prompts", () => {
+    const rounds = pickQuizRounds(GRAMMAR_BANK, GRAMMAR_BANK.length, fakeRandom(rollsA));
+    const prompts = new Set(rounds.map((r) => r.prompt));
+    expect(prompts.size).toBe(rounds.length);
+  });
+
+  it("keeps each returned item's options as a permutation of the source options, answer still present", () => {
+    const rounds = pickQuizRounds(GRAMMAR_BANK, GRAMMAR_BANK.length, fakeRandom(rollsA));
+    for (const round of rounds) {
+      const source = GRAMMAR_BANK.find((item) => item.prompt === round.prompt);
+      expect(source).toBeDefined();
+      expect(multiset(round.options)).toEqual(multiset(source!.options));
+      expect(round.options).toContain(round.answer);
+      expect(round.answer).toBe(source!.answer);
+    }
+  });
+
+  it("is deterministic for a seeded fake random", () => {
+    const first = pickQuizRounds(GRAMMAR_BANK, QUIZ_ROUNDS, fakeRandom(rollsA));
+    const second = pickQuizRounds(GRAMMAR_BANK, QUIZ_ROUNDS, fakeRandom(rollsA));
+    expect(second).toEqual(first);
+  });
+
+  it("caps at the bank length when requesting more than available", () => {
+    const rounds = pickQuizRounds(SPELLING_BANK, 1000, fakeRandom(rollsA));
+    expect(rounds).toHaveLength(SPELLING_BANK.length);
+  });
+
+  it("does not mutate the source bank arrays", () => {
+    const beforeGrammar = JSON.stringify(GRAMMAR_BANK);
+    const beforeSpelling = JSON.stringify(SPELLING_BANK);
+    pickQuizRounds(GRAMMAR_BANK, GRAMMAR_BANK.length, fakeRandom(rollsA));
+    pickQuizRounds(SPELLING_BANK, SPELLING_BANK.length, fakeRandom(rollsA));
+    expect(JSON.stringify(GRAMMAR_BANK)).toBe(beforeGrammar);
+    expect(JSON.stringify(SPELLING_BANK)).toBe(beforeSpelling);
   });
 });
