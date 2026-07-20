@@ -145,6 +145,9 @@ struct NextUpWidgetView: View {
 struct KairoWidgetBundle: WidgetBundle {
     var body: some Widget {
         NextUpWidget()
+        #if canImport(ActivityKit)
+        FocusLiveActivity()
+        #endif
     }
 }
 

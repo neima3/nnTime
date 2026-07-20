@@ -1,4 +1,5 @@
 import SwiftUI
+import ActivityKit
 
 // MARK: - Focus: server-authoritative timer (ADR-004) with the sky ring,
 // overtime that counts up instead of going silent, and Spline Mono digits.
@@ -12,6 +13,7 @@ struct FocusView: View {
     @State private var finishedMin: Int?
     @State private var pendingTitle = "Deep focus"
     @State private var pendingEmoji = "🎯"
+    @State private var liveActivity: ActivityKit.Activity<FocusAttributes>?
 
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private let resync = Timer.publish(every: 15, on: .main, in: .common).autoconnect()
@@ -227,6 +229,7 @@ struct FocusView: View {
             remaining = state.remainingSec ?? duration * 60
             overtime = 0
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            startLiveActivity(remainingSec: remaining)
         } catch {}
     }
 
@@ -237,6 +240,7 @@ struct FocusView: View {
             self.session = state.session
             remaining = state.remainingSec ?? remaining
             if body["action"] as? String == "extend" { overtime = 0 }
+            await updateLiveActivity()
         } catch {}
     }
 
@@ -251,7 +255,44 @@ struct FocusView: View {
             session = nil
             finishedMin = focused
             overtime = 0
+            endLiveActivity()
         } catch {}
+    }
+}
+
+extension FocusView {
+    /// Lock-screen + Dynamic Island presence while a session runs (spec §4).
+    private func startLiveActivity(remainingSec: Int) {
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        endLiveActivity()
+        let attributes = FocusAttributes(title: pendingTitle, emoji: pendingEmoji, targetMin: duration)
+        let state = FocusAttributes.ContentState(
+            endDate: Date().addingTimeInterval(TimeInterval(remainingSec)),
+            paused: false,
+            pausedRemainingSec: remainingSec
+        )
+        liveActivity = try? ActivityKit.Activity<FocusAttributes>.request(
+            attributes: attributes,
+            content: ActivityContent(state: state, staleDate: nil)
+        )
+    }
+
+    private func updateLiveActivity() async {
+        guard let liveActivity, let session else { return }
+        let state = FocusAttributes.ContentState(
+            endDate: Date().addingTimeInterval(TimeInterval(remaining)),
+            paused: session.state == "paused",
+            pausedRemainingSec: remaining
+        )
+        await liveActivity.update(ActivityContent(state: state, staleDate: nil))
+    }
+
+    private func endLiveActivity() {
+        guard let activity = liveActivity else { return }
+        liveActivity = nil
+        Task {
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
     }
 }
 

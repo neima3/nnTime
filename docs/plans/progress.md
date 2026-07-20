@@ -1,5 +1,26 @@
 # Progress log
 
+## 2026-07-19 — iOS round 5: focus Live Activity + Dynamic Island (Fable)
+
+Implemented ios-adaptation §4 — the focus timer now lives on the lock
+screen and in the Dynamic Island:
+- `Shared/FocusActivity.swift`: FocusAttributes (title/emoji/target) +
+  ContentState (endDate, paused, frozen remaining) shared app↔extension.
+- `Widget/FocusLiveActivity.swift`: lock-screen banner (emoji circle on
+  sky, title + target line, self-ticking `Text(timerInterval:)` mono
+  countdown — zero per-second pushes), Dynamic Island expanded/compact
+  (◔ + live countdown)/minimal presentations; paused state freezes the
+  digits and swaps in a pause glyph.
+- FocusView lifecycle: start → Activity.request; pause/resume/extend →
+  update; complete → end(.immediate). NSSupportsLiveActivities enabled.
+  Gotcha fixed: the wire model named `Activity` shadowed ActivityKit's —
+  qualified explicitly.
+- **Verified on simulator:** dedicated XCUITest starts a session,
+  backgrounds the app, and screenshots Springboard — the island renders
+  ◔ + a live 24:54 countdown (browser-qa/ios-07-live-activity.png);
+  session then completed in-app for cleanup. Full suite (flow + live
+  activity + tour) green against production.
+
 ## 2026-07-19 — iOS round 4: checklists, inbox promotion, Next-up widget (Fable)
 
 - **Checklist steps everywhere:** timeline blocks show up to 3 step lines
