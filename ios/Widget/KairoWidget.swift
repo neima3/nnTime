@@ -9,13 +9,15 @@ struct NextUpEntry: TimelineEntry {
     let date: Date
     let block: CachedBlock?
     let isCurrent: Bool
+    /// Full day context for the medium strip.
+    let blocks: [CachedBlock]
+    let nowMin: Int
 }
 
 struct NextUpProvider: TimelineProvider {
     func placeholder(in context: Context) -> NextUpEntry {
-        NextUpEntry(date: Date(),
-                    block: CachedBlock(title: "Morning reset", emoji: "🌤", startMin: 480, durationMin: 30, done: false, category: "butter"),
-                    isCurrent: false)
+        let sample = CachedBlock(title: "Morning reset", emoji: "🌤", startMin: 480, durationMin: 30, done: false, category: "butter")
+        return NextUpEntry(date: Date(), block: sample, isCurrent: false, blocks: [sample], nowMin: 470)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (NextUpEntry) -> Void) {
@@ -46,25 +48,27 @@ struct NextUpProvider: TimelineProvider {
 
     private func entry(at date: Date) -> NextUpEntry {
         guard let snap = DayCache.read(), let zone = TimeZone(identifier: snap.zone) else {
-            return NextUpEntry(date: date, block: nil, isCurrent: false)
+            return NextUpEntry(date: date, block: nil, isCurrent: false, blocks: [], nowMin: 0)
         }
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = zone
         let comps = cal.dateComponents([.hour, .minute], from: date)
         let nowMin = (comps.hour ?? 0) * 60 + (comps.minute ?? 0)
 
-        if let current = snap.blocks.first(where: { !$0.done && $0.startMin <= nowMin && nowMin < $0.endMin }) {
-            return NextUpEntry(date: date, block: current, isCurrent: true)
+        let sorted = snap.blocks.sorted { $0.startMin < $1.startMin }
+        if let current = sorted.first(where: { !$0.done && $0.startMin <= nowMin && nowMin < $0.endMin }) {
+            return NextUpEntry(date: date, block: current, isCurrent: true, blocks: sorted, nowMin: nowMin)
         }
-        let next = snap.blocks
+        let next = sorted
             .filter { !$0.done && $0.startMin > nowMin }
             .min { $0.startMin < $1.startMin }
-        return NextUpEntry(date: date, block: next, isCurrent: false)
+        return NextUpEntry(date: date, block: next, isCurrent: false, blocks: sorted, nowMin: nowMin)
     }
 }
 
 struct NextUpWidgetView: View {
     var entry: NextUpEntry
+    @Environment(\.widgetFamily) private var family
 
     private func fill(_ category: String) -> Color {
         switch category {
@@ -89,6 +93,71 @@ struct NextUpWidgetView: View {
     }
 
     var body: some View {
+        if family == .systemMedium {
+            mediumStrip
+        } else {
+            smallCard
+        }
+    }
+
+    /// Medium: the day as mini pills with a now-dot between past and future.
+    private var mediumStrip: some View {
+        let upcoming = entry.blocks.filter { $0.endMin > entry.nowMin }.prefix(4)
+        let doneCount = entry.blocks.filter(\.done).count
+        let paper = Color(red: 0.969, green: 0.957, blue: 0.933)
+        let inkColor = Color(red: 0.141, green: 0.122, blue: 0.192)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Text("◔").font(.system(size: 13, weight: .bold))
+                Text("TODAY")
+                    .font(.system(size: 10, weight: .heavy)).kerning(1.2)
+                Spacer()
+                if !entry.blocks.isEmpty {
+                    Text("\(doneCount) of \(entry.blocks.count) · \(entry.blocks.isEmpty ? 0 : doneCount * 100 / entry.blocks.count)%")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .opacity(0.6)
+                }
+            }
+            .opacity(0.75)
+            if upcoming.isEmpty {
+                Spacer()
+                Text(entry.blocks.isEmpty ? "Nothing planned — add something kind." : "All done. Go be free. 🎉")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .opacity(0.7)
+                    .frame(maxWidth: .infinity)
+                Spacer()
+            } else {
+                HStack(spacing: 6) {
+                    ForEach(Array(upcoming.enumerated()), id: \.offset) { _, block in
+                        let active = block.startMin <= entry.nowMin
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(block.emoji).font(.system(size: 15))
+                            Text(block.title)
+                                .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                                .lineLimit(1)
+                            Text(String(format: "%d:%02d", block.startMin / 60, block.startMin % 60))
+                                .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
+                                .opacity(0.7)
+                        }
+                        .padding(7)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(RoundedRectangle(cornerRadius: 10).fill(fill(block.category)))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(active ? Color(red: 1.0, green: 0.361, blue: 0.302) : .clear, lineWidth: 1.5)
+                        )
+                        .foregroundStyle(ink(block.category))
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .foregroundStyle(inkColor)
+        .containerBackground(paper, for: .widget)
+        .widgetURL(URL(string: "kairo://today"))
+    }
+
+    private var smallCard: some View {
         Group {
             if let block = entry.block {
                 VStack(alignment: .leading, spacing: 4) {
@@ -131,6 +200,7 @@ struct NextUpWidgetView: View {
                 .containerBackground(Color(red: 0.969, green: 0.957, blue: 0.933), for: .widget)
             }
         }
+        .widgetURL(URL(string: "kairo://today"))
     }
 
     private func timeLine(_ block: CachedBlock) -> String {
@@ -158,6 +228,6 @@ struct NextUpWidget: Widget {
         }
         .configurationDisplayName("Next up")
         .description("Your current or next activity, at a glance.")
-        .supportedFamilies([.systemSmall])
+        .supportedFamilies([.systemSmall, .systemMedium])
     }
 }

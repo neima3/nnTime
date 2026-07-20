@@ -45,7 +45,12 @@ struct FocusView: View {
         .task { await hydrate() }
         .onReceive(tick) { _ in
             guard session?.state == "running" else { return }
-            if remaining > 0 { remaining -= 1 } else { overtime += 1 }
+            if remaining > 0 {
+                remaining -= 1
+            } else {
+                overtime += 1
+                if overtime == 1 { Task { await updateLiveActivity() } }
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .kairoStartFocus)) { note in
             guard session == nil else { return }
@@ -269,7 +274,8 @@ extension FocusView {
         let state = FocusAttributes.ContentState(
             endDate: Date().addingTimeInterval(TimeInterval(remainingSec)),
             paused: false,
-            pausedRemainingSec: remainingSec
+            pausedRemainingSec: remainingSec,
+            overtime: false
         )
         liveActivity = try? ActivityKit.Activity<FocusAttributes>.request(
             attributes: attributes,
@@ -282,7 +288,8 @@ extension FocusView {
         let state = FocusAttributes.ContentState(
             endDate: Date().addingTimeInterval(TimeInterval(remaining)),
             paused: session.state == "paused",
-            pausedRemainingSec: remaining
+            pausedRemainingSec: remaining,
+            overtime: overtime > 0 && session.state == "running"
         )
         await liveActivity.update(ActivityContent(state: state, staleDate: nil))
     }

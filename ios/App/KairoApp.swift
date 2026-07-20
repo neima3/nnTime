@@ -120,6 +120,14 @@ struct MainTabs: View {
         .onReceive(NotificationCenter.default.publisher(for: .kairoStartFocus)) { _ in
             selection = 3
         }
+        .onOpenURL { url in
+            // kairo://today | kairo://focus | kairo://inbox
+            switch url.host {
+            case "focus": selection = 3
+            case "inbox": selection = 1
+            default: selection = 0
+            }
+        }
     }
 }
 

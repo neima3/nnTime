@@ -1,5 +1,24 @@
 # Progress log
 
+## 2026-07-19 — iOS round 6: overtime island, medium widget, deep links (Fable)
+
+- **Live Activity overtime** (ios-adaptation §4): when a session passes its
+  target, the lock-screen banner + Dynamic Island (expanded/compact) switch
+  the digits to the now-coral and count UP from the target, with copy
+  "past target — that's okay" / "Good stopping point? Wrap up in the app."
+  FocusView flips the ContentState exactly once at the zero crossing.
+- **Medium "Today strip" widget** (spec §3): the day as up-to-4 mini
+  category pills with a now-coral outline on the active block, a
+  "n of m · N%" progress footer, and honest empty/all-done states
+  ("All done. Go be free. 🎉"). Shares the same day cache; supportedFamilies
+  now [small, medium].
+- **Deep links:** `kairo://` URL scheme registered; both widget families
+  carry `.widgetURL(kairo://today)`; app routes today/focus/inbox via
+  onOpenURL. Scheme registration verified (simctl openurl → system
+  "Open in Kairo?"), routing verified by XCUITest.
+- Full suite (flow + live activity + tour + deep link) green against
+  production.
+
 ## 2026-07-19 — iOS round 5: focus Live Activity + Dynamic Island (Fable)
 
 Implemented ios-adaptation §4 — the focus timer now lives on the lock

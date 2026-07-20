@@ -11,6 +11,8 @@ struct FocusAttributes: ActivityAttributes {
         var paused: Bool
         /// Remaining seconds frozen at pause time (shown while paused).
         var pausedRemainingSec: Int
+        /// Past the target and still going — digits switch to the now color.
+        var overtime: Bool
     }
 
     var title: String
