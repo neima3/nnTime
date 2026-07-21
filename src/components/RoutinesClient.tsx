@@ -247,7 +247,7 @@ export function RoutinesClient({
               <button
                 type="button"
                 onClick={() => scheduleToday(r)}
-                className="inline-flex items-center gap-1 rounded-xl bg-iris-soft px-3 py-1.5 text-[12px] font-semibold text-iris"
+                className="inline-flex items-center gap-1 rounded-xl bg-iris-soft px-3 py-1.5 text-[12px] font-semibold text-iris-deep"
               >
                 <Play size={13} />
                 Use today

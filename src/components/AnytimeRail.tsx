@@ -120,7 +120,7 @@ export function AnytimeRail({
     <div className="rounded-3xl border border-border bg-surface p-5 shadow-card">
       <div className="flex items-center justify-between">
         <h2 className="font-display text-lg font-bold">Anytime</h2>
-        <span className="rounded-full bg-iris-soft px-2 py-0.5 text-[12px] font-bold text-iris">
+        <span className="rounded-full bg-iris-soft px-2 py-0.5 text-[12px] font-bold text-iris-deep">
           {items.length}
         </span>
       </div>

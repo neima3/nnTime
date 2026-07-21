@@ -89,7 +89,7 @@ export default function LandingPage() {
       {/* hero */}
       <section className="mx-auto grid w-full max-w-6xl items-center gap-12 px-5 py-14 md:grid-cols-2 md:py-24">
         <div>
-          <p className="inline-flex rounded-full bg-iris-soft px-3 py-1 text-[13px] font-bold text-iris">
+          <p className="inline-flex rounded-full bg-iris-soft px-3 py-1 text-[13px] font-bold text-iris-deep">
             Built for brains that plan differently
           </p>
           <h1 className="mt-5 font-display text-5xl font-bold leading-[1.05] tracking-tight md:text-6xl">
