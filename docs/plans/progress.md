@@ -1,5 +1,40 @@
 # Progress log
 
+## 2026-07-21 — 20-phase 10× program, continuation (Fable + subagents)
+Roadmap: `docs/plans/2026-07-20-20phase-program.md`. **11 of 20 phases done.**
+
+**Shipped + verified this continuation:**
+- **P9 web a11y sweep** (Sonnet subagent, verified): `aria-modal` on
+  CommandPalette/QuickCapture/PickForMe dialogs; OneThing gained full
+  `role="dialog"`/label + container-focus fallback; KeyboardShortcuts focuses
+  Close on open; QuickCapture window-level Escape. Gates green. Deployed live.
+- **P3 iOS Routines** (Fable, main loop): `Routine` wire models + `KairoAPI.routines()`;
+  `RoutinesView` (cards + polished empty state) and `RoutinePlayerView`
+  (full-screen calm player — per-step countdown ring, untimed ∞ steps,
+  time's-up holds at zero, progress dots, next-step preview, pause/skip,
+  gentle completion; reduced-motion + haptics). Wired into More; refreshed
+  stale copy. `KairoRoutinesTour` UI test passes. Evidence:
+  `browser-qa/ios-20-routines-list.png`, `ios-21-routine-player.png`
+  (seeded a "Wind-down" routine on the synthetic QA account to capture the player).
+- **P12 Reward Garden** (Fable): `RewardGarden.tsx` hero card on Insights —
+  cumulative growth that never resets (5 plant stages by total effort + a
+  meadow of blooms). Pure/derived, no new API. **Verified live** on
+  time.neima.me showing "In Bloom · 28 planted" — `browser-qa/web-garden-live.png`.
+
+Earlier in the program (already ticked): P1 iOS Stats, P2 iOS Pick-for-me,
+P4 iOS Review, P5 iOS Play, P6 iOS Inbox tend, P7 WCAG-AA contrast token pass,
+P10 security review, P11 server test coverage (+110 tests).
+
+**Remaining (9): P8** prod-build Lighthouse measure+fix; **P13** weekly
+reflection digest; **P14** focus soundscape presets; **P15** peak-focus nudge;
+**P16** energy-aware plan-my-day; **P17** landing polish; **P18** web onboarding
+refinement; **P19** cross-platform copy/empty-state audit (subagent-friendly);
+**P20** final gates + deploy + iOS suite green.
+
+Deploys this session: Coolify `qqlhxs05…` (P7 contrast + security + tests) and
+`jfwo9hn…` (P12 garden) both finished; live verified. Latest commit at handoff:
+Reward Garden (530e186) + roadmap ticks.
+
 ## 2026-07-20 — iOS production program: 10 phases (Fable + subagent)
 
 Plan: docs/plans/2026-07-20-ios-production-roadmap.md (all ticked).

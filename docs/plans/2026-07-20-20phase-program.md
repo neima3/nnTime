@@ -35,7 +35,7 @@ pass (a11y), prod-build Lighthouse.
 - [x] P11: Test coverage — server/service unit tests for gaps (subagent)
 
 ### New ADHD capabilities
-- [ ] P12: Reward garden / visual progress — growth that isn't a streak
+- [x] P12: Reward garden / visual progress — growth that isn't a streak
 - [ ] P13: Weekly reflection — gentle patterns digest on Stats
 - [ ] P14: Focus soundscape polish + session presets (named rituals)
 - [ ] P15: Smart "when am I most focused" nudge (uses focus-hours data)
