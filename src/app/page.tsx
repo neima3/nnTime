@@ -348,6 +348,120 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* signature moments — the parts people come back for */}
+      <section className="mx-auto w-full max-w-6xl px-5 pb-4 pt-20">
+        <p className="text-[13px] font-bold uppercase tracking-[0.14em] text-iris">
+          The parts people fall for
+        </p>
+        <h2 className="mt-3 max-w-2xl font-display text-3xl font-bold tracking-tight md:text-4xl">
+          Progress that feels good — without the pressure.
+        </h2>
+
+        <div className="mt-12 grid gap-4 lg:grid-cols-3">
+          {/* Reward Garden */}
+          <article className="relative overflow-hidden rounded-3xl border border-border bg-surface p-6 shadow-card">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-cat-mint/40 to-transparent"
+            />
+            <div className="relative">
+              <p className="text-[12px] font-bold uppercase tracking-wide text-ink-faint">
+                Reward garden
+              </p>
+              <h3 className="mt-1.5 font-display text-lg font-bold">
+                Growth a missed day can&apos;t undo
+              </h3>
+              <div className="mt-5 flex items-center gap-3.5">
+                <div className="grid size-16 shrink-0 place-items-center rounded-3xl bg-cat-mint/50 text-4xl">
+                  <span aria-hidden>🌷</span>
+                </div>
+                <div>
+                  <p className="font-display text-lg font-bold leading-tight">In bloom</p>
+                  <p className="text-[12.5px] text-ink-soft">
+                    <span className="font-semibold text-ink">28</span> planted · 4 to flourishing
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-1 text-lg" aria-hidden>
+                <span>🌸</span><span>🌼</span><span>🌻</span><span>🌷</span><span>🪻</span><span>🌺</span>
+              </div>
+              <p className="mt-4 text-[13.5px] leading-relaxed text-ink-soft">
+                Every finished thing and every focus block plants something. It
+                only ever grows — no streak to break, no guilt to carry.
+              </p>
+            </div>
+          </article>
+
+          {/* Focus rituals */}
+          <article className="rounded-3xl border border-border bg-surface p-6 shadow-card">
+            <p className="text-[12px] font-bold uppercase tracking-wide text-ink-faint">
+              Focus rituals
+            </p>
+            <h3 className="mt-1.5 font-display text-lg font-bold">
+              One tap sets the whole frame
+            </h3>
+            <div className="mt-5 flex flex-wrap gap-1.5">
+              {[
+                { e: "🧠", l: "Deep work", on: false },
+                { e: "🌙", l: "Wind down", on: true },
+                { e: "👥", l: "Body double", on: false },
+                { e: "🎨", l: "Creative flow", on: false },
+              ].map((r) => (
+                <span
+                  key={r.l}
+                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[12px] font-semibold ${
+                    r.on
+                      ? "border-iris bg-iris-soft text-iris-deep"
+                      : "border-border text-ink-soft"
+                  }`}
+                >
+                  <span aria-hidden>{r.e}</span>
+                  {r.l}
+                </span>
+              ))}
+            </div>
+            <div className="mt-4 flex items-center gap-3 rounded-2xl border border-cat-sky-ink/20 bg-cat-sky/40 p-3.5">
+              <span className="text-2xl" aria-hidden>🌙</span>
+              <div>
+                <p className="text-[14px] font-bold">Wind down</p>
+                <p className="tnum text-[12.5px] font-medium text-ink-soft">10:00 · gentle</p>
+              </div>
+            </div>
+            <p className="mt-4 text-[13.5px] leading-relaxed text-ink-soft">
+              Named sessions — deep work, a quick win, a body-double block, a
+              wind-down — set the title, length, and vibe in a single tap.
+            </p>
+          </article>
+
+          {/* Routines player */}
+          <article className="rounded-3xl border border-border bg-surface p-6 shadow-card">
+            <p className="text-[12px] font-bold uppercase tracking-wide text-ink-faint">
+              Routines
+            </p>
+            <h3 className="mt-1.5 font-display text-lg font-bold">
+              A ritual that keeps its own time
+            </h3>
+            <div className="mt-5 flex flex-col items-center rounded-2xl border border-border bg-canvas p-5">
+              <div className="flex gap-1.5" aria-hidden>
+                <span className="h-1.5 w-5 rounded-full bg-success" />
+                <span className="h-1.5 w-5 rounded-full bg-iris" />
+                <span className="size-1.5 rounded-full bg-border-strong" />
+                <span className="size-1.5 rounded-full bg-border-strong" />
+              </div>
+              <p className="tnum mt-4 font-mono text-3xl font-bold">02:41</p>
+              <p className="text-[13px] font-bold">Tidy one surface</p>
+              <p className="text-[11.5px] font-medium text-ink-soft">
+                Step 2 of 4 · next · Tea, no screens
+              </p>
+            </div>
+            <p className="mt-4 text-[13.5px] leading-relaxed text-ink-soft">
+              Drop a morning or wind-down routine into any day and run it hands
+              free — each step timed, time&apos;s-up waits for you, never rushes.
+            </p>
+          </article>
+        </div>
+      </section>
+
       {/* features */}
       <section className="mx-auto w-full max-w-6xl px-5 pb-24 pt-20">
         <h2 className="font-display text-3xl font-bold tracking-tight md:text-4xl">
