@@ -1,7 +1,7 @@
 # Progress log
 
 ## 2026-07-21 — 20-phase 10× program, continuation (Fable + subagents)
-Roadmap: `docs/plans/2026-07-20-20phase-program.md`. **11 of 20 phases done.**
+Roadmap: `docs/plans/2026-07-20-20phase-program.md`. **12 of 20 phases done.**
 
 **Shipped + verified this continuation:**
 - **P9 web a11y sweep** (Sonnet subagent, verified): `aria-modal` on
@@ -25,8 +25,13 @@ Earlier in the program (already ticked): P1 iOS Stats, P2 iOS Pick-for-me,
 P4 iOS Review, P5 iOS Play, P6 iOS Inbox tend, P7 WCAG-AA contrast token pass,
 P10 security review, P11 server test coverage (+110 tests).
 
-**Remaining (9): P8** prod-build Lighthouse measure+fix; **P13** weekly
-reflection digest; **P14** focus soundscape presets; **P15** peak-focus nudge;
+- **P13 Weekly Reflection** (Fable): `WeeklyReflection.tsx` "This fortnight,
+  gently" card — 2–3 derived warm observations (best weekday, focus given,
+  peak window, days shown up), gated on ≥3 completions. Pure/derived.
+  **Verified live** — `browser-qa/web-insights-full.png`.
+
+**Remaining (8): P8** prod-build Lighthouse measure+fix; **P14** focus
+soundscape presets; **P15** peak-focus nudge;
 **P16** energy-aware plan-my-day; **P17** landing polish; **P18** web onboarding
 refinement; **P19** cross-platform copy/empty-state audit (subagent-friendly);
 **P20** final gates + deploy + iOS suite green.

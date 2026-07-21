@@ -36,7 +36,7 @@ pass (a11y), prod-build Lighthouse.
 
 ### New ADHD capabilities
 - [x] P12: Reward garden / visual progress — growth that isn't a streak
-- [ ] P13: Weekly reflection — gentle patterns digest on Stats
+- [x] P13: Weekly reflection — gentle patterns digest on Stats
 - [ ] P14: Focus soundscape polish + session presets (named rituals)
 - [ ] P15: Smart "when am I most focused" nudge (uses focus-hours data)
 - [ ] P16: Energy-aware Plan-my-day (respect low-battery + energy tags)
