@@ -71,6 +71,38 @@ struct StatsResponse: Decodable {
     let focusHours: FocusHours?
 }
 
+// MARK: - Routines (P3 iOS parity)
+
+struct Routine: Decodable, Identifiable {
+    let id: String
+    let title: String
+    let emoji: String?
+    let notes: String?
+    let steps: [Step]
+    let schedules: [Schedule]
+    let stepCount: Int
+    let totalMin: Int
+    let revision: Int
+
+    struct Step: Decodable, Identifiable {
+        let id: String
+        let title: String
+        let durationMin: Int?
+        let sortOrder: Int
+    }
+
+    struct Schedule: Decodable, Identifiable {
+        let id: String
+        let rrule: String?
+        let paused: Bool
+    }
+
+    /// Steps in play order, filling a default 5-min timer where none is set.
+    var orderedSteps: [Step] {
+        steps.sorted { $0.sortOrder < $1.sortOrder }
+    }
+}
+
 struct FocusSnapshot: Decodable {
     let session: FocusSession?
     let remainingSec: Int?

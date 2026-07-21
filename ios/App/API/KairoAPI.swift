@@ -225,6 +225,13 @@ actor KairoAPI {
         try await request("GET", "/api/v1/stats", as: StatsResponse.self)
     }
 
+    // MARK: Routines
+
+    func routines() async throws -> [Routine] {
+        let page: Page<Routine> = try await request("GET", "/api/v1/routines", as: Page<Routine>.self)
+        return page.items
+    }
+
     // MARK: Focus sessions (ADR-004, server-authoritative)
 
     func activeFocus() async throws -> FocusSnapshot {

@@ -34,7 +34,7 @@ struct MoreView: View {
                                 } icon: {
                                     Image(systemName: "sparkles").foregroundStyle(Color.kIris)
                                 }
-                                Text("Brain-break games, AI planning, routines player, week & month views live at time.neima.me — same account, same day.")
+                                Text("AI planning, month view, templates and more live at time.neima.me — same account, same day.")
                                     .font(.kBody(13.5))
                                     .foregroundStyle(Color.kInkSoft)
                                 Link(destination: URL(string: "https://time.neima.me/app/today")!) {
@@ -48,6 +48,10 @@ struct MoreView: View {
                         }
 
                         card {
+                            NavigationLink { RoutinesView() } label: {
+                                row(icon: "repeat", title: "Routines", value: "Run a ritual")
+                            }.buttonStyle(.plain)
+                            divider
                             NavigationLink { StatsView() } label: {
                                 row(icon: "chart.bar.fill", title: "Insights", value: "Your week")
                             }.buttonStyle(.plain)
