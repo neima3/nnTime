@@ -5,6 +5,16 @@ import ActivityKit
 // overtime that counts up instead of going silent, and Spline Mono digits.
 
 struct FocusView: View {
+    /// Named session presets (R3 — mirrors web Focus rituals).
+    struct Ritual { let id: String; let label: String; let emoji: String; let title: String; let min: Int }
+    static let rituals: [Ritual] = [
+        .init(id: "deep", label: "Deep work", emoji: "🧠", title: "Deep work", min: 45),
+        .init(id: "quick", label: "Quick win", emoji: "⚡", title: "Quick win", min: 15),
+        .init(id: "double", label: "Body double", emoji: "👥", title: "Body double", min: 25),
+        .init(id: "wind", label: "Wind down", emoji: "🌙", title: "Wind down", min: 10),
+        .init(id: "flow", label: "Creative flow", emoji: "🎨", title: "Creative flow", min: 45),
+    ]
+
     @State private var session: FocusSession?
     @State private var remaining = 25 * 60
     @State private var overtime = 0
@@ -82,6 +92,34 @@ struct FocusView: View {
                         .font(.kBody(13))
                         .foregroundStyle(Color.kInkSoft)
                 }
+            }
+
+            // Named rituals — one tap frames the whole session (R3 parity).
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Self.rituals, id: \.id) { r in
+                        let on = pendingTitle == r.title && duration == r.min
+                        Button {
+                            pendingTitle = r.title
+                            pendingEmoji = r.emoji
+                            duration = r.min
+                            remaining = r.min * 60
+                        } label: {
+                            HStack(spacing: 5) {
+                                Text(r.emoji)
+                                Text(r.label)
+                            }
+                            .font(.kBody(13, weight: .semibold))
+                            .foregroundStyle(on ? Color.kIris : Color.kInkSoft)
+                            .padding(.horizontal, 12).padding(.vertical, 8)
+                            .background(
+                                Capsule().fill(on ? Color.kIrisSoft : Color.kSurface)
+                                    .overlay(Capsule().stroke(on ? Color.kIris : Color.kBorder, lineWidth: 1))
+                            )
+                        }
+                    }
+                }
+                .padding(.horizontal, 4)
             }
 
             HStack(spacing: 6) {

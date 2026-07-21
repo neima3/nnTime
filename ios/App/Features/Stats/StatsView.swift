@@ -15,6 +15,10 @@ struct StatsView: View {
             } else if let stats {
                 ScrollView {
                     VStack(spacing: 14) {
+                        gardenCard(stats)
+                        if let notes = reflectionNotesFor(stats), !notes.isEmpty {
+                            reflectionCard(notes)
+                        }
                         weekCard(stats)
                         HStack(spacing: 14) {
                             streakCard(stats)
@@ -120,6 +124,77 @@ struct StatsView: View {
                  ? "Your \(e.avgTargetMin)-min focus plans actually run about \(e.avgActualMin) min. That's normal — plan ×\(String(format: "%.1f", e.ratio)) and you'll land on time."
                  : "Your time estimates are landing — plans and reality match. Rare skill. Keep it.")
                 .font(.kBody(13.5)).foregroundStyle(Color.kInkSoft)
+        }
+        .padding(16).frame(maxWidth: .infinity, alignment: .leading).kCard(radius: 20)
+    }
+
+    // MARK: Reward Garden — growth that isn't a streak.
+
+    private func gardenCard(_ s: StatsResponse) -> some View {
+        let g = Insights.gardenState(totalCompleted: s.totalCompleted, totalFocusMin: s.totalFocusMin)
+        let meadow = ["🌸", "🌼", "🌻", "🌷", "🪻", "🌺"]
+        return VStack(alignment: .leading, spacing: 0) {
+            Text("Your garden").font(.kBody(16, weight: .bold)).foregroundStyle(Color.kInk)
+            Text("It only ever grows — no day can undo it")
+                .font(.kBody(12.5)).foregroundStyle(Color.kInkSoft)
+            HStack(spacing: 14) {
+                Text(g.stage.emoji).font(.system(size: 40))
+                    .frame(width: 64, height: 64)
+                    .background(RoundedRectangle(cornerRadius: 20).fill(Color.kCatMint.opacity(0.5)))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(g.stage.name.capitalized).font(.kDisplay(19)).foregroundStyle(Color.kInk)
+                    if g.points == 0 {
+                        Text("Finish one thing or a focus block to plant your first seed.")
+                            .font(.kBody(12.5)).foregroundStyle(Color.kInkSoft)
+                    } else if let next = g.next {
+                        Text("\(g.points) planted in \(s.days ?? 14) days · \(g.toNext) more until \(next.name)")
+                            .font(.kBody(12.5)).foregroundStyle(Color.kInkSoft)
+                    } else {
+                        Text("\(g.points) planted · fully grown, and still going")
+                            .font(.kBody(12.5)).foregroundStyle(Color.kInkSoft)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.top, 14)
+            if g.bloomCount > 0 {
+                HStack(spacing: 3) {
+                    ForEach(0..<g.bloomCount, id: \.self) { i in
+                        Text(meadow[i % meadow.count]).font(.system(size: 16))
+                    }
+                }
+                .padding(.top, 12)
+            }
+        }
+        .padding(16).frame(maxWidth: .infinity, alignment: .leading).kCard(radius: 20)
+    }
+
+    // MARK: Weekly Reflection — gentle patterns digest.
+
+    private func reflectionNotesFor(_ s: StatsResponse) -> [String]? {
+        let byDateCompleted = s.byDate.mapValues { $0.completed }
+        return Insights.reflectionNotes(
+            byDate: byDateCompleted,
+            totalCompleted: s.totalCompleted,
+            totalFocusMin: s.totalFocusMin,
+            peakHour: s.focusHours?.peakHour
+        )
+    }
+
+    private func reflectionCard(_ notes: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("This fortnight, gently").font(.kBody(16, weight: .bold)).foregroundStyle(Color.kInk)
+            Text("Patterns worth noticing — nothing to fix")
+                .font(.kBody(12.5)).foregroundStyle(Color.kInkSoft)
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(Array(notes.prefix(3).enumerated()), id: \.offset) { _, note in
+                    HStack(alignment: .top, spacing: 8) {
+                        Text("·").font(.kBody(14, weight: .bold)).foregroundStyle(Color.kIris)
+                        Text(note).font(.kBody(13.5)).foregroundStyle(Color.kInk)
+                    }
+                }
+            }
+            .padding(.top, 14)
         }
         .padding(16).frame(maxWidth: .infinity, alignment: .leading).kCard(radius: 20)
     }

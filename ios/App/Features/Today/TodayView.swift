@@ -15,6 +15,8 @@ struct TodayView: View {
     @State private var showReview = false
     @State private var editorStart = 9 * 60
     @State private var loadError: String?
+    @State private var peakHour: Int?
+    @State private var peakDismissedDay = ""
     /// 0 = today, ±n days.
     @State private var dayOffset = 0
 
@@ -35,6 +37,11 @@ struct TodayView: View {
                             header
                                 .padding(.horizontal, 20)
                                 .padding(.top, 8)
+                            if let nudge = peakNudge {
+                                nudge
+                                    .padding(.horizontal, 16)
+                                    .padding(.top, 10)
+                            }
                             TimelineCanvas(
                                 blocks: blocks,
                                 nowMin: nowMin,
@@ -168,6 +175,51 @@ struct TodayView: View {
 
     private var doneCount: Int { blocks.filter(\.done).count }
 
+    /// Peak-focus nudge (R4) — shown only today, inside the personal peak
+    /// window, once per day. Fed by the stats focus-hours data.
+    private var peakNudge: AnyView? {
+        guard dayOffset == 0, let peak = peakHour else { return nil }
+        let today = KTime.dateString(Date(), zone: .current)
+        guard peakDismissedDay != today else { return nil }
+        let nowHour = Calendar.current.component(.hour, from: Date())
+        guard Insights.isInPeakWindow(nowHour: nowHour, peakHour: peak) else { return nil }
+        let isNow = nowHour == peak
+        return AnyView(
+            HStack(spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.kIris)
+                    .frame(width: 34, height: 34)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(Color.kIrisSoft))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(isNow ? "This is usually your sharpest hour"
+                               : "Your focus peaks around \(Insights.hourLabel(peak))")
+                        .font(.kBody(13.5, weight: .bold)).foregroundStyle(Color.kInk)
+                    Text("Protect it with one focus block?")
+                        .font(.kBody(12)).foregroundStyle(Color.kInkSoft)
+                }
+                Spacer(minLength: 4)
+                Button {
+                    NotificationCenter.default.post(name: .kairoStartFocus, object: nil,
+                        userInfo: ["title": "Deep work", "emoji": "🧠", "duration": 45])
+                } label: {
+                    Text("Focus").font(.kBody(13, weight: .bold)).foregroundStyle(Color.kInkInverse)
+                        .padding(.horizontal, 12).padding(.vertical, 7)
+                        .background(Capsule().fill(Color.kIris))
+                }
+                Button {
+                    peakDismissedDay = today
+                    UserDefaults.standard.set(today, forKey: "kairo.peakNudgeDismissed")
+                } label: {
+                    Image(systemName: "xmark").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.kInkFaint)
+                }
+                .accessibilityLabel("Dismiss for today")
+            }
+            .padding(12)
+            .background(RoundedRectangle(cornerRadius: 16).fill(Color.kIrisGhost)
+                .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.kIris.opacity(0.3), lineWidth: 1)))
+        )
+    }
+
     /// Earliest not-done block still ahead of now (today only).
     private var upNext: DayBlock? {
         blocks
@@ -297,6 +349,19 @@ struct TodayView: View {
             loadError = (error as? APIError)?.errorDescription
         }
         loading = false
+        if dayOffset == 0 { await loadPeak() }
+    }
+
+    /// Pull the peak-focus hour from stats (only worth showing today).
+    private func loadPeak() async {
+        peakDismissedDay = UserDefaults.standard.string(forKey: "kairo.peakNudgeDismissed") ?? ""
+        guard let stats = try? await KairoAPI.shared.stats(),
+              let hours = stats.focusHours,
+              Insights.focusSessionCount(hours.hours) >= Insights.peakMinSessions else {
+            peakHour = nil
+            return
+        }
+        peakHour = hours.peakHour
     }
 
     private func move(_ block: DayBlock, to newStartMin: Int) async {

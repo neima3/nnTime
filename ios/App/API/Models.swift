@@ -69,6 +69,7 @@ struct StatsResponse: Decodable {
     let totalFocusMin: Int
     let estimate: Estimate?
     let focusHours: FocusHours?
+    let days: Int?
 }
 
 // MARK: - Routines (P3 iOS parity)
