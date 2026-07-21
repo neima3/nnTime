@@ -44,8 +44,10 @@ function StepDots({ step }: { step: number }) {
           key={s}
           className={
             s === step
-              ? "h-2 w-6 rounded-full bg-iris"
-              : "size-2 rounded-full bg-border-strong"
+              ? "h-2 w-6 rounded-full bg-iris transition-all"
+              : s < step
+                ? "size-2 rounded-full bg-iris/50 transition-all"
+                : "size-2 rounded-full bg-border-strong transition-all"
           }
         />
       ))}
@@ -62,6 +64,35 @@ export default function OnboardingPage() {
   const [busy, setBusy] = useState(false);
   const [createdCount, setCreatedCount] = useState<number | null>(null);
   const [zone, setZone] = useState("UTC");
+
+  // Resume where they left off — onboarding survives a refresh or a wandered-off
+  // tab (ADHD reality). Restored after hydration to avoid a mismatch.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("kairo:onboarding");
+      if (!raw) return;
+      const saved = JSON.parse(raw) as {
+        step?: number;
+        name?: string;
+        picked?: number[];
+      };
+      /* eslint-disable react-hooks/set-state-in-effect */
+      if (saved.step && saved.step >= 1 && saved.step <= 2) setStep(saved.step);
+      if (typeof saved.name === "string") setName(saved.name);
+      if (Array.isArray(saved.picked)) setPicked(new Set(saved.picked));
+      /* eslint-enable react-hooks/set-state-in-effect */
+    } catch {}
+  }, []);
+
+  // Persist progress on every change (cleared once anchors are created).
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "kairo:onboarding",
+        JSON.stringify({ step, name, picked: [...picked] }),
+      );
+    } catch {}
+  }, [step, name, picked]);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -116,6 +147,10 @@ export default function OnboardingPage() {
     }
     setCreatedCount(created);
     setBusy(false);
+    // Reached the finish — onboarding is done, forget the saved progress.
+    try {
+      localStorage.removeItem("kairo:onboarding");
+    } catch {}
     setStep(3);
   };
 
@@ -243,7 +278,12 @@ export default function OnboardingPage() {
               )}
               <button
                 type="button"
-                onClick={() => setStep(3)}
+                onClick={() => {
+                  try {
+                    localStorage.removeItem("kairo:onboarding");
+                  } catch {}
+                  setStep(3);
+                }}
                 className="mt-2 w-full rounded-2xl py-2.5 text-[13px] font-semibold text-ink-faint hover:bg-surface-sunken"
               >
                 Skip — I&apos;ll build my own
