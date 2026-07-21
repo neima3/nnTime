@@ -30,7 +30,7 @@ pass (a11y), prod-build Lighthouse.
 ### Web — pay down real debts + hardening
 - [x] P7: Accessibility token pass — WCAG AA contrast across surfaces
 - [ ] P8: Prod-build Lighthouse — measure + fix real perf wins
-- [ ] P9: Web a11y sweep — keyboard/ARIA on overlays (subagent + accesslint)
+- [x] P9: Web a11y sweep — keyboard/ARIA on overlays (subagent + accesslint)
 - [x] P10: Security review pass of API surface (subagent)
 - [x] P11: Test coverage — server/service unit tests for gaps (subagent)
 
