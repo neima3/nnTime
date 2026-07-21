@@ -22,12 +22,14 @@ const RITUALS: {
   title: string;
   min: number;
   vibe: string;
+  /** Soundscape auto-started with this ritual (null = silence). */
+  sound: "rain" | "forest" | "ocean" | "cafe" | "whitenoise" | null;
 }[] = [
-  { id: "deep", label: "Deep work", emoji: "🧠", title: "Deep work", min: 45, vibe: "White noise" },
-  { id: "quick", label: "Quick win", emoji: "⚡", title: "Quick win", min: 15, vibe: "Silence" },
-  { id: "double", label: "Body double", emoji: "👥", title: "Body double", min: 25, vibe: "Café" },
-  { id: "wind", label: "Wind down", emoji: "🌙", title: "Wind down", min: 10, vibe: "Rain" },
-  { id: "flow", label: "Creative flow", emoji: "🎨", title: "Creative flow", min: 45, vibe: "Forest" },
+  { id: "deep", label: "Deep work", emoji: "🧠", title: "Deep work", min: 45, vibe: "White noise", sound: "whitenoise" },
+  { id: "quick", label: "Quick win", emoji: "⚡", title: "Quick win", min: 15, vibe: "Silence", sound: null },
+  { id: "double", label: "Body double", emoji: "👥", title: "Body double", min: 25, vibe: "Café", sound: "cafe" },
+  { id: "wind", label: "Wind down", emoji: "🌙", title: "Wind down", min: 10, vibe: "Rain", sound: "rain" },
+  { id: "flow", label: "Creative flow", emoji: "🎨", title: "Creative flow", min: 45, vibe: "Forest", sound: "forest" },
 ];
 
 type Session = {
@@ -559,6 +561,12 @@ export function FocusClient({
                     setTitle(r.title);
                     setEmoji(r.emoji);
                     setDurationMin(r.min);
+                    // Auto-start the ritual's vibe (the click is the gesture
+                    // Web Audio needs). AmbientSounds, mounted in the shell,
+                    // picks this up and plays it.
+                    window.dispatchEvent(
+                      new CustomEvent("kairo:soundscape", { detail: { id: r.sound } }),
+                    );
                   }}
                   title={`${r.min} min · ${r.vibe}`}
                   className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none ${

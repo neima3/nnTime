@@ -21,54 +21,76 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Volume2, VolumeX } from "lucide-react";
+import { Soundscape, type SoundscapeId } from "@/lib/soundscape";
 
-const SOUNDS = [
-  { id: "rain", label: "🌧️ Rain", file: "/audio/rain.ogg" },
-  { id: "forest", label: "🌲 Forest", file: "/audio/forest.ogg" },
-  { id: "ocean", label: "🌊 Ocean", file: "/audio/ocean.ogg" },
-  { id: "cafe", label: "☕ Cafe", file: "/audio/cafe.ogg" },
-  { id: "whitenoise", label: "⚪ White noise", file: "/audio/whitenoise.ogg" },
-] as const;
+const SOUNDS: { id: SoundscapeId; label: string }[] = [
+  { id: "rain", label: "🌧️ Rain" },
+  { id: "forest", label: "🌲 Forest" },
+  { id: "ocean", label: "🌊 Ocean" },
+  { id: "cafe", label: "☕ Cafe" },
+  { id: "whitenoise", label: "⚪ White noise" },
+];
+
+/** Focus rituals fire this to auto-start their vibe (detail.id or null). */
+const RITUAL_EVENT = "kairo:soundscape";
 
 export function AmbientSounds() {
-  const [active, setActive] = useState<string | null>(null);
+  const [active, setActive] = useState<SoundscapeId | null>(null);
   const [volume, setVolume] = useState(0.5);
   const [muted, setMuted] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const engineRef = useRef<Soundscape | null>(null);
+
+  const getEngine = () => {
+    if (!engineRef.current) engineRef.current = new Soundscape();
+    return engineRef.current;
+  };
 
   useEffect(() => {
-    // Create a single audio element that we swap sources on (gapless).
-    if (!audioRef.current) {
-      audioRef.current = new Audio();
-      audioRef.current.loop = true;
-    }
     return () => {
-      audioRef.current?.pause();
+      engineRef.current?.stop();
     };
   }, []);
 
-  const toggle = (id: string, file: string) => {
-    const audio = audioRef.current;
-    if (!audio) return;
+  const toggle = (id: SoundscapeId) => {
+    const engine = getEngine();
     if (active === id) {
-      audio.pause();
+      engine.stop();
       setActive(null);
     } else {
-      audio.src = file;
-      audio.volume = muted ? 0 : volume;
-      audio.play().catch(() => {
-        // Autoplay policy: user gesture required. The click IS the gesture,
-        // so this should work. If not, the pill just doesn't start.
-      });
+      engine.setVolume(volume);
+      engine.setMuted(muted);
+      engine.play(id);
       setActive(id);
     }
   };
 
+  // A Focus ritual (or anything) can request a soundscape by dispatching
+  // `kairo:soundscape` with { id } — or { id: null } to stop.
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = muted ? 0 : volume;
-    }
+    const onRequest = (e: Event) => {
+      const id = (e as CustomEvent<{ id: SoundscapeId | null }>).detail?.id ?? null;
+      const engine = getEngine();
+      if (!id) {
+        engine.stop();
+        setActive(null);
+        return;
+      }
+      engine.setVolume(volume);
+      engine.setMuted(muted);
+      engine.play(id);
+      setActive(id);
+    };
+    window.addEventListener(RITUAL_EVENT, onRequest);
+    return () => window.removeEventListener(RITUAL_EVENT, onRequest);
   }, [volume, muted]);
+
+  useEffect(() => {
+    engineRef.current?.setVolume(volume);
+  }, [volume]);
+
+  useEffect(() => {
+    engineRef.current?.setMuted(muted);
+  }, [muted]);
 
   return (
     <div className="flex items-center gap-2">
@@ -76,7 +98,7 @@ export function AmbientSounds() {
         {SOUNDS.map((s) => (
           <button
             key={s.id}
-            onClick={() => toggle(s.id, s.file)}
+            onClick={() => toggle(s.id)}
             className={`rounded-lg px-2.5 py-1 text-[12px] font-semibold transition-colors ${
               active === s.id
                 ? "bg-iris text-ink-inverse"
