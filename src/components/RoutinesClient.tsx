@@ -78,7 +78,7 @@ export function RoutinesClient({
     });
     setBusy(false);
     if (!res.ok) {
-      toast("Could not create routine");
+      toast("Couldn't create it — try again");
       return;
     }
     toast("Routine created");
@@ -103,7 +103,7 @@ export function RoutinesClient({
         },
       );
       if (!res.ok) {
-        toast("Could not update schedule");
+        toast("Couldn't update the schedule — try again");
         return;
       }
       setItems((prev) =>
@@ -130,7 +130,7 @@ export function RoutinesClient({
         headers: { "If-Match": String(r.revision) },
       });
       if (!res.ok && res.status !== 204) {
-        toast("Could not delete");
+        toast("Couldn't delete it — try again");
         return;
       }
       setItems((prev) => prev.filter((x) => x.id !== r.id));

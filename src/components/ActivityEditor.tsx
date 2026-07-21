@@ -299,7 +299,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
         }
         if (!res.ok) {
           const body = await res.json().catch(() => null);
-          setError(body?.error?.message ?? "Could not create activity.");
+          setError(body?.error?.message ?? "Couldn't create it — try again");
           setSaving(false);
           return;
         }
@@ -337,7 +337,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
         }
         if (!res.ok) {
           const body = await res.json().catch(() => null);
-          setError(body?.error?.message ?? "Could not save activity.");
+          setError(body?.error?.message ?? "Couldn't save it — try again");
           setSaving(false);
           return;
         }
@@ -379,7 +379,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
       headers: { "If-Match": String(revision) },
     });
     if (!res.ok && res.status !== 204) {
-      setError("Could not delete.");
+      setError("Couldn't delete it — try again");
       setSaving(false);
       return;
     }

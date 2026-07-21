@@ -180,7 +180,7 @@ export function SettingsClient() {
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        setStatus("Could not save settings.");
+        setStatus("Couldn't save your settings — try again");
         return;
       }
       invalidateSettingsCache();
@@ -212,7 +212,7 @@ export function SettingsClient() {
   const exportData = useCallback(async () => {
     const res = await fetch("/api/v1/privacy/export");
     if (!res.ok) {
-      setStatus("Export failed — sign in?");
+      setStatus("Couldn't export — sign in?");
       return;
     }
     const blob = await res.blob();
@@ -269,7 +269,7 @@ export function SettingsClient() {
     });
     setDeleteBusy(false);
     if (!res.ok && res.status !== 204) {
-      setStatus("Could not delete account");
+      setStatus("Couldn't delete your account — try again or reach out");
       return;
     }
     window.location.href = "/";

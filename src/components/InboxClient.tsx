@@ -138,7 +138,7 @@ export function InboxClient({
         }),
       });
       if (!res.ok) {
-        setError("Could not add item.");
+        setError("Couldn't add it — try again");
         setBusy(null);
         return;
       }
@@ -207,7 +207,7 @@ export function InboxClient({
           },
         });
       } else {
-        setError("Could not delete.");
+        setError("Couldn't delete it — try again");
       }
       setBusy(null);
     },
@@ -254,7 +254,7 @@ export function InboxClient({
           setItems((prev) => prev.filter((i) => i.id !== item.id));
           router.refresh();
         } else {
-          setError("Could not move to Anytime.");
+          setError("Couldn't move it — try again");
         }
       }
       setBusy(null);

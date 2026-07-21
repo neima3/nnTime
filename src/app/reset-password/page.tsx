@@ -28,7 +28,7 @@ function ResetForm() {
         token,
       });
       if (res.error) {
-        setError(res.error.message ?? "Reset failed.");
+        setError(res.error.message ?? "Couldn't reset your password — try again.");
         setPending(false);
         return;
       }

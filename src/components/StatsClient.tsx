@@ -96,7 +96,7 @@ export function StatsClient() {
     });
     setMoodBusy(false);
     if (!res.ok) {
-      toast("Could not save mood");
+      toast("Couldn't save that — try again");
       return;
     }
     toast("Mood noted — thank you");

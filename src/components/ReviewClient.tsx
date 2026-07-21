@@ -67,7 +67,7 @@ export function ReviewClient({
             }),
           });
           if (!res.ok) {
-            setError("Could not update activity.");
+            setError("Couldn't update it — try again");
             setBusy(false);
             return;
           }
@@ -94,7 +94,7 @@ export function ReviewClient({
             }),
           });
           if (!res.ok) {
-            setError("Could not reschedule.");
+            setError("Couldn't reschedule it — try again");
             setBusy(false);
             return;
           }

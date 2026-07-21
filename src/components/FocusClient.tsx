@@ -324,7 +324,7 @@ export function FocusClient({
       return;
     }
     if (!res.ok) {
-      setError("Could not start focus session.");
+      setError("Couldn't start the session — try again");
       return;
     }
     const data = await res.json();
