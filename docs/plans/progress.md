@@ -1,5 +1,40 @@
 # Progress log
 
+## 2026-07-20 — iOS production program: 10 phases (Fable + subagent)
+
+Plan: docs/plans/2026-07-20-ios-production-roadmap.md (all ticked).
+
+1. **Interactive complete widget:** `CompleteActivityIntent` (App Intents) on
+   the small "Next up" widget — flips the shared cache optimistically then
+   PATCHes via `Shared/KairoRemote` (app-group cookie store so the widget
+   process carries the session). Cache now carries id/revision/occurrenceKey.
+2. **Live Activity buttons:** +10 (`ExtendFocusIntent`) and Done
+   (`CompleteFocusIntent`) on the lock-screen banner (rebuilt as a VStack)
+   and Dynamic Island expanded bottom; overtime tinting already shipped.
+3. **Large + accessory widgets:** systemLarge "Today list" (5 rows + "+n
+   more"), accessoryCircular (day-progress ring around ◔), rectangular
+   (next-up), inline; all deep-link to kairo://today.
+4. **First-run onboarding:** `OnboardingSheet` anchor picker (mirrors web),
+   creates real activities (daily RRULEs), one-time via app-group flag.
+5. **Settings:** theme override (system/light/dark → `.preferredColorScheme`,
+   persisted), reduced-stimulation toggle, data links, sign out — verified
+   Dark recolors the whole app.
+6. **Resilient states:** `NetworkMonitor` (NWPathMonitor) → butter offline
+   banner across all tabs.
+7. **Accessibility:** timeline blocks expose complete/edit/focus/delete as
+   VoiceOver custom actions + descriptive labels; progress ring has an
+   accessibilityValue.
+8. **API unit tests (subagent):** `KairoUnitTests` target, 15 golden
+   decode/date-strategy/error cases, wired into the scheme.
+9. **Refresh/haptics:** selection haptics on chips/toggles; consistent
+   success/medium generators.
+10. **Ship prep:** full suite green — **15 unit + 5 UI tests** (flow, live
+    activity, deep link, tour, new-screens); onboarding + Settings-dark
+    captured (browser-qa/ios-09/10).
+
+Caveat unchanged: widget/intent networking + app-group cache read live data
+once signing activates the group.me.neima.kairo entitlement (files in place).
+
 ## 2026-07-19 — iOS round 6: overtime island, medium widget, deep links (Fable)
 
 - **Live Activity overtime** (ios-adaptation §4): when a session passes its

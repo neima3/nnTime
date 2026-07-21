@@ -9,6 +9,7 @@ final class KairoFlowUITests: XCTestCase {
 
     func testSignInCreateCompleteFlow() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-kairoSkipOnboarding"]
         app.launch()
 
         // Sign in (skipped if a session already exists).

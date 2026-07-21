@@ -12,13 +12,18 @@ struct MoreView: View {
                 Color.kCanvas.ignoresSafeArea()
                 ScrollView {
                     VStack(spacing: 12) {
-                        card {
-                            row(icon: "globe", title: "Planning timezone",
-                                value: settings?.timezone ?? app.timezone.identifier)
-                            divider
-                            row(icon: "paintpalette", title: "Theme",
-                                value: "Matches your device")
+                        NavigationLink {
+                            SettingsView()
+                        } label: {
+                            card {
+                                row(icon: "gearshape", title: "Settings",
+                                    value: app.theme.label)
+                                divider
+                                row(icon: "globe", title: "Planning timezone",
+                                    value: settings?.timezone ?? app.timezone.identifier)
+                            }
                         }
+                        .buttonStyle(.plain)
 
                         card {
                             VStack(alignment: .leading, spacing: 10) {

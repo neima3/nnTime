@@ -93,10 +93,111 @@ struct NextUpWidgetView: View {
     }
 
     var body: some View {
-        if family == .systemMedium {
-            mediumStrip
+        switch family {
+        case .systemMedium: mediumStrip
+        case .systemLarge: largeList
+        case .accessoryCircular: accessoryCircular
+        case .accessoryRectangular: accessoryRectangular
+        case .accessoryInline: accessoryInline
+        default: smallCard
+        }
+    }
+
+    // Large: date header + up to 5 upcoming rows + "+n more".
+    private var largeList: some View {
+        let upcoming = entry.blocks.filter { $0.endMin > entry.nowMin }
+        let shown = Array(upcoming.prefix(5))
+        let more = upcoming.count - shown.count
+        let paper = Color(red: 0.969, green: 0.957, blue: 0.933)
+        let inkColor = Color(red: 0.141, green: 0.122, blue: 0.192)
+        let softColor = Color(red: 0.435, green: 0.408, blue: 0.514)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("◔").font(.system(size: 15, weight: .bold))
+                Text("Today").font(.system(size: 15, weight: .bold, design: .rounded))
+                Spacer()
+                let done = entry.blocks.filter(\.done).count
+                if !entry.blocks.isEmpty {
+                    Text("\(done)/\(entry.blocks.count)")
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(softColor)
+                }
+            }
+            if shown.isEmpty {
+                Spacer()
+                Text(entry.blocks.isEmpty ? "Nothing planned — add something kind." : "All done. Go be free. 🎉")
+                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .foregroundStyle(softColor)
+                    .frame(maxWidth: .infinity)
+                Spacer()
+            } else {
+                ForEach(Array(shown.enumerated()), id: \.offset) { _, block in
+                    let active = block.startMin <= entry.nowMin
+                    HStack(spacing: 9) {
+                        Text(block.emoji).font(.system(size: 15))
+                            .frame(width: 30, height: 30)
+                            .background(Circle().fill(fill(block.category)))
+                        Text(block.title)
+                            .font(.system(size: 13.5, weight: .semibold, design: .rounded))
+                            .lineLimit(1)
+                        Spacer()
+                        Text(String(format: "%d:%02d", block.startMin / 60, block.startMin % 60))
+                            .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(softColor)
+                        if active {
+                            Circle().fill(Color(red: 1.0, green: 0.361, blue: 0.302)).frame(width: 6, height: 6)
+                        }
+                    }
+                }
+                if more > 0 {
+                    Text("+\(more) more").font(.system(size: 12, weight: .semibold)).foregroundStyle(softColor)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .foregroundStyle(inkColor)
+        .containerBackground(paper, for: .widget)
+        .widgetURL(URL(string: "kairo://today"))
+    }
+
+    // Lock-screen accessories.
+    private var accessoryCircular: some View {
+        let done = entry.blocks.filter(\.done).count
+        let frac = entry.blocks.isEmpty ? 0 : Double(done) / Double(entry.blocks.count)
+        return ZStack {
+            AccessoryWidgetBackground()
+            Circle().stroke(.tertiary, lineWidth: 4)
+            Circle().trim(from: 0, to: max(0.001, frac))
+                .stroke(.primary, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            Text("◔").font(.system(size: 16, weight: .bold))
+        }
+        .widgetURL(URL(string: "kairo://today"))
+    }
+
+    private var accessoryRectangular: some View {
+        HStack(spacing: 6) {
+            if let block = entry.block {
+                Text(block.emoji)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(entry.isCurrent ? "Now" : "Up next")
+                        .font(.system(size: 11, weight: .bold)).textCase(.uppercase)
+                    Text(block.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                    Text(String(format: "%d:%02d", block.startMin / 60, block.startMin % 60))
+                        .font(.system(size: 11, design: .monospaced))
+                }
+            } else {
+                Text("◔ Nothing planned").font(.system(size: 12, weight: .semibold))
+            }
+        }
+        .widgetURL(URL(string: "kairo://today"))
+    }
+
+    private var accessoryInline: some View {
+        if let block = entry.block {
+            Text("◔ \(String(format: "%d:%02d", block.startMin / 60, block.startMin % 60)) \(block.title)")
         } else {
-            smallCard
+            Text("◔ Nothing planned")
         }
     }
 
@@ -161,13 +262,20 @@ struct NextUpWidgetView: View {
         Group {
             if let block = entry.block {
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack {
+                    HStack(alignment: .top) {
                         Text(block.emoji)
                             .font(.system(size: 18))
                             .frame(width: 30, height: 30)
                             .background(Circle().fill(.white.opacity(0.65)))
                         Spacer()
-                        if entry.isCurrent {
+                        if let id = block.activityId, let rev = block.revision, !block.done {
+                            Button(intent: CompleteActivityIntent(activityId: id, revision: rev, occurrenceKey: block.occurrenceKey)) {
+                                Image(systemName: "circle")
+                                    .font(.system(size: 20, weight: .semibold))
+                                    .foregroundStyle(ink(block.category).opacity(0.55))
+                            }
+                            .buttonStyle(.plain)
+                        } else if entry.isCurrent {
                             Circle()
                                 .fill(Color(red: 1.0, green: 0.361, blue: 0.302))
                                 .frame(width: 7, height: 7)
@@ -228,6 +336,7 @@ struct NextUpWidget: Widget {
         }
         .configurationDisplayName("Next up")
         .description("Your current or next activity, at a glance.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge,
+                            .accessoryCircular, .accessoryRectangular, .accessoryInline])
     }
 }

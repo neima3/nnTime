@@ -117,6 +117,9 @@ struct TodayView: View {
         }
         .task { await load() }
         .onReceive(tick) { _ in nowMin = KTime.nowMinutes(in: app.timezone) }
+        .onReceive(NotificationCenter.default.publisher(for: .kairoDayChanged)) { _ in
+            Task { await load() }
+        }
     }
 
     private var viewedDate: Date {
@@ -158,6 +161,8 @@ struct TodayView: View {
             if !blocks.isEmpty {
                 ProgressRing(fraction: Double(doneCount) / Double(blocks.count))
                     .frame(width: 34, height: 34)
+                    .accessibilityLabel("Day progress")
+                    .accessibilityValue("\(doneCount) of \(blocks.count) done")
                 VStack(alignment: .leading, spacing: 1) {
                     Text(doneCount == blocks.count ? "Day done!" : "\(doneCount) of \(blocks.count) done")
                         .font(.kBody(13, weight: .semibold))
@@ -257,7 +262,9 @@ struct TodayView: View {
                     blocks: blocks.map {
                         CachedBlock(title: $0.title, emoji: $0.emoji, startMin: $0.startMin,
                                     durationMin: $0.durationMin, done: $0.done,
-                                    category: $0.category.rawValue)
+                                    category: $0.category.rawValue,
+                                    activityId: $0.id, revision: $0.revision,
+                                    occurrenceKey: $0.occurrenceKey)
                     }
                 )
                 WidgetCenter.shared.reloadAllTimelines()
@@ -541,6 +548,11 @@ struct BlockCard: View {
                 }
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(block.title), \(KTime.hhmm(block.startMin)) to \(KTime.hhmm(block.endMin)), \(block.done ? "done" : "not done")")
+        .accessibilityLabel("\(block.title), \(KTime.hhmm(block.startMin)) to \(KTime.hhmm(block.endMin)), \(block.category.rawValue), \(block.done ? "done" : "not done")")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Double tap to edit")
+        .accessibilityAction(named: block.done ? "Mark incomplete" : "Complete") { onComplete() }
+        .accessibilityAction(named: "Focus on this") { onFocus() }
+        .accessibilityAction(named: "Delete") { onDelete() }
     }
 }

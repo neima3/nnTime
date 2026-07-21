@@ -4,6 +4,7 @@ import XCTest
 final class KairoScreenshotTour: XCTestCase {
     func testTour() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-kairoSkipOnboarding"]
         app.launch()
 
         let email = app.textFields["you@example.com"]

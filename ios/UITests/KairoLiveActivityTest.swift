@@ -5,6 +5,7 @@ import XCTest
 final class KairoLiveActivityTest: XCTestCase {
     func testFocusLiveActivity() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-kairoSkipOnboarding"]
         app.launch()
 
         let email = app.textFields["you@example.com"]

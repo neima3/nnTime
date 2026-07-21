@@ -270,7 +270,8 @@ extension FocusView {
     private func startLiveActivity(remainingSec: Int) {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         endLiveActivity()
-        let attributes = FocusAttributes(title: pendingTitle, emoji: pendingEmoji, targetMin: duration)
+        guard let sid = session?.id else { return }
+        let attributes = FocusAttributes(title: pendingTitle, emoji: pendingEmoji, targetMin: duration, sessionId: sid)
         let state = FocusAttributes.ContentState(
             endDate: Date().addingTimeInterval(TimeInterval(remainingSec)),
             paused: false,

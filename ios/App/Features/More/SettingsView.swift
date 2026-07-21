@@ -1,0 +1,116 @@
+import SwiftUI
+
+struct SettingsView: View {
+    @Environment(AppState.self) private var app
+
+    var body: some View {
+        ZStack {
+            Color.kCanvas.ignoresSafeArea()
+            ScrollView {
+                VStack(spacing: 20) {
+                    group("Appearance") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Theme")
+                                .font(.kBody(14, weight: .semibold))
+                                .foregroundStyle(Color.kInk)
+                            HStack(spacing: 8) {
+                                ForEach(KairoPrefs.Theme.allCases) { theme in
+                                    Button {
+                                        app.theme = theme
+                                        KairoPrefs.theme = theme
+                                        UISelectionFeedbackGenerator().selectionChanged()
+                                    } label: {
+                                        Text(theme.label)
+                                            .font(.kBody(13, weight: .semibold))
+                                            .foregroundStyle(app.theme == theme ? Color.kIris : Color.kInkSoft)
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 11)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 12)
+                                                    .fill(app.theme == theme ? Color.kIrisSoft : Color.kSurface)
+                                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(app.theme == theme ? Color.kIris : Color.kBorder, lineWidth: 1))
+                                            )
+                                    }
+                                }
+                            }
+                        }
+                        .padding(16)
+                    }
+
+                    group("Comfort") {
+                        Toggle(isOn: Binding(
+                            get: { app.reducedStimulation },
+                            set: { v in app.reducedStimulation = v; KairoPrefs.reducedStimulation = v }
+                        )) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Reduced stimulation")
+                                    .font(.kBody(15, weight: .medium))
+                                    .foregroundStyle(Color.kInk)
+                                Text("Softer motion and calmer entrances")
+                                    .font(.kBody(12.5))
+                                    .foregroundStyle(Color.kInkSoft)
+                            }
+                        }
+                        .tint(.kIris)
+                        .padding(16)
+                    }
+
+                    group("Your data") {
+                        VStack(spacing: 0) {
+                            linkRow("Export or delete on the web", "square.and.arrow.up",
+                                    url: "https://time.neima.me/app/settings")
+                        }
+                    }
+
+                    Button {
+                        Task { await app.signOut() }
+                    } label: {
+                        Text("Sign out")
+                            .font(.kBody(15, weight: .semibold))
+                            .foregroundStyle(Color.kInkSoft)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                    }
+                    .kCard(radius: 18)
+
+                    Text("Kairo for iOS · 1.0")
+                        .font(.kBody(12))
+                        .foregroundStyle(Color.kInkFaint)
+                }
+                .padding(20)
+            }
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("Settings").font(.kDisplay(18, relativeTo: .headline)).foregroundStyle(Color.kInk)
+            }
+        }
+        .toolbarBackground(Color.kCanvas, for: .navigationBar)
+    }
+
+    private func group(_ title: String, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title.uppercased())
+                .font(.kBody(12, weight: .bold)).kerning(1.1)
+                .foregroundStyle(Color.kInkSoft)
+                .padding(.leading, 4)
+            content().frame(maxWidth: .infinity, alignment: .leading).kCard(radius: 20)
+        }
+    }
+
+    private func linkRow(_ title: String, _ icon: String, url: String) -> some View {
+        Link(destination: URL(string: url)!) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.kIris)
+                    .frame(width: 30, height: 30)
+                    .background(RoundedRectangle(cornerRadius: 9).fill(Color.kIrisGhost))
+                Text(title).font(.kBody(15, weight: .medium)).foregroundStyle(Color.kInk)
+                Spacer()
+                Image(systemName: "arrow.up.right").font(.system(size: 12)).foregroundStyle(Color.kInkFaint)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 13)
+        }
+    }
+}

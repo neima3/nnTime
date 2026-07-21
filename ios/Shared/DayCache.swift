@@ -9,6 +9,11 @@ struct CachedBlock: Codable {
     let durationMin: Int
     let done: Bool
     let category: String
+    // Identity for interactive completion from the widget (optional so older
+    // caches still decode).
+    var activityId: String? = nil
+    var revision: Int? = nil
+    var occurrenceKey: String? = nil
 
     var endMin: Int { startMin + durationMin }
 }

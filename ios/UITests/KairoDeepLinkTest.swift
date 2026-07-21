@@ -4,6 +4,7 @@ import XCTest
 final class KairoDeepLinkTest: XCTestCase {
     func testFocusDeepLink() throws {
         let app = XCUIApplication()
+        app.launchArguments += ["-kairoSkipOnboarding"]
         app.launchArguments += ["-kairoOpenURL", "kairo://focus"]
         app.launch()
 

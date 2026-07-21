@@ -16,36 +16,53 @@ struct FocusLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: FocusAttributes.self) { context in
             // Lock screen banner
-            HStack(spacing: 12) {
-                Text(context.attributes.emoji)
-                    .font(.system(size: 22))
-                    .frame(width: 44, height: 44)
-                    .background(Circle().fill(.white.opacity(0.7)))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(context.attributes.title)
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .lineLimit(1)
-                    Text(context.state.paused ? "paused"
-                         : context.state.overtime ? "past target — that's okay"
-                         : "focusing · \(context.attributes.targetMin) min target")
-                        .font(.system(size: 12, weight: .medium))
-                        .opacity(0.7)
-                }
-                Spacer()
-                Group {
-                    if context.state.paused {
-                        Text(remaining(context.state.pausedRemainingSec))
-                    } else if context.state.overtime {
-                        Text("+").font(.system(size: 18, weight: .bold, design: .monospaced)) +
-                        Text(timerInterval: context.state.endDate...Date.distantFuture, countsDown: false)
-                    } else {
-                        Text(timerInterval: Date.now...context.state.endDate, countsDown: true)
+            VStack(spacing: 10) {
+                HStack(spacing: 12) {
+                    Text(context.attributes.emoji)
+                        .font(.system(size: 22))
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(.white.opacity(0.7)))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(context.attributes.title)
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .lineLimit(1)
+                        Text(context.state.paused ? "paused"
+                             : context.state.overtime ? "past target — that's okay"
+                             : "focusing · \(context.attributes.targetMin) min target")
+                            .font(.system(size: 12, weight: .medium))
+                            .opacity(0.7)
                     }
+                    Spacer()
+                    Group {
+                        if context.state.paused {
+                            Text(remaining(context.state.pausedRemainingSec))
+                        } else if context.state.overtime {
+                            Text("+").font(.system(size: 18, weight: .bold, design: .monospaced)) +
+                            Text(timerInterval: context.state.endDate...Date.distantFuture, countsDown: false)
+                        } else {
+                            Text(timerInterval: Date.now...context.state.endDate, countsDown: true)
+                        }
+                    }
+                    .font(.system(size: 24, weight: .semibold, design: .monospaced))
+                    .monospacedDigit()
+                    .foregroundStyle(context.state.overtime ? now : ink)
+                    .frame(minWidth: 78, alignment: .trailing)
                 }
-                .font(.system(size: 24, weight: .semibold, design: .monospaced))
-                .monospacedDigit()
-                .foregroundStyle(context.state.overtime ? now : ink)
-                .frame(minWidth: 78, alignment: .trailing)
+                HStack(spacing: 8) {
+                    Button(intent: ExtendFocusIntent(sessionId: context.attributes.sessionId)) {
+                        Label("+10 min", systemImage: "plus")
+                            .font(.system(size: 13, weight: .bold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .tint(skyInk)
+                    Button(intent: CompleteFocusIntent(sessionId: context.attributes.sessionId)) {
+                        Label("Done", systemImage: "checkmark")
+                            .font(.system(size: 13, weight: .bold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .tint(Color(red: 0.137, green: 0.502, blue: 0.361))
+                }
+                .buttonStyle(.borderedProminent)
             }
             .foregroundStyle(ink)
             .padding(14)
@@ -77,11 +94,21 @@ struct FocusLiveActivity: Widget {
                     .frame(maxWidth: 70, alignment: .trailing)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    Text(context.state.paused ? "Paused — the ring will wait."
-                         : context.state.overtime ? "Good stopping point? Wrap up in the app."
-                         : "Deep in it. The app has the controls.")
-                        .font(.system(size: 12, weight: .medium))
-                        .opacity(0.75)
+                    HStack(spacing: 10) {
+                        Button(intent: ExtendFocusIntent(sessionId: context.attributes.sessionId)) {
+                            Label("+10", systemImage: "plus")
+                                .font(.system(size: 13, weight: .bold))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .tint(skyInk)
+                        Button(intent: CompleteFocusIntent(sessionId: context.attributes.sessionId)) {
+                            Label("Done", systemImage: "checkmark")
+                                .font(.system(size: 13, weight: .bold))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .tint(Color(red: 0.137, green: 0.502, blue: 0.361))
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
             } compactLeading: {
                 Text("◔").font(.system(size: 15, weight: .bold)).foregroundStyle(sky)

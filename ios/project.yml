@@ -46,6 +46,19 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: me.neima.kairo.uitests
         TEST_TARGET_NAME: Kairo
+  KairoUnitTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: UnitTests
+    dependencies:
+      - target: Kairo
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: me.neima.kairo.unittests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Kairo.app/Kairo"
+        BUNDLE_LOADER: "$(TEST_HOST)"
   KairoWidget:
     type: app-extension
     platform: iOS
@@ -70,9 +83,11 @@ schemes:
       targets:
         Kairo: all
         KairoUITests: [test]
+        KairoUnitTests: [test]
     run:
       config: Debug
     test:
       config: Debug
       targets:
+        - KairoUnitTests
         - KairoUITests

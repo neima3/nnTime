@@ -18,5 +18,6 @@ struct FocusAttributes: ActivityAttributes {
     var title: String
     var emoji: String
     var targetMin: Int
+    var sessionId: String
 }
 #endif
