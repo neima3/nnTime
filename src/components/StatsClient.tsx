@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BarChart3, Flame } from "lucide-react";
 import { toast } from "./Toast";
 import { SignedOutCard, SkeletonCards } from "./EmptyState";
+import { RewardGarden } from "./RewardGarden";
 
 type EstimateCalibration = {
   sessions: number;
@@ -128,6 +129,12 @@ export function StatsClient() {
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
+      <RewardGarden
+        totalCompleted={stats.totalCompleted}
+        totalFocusMin={stats.totalFocusMin}
+        days={stats.days}
+      />
+
       <Card title="This week" hint="Completions — no judgment, just shape">
         <div className="flex items-end justify-between gap-2">
           {last7.map((d) => (
