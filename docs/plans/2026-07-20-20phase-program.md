@@ -22,7 +22,7 @@ pass (a11y), prod-build Lighthouse.
 ### iOS parity — bring the loved web features native
 - [x] P1: iOS Stats screen (completion bars, streak, focus totals)
 - [x] P2: iOS Pick-for-me (decision breaker on Today + Inbox)
-- [ ] P3: iOS Routines (list + player with per-step timers)
+- [x] P3: iOS Routines (list + player with per-step timers)
 - [x] P4: iOS Review Today (I-did-it / move / let-go)
 - [x] P5: iOS Play — Brain breaks arcade (Time Feel, Quick Tap, Breath)
 - [x] P6: iOS Inbox tend + low-battery + capture polish
