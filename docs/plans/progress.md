@@ -1,5 +1,35 @@
 # Progress log
 
+## 2026-07-21 — Round 2: 10-phase program (Fable/Opus + subagents) — ✅ 10/10
+Roadmap: `docs/plans/2026-07-21-round2-10phase.md`.
+
+**iOS parity for the new web features** (all verified on simulator, shared
+`ios/App/Features/Stats/Insights.swift` mirrors `src/lib/insights.ts`):
+- R1 Reward Garden + R2 Weekly Reflection on Insights, R3 Focus rituals
+  (horizontal chips), R4 Peak-focus nudge on Today. Evidence: `browser-qa/
+  ios-30-focus-rituals.png`, `ios-32-insights-garden.png`. KairoRound2Tour passes.
+
+**Depth:**
+- R5 Procedural Web Audio soundscape engine (`src/lib/soundscape.ts`) — rain/
+  forest(+chirps)/ocean(swell)/cafe/white-noise generated live; replaced the
+  12-byte placeholder .ogg files; Focus rituals auto-start their vibe via a
+  `kairo:soundscape` event. Live: ritual reframes session cleanly (audible
+  playback needs a real audio device, not verifiable headless).
+- R9 "Protect your peak": nudge one-tap creates a recurring daily focus anchor
+  at the peak hour.
+
+**Debts + hardening (subagents, verified):**
+- R6 `useFocusTrap` hook wired into CommandPalette/QuickCapture/PickForMe/
+  OneThing/KeyboardShortcuts.
+- R7 copy sweep — 18 formal "Could not X." errors → warm contraction form.
+- R8 45 unit tests for the insights derivations (web suite now 389 tests).
+
+**Ship (R10):** web lint+typecheck+389 tests+build green, deployed to
+time.neima.me + live-verified; full iOS suite TEST SUCCEEDED. Insights logic
+extracted to `src/lib/insights.ts` as the single source both platforms use.
+
+
+
 ## 2026-07-21 — 20-phase 10× program, continuation (Fable + subagents)
 Roadmap: `docs/plans/2026-07-20-20phase-program.md`. **✅ 20 of 20 phases done.**
 
