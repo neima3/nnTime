@@ -1,7 +1,7 @@
 # Progress log
 
 ## 2026-07-21 — 20-phase 10× program, continuation (Fable + subagents)
-Roadmap: `docs/plans/2026-07-20-20phase-program.md`. **19 of 20 phases done**
+Roadmap: `docs/plans/2026-07-20-20phase-program.md`. **19 of 20 phases done — all executable phases complete; P17 deliberately deferred**
 (P17 landing shots deliberately deferred — see roadmap note).
 
 **Second continuation batch (P8, P14–P18, P19):**

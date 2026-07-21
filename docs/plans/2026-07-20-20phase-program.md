@@ -49,7 +49,9 @@ pass (a11y), prod-build Lighthouse.
       would lower the quality bar rather than raise it. Left for a dedicated pass.)
 - [x] P18: Onboarding refinement (web) — resumable, progress feel
 - [x] P19: Cross-platform copy + empty-state audit (subagent)
-- [ ] P20: Full gates + deploy + live verify (web) + iOS suite green
+- [x] P20: Full gates + deploy + live verify (web) + iOS suite green
+      (web: lint+typecheck+344 tests+build green, live-verified; iOS: full
+      unit+UI suite TEST SUCCEEDED)
 
 ## Rules
 Tokens only; nothing turns red; forgiving copy; browser/simulator evidence
