@@ -29,7 +29,7 @@ pass (a11y), prod-build Lighthouse.
 
 ### Web — pay down real debts + hardening
 - [x] P7: Accessibility token pass — WCAG AA contrast across surfaces
-- [ ] P8: Prod-build Lighthouse — measure + fix real perf wins
+- [x] P8: Prod-build Lighthouse — measure + fix real perf wins (live: perf 100, a11y 100)
 - [x] P9: Web a11y sweep — keyboard/ARIA on overlays (subagent + accesslint)
 - [x] P10: Security review pass of API surface (subagent)
 - [x] P11: Test coverage — server/service unit tests for gaps (subagent)
@@ -43,7 +43,11 @@ pass (a11y), prod-build Lighthouse.
 
 ### Polish + ship
 - [ ] P17: Landing page conversion polish + real product shots
-- [ ] P18: Onboarding refinement (web) — resumable, progress feel
+      (DEFERRED — deliberate. Landing already scores perf 100 / a11y 100 with a
+      crafted, theme-aware hero mock. Doing "real product shots" justice means a
+      new showcase section + captured shots + re-verify; a rushed screenshot swap
+      would lower the quality bar rather than raise it. Left for a dedicated pass.)
+- [x] P18: Onboarding refinement (web) — resumable, progress feel
 - [x] P19: Cross-platform copy + empty-state audit (subagent)
 - [ ] P20: Full gates + deploy + live verify (web) + iOS suite green
 

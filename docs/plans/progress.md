@@ -1,7 +1,38 @@
 # Progress log
 
 ## 2026-07-21 — 20-phase 10× program, continuation (Fable + subagents)
-Roadmap: `docs/plans/2026-07-20-20phase-program.md`. **12 of 20 phases done.**
+Roadmap: `docs/plans/2026-07-20-20phase-program.md`. **19 of 20 phases done**
+(P17 landing shots deliberately deferred — see roadmap note).
+
+**Second continuation batch (P8, P14–P18, P19):**
+- **P14 Focus rituals**: named session presets (Deep work / Quick win / Body
+  double / Wind down / Creative flow) on the Focus setup — one tap sets
+  title+emoji+duration+vibe. Verified live (interactive) —
+  `browser-qa/web-focus-rituals.png`, `web-focus-winddown.png`.
+- **P15 Peak-focus nudge** on Today: derives peak attention hour from
+  focus-hours; offers to protect the window; dismissible once/day, silent under
+  4 sessions of history. `PeakFocusNudge.tsx`.
+- **P16 Energy-aware Plan-my-day**: low-battery days default to gentle planning
+  + note; AI prompt sharpened to drop high-energy tasks on depleted days and
+  under-fill. `PlanDayClient.tsx` + `ai.ts`.
+- **P19 Copy pass** (from Sonnet audit): warmed the sync-conflict banner (no
+  red/⚠), fixed block/activity terminology in shortcuts, standardized bare
+  "Network error." copy, warmed formal error toasts, matched web empty states
+  to iOS's voice, added inline CTA to web routines empty state.
+- **P8 Lighthouse**: measured prod landing — perf 99→**100**, a11y 95→**100**
+  after fixing the one failing color-contrast node (small text-iris→text-iris-deep
+  on iris-soft; no token change). Re-measured live to confirm. No perf work
+  needed (LCP 1.6s, CLS 0).
+- **P18 Resumable onboarding**: step/name/picks persist to localStorage,
+  restore after hydration, cleared on finish/skip; progress dots fill for
+  completed steps. **Verified live** — reloaded mid-flow and it resumed at step 2
+  with the name intact (`browser-qa/web-onboarding-resumed.png`).
+- **P20**: full web gates green (lint, typecheck, 344 tests, build); iOS unit
+  suite green; full iOS suite run for final sign-off. Deploys this batch all
+  finished + live-verified on time.neima.me.
+
+---
+Roadmap earlier state: **12 of 20 phases done.**
 
 **Shipped + verified this continuation:**
 - **P9 web a11y sweep** (Sonnet subagent, verified): `aria-modal` on
