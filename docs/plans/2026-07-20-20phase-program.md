@@ -42,11 +42,10 @@ pass (a11y), prod-build Lighthouse.
 - [x] P16: Energy-aware Plan-my-day (respect low-battery + energy tags)
 
 ### Polish + ship
-- [ ] P17: Landing page conversion polish + real product shots
-      (DEFERRED — deliberate. Landing already scores perf 100 / a11y 100 with a
-      crafted, theme-aware hero mock. Doing "real product shots" justice means a
-      new showcase section + captured shots + re-verify; a rushed screenshot swap
-      would lower the quality bar rather than raise it. Left for a dedicated pass.)
+- [x] P17: Landing page conversion polish + real product shots
+      ("Signature moments" showcase — Reward Garden / Focus rituals / Routines,
+      built as crafted theme-aware mocks matching the hero. Live-verified;
+      Lighthouse held perf ~98–100 / a11y 100.)
 - [x] P18: Onboarding refinement (web) — resumable, progress feel
 - [x] P19: Cross-platform copy + empty-state audit (subagent)
 - [x] P20: Full gates + deploy + live verify (web) + iOS suite green

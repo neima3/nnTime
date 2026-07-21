@@ -1,8 +1,14 @@
 # Progress log
 
 ## 2026-07-21 — 20-phase 10× program, continuation (Fable + subagents)
-Roadmap: `docs/plans/2026-07-20-20phase-program.md`. **19 of 20 phases done — all executable phases complete; P17 deliberately deferred**
-(P17 landing shots deliberately deferred — see roadmap note).
+Roadmap: `docs/plans/2026-07-20-20phase-program.md`. **✅ 20 of 20 phases done.**
+
+- **P17 Landing showcase**: added a "The parts people fall for" section between
+  the ADHD-problems grid and the feature grid — three crafted, theme-aware
+  product mocks (Reward Garden, Focus rituals, Routines step player) matching
+  the hero's quality bar (no raster screenshots → keeps Lighthouse 98–100 /
+  a11y 100, responsive + dark-correct). Live-verified —
+  `browser-qa/web-p17-showcase-dark.png`.
 
 **Second continuation batch (P8, P14–P18, P19):**
 - **P14 Focus rituals**: named session presets (Deep work / Quick win / Body
