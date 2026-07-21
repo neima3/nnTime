@@ -12,6 +12,7 @@ struct TodayView: View {
     @State private var showEditor = false
     @State private var editingBlock: DayBlock?
     @State private var showPick = false
+    @State private var showReview = false
     @State private var editorStart = 9 * 60
     @State private var loadError: String?
     /// 0 = today, ±n days.
@@ -67,15 +68,23 @@ struct TodayView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        dayOffset -= 1
-                        Task { await load() }
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color.kInkSoft)
+                    HStack(spacing: 14) {
+                        Button {
+                            dayOffset -= 1
+                            Task { await load() }
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Color.kInkSoft)
+                        }
+                        .accessibilityLabel("Previous day")
+                        if dayOffset == 0 && blocks.contains(where: { !$0.done }) {
+                            Button { showReview = true } label: {
+                                Image(systemName: "checklist").font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.kIris)
+                            }
+                            .accessibilityLabel("Review today")
+                        }
                     }
-                    .accessibilityLabel("Previous day")
                 }
                 ToolbarItem(placement: .principal) {
                     Button {
@@ -124,6 +133,9 @@ struct TodayView: View {
             }
             .sheet(isPresented: $showPick) {
                 PickForMeSheet(blocks: blocks, nowMin: nowMin)
+            }
+            .sheet(isPresented: $showReview, onDismiss: { Task { await load() } }) {
+                ReviewSheet(date: date, zone: app.timezone, items: blocks) { }
             }
             .refreshable { await load() }
         }

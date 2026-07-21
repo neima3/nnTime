@@ -23,9 +23,9 @@ pass (a11y), prod-build Lighthouse.
 - [x] P1: iOS Stats screen (completion bars, streak, focus totals)
 - [x] P2: iOS Pick-for-me (decision breaker on Today + Inbox)
 - [ ] P3: iOS Routines (list + player with per-step timers)
-- [ ] P4: iOS Review Today (I-did-it / move / let-go)
+- [x] P4: iOS Review Today (I-did-it / move / let-go)
 - [x] P5: iOS Play — Brain breaks arcade (Time Feel, Quick Tap, Breath)
-- [ ] P6: iOS Inbox tend + low-battery + capture polish
+- [x] P6: iOS Inbox tend + low-battery + capture polish
 
 ### Web — pay down real debts + hardening
 - [x] P7: Accessibility token pass — WCAG AA contrast across surfaces
