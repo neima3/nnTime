@@ -3,7 +3,8 @@ import XCTest
 /// Captures the first-run onboarding sheet and the Settings screen (dark).
 final class KairoNewScreensTour: XCTestCase {
     func testNewScreens() throws {
-        let app = XCUIApplication()   // no skip flag → onboarding shows
+        let app = XCUIApplication()
+        app.launchArguments += ["-kairoResetOnboarding"]
         app.launch()
 
         let email = app.textFields["you@example.com"]

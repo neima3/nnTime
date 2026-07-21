@@ -4,6 +4,12 @@ import SwiftUI
 struct KairoApp: App {
     @State private var appState = AppState()
 
+    init() {
+        if ProcessInfo.processInfo.arguments.contains("-kairoResetOnboarding") {
+            KairoPrefs.hasOnboarded = false
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()

@@ -190,7 +190,12 @@ async function editThisAndFuture(
         revision: series.revision + 1,
         updatedAt: new Date(),
       })
-      .where(eq(schema.activitySeries.id, series.id));
+      .where(
+        and(
+          eq(schema.activitySeries.id, series.id),
+          eq(schema.activitySeries.userId, userId),
+        ),
+      );
 
     // 2. Create the new series starting at occurrenceKey with the patch applied.
     const newSeriesId = crypto.randomUUID();
@@ -236,7 +241,12 @@ async function editAll(
       revision: series.revision + 1,
       updatedAt: new Date(),
     })
-    .where(eq(schema.activitySeries.id, series.id))
+    .where(
+      and(
+        eq(schema.activitySeries.id, series.id),
+        eq(schema.activitySeries.userId, userId),
+      ),
+    )
     .returning();
   await appendChangeLog(db, userId, "activity_series", series.id, "upsert", updated!.revision);
 }
@@ -261,7 +271,12 @@ export async function deleteSeriesOccurrence(
     await db
       .update(schema.activitySeries)
       .set({ deletedAt: new Date(), revision: ifMatchRevision + 1 })
-      .where(eq(schema.activitySeries.id, seriesId));
+      .where(
+        and(
+          eq(schema.activitySeries.id, seriesId),
+          eq(schema.activitySeries.userId, userId),
+        ),
+      );
     return;
   }
   // this_and_future: truncate the series before this occurrence.

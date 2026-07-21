@@ -38,11 +38,11 @@ function getClient() {
 /* Output schemas (strict — unknown fields rejected, length caps)             */
 /* -------------------------------------------------------------------------- */
 
-export const breakdownSchema = z.object({
+export const breakdownSchema = z.strictObject({
   steps: z.array(z.string().max(200)).max(10),
 });
 
-export const nlAddSchema = z.object({
+export const nlAddSchema = z.strictObject({
   title: z.string().max(200),
   emoji: z.string().max(10).optional(),
   durationMin: z.number().int().min(5).max(480).optional(),
@@ -57,19 +57,19 @@ export const nlAddSchema = z.object({
   startMin: z.number().int().min(0).max(1439).optional(),
 });
 
-export const planDayItemSchema = z.object({
+export const planDayItemSchema = z.strictObject({
   taskId: z.string().uuid(),
   scheduledStart: z.string().optional(), // ISO time or null
   reason: z.string().max(200).optional(),
 });
 
-export const planDaySchema = z.object({
+export const planDaySchema = z.strictObject({
   items: z.array(planDayItemSchema).max(20),
 });
 
-export const priorityGroupingSchema = z.object({
+export const priorityGroupingSchema = z.strictObject({
   groups: z.array(
-    z.object({
+    z.strictObject({
       priority: z.enum(["high", "low", "none"]),
       taskIds: z.array(z.string().uuid()).max(50),
       durationEstimateMin: z.number().int().min(5).max(480).optional(),

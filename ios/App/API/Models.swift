@@ -57,6 +57,20 @@ struct TaskItem: Decodable, Identifiable {
     let createdAt: Date?
 }
 
+struct StatsResponse: Decodable {
+    struct DayStat: Decodable { let completed: Int; let focusMin: Int; let mood: String? }
+    struct Estimate: Decodable { let sessions: Int; let avgTargetMin: Int; let avgActualMin: Int; let ratio: Double }
+    struct FocusHours: Decodable { let hours: [Int]; let peakHour: Int }
+
+    struct Streak: Decodable { let current: Int; let best: Int }
+    let byDate: [String: DayStat]
+    let streak: Streak
+    let totalCompleted: Int
+    let totalFocusMin: Int
+    let estimate: Estimate?
+    let focusHours: FocusHours?
+}
+
 struct FocusSnapshot: Decodable {
     let session: FocusSession?
     let remainingSec: Int?

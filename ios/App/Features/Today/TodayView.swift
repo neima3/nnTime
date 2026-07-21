@@ -11,6 +11,7 @@ struct TodayView: View {
     @State private var nowMin = 0
     @State private var showEditor = false
     @State private var editingBlock: DayBlock?
+    @State private var showPick = false
     @State private var editorStart = 9 * 60
     @State private var loadError: String?
     /// 0 = today, ±n days.
@@ -95,15 +96,23 @@ struct TodayView: View {
                     .accessibilityLabel(dayOffset == 0 ? "Today" : "Back to today")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        dayOffset += 1
-                        Task { await load() }
-                    } label: {
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color.kInkSoft)
+                    HStack(spacing: 14) {
+                        if dayOffset == 0 && blocks.contains(where: { !$0.done }) {
+                            Button { showPick = true } label: {
+                                Image(systemName: "dice").font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.kIris)
+                            }
+                            .accessibilityLabel("Pick for me")
+                        }
+                        Button {
+                            dayOffset += 1
+                            Task { await load() }
+                        } label: {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(Color.kInkSoft)
+                        }
+                        .accessibilityLabel("Next day")
                     }
-                    .accessibilityLabel("Next day")
                 }
             }
             .toolbarBackground(Color.kCanvas, for: .navigationBar)
@@ -112,6 +121,9 @@ struct TodayView: View {
             }
             .sheet(item: $editingBlock, onDismiss: { Task { await load() } }) { block in
                 EditorSheet(date: date, startMin: block.startMin, editing: block)
+            }
+            .sheet(isPresented: $showPick) {
+                PickForMeSheet(blocks: blocks, nowMin: nowMin)
             }
             .refreshable { await load() }
         }

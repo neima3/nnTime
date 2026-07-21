@@ -219,6 +219,12 @@ actor KairoAPI {
         _ = try await request("DELETE", "/api/v1/tasks/\(id)", ifMatch: revision, as: EmptyResponse.self)
     }
 
+    // MARK: Stats
+
+    func stats() async throws -> StatsResponse {
+        try await request("GET", "/api/v1/stats", as: StatsResponse.self)
+    }
+
     // MARK: Focus sessions (ADR-004, server-authoritative)
 
     func activeFocus() async throws -> FocusSnapshot {

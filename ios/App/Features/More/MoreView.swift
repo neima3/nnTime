@@ -47,6 +47,16 @@ struct MoreView: View {
                             .padding(16)
                         }
 
+                        card {
+                            NavigationLink { StatsView() } label: {
+                                row(icon: "chart.bar.fill", title: "Insights", value: "Your week")
+                            }.buttonStyle(.plain)
+                            divider
+                            NavigationLink { PlayView() } label: {
+                                row(icon: "gamecontroller.fill", title: "Brain breaks", value: "Quick games")
+                            }.buttonStyle(.plain)
+                        }
+
                         Button {
                             Task { await app.signOut() }
                         } label: {
