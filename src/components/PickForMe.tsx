@@ -118,6 +118,7 @@ export function PickForMe({
         >
           <div
             role="dialog"
+            aria-modal="true"
             aria-label="Your one thing"
             className="rise-in w-full max-w-sm rounded-3xl border border-border bg-surface p-6 text-center shadow-float"
           >

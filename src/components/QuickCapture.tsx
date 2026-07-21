@@ -133,6 +133,16 @@ export function QuickCapture() {
     setParsing(false);
   }, [stopListening]);
 
+  // Escape closes regardless of which control inside the sheet has focus.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, close]);
+
   /** "Magic add": parse the text; render a confirm chip. Never auto-saves. */
   const magicParse = useCallback(async () => {
     const input = text.trim();
@@ -317,6 +327,7 @@ export function QuickCapture() {
         >
           <div
             role="dialog"
+            aria-modal="true"
             aria-label="Quick capture"
             className="rise-in w-full max-w-lg rounded-3xl border border-border bg-surface p-4 shadow-float"
           >

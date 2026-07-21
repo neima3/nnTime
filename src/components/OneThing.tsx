@@ -25,9 +25,12 @@ export function OneThing() {
   const [open, setOpen] = useState(false);
   const info = useNowInfo();
   const primaryRef = useRef<HTMLAnchorElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (open) primaryRef.current?.focus();
+    // Prefer the primary action; fall back to the container so focus still
+    // lands inside the view when there's nothing scheduled (no Link to focus).
+    if (open) (primaryRef.current ?? containerRef.current)?.focus();
   }, [open]);
 
   useEffect(() => {
@@ -63,7 +66,14 @@ export function OneThing() {
   const subject = current ?? next;
 
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-canvas px-6">
+    <div
+      ref={containerRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label="One thing"
+      tabIndex={-1}
+      className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-canvas px-6 outline-none"
+    >
       <button
         type="button"
         aria-label="Close one-thing view"

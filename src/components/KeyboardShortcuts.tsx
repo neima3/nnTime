@@ -4,7 +4,7 @@
  * Global shortcuts: `n` → new activity, `?` → help overlay.
  * Ignores keypresses while typing in inputs.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import { clientToday } from "@/lib/client-date";
@@ -24,6 +24,11 @@ export function KeyboardShortcuts() {
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (open) closeRef.current?.focus();
+  }, [open]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -70,6 +75,7 @@ export function KeyboardShortcuts() {
             Keyboard
           </h2>
           <button
+            ref={closeRef}
             type="button"
             aria-label="Close"
             onClick={() => setOpen(false)}

@@ -120,6 +120,7 @@ export function CommandPalette() {
     >
       <div
         role="dialog"
+        aria-modal="true"
         aria-label="Command palette"
         className="rise-in w-full max-w-lg overflow-hidden rounded-3xl border border-border bg-surface shadow-float"
       >
