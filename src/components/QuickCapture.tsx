@@ -9,6 +9,7 @@
  * chain-dumping. Voice uses the Web Speech API where the browser has it.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 import { Loader2, Mic, MicOff, PenLine, Sparkles, X } from "lucide-react";
 import { toast } from "./Toast";
 import { notifyDayChanged } from "./NowBar";
@@ -62,6 +63,8 @@ export function QuickCapture() {
   const [parsing, setParsing] = useState(false);
   const [proposal, setProposal] = useState<Proposal | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, open);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const voiceSupported = getSpeechRecognition() != null;
 
@@ -326,6 +329,7 @@ export function QuickCapture() {
           }}
         >
           <div
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-label="Quick capture"

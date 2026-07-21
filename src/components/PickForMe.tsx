@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Dices, Play, X } from "lucide-react";
 import { useLowBattery } from "./LowBattery";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 import { clientToday } from "@/lib/client-date";
 
 export interface PickCandidate {
@@ -51,6 +52,8 @@ export function PickForMe({
   const [todayStr] = useState(() => clientToday());
   const lowBattery = useLowBattery(date ?? todayStr);
   const primaryRef = useRef<HTMLAnchorElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, open);
 
   // Esc closes; focus lands on the primary action when the card opens.
   useEffect(() => {
@@ -117,6 +120,7 @@ export function PickForMe({
           }}
         >
           <div
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-label="Your one thing"

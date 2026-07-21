@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Timer, X } from "lucide-react";
 import { useNowInfo } from "./NowBar";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 import { fmt } from "@/lib/mock";
 
 const EVENT = "kairo:one-thing";
@@ -26,6 +27,7 @@ export function OneThing() {
   const info = useNowInfo();
   const primaryRef = useRef<HTMLAnchorElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(containerRef, open);
 
   useEffect(() => {
     // Prefer the primary action; fall back to the container so focus still

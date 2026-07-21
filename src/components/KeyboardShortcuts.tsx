@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { X } from "lucide-react";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 import { clientToday } from "@/lib/client-date";
 
 function isTypingTarget(el: EventTarget | null) {
@@ -25,6 +26,8 @@ export function KeyboardShortcuts() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, open);
 
   useEffect(() => {
     if (open) closeRef.current?.focus();
@@ -67,6 +70,7 @@ export function KeyboardShortcuts() {
       onClick={() => setOpen(false)}
     >
       <div
+        ref={dialogRef}
         className="w-full max-w-sm rounded-3xl border border-border bg-surface p-6 shadow-float"
         onClick={(e) => e.stopPropagation()}
       >
