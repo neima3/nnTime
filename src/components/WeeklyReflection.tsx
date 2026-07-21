@@ -9,23 +9,7 @@
  * once there's enough to notice — quiet weeks are left in peace.
  */
 
-const WEEKDAYS = [
-  "Sundays",
-  "Mondays",
-  "Tuesdays",
-  "Wednesdays",
-  "Thursdays",
-  "Fridays",
-  "Saturdays",
-];
-
-function hourLabel(h: number) {
-  if (h === 0) return "midnight";
-  if (h === 12) return "noon";
-  const period = h < 12 ? "am" : "pm";
-  const twelve = h % 12 === 0 ? 12 : h % 12;
-  return `${twelve}${period}`;
-}
+import { reflectionNotes } from "@/lib/insights";
 
 export function WeeklyReflection({
   byDate,
@@ -38,49 +22,12 @@ export function WeeklyReflection({
   totalFocusMin: number;
   peakHour: number | null;
 }) {
-  // Not enough signal yet — leave quiet weeks alone.
-  if (totalCompleted < 3) return null;
-
-  const notes: string[] = [];
-
-  // Which weekday tends to be theirs (by completions).
-  const byWeekday = new Array(7).fill(0);
-  let activeDays = 0;
-  for (const [key, v] of Object.entries(byDate)) {
-    if (v.completed > 0) {
-      activeDays++;
-      const d = new Date(key + "T00:00:00");
-      byWeekday[d.getDay()] += v.completed;
-    }
-  }
-  const bestDow = byWeekday.indexOf(Math.max(...byWeekday));
-  if (byWeekday[bestDow] >= 2) {
-    notes.push(
-      `${WEEKDAYS[bestDow]} tend to be yours — that's where the most got finished.`,
-    );
-  }
-
-  // Focus given.
-  if (totalFocusMin >= 25) {
-    const h = Math.round(totalFocusMin / 6) / 10;
-    notes.push(
-      `You gave about ${h < 1 ? `${totalFocusMin} focused minutes` : `${h} focused hours`} — time you chose to spend on what mattered.`,
-    );
-  }
-
-  // Peak attention window.
-  if (peakHour != null) {
-    notes.push(
-      `Your attention lands most around ${hourLabel(peakHour)}. Worth guarding for the hard things.`,
-    );
-  }
-
-  // Showing up.
-  if (activeDays >= 4) {
-    notes.push(
-      `You showed up on ${activeDays} different days. Consistency, the forgiving kind.`,
-    );
-  }
+  const notes = reflectionNotes({
+    byDate,
+    totalCompleted,
+    totalFocusMin,
+    peakHour,
+  });
 
   if (notes.length === 0) return null;
   const shown = notes.slice(0, 3);

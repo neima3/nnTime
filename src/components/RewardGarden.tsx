@@ -11,23 +11,8 @@
  * Pure/derived — no new API. Fed by the same stats the page already loads.
  */
 
-type Stage = {
-  emoji: string;
-  name: string;
-  /** Points needed to reach this stage. */
-  at: number;
-};
+import { gardenState } from "@/lib/insights";
 
-const STAGES: Stage[] = [
-  { emoji: "🌱", name: "a seed", at: 0 },
-  { emoji: "🌿", name: "a sprout", at: 3 },
-  { emoji: "🪴", name: "growing", at: 8 },
-  { emoji: "🌷", name: "in bloom", at: 16 },
-  { emoji: "🌳", name: "flourishing", at: 32 },
-];
-
-/** One bloom per this many completions in the meadow row. */
-const PER_BLOOM = 3;
 const MEADOW_BLOOMS = ["🌸", "🌼", "🌻", "🌷", "🪻", "🌺"];
 
 export function RewardGarden({
@@ -39,22 +24,10 @@ export function RewardGarden({
   totalFocusMin: number;
   days: number;
 }) {
-  // Each completion is a point; each ~25-min focus block adds one too.
-  const focusBlocks = Math.floor(totalFocusMin / 25);
-  const points = totalCompleted + focusBlocks;
-
-  let stageIdx = 0;
-  for (let i = STAGES.length - 1; i >= 0; i--) {
-    if (points >= STAGES[i].at) {
-      stageIdx = i;
-      break;
-    }
-  }
-  const stage = STAGES[stageIdx];
-  const next = STAGES[stageIdx + 1];
-  const toNext = next ? next.at - points : 0;
-
-  const bloomCount = Math.min(24, Math.floor(totalCompleted / PER_BLOOM));
+  const { points, stage, next, toNext, bloomCount } = gardenState(
+    totalCompleted,
+    totalFocusMin,
+  );
 
   return (
     <section className="rise-in relative overflow-hidden rounded-3xl border border-border bg-surface p-5 shadow-card sm:col-span-2">

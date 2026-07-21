@@ -14,14 +14,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Sparkles, X } from "lucide-react";
 import { clientToday } from "@/lib/client-date";
-
-function hourLabel(h: number) {
-  if (h === 0) return "midnight";
-  if (h === 12) return "noon";
-  const period = h < 12 ? "am" : "pm";
-  const twelve = h % 12 === 0 ? 12 : h % 12;
-  return `${twelve}${period}`;
-}
+import {
+  hourLabel,
+  focusSessionCount,
+  isInPeakWindow,
+  PEAK_MIN_SESSIONS,
+} from "@/lib/insights";
 
 export function PeakFocusNudge() {
   const [peakHour, setPeakHour] = useState<number | null>(null);
@@ -38,10 +36,8 @@ export function PeakFocusNudge() {
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled || !data?.focusHours) return;
-        const hours: number[] = data.focusHours.hours ?? [];
-        const sessions = hours.reduce((a, b) => a + b, 0);
         // Need a real pattern before we claim one.
-        if (sessions < 4) return;
+        if (focusSessionCount(data.focusHours.hours) < PEAK_MIN_SESSIONS) return;
         setPeakHour(data.focusHours.peakHour);
         setDismissed(false);
       })
@@ -54,9 +50,7 @@ export function PeakFocusNudge() {
   if (dismissed || peakHour == null) return null;
 
   const nowHour = new Date().getHours();
-  // Show inside the window: the hour before, the peak hour, and the hour after.
-  const inWindow = Math.abs(nowHour - peakHour) <= 1;
-  if (!inWindow) return null;
+  if (!isInPeakWindow(nowHour, peakHour)) return null;
 
   function dismiss() {
     setDismissed(true);
