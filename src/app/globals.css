@@ -17,8 +17,8 @@
 
   /* ink */
   --ink: #241f31;
-  --ink-soft: #6f6883;
-  --ink-faint: #a49dae;
+  --ink-soft: #68617b;
+  --ink-faint: #736c7c;
   --ink-inverse: #fffdf9;
 
   /* iris — primary */
@@ -36,12 +36,12 @@
   --danger-soft: #fbdfdf;
 
   /* category pastels: fill / ink pair */
-  --cat-peach: #ffd9c2;      --cat-peach-ink: #a34a1c;
-  --cat-butter: #ffe9a6;     --cat-butter-ink: #8a6900;
-  --cat-mint: #c8edd6;       --cat-mint-ink: #1e7a4c;
-  --cat-sky: #c8e3fa;        --cat-sky-ink: #1d6aa6;
+  --cat-peach: #ffd9c2;      --cat-peach-ink: #954419;
+  --cat-butter: #ffe9a6;     --cat-butter-ink: #7e6000;
+  --cat-mint: #c8edd6;       --cat-mint-ink: #1b7045;
+  --cat-sky: #c8e3fa;        --cat-sky-ink: #1a6198;
   --cat-lilac: #e2dbfb;      --cat-lilac-ink: #5b48c9;
-  --cat-rose: #fad5e3;       --cat-rose-ink: #b03769;
+  --cat-rose: #fad5e3;       --cat-rose-ink: #a13260;
 
   /* shadows — plum-tinted, soft */
   --shadow-card: 0 1px 2px rgba(36, 31, 49, 0.05), 0 4px 16px rgba(36, 31, 49, 0.06);
@@ -58,7 +58,7 @@
 
   --ink: #f0edf7;
   --ink-soft: #a79fbc;
-  --ink-faint: #6f6883;
+  --ink-faint: #8b84a0;
   --ink-inverse: #241f31;
 
   --iris: #8c81ea;

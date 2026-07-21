@@ -28,7 +28,7 @@ pass (a11y), prod-build Lighthouse.
 - [ ] P6: iOS Inbox tend + low-battery + capture polish
 
 ### Web — pay down real debts + hardening
-- [ ] P7: Accessibility token pass — WCAG AA contrast across surfaces
+- [x] P7: Accessibility token pass — WCAG AA contrast across surfaces
 - [ ] P8: Prod-build Lighthouse — measure + fix real perf wins
 - [ ] P9: Web a11y sweep — keyboard/ARIA on overlays (subagent + accesslint)
 - [x] P10: Security review pass of API surface (subagent)

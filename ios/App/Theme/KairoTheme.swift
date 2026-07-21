@@ -27,8 +27,8 @@ extension Color {
 
     // ink
     static let kInk = dyn(0x241F31, 0xF0EDF7)
-    static let kInkSoft = dyn(0x6F6883, 0xA79FBC)
-    static let kInkFaint = dyn(0xA49DAE, 0x6F6883)
+    static let kInkSoft = dyn(0x68617B, 0xA79FBC)
+    static let kInkFaint = dyn(0x736C7C, 0x8B84A0)
     static let kInkInverse = dyn(0xFFFDF9, 0x241F31)
 
     // iris — primary
@@ -47,17 +47,17 @@ extension Color {
 
     // category pastels — fill / ink pairs
     static let kCatPeach = dyn(0xFFD9C2, 0x4A2C1C)
-    static let kCatPeachInk = dyn(0xA34A1C, 0xFFB894)
+    static let kCatPeachInk = dyn(0x954419, 0xFFB894)
     static let kCatButter = dyn(0xFFE9A6, 0x423714)
-    static let kCatButterInk = dyn(0x8A6900, 0xF2D478)
+    static let kCatButterInk = dyn(0x7E6000, 0xF2D478)
     static let kCatMint = dyn(0xC8EDD6, 0x1C3A2B)
-    static let kCatMintInk = dyn(0x1E7A4C, 0x86DCAE)
+    static let kCatMintInk = dyn(0x1B7045, 0x86DCAE)
     static let kCatSky = dyn(0xC8E3FA, 0x1C3348)
-    static let kCatSkyInk = dyn(0x1D6AA6, 0x8EC7F2)
+    static let kCatSkyInk = dyn(0x1A6198, 0x8EC7F2)
     static let kCatLilac = dyn(0xE2DBFB, 0x2E2749)
     static let kCatLilacInk = dyn(0x5B48C9, 0xBAAEF5)
     static let kCatRose = dyn(0xFAD5E3, 0x452432)
-    static let kCatRoseInk = dyn(0xB03769, 0xF2A0C0)
+    static let kCatRoseInk = dyn(0xA13260, 0xF2A0C0)
 }
 
 // MARK: - Category palette lookup
