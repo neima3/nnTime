@@ -556,8 +556,8 @@ export function TimelineCanvas({
 
       {/* Conflict banner */}
       {conflictId && (
-        <div className="absolute bottom-4 left-1/2 z-30 -translate-x-1/2 rounded-xl bg-danger-soft px-4 py-2 text-[13px] font-semibold text-danger shadow-float">
-          ⚠ Edit rolled back — someone else changed this activity. Refresh to see the latest.
+        <div className="absolute bottom-4 left-1/2 z-30 -translate-x-1/2 rounded-xl bg-cat-lilac px-4 py-2 text-[13px] font-semibold text-cat-lilac-ink shadow-float">
+          Someone else just touched this — your edit didn&apos;t stick. Refresh to see the latest.
         </div>
       )}
     </div>

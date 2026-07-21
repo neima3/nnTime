@@ -105,7 +105,7 @@ export function ReviewClient({
         router.refresh();
         notifyDayChanged();
       } catch {
-        setError("Network error.");
+        setError("Couldn't reach the server. Please try again.");
         setBusy(false);
       }
     },

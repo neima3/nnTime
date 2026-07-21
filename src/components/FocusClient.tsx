@@ -10,6 +10,26 @@ import { useRouter } from "next/navigation";
 import { Check, Coffee, Pause, Play, Plus, SkipForward } from "lucide-react";
 import { celebrate } from "./Celebration";
 
+/**
+ * Named session presets (P14 — rituals). One tap sets the whole frame: what
+ * you're calling it, how long, and the vibe to reach for. Chosen for common
+ * ADHD needs — a warm-up win, a body-double block, a gentle wind-down.
+ */
+const RITUALS: {
+  id: string;
+  label: string;
+  emoji: string;
+  title: string;
+  min: number;
+  vibe: string;
+}[] = [
+  { id: "deep", label: "Deep work", emoji: "🧠", title: "Deep work", min: 45, vibe: "White noise" },
+  { id: "quick", label: "Quick win", emoji: "⚡", title: "Quick win", min: 15, vibe: "Silence" },
+  { id: "double", label: "Body double", emoji: "👥", title: "Body double", min: 25, vibe: "Café" },
+  { id: "wind", label: "Wind down", emoji: "🌙", title: "Wind down", min: 10, vibe: "Rain" },
+  { id: "flow", label: "Creative flow", emoji: "🎨", title: "Creative flow", min: 45, vibe: "Forest" },
+];
+
 type Session = {
   id: string;
   state: "running" | "paused" | "completed" | "skipped" | "cancelled";
@@ -320,7 +340,7 @@ export function FocusClient({
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        setError("Action failed.");
+        setError("That didn't go through — try again.");
         return;
       }
       const data = await res.json();
@@ -522,8 +542,41 @@ export function FocusClient({
           />
         </div>
 
+        {!activityId && (
+          <div
+            className="mt-8 flex flex-wrap items-center justify-center gap-2"
+            role="group"
+            aria-label="Session rituals"
+          >
+            {RITUALS.map((r) => {
+              const on = title === r.title && durationMin === r.min;
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => {
+                    setTitle(r.title);
+                    setEmoji(r.emoji);
+                    setDurationMin(r.min);
+                  }}
+                  title={`${r.min} min · ${r.vibe}`}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none ${
+                    on
+                      ? "border-iris bg-iris-soft text-iris"
+                      : "border-border bg-surface text-ink-soft hover:text-ink"
+                  }`}
+                >
+                  <span aria-hidden>{r.emoji}</span>
+                  {r.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         <div
-          className="mt-8 flex items-center gap-1.5 rounded-full border border-border bg-surface p-1 shadow-card"
+          className="mt-6 flex items-center gap-1.5 rounded-full border border-border bg-surface p-1 shadow-card"
           role="group"
           aria-label="Session length"
         >

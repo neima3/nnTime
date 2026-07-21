@@ -284,6 +284,13 @@ export function RoutinesClient({
             <p className="mx-auto mt-1 max-w-xs text-[13px] leading-relaxed text-ink-soft">
               A routine is a sequence you can drop into any day — mornings, wind-downs, gym blocks.
             </p>
+            <button
+              type="button"
+              onClick={() => setOpen(true)}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-iris px-4 py-2 text-[13px] font-semibold text-ink-inverse shadow-card transition-colors hover:bg-iris-deep focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+            >
+              + Build your first routine
+            </button>
           </div>
         )}
       </div>

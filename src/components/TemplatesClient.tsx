@@ -74,7 +74,7 @@ export function TemplatesClient({
       router.push(`/app/today?date=${date}`);
       router.refresh();
     } catch {
-      setMsg("Network error.");
+      setMsg("Couldn't reach the server. Please try again.");
     }
     setBusy(null);
   }

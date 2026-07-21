@@ -106,7 +106,7 @@ export function AnytimeRail({
         headers: { "If-Match": String(item.revision) },
       });
       if (!res.ok && res.status !== 204) {
-        toast("Could not clear item");
+        toast("Couldn't clear it — try again in a sec");
         return;
       }
       setItems((prev) => prev.filter((x) => x.id !== item.id));
@@ -177,7 +177,7 @@ export function AnytimeRail({
           );
         })}
         {items.length === 0 && (
-          <li className="text-[13px] text-ink-faint">No anytime items.</li>
+          <li className="text-[13px] text-ink-faint">Nothing waiting here — clear runway.</li>
         )}
       </ul>
     </div>

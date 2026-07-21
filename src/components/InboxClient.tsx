@@ -112,7 +112,7 @@ export function InboxClient({
       });
       toast("Grouped by priority (suggestion — save via edit later)");
     } catch {
-      setGroupMsg("Network error");
+      setGroupMsg("Couldn't reach the server. Please try again.");
     }
     setBusy(null);
   }, [authed]);
@@ -158,7 +158,7 @@ export function InboxClient({
       setDraft("");
       router.refresh();
     } catch {
-      setError("Network error.");
+      setError("Couldn't reach the server. Please try again.");
     }
     setBusy(null);
   }, [draft, authed, router]);
@@ -460,7 +460,7 @@ export function InboxClient({
         })}
         {items.length === 0 && (
           <li className="rounded-2xl border border-dashed border-border px-4 py-10 text-center text-[14px] text-ink-soft">
-            Inbox is empty. Dump a thought above.
+            Inbox is empty. Dump a thought above — head stays clear.
           </li>
         )}
       </ul>

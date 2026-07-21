@@ -740,7 +740,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
                         setSteps((prev) => [...prev, ...next.filter(Boolean)]);
                       }
                     } catch {
-                      setError("Network error talking to AI.");
+                      setError("Couldn't reach the AI — add steps by hand for now.");
                     }
                     setSaving(false);
                   }}

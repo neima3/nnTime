@@ -163,7 +163,7 @@ export async function planMyDay(
   const response = await getClient().messages.create({
     model: "claude-haiku-4-5",
     max_tokens: 800,
-    system: `You help plan a day for someone with ADHD. Given tasks, current energy, and free time slots, propose a schedule. Respond ONLY with JSON: {"items":[{"taskId":"uuid","scheduledStart":"HH:MM","reason":"brief"}]}. Never schedule more than fits. Energy: low=quick tasks, high=deep work.`,
+    system: `You help plan a day for someone with ADHD. Given tasks (each may carry an "energy" tag), the person's current energy, and free time slots, propose a gentle schedule. Respond ONLY with JSON: {"items":[{"taskId":"uuid","scheduledStart":"HH:MM","reason":"brief"}]}. Never schedule more than comfortably fits — under-fill rather than over-pack. Honor energy: current=low means quick/low-energy tasks only and LEAVE OUT tasks tagged "high" (don't force a hard task on a depleted day); current=high favors deep/high-energy work. When matched to energy, the "reason" should be kind and brief (e.g. "gentle start", "you're sharp now"). It's fine to schedule fewer tasks than given.`,
     messages: [
       {
         role: "user",

@@ -116,7 +116,7 @@ export function KeyboardShortcuts() {
             </kbd>
           </li>
           <li className="flex justify-between gap-4">
-            <span className="text-ink-soft">Move selected block</span>
+            <span className="text-ink-soft">Move selected activity</span>
             <kbd className="rounded-lg bg-surface-sunken px-2 py-0.5 font-mono text-[12px] font-bold">
               ↑ ↓
             </kbd>

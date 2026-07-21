@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { clientToday } from "@/lib/client-date";
+import { useLowBattery } from "./LowBattery";
 import { toast } from "./Toast";
 
 type Proposal = {
@@ -19,8 +20,15 @@ type Proposal = {
 
 export function PlanDayClient() {
   const router = useRouter();
-  const [energy, setEnergy] = useState<"low" | "medium" | "high">("medium");
+  const [energyChoice, setEnergyChoice] = useState<"low" | "medium" | "high">("medium");
+  const [energyTouched, setEnergyTouched] = useState(false);
+  const lowBattery = useLowBattery(clientToday());
   const [loading, setLoading] = useState(false);
+
+  // On a low-battery day, plan gently by default — unless they've said otherwise.
+  // Derived (no effect) so it can't cascade renders.
+  const energy: "low" | "medium" | "high" =
+    !energyTouched && lowBattery ? "low" : energyChoice;
   const [items, setItems] = useState<Proposal[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +60,7 @@ export function PlanDayClient() {
         setMessage("No suggestions — try adding inbox tasks first.");
       }
     } catch {
-      setError("Network error.");
+      setError("Couldn't reach the server. Please try again.");
     }
     setLoading(false);
   }
@@ -81,6 +89,12 @@ export function PlanDayClient() {
         accept each chip.
       </p>
 
+      {lowBattery && (
+        <p className="mt-3 rounded-2xl border border-iris/25 bg-iris-ghost px-3.5 py-2.5 text-[12.5px] font-medium text-ink-soft">
+          🔋 Low-battery day — planning gently. Heavier tasks sit this one out.
+        </p>
+      )}
+
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <span className="text-[12px] font-bold uppercase tracking-wide text-ink-soft">
           Energy
@@ -89,7 +103,10 @@ export function PlanDayClient() {
           <button
             key={e}
             type="button"
-            onClick={() => setEnergy(e)}
+            onClick={() => {
+              setEnergyChoice(e);
+              setEnergyTouched(true);
+            }}
             className={`rounded-full px-3 py-1.5 text-[13px] font-semibold capitalize ${
               energy === e
                 ? "bg-iris text-ink-inverse"
