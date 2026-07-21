@@ -5,6 +5,7 @@ import { BarChart3, Flame } from "lucide-react";
 import { toast } from "./Toast";
 import { SignedOutCard, SkeletonCards } from "./EmptyState";
 import { RewardGarden } from "./RewardGarden";
+import { WeeklyReflection } from "./WeeklyReflection";
 
 type EstimateCalibration = {
   sessions: number;
@@ -133,6 +134,13 @@ export function StatsClient() {
         totalCompleted={stats.totalCompleted}
         totalFocusMin={stats.totalFocusMin}
         days={stats.days}
+      />
+
+      <WeeklyReflection
+        byDate={stats.byDate}
+        totalCompleted={stats.totalCompleted}
+        totalFocusMin={stats.totalFocusMin}
+        peakHour={stats.focusHours?.peakHour ?? null}
       />
 
       <Card title="This week" hint="Completions — no judgment, just shape">
