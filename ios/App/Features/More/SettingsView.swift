@@ -2,6 +2,8 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(AppState.self) private var app
+    @State private var remindersOn = KairoPrefs.remindersEnabled
+    @State private var permissionDenied = false
 
     var body: some View {
         ZStack {
@@ -55,6 +57,32 @@ struct SettingsView: View {
                         .padding(16)
                     }
 
+                    group("Reminders") {
+                        VStack(alignment: .leading, spacing: 0) {
+                            Toggle(isOn: Binding(
+                                get: { remindersOn },
+                                set: { v in setReminders(v) }
+                            )) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Gentle activity reminders")
+                                        .font(.kBody(15, weight: .medium))
+                                        .foregroundStyle(Color.kInk)
+                                    Text("A nudge a few minutes before each block, and when it starts")
+                                        .font(.kBody(12.5))
+                                        .foregroundStyle(Color.kInkSoft)
+                                }
+                            }
+                            .tint(.kIris)
+                            if permissionDenied {
+                                Text("Notifications are off for Kairo in iOS Settings. Turn them on there to get reminders.")
+                                    .font(.kBody(12))
+                                    .foregroundStyle(Color.kInkFaint)
+                                    .padding(.top, 10)
+                            }
+                        }
+                        .padding(16)
+                    }
+
                     group("Your data") {
                         VStack(spacing: 0) {
                             linkRow("Export or delete on the web", "square.and.arrow.up",
@@ -87,6 +115,30 @@ struct SettingsView: View {
             }
         }
         .toolbarBackground(Color.kCanvas, for: .navigationBar)
+    }
+
+    private func setReminders(_ on: Bool) {
+        UISelectionFeedbackGenerator().selectionChanged()
+        if on {
+            Task {
+                let granted = await NotificationManager.requestAuthorization()
+                await MainActor.run {
+                    if granted {
+                        remindersOn = true
+                        permissionDenied = false
+                        KairoPrefs.remindersEnabled = true
+                    } else {
+                        remindersOn = false
+                        permissionDenied = true
+                        KairoPrefs.remindersEnabled = false
+                    }
+                }
+            }
+        } else {
+            remindersOn = false
+            KairoPrefs.remindersEnabled = false
+            NotificationManager.cancelAll()
+        }
     }
 
     private func group(_ title: String, @ViewBuilder content: () -> some View) -> some View {

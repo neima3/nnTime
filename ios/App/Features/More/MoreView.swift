@@ -48,6 +48,10 @@ struct MoreView: View {
                         }
 
                         card {
+                            NavigationLink { TemplatesView() } label: {
+                                row(icon: "square.grid.2x2", title: "Templates", value: "Quick-start blocks")
+                            }.buttonStyle(.plain)
+                            divider
                             NavigationLink { RoutinesView() } label: {
                                 row(icon: "repeat", title: "Routines", value: "Run a ritual")
                             }.buttonStyle(.plain)

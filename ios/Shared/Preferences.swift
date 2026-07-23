@@ -35,4 +35,21 @@ enum KairoPrefs {
         get { store.bool(forKey: "kairo-onboarded") }
         set { store.set(newValue, forKey: "kairo-onboarded") }
     }
+
+    /// Local reminders for upcoming activities (T2). Defaults on once the user
+    /// grants permission; the toggle lives in Settings.
+    static var remindersEnabled: Bool {
+        get { store.bool(forKey: "kairo-reminders") }
+        set { store.set(newValue, forKey: "kairo-reminders") }
+    }
+
+    /// Fire a gentle "time to shift" nudge this many minutes before a block
+    /// starts, in addition to the on-time reminder (T4 transition cushion).
+    static var transitionLeadMin: Int {
+        get {
+            let v = store.object(forKey: "kairo-transition-lead") as? Int
+            return v ?? 5
+        }
+        set { store.set(newValue, forKey: "kairo-transition-lead") }
+    }
 }

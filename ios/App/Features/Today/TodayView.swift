@@ -349,7 +349,10 @@ struct TodayView: View {
             loadError = (error as? APIError)?.errorDescription
         }
         loading = false
-        if dayOffset == 0 { await loadPeak() }
+        if dayOffset == 0 {
+            await loadPeak()
+            await NotificationManager.reschedule(blocks: blocks, zone: app.timezone)
+        }
     }
 
     /// Pull the peak-focus hour from stats (only worth showing today).

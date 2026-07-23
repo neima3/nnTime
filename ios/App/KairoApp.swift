@@ -40,6 +40,8 @@ final class AppState {
     }
     /// categoryId → semantic key, fetched once per session.
     var categoryMap: [String: KairoCategory] = [:]
+    /// semantic key → categoryId, for creating activities with the right color.
+    var categoryIdByKey: [String: String] = [:]
 
     func bootstrap() async {
         do {
@@ -62,12 +64,16 @@ final class AppState {
             let (data, _) = try await URLSession.shared.data(for: req)
             let page = try JSONDecoder().decode(CategoryPage.self, from: data)
             var map: [String: KairoCategory] = [:]
+            var byKey: [String: String] = [:]
             for c in page.items {
                 if let cat = KairoCategory(rawValue: c.key) { map[c.id] = cat }
+                byKey[c.key] = c.id
             }
             categoryMap = map
+            categoryIdByKey = byKey
         } catch {
             categoryMap = [:]
+            categoryIdByKey = [:]
         }
     }
 
