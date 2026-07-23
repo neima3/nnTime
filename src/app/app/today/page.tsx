@@ -26,6 +26,7 @@ import { TodayTimeline } from "@/components/TodayTimeline";
 import { TimezoneNudge } from "@/components/TimezoneNudge";
 import { PickForMe, type PickCandidate } from "@/components/PickForMe";
 import { PeakFocusNudge } from "@/components/PeakFocusNudge";
+import { DailyBrief } from "@/components/DailyBrief";
 import { DayRituals } from "@/components/DayRituals";
 import { LowBatteryNote, LowBatteryToggle } from "@/components/LowBattery";
 import { DayDoneRain } from "@/components/DayDoneRain";
@@ -376,6 +377,16 @@ export default async function TodayPage({
 
           {authed && <TimezoneNudge zone={zone} />}
 
+          {authed && isToday && (
+            <DailyBrief
+              blocks={activities.map((a) => ({
+                title: a.title,
+                emoji: a.emoji,
+                start: a.start,
+                done: !!a.done,
+              }))}
+            />
+          )}
           {authed && isToday && <LowBatteryNote date={date} />}
           {authed && isToday && <PeakFocusNudge />}
 
