@@ -108,11 +108,13 @@ struct EditorSheet: View {
                                 HStack(spacing: 8) {
                                     stepper(
                                         label: KTime.hhmm(startMin),
+                                        what: "start time",
                                         minus: { startMin = max(0, startMin - 15) },
                                         plus: { startMin = min(23 * 60 + 45, startMin + 15) }
                                     )
                                     stepper(
                                         label: KTime.duration(durationMin),
+                                        what: "duration",
                                         minus: { durationMin = max(5, durationMin - 15) },
                                         plus: { durationMin = min(480, durationMin + 15) }
                                     )
@@ -258,17 +260,20 @@ struct EditorSheet: View {
         }
     }
 
-    private func stepper(label: String, minus: @escaping () -> Void, plus: @escaping () -> Void) -> some View {
+    private func stepper(label: String, what: String = "value", minus: @escaping () -> Void, plus: @escaping () -> Void) -> some View {
         HStack(spacing: 0) {
             Button(action: minus) {
                 Image(systemName: "minus").frame(width: 36, height: 40)
             }
+            .accessibilityLabel("Decrease \(what)")
             Text(label)
                 .font(.kMono(15))
                 .frame(minWidth: 72)
+                .accessibilityLabel("\(what): \(label)")
             Button(action: plus) {
                 Image(systemName: "plus").frame(width: 36, height: 40)
             }
+            .accessibilityLabel("Increase \(what)")
         }
         .foregroundStyle(Color.kInk)
         .background(

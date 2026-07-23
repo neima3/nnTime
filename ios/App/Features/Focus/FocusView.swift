@@ -189,10 +189,11 @@ struct FocusView: View {
             }
 
             HStack(spacing: 18) {
-                controlButton("plus", size: 56) {
+                controlButton("plus", size: 56, label: "Extend 5 minutes") {
                     Task { await action(["action": "extend", "addMinutes": 5]) }
                 }
-                controlButton(session.state == "paused" ? "play.fill" : "pause.fill", size: 76, filled: true) {
+                controlButton(session.state == "paused" ? "play.fill" : "pause.fill", size: 76, filled: true,
+                              label: session.state == "paused" ? "Resume" : "Pause") {
                     Task {
                         await action([
                             "action": "transition",
@@ -200,7 +201,7 @@ struct FocusView: View {
                         ])
                     }
                 }
-                controlButton("checkmark", size: 56) {
+                controlButton("checkmark", size: 56, label: "Complete session") {
                     Task { await complete(session) }
                 }
             }
@@ -236,7 +237,7 @@ struct FocusView: View {
         }
     }
 
-    private func controlButton(_ symbol: String, size: CGFloat, filled: Bool = false, action: @escaping () -> Void) -> some View {
+    private func controlButton(_ symbol: String, size: CGFloat, filled: Bool = false, label: String = "", action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: size * 0.34, weight: .semibold))
@@ -247,6 +248,7 @@ struct FocusView: View {
                         .overlay(Circle().stroke(filled ? Color.clear : Color.kBorder, lineWidth: 1))
                 )
         }
+        .accessibilityLabel(label)
         .kCardShadow()
     }
 

@@ -12,12 +12,12 @@ struct OnboardingSheet: View {
 
     private struct Anchor { let emoji, title, hint: String; let startMin, durationMin: Int; let daily: Bool }
     private let anchors: [Anchor] = [
-        .init(emoji: "🌤", title: "Morning reset", hint: "8:00 · daily", startMin: 480, durationMin: 30, daily: true),
-        .init(emoji: "💊", title: "Meds + breakfast", hint: "8:30 · daily", startMin: 510, durationMin: 15, daily: true),
+        .init(emoji: "🌤", title: "Morning reset", hint: "8:00 · every day", startMin: 480, durationMin: 30, daily: true),
+        .init(emoji: "💊", title: "Meds + breakfast", hint: "8:30 · every day", startMin: 510, durationMin: 15, daily: true),
         .init(emoji: "🎨", title: "Deep work block", hint: "9:30 · today", startMin: 570, durationMin: 90, daily: false),
-        .init(emoji: "🍜", title: "Real lunch", hint: "12:30 · today", startMin: 750, durationMin: 45, daily: false),
+        .init(emoji: "🍜", title: "Real lunch, no desk", hint: "12:30 · today", startMin: 750, durationMin: 45, daily: false),
         .init(emoji: "🏃", title: "Move a little", hint: "17:00 · today", startMin: 1020, durationMin: 30, daily: false),
-        .init(emoji: "🌙", title: "Wind-down", hint: "21:30 · daily", startMin: 1290, durationMin: 30, daily: true),
+        .init(emoji: "🌙", title: "Wind-down", hint: "21:30 · every day", startMin: 1290, durationMin: 30, daily: true),
     ]
 
     var body: some View {

@@ -84,8 +84,11 @@ struct TemplatesView: View {
                 .background(RoundedRectangle(cornerRadius: 14).fill(cat.fill))
             VStack(alignment: .leading, spacing: 2) {
                 Text(t.title).font(.kBody(15, weight: .bold)).foregroundStyle(Color.kInk)
-                Text("\(t.steps.count) steps · \(KTime.duration(t.minutes))")
+                Text(t.steps.joined(separator: " · "))
                     .font(.kBody(12)).foregroundStyle(Color.kInkSoft)
+                    .lineLimit(1)
+                Text("\(t.steps.count) steps · \(KTime.duration(t.minutes))")
+                    .font(.kBody(11)).foregroundStyle(Color.kInkFaint)
             }
             Spacer(minLength: 4)
             Button {

@@ -398,6 +398,7 @@ export function QuickCapture() {
               )}
               <button
                 type="button"
+                aria-label="Save"
                 disabled={!text.trim() || saving}
                 onClick={() => void save(false)}
                 className="grid h-11 shrink-0 place-items-center rounded-2xl bg-iris px-4 text-[14px] font-semibold text-ink-inverse transition-all hover:bg-iris-deep active:scale-[0.98] disabled:opacity-50"
