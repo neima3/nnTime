@@ -1,5 +1,40 @@
 # Progress log
 
+## 2026-07-23 — Round 3: 20-phase program (Opus + subagents) — IN PROGRESS
+Roadmap: `docs/plans/2026-07-23-round3-20phase.md`. **Shipped this session: T2,
+T4, T5, T9, plus partial T17/T18. The rest remain — 20 phases is multi-session.**
+
+Done + verified:
+- **T2 iOS local notifications** — `NotificationManager` schedules on-device
+  reminders for today's upcoming blocks; Settings toggle + permission flow.
+- **T4 transition cushions** — a "time to shift" nudge N min before each block.
+- **T5 iOS Templates** — native grouped screen, one-tap apply → activity+checklist.
+  (T2/T4/T5 verified on simulator: `browser-qa/ios-40/41`, KairoRound3Tour passes.)
+- **T9 Smart Daily Brief** — morning orientation card on web Today (blocks +
+  first-up + peak window). Build-verified + deployed; **live visual check was
+  blocked** — the dev machine hit 99% disk and the agent-browser daemon started
+  crashing (CDP channel closed). Freed ~7 GB but it stayed unstable. Reached
+  `/app/today` signed-in; card is build-verified and mirrors the verified
+  PeakFocusNudge pattern.
+- **T17/T18 (partial)** — ran a round-2 UX audit (subagent, 27 findings) and
+  applied the cheap must-fixes: iOS Focus control + editor-stepper VoiceOver
+  labels, web QuickCapture save aria-label, iOS onboarding anchor copy
+  reconciled with web, iOS Templates show step labels.
+
+Ship gate: web lint+typecheck+**389 tests**+build green, deployed + live smoke
+200; iOS build + Round3 tour green.
+
+**Remaining (T1, T3, T6–T8, T10–T16, T19, T20):** the T18 audit surfaced the
+highest-value next targets — iOS mood check-in, iOS break flow after focus,
+iOS Day Rituals, iOS week-view semantics vs web, iOS soundscape parity, and
+web push (T1). See roadmap + audit findings for the full list.
+
+⚠️ **Environment note:** the dev machine's Data volume is ~99% full (only a few
+GB free). This is degrading Xcode result bundles and the browser daemon —
+worth clearing space before the next session.
+
+
+
 ## 2026-07-21 — Round 2: 10-phase program (Fable/Opus + subagents) — ✅ 10/10
 Roadmap: `docs/plans/2026-07-21-round2-10phase.md`.
 
