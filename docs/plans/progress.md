@@ -1,5 +1,29 @@
 # Progress log
 
+## 2026-07-24 — Round 5: 10-phase program (Opus) — 6/10
+Roadmap: `docs/plans/2026-07-24-round5-10phase.md`.
+
+Done + verified:
+- **G1 iOS Week tap-to-edit** — blocks open the editor; every day (incl. empty)
+  has a "+" to add. **G3 iOS Weekly Intentions** — synced via
+  settings.notificationPrefs; **verified cross-platform**: an intention added on
+  the web showed on iOS (`browser-qa/ios-60-week-intentions.png`). Added
+  KairoAPI.settingsRaw() for the flexible prefs blob.
+- **G6 Quiet hours** — iOS reminders skip a nightly window (Settings toggle,
+  default 22:00–07:00, overnight-wrap aware).
+- **G7 Web focus polish** — idle screen shows the linked activity's name instead
+  of a raw UUID. Deployed + live.
+- **G8 iOS Play best scores** — Time Feel + Quick Tap record and show a personal
+  best (app-group UserDefaults).
+- **G10 ship gate** — web lint+typecheck+**372 tests**+build green, deployed +
+  live smoke 200; **full iOS suite green (12 suites)**.
+
+**Remaining (G2, G4, G5, G9):** iOS Search/quick-jump, iOS Focus session
+checklist (needs threading activityId through the focus flow), iOS native
+AVAudioEngine soundscape, integration tests for new surfaces.
+
+
+
 ## 2026-07-24 — Round 4: 10-phase program (Opus + verification back) — 4/10
 Roadmap: `docs/plans/2026-07-24-round4-10phase.md`. Disk was freed (~26 GB) and
 agent-browser works again, so full visual verification is back.
