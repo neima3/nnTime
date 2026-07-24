@@ -32,6 +32,8 @@ const HANDLERS_WITHOUT_OPENAPI = [
   "/api/v1/stats",
   "/api/v1/tasks/import",
   "/api/v1/jobs/tick",
+  // Web Push (F1) — private product endpoints, not in the published contract.
+  "/api/v1/push/*",
   // Implemented path shapes differ from deferred OpenAPI designs:
   // list occurrences by series id (not get-by-occurrenceKey).
   "/api/v1/activities/{id}/occurrences",
