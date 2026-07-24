@@ -8,6 +8,7 @@ struct OnboardingSheet: View {
 
     @State private var picked: Set<Int> = [0, 2, 5]
     @State private var busy = false
+    @State private var step = 0   // 0 = anchors, 1 = orientation
     let onDone: () -> Void
 
     private struct Anchor { let emoji, title, hint: String; let startMin, durationMin: Int; let daily: Bool }
@@ -23,6 +24,60 @@ struct OnboardingSheet: View {
     var body: some View {
         ZStack {
             Color.kCanvas.ignoresSafeArea()
+            if step == 1 { orientation } else { anchorPicker }
+        }
+        .interactiveDismissDisabled(busy)
+    }
+
+    private var orientation: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Three things worth knowing").font(.kDisplay(26)).foregroundStyle(Color.kInk)
+                Text("You'll find the rest as you go. No pressure to remember them.")
+                    .font(.kBody(14)).foregroundStyle(Color.kInkSoft)
+            }
+            .padding(.top, 8)
+
+            VStack(spacing: 12) {
+                orientationRow("dice", "Stuck on what to do?", "Tap “Pick for me” on Today — it chooses exactly one thing.")
+                orientationRow("timer", "Focus a block", "Tap a block, then Focus — a calm timer that never shames overtime.")
+                orientationRow("gamecontroller", "Need a reset?", "Brain breaks live in More — two minutes of play counts as rest.")
+            }
+
+            Spacer()
+
+            Button { finish() } label: {
+                Text("Start my day")
+                    .font(.kBody(16, weight: .semibold)).foregroundStyle(Color.kInkInverse)
+                    .frame(maxWidth: .infinity).padding(.vertical, 15)
+                    .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.kIris))
+            }
+            .kFloatShadow()
+            Text("Every step is skippable. Nothing here is a commitment.")
+                .font(.kBody(12)).foregroundStyle(Color.kInkFaint)
+                .frame(maxWidth: .infinity)
+        }
+        .padding(20)
+    }
+
+    private func orientationRow(_ icon: String, _ title: String, _ body: String) -> some View {
+        HStack(alignment: .top, spacing: 13) {
+            Image(systemName: icon).font(.system(size: 16, weight: .semibold)).foregroundStyle(Color.kIris)
+                .frame(width: 38, height: 38)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color.kIrisSoft))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.kBody(15, weight: .bold)).foregroundStyle(Color.kInk)
+                Text(body).font(.kBody(13)).foregroundStyle(Color.kInkSoft)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .kCard(radius: 16)
+    }
+
+    private var anchorPicker: some View {
+        ZStack {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Pick your anchors").font(.kDisplay(26)).foregroundStyle(Color.kInk)
@@ -79,7 +134,7 @@ struct OnboardingSheet: View {
                 .opacity(picked.isEmpty ? 0.6 : 1)
                 .kFloatShadow()
 
-                Button("Skip — I'll build my own") { finish() }
+                Button("Skip — I'll build my own") { withAnimation { step = 1 } }
                     .font(.kBody(13, weight: .semibold))
                     .foregroundStyle(Color.kInkFaint)
                     .frame(maxWidth: .infinity)
@@ -102,7 +157,8 @@ struct OnboardingSheet: View {
             )
         }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        finish()
+        busy = false
+        withAnimation { step = 1 }
     }
 
     private func finish() {

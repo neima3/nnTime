@@ -21,6 +21,12 @@ final class KairoNewScreensTour: XCTestCase {
         snap(app, "09-onboarding")
         app.buttons["Skip — I'll build my own"].tap()
 
+        // Orientation step (H5)
+        XCTAssertTrue(app.staticTexts["Three things worth knowing"].waitForExistence(timeout: 8))
+        sleep(1)
+        snap(app, "11-orientation")
+        app.buttons["Start my day"].tap()
+
         // Settings → dark
         XCTAssertTrue(app.buttons["New activity"].waitForExistence(timeout: 15))
         app.tabBars.buttons["More"].tap()
