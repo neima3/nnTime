@@ -43,6 +43,8 @@ enum NotificationManager {
             guard scheduled < 56 else { break }
             guard let startDate = dateFor(minute: block.startMin, calendar: cal, now: now),
                   startDate > now else { continue }
+            // Quiet hours — skip reminders that would fire while resting.
+            if KairoPrefs.inQuietHours(cal.component(.hour, from: startDate)) { continue }
 
             // Transition cushion — a few minutes before.
             if lead > 0, let cushionDate = cal.date(byAdding: .minute, value: -lead, to: startDate),

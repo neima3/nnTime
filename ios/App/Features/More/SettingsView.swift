@@ -7,6 +7,7 @@ struct SettingsView: View {
     @State private var hourCycle = "h12"
     @State private var weekStart = 0
     @State private var settingsRevision: Int?
+    @State private var quietHours = KairoPrefs.quietHoursEnabled
 
     var body: some View {
         ZStack {
@@ -98,6 +99,20 @@ struct SettingsView: View {
                                     .foregroundStyle(Color.kInkFaint)
                                     .padding(.top, 10)
                             }
+                            if remindersOn {
+                                Rectangle().fill(Color.kBorder).frame(height: 1).padding(.vertical, 12)
+                                Toggle(isOn: Binding(
+                                    get: { quietHours },
+                                    set: { v in quietHours = v; KairoPrefs.quietHoursEnabled = v }
+                                )) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Quiet hours").font(.kBody(15, weight: .medium)).foregroundStyle(Color.kInk)
+                                        Text("No reminders \(hourText(KairoPrefs.quietStartHour))–\(hourText(KairoPrefs.quietEndHour)) — rest undisturbed")
+                                            .font(.kBody(12.5)).foregroundStyle(Color.kInkSoft)
+                                    }
+                                }
+                                .tint(.kIris)
+                            }
                         }
                         .padding(16)
                     }
@@ -175,6 +190,14 @@ struct SettingsView: View {
         if let updated = try? await KairoAPI.shared.updateSettings(patch: patch, revision: rev) {
             await MainActor.run { settingsRevision = updated.revision }
         }
+    }
+
+    private func hourText(_ h: Int) -> String {
+        if h == 0 { return "midnight" }
+        if h == 12 { return "noon" }
+        let period = h < 12 ? "am" : "pm"
+        let twelve = h % 12 == 0 ? 12 : h % 12
+        return "\(twelve)\(period)"
     }
 
     private func setReminders(_ on: Bool) {

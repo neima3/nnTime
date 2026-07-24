@@ -52,4 +52,27 @@ enum KairoPrefs {
         }
         set { store.set(newValue, forKey: "kairo-transition-lead") }
     }
+
+    /// Quiet hours (G6) — suppress reminders that would fire inside this nightly
+    /// window. Defaults 22:00–07:00, off until enabled.
+    static var quietHoursEnabled: Bool {
+        get { store.bool(forKey: "kairo-quiet-enabled") }
+        set { store.set(newValue, forKey: "kairo-quiet-enabled") }
+    }
+    static var quietStartHour: Int {
+        get { store.object(forKey: "kairo-quiet-start") as? Int ?? 22 }
+        set { store.set(newValue, forKey: "kairo-quiet-start") }
+    }
+    static var quietEndHour: Int {
+        get { store.object(forKey: "kairo-quiet-end") as? Int ?? 7 }
+        set { store.set(newValue, forKey: "kairo-quiet-end") }
+    }
+
+    /// True if `hour` falls inside the quiet window (handles overnight wrap).
+    static func inQuietHours(_ hour: Int) -> Bool {
+        guard quietHoursEnabled else { return false }
+        let s = quietStartHour, e = quietEndHour
+        if s == e { return false }
+        return s < e ? (hour >= s && hour < e) : (hour >= s || hour < e)
+    }
 }
