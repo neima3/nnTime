@@ -36,12 +36,12 @@ final class KairoLiveActivityTest: XCTestCase {
 
         // Clean up: back into the app, complete the session.
         app.activate()
-        let complete = app.buttons["checkmark"].firstMatch
+        let complete = app.buttons["Complete session"].firstMatch
         if complete.waitForExistence(timeout: 8) {
             complete.tap()
         }
-        XCTAssertTrue(app.staticTexts["Session done"].firstMatch.waitForExistence(timeout: 10)
-                      || app.buttons["Back to it"].waitForExistence(timeout: 4),
+        XCTAssertTrue(app.buttons["Take a 5-min break"].waitForExistence(timeout: 10)
+                      || app.buttons["Done for now"].waitForExistence(timeout: 4),
                       "session should complete")
     }
 }
