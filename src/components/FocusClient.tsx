@@ -141,6 +141,7 @@ export function FocusClient({
   /** Linked activity's checklist (wave 4: tick steps mid-session). */
   const [checklist, setChecklist] = useState<{ label: string; done: boolean }[] | null>(null);
   const [checklistRev, setChecklistRev] = useState<number | null>(null);
+  const [linkedTitle, setLinkedTitle] = useState<string | null>(null);
 
   useEffect(() => {
     if (!activityId) return;
@@ -149,6 +150,7 @@ export function FocusClient({
       .then((r) => (r.ok ? r.json() : null))
       .then((a) => {
         if (cancelled || !a) return;
+        if (typeof a.title === "string") setLinkedTitle(a.title);
         if (Array.isArray(a.checklistTemplate) && a.checklistTemplate.length > 0) {
           setChecklist(
             a.checklistTemplate.map((x: { label?: string; done?: boolean }) => ({
@@ -620,7 +622,7 @@ export function FocusClient({
         </button>
         {activityId && (
           <p className="mt-3 text-[12px] text-ink-faint">
-            Linked activity · {activityId.slice(0, 8)}…
+            Linked to · {linkedTitle ?? "your activity"}
           </p>
         )}
 
