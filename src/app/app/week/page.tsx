@@ -12,6 +12,7 @@ import {
 import { buildCategoryMap, dateToMinutesFromMidnight } from "@/lib/adapters";
 import { expandActivitiesForDay } from "@/server/services/day";
 import { instantToDateStr, resolveDayBounds } from "@/server/temporal/zone";
+import { WeeklyIntentions } from "@/components/WeeklyIntentions";
 
 type Block = {
   id: string;
@@ -217,6 +218,8 @@ export default async function WeekPage({
             </Link>
           </div>
         </header>
+
+        <WeeklyIntentions weekStart={weekStart} />
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
           {days.map((d) => (
