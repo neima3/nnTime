@@ -1,5 +1,33 @@
 # Progress log
 
+## 2026-07-24 — Round 4: 10-phase program (Opus + verification back) — 4/10
+Roadmap: `docs/plans/2026-07-24-round4-10phase.md`. Disk was freed (~26 GB) and
+agent-browser works again, so full visual verification is back.
+
+Done + verified:
+- **F1 Web Push** — completes the reminders story (pairs with iOS notifications).
+  web-push + VAPID (keys in Coolify buildtime env), subscribe/unsubscribe/test
+  endpoints, SW push + notificationclick handlers (cache v4), PushReminders opt-in
+  in web Settings. **Server pipeline verified live**: subscribe → `{ok:true}`,
+  test/unsubscribe → 200. Real notification *display* needs a real browser+push
+  service (not headless). NOTE: fixing this took 8 migrations — the prod
+  `push_subscriptions` table was badly drifted (missing keys/deleted_at/indexes
+  and a wrong FK to `users` vs `user`); rebuilt it cleanly (it was empty).
+- **F3 iOS Month** — Monday-first grid, completion dots, tap-day preview sheet.
+  Verified: `browser-qa/ios-50-month.png`.
+- **F6 iOS Settings formatting** — 12/24h + week-start, persisted via new
+  KairoAPI.updateSettings. Verified: `browser-qa/ios-51-settings-format.png`.
+- **F7 Weekly Intentions** — 1–3 streak-free aims on the Week page, persisted in
+  settings.notificationPrefs (syncs to iOS). **Verified live**: survived a full
+  reload (`browser-qa/web-f7-intentions.png`).
+
+Ship gate: web lint+typecheck+**372 tests**+build green, deployed + SW v4 live.
+
+**Remaining (F2, F4, F5, F8, F9, F10):** notif quiet-hours, iOS Search, iOS Week
+tap-to-edit, iOS native soundscape, E2E tests, final ship sweep.
+
+
+
 ## 2026-07-23 — Round 3: 20-phase program (Opus + subagents) — IN PROGRESS
 Roadmap: `docs/plans/2026-07-23-round3-20phase.md`. **Shipped this session: T2,
 T4, T5, T9, plus partial T17/T18. The rest remain — 20 phases is multi-session.**
