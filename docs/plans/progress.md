@@ -24,6 +24,19 @@ Done + verified:
 Ship gate: web lint+typecheck+**389 tests**+build green, deployed + live smoke
 200; iOS build + Round3 tour green.
 
+**Continuation ("do it all") — more iOS parity from the audit (all build- +
+simulator-verified; full iOS suite green after fixing a selector regression):**
+- iOS **Mood check-in** on Insights (Low/Okay/Good/Great → POST /api/v1/mood).
+  Verified: `browser-qa/ios-42-mood.png`.
+- iOS Focus **break flow** (Take a 5-min break → countdown → "I'm ready now";
+  Keep going / Done for now) + **overtime inline actions** (Wrap up / +5 more,
+  shows minutes past target).
+- iOS **Day Rituals** on Today — morning "ease into today" (→ Templates) +
+  evening "close the day gently" (→ Review), window-gated + dismissible.
+- Fixed `KairoLiveActivityTest` selectors broken by the Focus done-state rename.
+- (Earlier in this continuation: iOS VoiceOver labels, copy reconciliation,
+  Templates step labels — committed under T17/T18.)
+
 **Remaining (T1, T3, T6–T8, T10–T16, T19, T20):** the T18 audit surfaced the
 highest-value next targets — iOS mood check-in, iOS break flow after focus,
 iOS Day Rituals, iOS week-view semantics vs web, iOS soundscape parity, and
