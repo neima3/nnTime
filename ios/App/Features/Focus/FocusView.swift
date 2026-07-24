@@ -25,6 +25,11 @@ struct FocusView: View {
     @State private var breakSec: Int?
     @State private var pendingTitle = "Deep focus"
     @State private var pendingEmoji = "🎯"
+    // Linked activity + its checklist (H2), when focus is started from a block.
+    @State private var linkedActivityId: String?
+    @State private var linkedOccurrenceKey: String?
+    @State private var linkedRevision = 1
+    @State private var checklist: [(label: String, done: Bool)] = []
     @State private var liveActivity: ActivityKit.Activity<FocusAttributes>?
 
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -82,6 +87,17 @@ struct FocusView: View {
                 duration = min(60, max(5, mins))
                 remaining = duration * 60
             }
+            linkedActivityId = note.userInfo?["activityId"] as? String
+            linkedOccurrenceKey = note.userInfo?["occurrenceKey"] as? String
+            linkedRevision = note.userInfo?["revision"] as? Int ?? 1
+            if let raw = note.userInfo?["checklist"] as? [[String: Any]] {
+                checklist = raw.compactMap {
+                    guard let l = $0["label"] as? String else { return nil }
+                    return (l, ($0["done"] as? Bool) ?? false)
+                }
+            } else {
+                checklist = []
+            }
             finishedMin = nil
         }
         .onReceive(resync) { _ in
@@ -116,6 +132,9 @@ struct FocusView: View {
                             pendingEmoji = r.emoji
                             duration = r.min
                             remaining = r.min * 60
+                            // A ritual is a fresh, unlinked session.
+                            linkedActivityId = nil
+                            checklist = []
                         } label: {
                             HStack(spacing: 5) {
                                 Text(r.emoji)
@@ -236,6 +255,43 @@ struct FocusView: View {
                     Task { await complete(session) }
                 }
             }
+
+            if !checklist.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("STEPS").font(.kBody(10, weight: .bold)).kerning(1.2).foregroundStyle(Color.kInkFaint)
+                    ForEach(checklist.indices, id: \.self) { i in
+                        Button { Task { await toggleStep(i) } } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: checklist[i].done ? "checkmark.circle.fill" : "circle")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(checklist[i].done ? Color.kSuccess : Color.kInkFaint)
+                                Text(checklist[i].label)
+                                    .font(.kBody(14))
+                                    .foregroundStyle(checklist[i].done ? Color.kInkFaint : Color.kInk)
+                                    .strikethrough(checklist[i].done)
+                                Spacer()
+                            }
+                        }
+                        .accessibilityLabel("\(checklist[i].label), \(checklist[i].done ? "done" : "not done")")
+                    }
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .kCard(radius: 16)
+                .padding(.horizontal, 24)
+            }
+        }
+    }
+
+    private func toggleStep(_ i: Int) async {
+        guard let id = linkedActivityId else { return }
+        checklist[i].done.toggle()
+        UISelectionFeedbackGenerator().selectionChanged()
+        let payload = checklist.map { ["label": $0.label, "done": $0.done] as [String: Any] }
+        if let updated = try? await KairoAPI.shared.setChecklist(
+            activityId: id, revision: linkedRevision, occurrenceKey: linkedOccurrenceKey, checklist: payload
+        ) {
+            linkedRevision = updated.revision
         }
     }
 

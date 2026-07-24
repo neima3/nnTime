@@ -55,10 +55,17 @@ struct TodayView: View {
                                 onComplete: { block in Task { await toggle(block) } },
                                 onDelete: { block in Task { await remove(block) } },
                                 onFocus: { block in
+                                    var info: [String: Any] = [
+                                        "title": block.title, "emoji": block.emoji,
+                                        "duration": block.durationMin,
+                                        "activityId": block.id, "revision": block.revision,
+                                    ]
+                                    if let ok = block.occurrenceKey { info["occurrenceKey"] = ok }
+                                    if !block.checklist.isEmpty {
+                                        info["checklist"] = block.checklist.map { ["label": $0.label, "done": $0.done] }
+                                    }
                                     NotificationCenter.default.post(
-                                        name: .kairoStartFocus,
-                                        object: nil,
-                                        userInfo: ["title": block.title, "emoji": block.emoji, "duration": block.durationMin]
+                                        name: .kairoStartFocus, object: nil, userInfo: info
                                     )
                                 },
                                 onOpen: { block in editingBlock = block },
