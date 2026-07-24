@@ -6,6 +6,9 @@ struct StatsView: View {
     @Environment(AppState.self) private var app
     @State private var stats: StatsResponse?
     @State private var loading = true
+    @State private var moodBusy = false
+    @State private var moodPicked: String?
+    @State private var moodSaved = false
 
     var body: some View {
         ZStack {
@@ -26,6 +29,7 @@ struct StatsView: View {
                         }
                         if let hours = stats.focusHours { focusHoursCard(hours) }
                         if let est = stats.estimate { timeTruthCard(est) }
+                        moodCard()
                     }
                     .padding(20)
                 }
@@ -197,6 +201,55 @@ struct StatsView: View {
             .padding(.top, 14)
         }
         .padding(16).frame(maxWidth: .infinity, alignment: .leading).kCard(radius: 20)
+    }
+
+    // MARK: Mood check-in (audit parity) — one tap, private, no wrong answer.
+
+    private func moodCard() -> some View {
+        let moods: [(id: String, label: String, emoji: String)] = [
+            ("low", "Low", "🌧️"), ("okay", "Okay", "⛅"),
+            ("good", "Good", "🌤️"), ("great", "Great", "☀️"),
+        ]
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("Mood check-in").font(.kBody(16, weight: .bold)).foregroundStyle(Color.kInk)
+            Text(moodSaved ? "Noted — thank you." : "One tap · private")
+                .font(.kBody(12.5)).foregroundStyle(Color.kInkSoft)
+            HStack(spacing: 8) {
+                ForEach(moods, id: \.id) { m in
+                    Button {
+                        Task { await sendMood(m.id) }
+                    } label: {
+                        VStack(spacing: 4) {
+                            Text(m.emoji).font(.system(size: 20))
+                            Text(m.label).font(.kBody(12, weight: .semibold))
+                                .foregroundStyle(moodPicked == m.id ? Color.kIris : Color.kInkSoft)
+                        }
+                        .frame(maxWidth: .infinity).padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(moodPicked == m.id ? Color.kIrisSoft : Color.kSurfaceRaised)
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(moodPicked == m.id ? Color.kIris : Color.kBorder, lineWidth: 1))
+                        )
+                    }
+                    .disabled(moodBusy)
+                }
+            }
+        }
+        .padding(16).frame(maxWidth: .infinity, alignment: .leading).kCard(radius: 20)
+    }
+
+    private func sendMood(_ mood: String) async {
+        moodBusy = true
+        moodPicked = mood
+        do {
+            try await KairoAPI.shared.postMood(mood)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            moodSaved = true
+        } catch {
+            moodPicked = nil
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+        }
+        moodBusy = false
     }
 
     private func row(_ label: String, _ value: String) -> some View {

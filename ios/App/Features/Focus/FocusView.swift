@@ -21,6 +21,8 @@ struct FocusView: View {
     @State private var duration = 25
     @State private var loading = true
     @State private var finishedMin: Int?
+    /// Local break countdown (seconds) after a finished session; nil = none.
+    @State private var breakSec: Int?
     @State private var pendingTitle = "Deep focus"
     @State private var pendingEmoji = "🎯"
     @State private var liveActivity: ActivityKit.Activity<FocusAttributes>?
@@ -34,6 +36,8 @@ struct FocusView: View {
                 Color.kCanvas.ignoresSafeArea()
                 if loading {
                     ProgressView().tint(.kIris)
+                } else if let breakSec {
+                    breakState(breakSec)
                 } else if let finishedMin {
                     doneState(minutes: finishedMin)
                 } else if let session {
@@ -54,6 +58,14 @@ struct FocusView: View {
         }
         .task { await hydrate() }
         .onReceive(tick) { _ in
+            if let bs = breakSec {
+                if bs > 1 { breakSec = bs - 1 }
+                else {
+                    breakSec = nil
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                }
+                return
+            }
             guard session?.state == "running" else { return }
             if remaining > 0 {
                 remaining -= 1
@@ -181,11 +193,30 @@ struct FocusView: View {
             }
 
             if inOvertime {
-                Text("Good stopping point?")
-                    .font(.kBody(14, weight: .semibold))
-                    .foregroundStyle(Color.kCatButterInk)
-                    .padding(.horizontal, 16).padding(.vertical, 10)
-                    .background(Capsule().fill(Color.kCatButter))
+                VStack(spacing: 8) {
+                    Text("\(max(1, overtime / 60)) min past your target. Good stopping point?")
+                        .font(.kBody(13.5, weight: .semibold))
+                        .foregroundStyle(Color.kCatButterInk)
+                        .multilineTextAlignment(.center)
+                    HStack(spacing: 8) {
+                        Button {
+                            Task { await complete(session) }
+                        } label: {
+                            Text("Wrap up").font(.kBody(13, weight: .bold)).foregroundStyle(Color.kCatButter)
+                                .padding(.horizontal, 14).padding(.vertical, 7)
+                                .background(Capsule().fill(Color.kCatButterInk))
+                        }
+                        Button {
+                            Task { await action(["action": "extend", "addMinutes": 5]) }
+                        } label: {
+                            Text("+5 more").font(.kBody(13, weight: .bold)).foregroundStyle(Color.kCatButterInk)
+                                .padding(.horizontal, 14).padding(.vertical, 7)
+                                .background(Capsule().stroke(Color.kCatButterInk, lineWidth: 1))
+                        }
+                    }
+                }
+                .padding(.horizontal, 16).padding(.vertical, 12)
+                .background(RoundedRectangle(cornerRadius: 16).fill(Color.kCatButter))
             }
 
             HStack(spacing: 18) {
@@ -221,19 +252,62 @@ struct FocusView: View {
             Text("That counted. What now?")
                 .font(.kBody(14.5))
                 .foregroundStyle(Color.kInkSoft)
+            VStack(spacing: 10) {
+                Button {
+                    breakSec = 5 * 60
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                } label: {
+                    Label("Take a 5-min break", systemImage: "cup.and.saucer.fill")
+                        .font(.kBody(15, weight: .semibold))
+                        .foregroundStyle(Color.kInkInverse)
+                        .frame(maxWidth: .infinity).padding(.vertical, 14)
+                        .background(Capsule().fill(Color.kIris))
+                }
+                .kFloatShadow()
+                HStack(spacing: 10) {
+                    Button {
+                        finishedMin = nil
+                        remaining = duration * 60
+                        overtime = 0
+                    } label: {
+                        Text("Keep going")
+                            .font(.kBody(14, weight: .semibold)).foregroundStyle(Color.kInk)
+                            .frame(maxWidth: .infinity).padding(.vertical, 12)
+                            .background(Capsule().fill(Color.kSurface).overlay(Capsule().stroke(Color.kBorder, lineWidth: 1)))
+                    }
+                    Button {
+                        finishedMin = nil
+                    } label: {
+                        Text("Done for now")
+                            .font(.kBody(14, weight: .semibold)).foregroundStyle(Color.kInkSoft)
+                            .frame(maxWidth: .infinity).padding(.vertical, 12)
+                            .background(Capsule().fill(Color.kSurface).overlay(Capsule().stroke(Color.kBorder, lineWidth: 1)))
+                    }
+                }
+            }
+            .padding(.top, 8)
+            .padding(.horizontal, 28)
+        }
+    }
+
+    private func breakState(_ sec: Int) -> some View {
+        VStack(spacing: 16) {
+            Text("☕").font(.system(size: 52))
+            Text("Breathe. Stretch. Sip.")
+                .font(.kDisplay(22)).foregroundStyle(Color.kInk)
+            Text(KTime.mmss(sec))
+                .font(.kMono(46, weight: .bold)).foregroundStyle(Color.kInk)
+                .contentTransition(.numericText())
+            Text("break time — no rush").font(.kBody(13)).foregroundStyle(Color.kInkSoft)
             Button {
-                finishedMin = nil
-                remaining = duration * 60
-                overtime = 0
+                breakSec = nil
             } label: {
-                Text("Back to it")
-                    .font(.kBody(15, weight: .semibold))
-                    .foregroundStyle(Color.kInkInverse)
+                Text("I'm ready now")
+                    .font(.kBody(15, weight: .semibold)).foregroundStyle(Color.kInkInverse)
                     .padding(.horizontal, 26).padding(.vertical, 13)
                     .background(Capsule().fill(Color.kIris))
             }
-            .padding(.top, 8)
-            .kFloatShadow()
+            .padding(.top, 6).kFloatShadow()
         }
     }
 

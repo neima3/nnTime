@@ -225,6 +225,12 @@ actor KairoAPI {
         try await request("GET", "/api/v1/stats", as: StatsResponse.self)
     }
 
+    // MARK: Mood
+
+    func postMood(_ mood: String) async throws {
+        _ = try await request("POST", "/api/v1/mood", body: ["mood": mood], as: EmptyResponse.self)
+    }
+
     // MARK: Routines
 
     func routines() async throws -> [Routine] {

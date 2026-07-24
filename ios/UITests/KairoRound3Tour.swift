@@ -34,6 +34,18 @@ final class KairoRound3Tour: XCTestCase {
         XCTAssertTrue(app.staticTexts["Gentle activity reminders"].waitForExistence(timeout: 8))
         sleep(1)
         snap(app, "41-settings-reminders")
+
+        // Insights → mood check-in (scroll to bottom)
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        let insights = app.staticTexts["Insights"].firstMatch
+        if insights.waitForExistence(timeout: 6) {
+            insights.tap()
+            XCTAssertTrue(app.navigationBars.staticTexts["Insights"].waitForExistence(timeout: 8))
+            sleep(1)
+            app.swipeUp(); app.swipeUp(); app.swipeUp()
+            sleep(1)
+            snap(app, "42-insights-mood")
+        }
     }
 
     private func snap(_ app: XCUIApplication, _ name: String) {
