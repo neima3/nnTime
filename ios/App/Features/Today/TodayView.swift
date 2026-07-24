@@ -17,6 +17,8 @@ struct TodayView: View {
     @State private var loadError: String?
     @State private var peakHour: Int?
     @State private var peakDismissedDay = ""
+    @State private var ritualDismissedDay = ""
+    @State private var showTemplates = false
     /// 0 = today, ±n days.
     @State private var dayOffset = 0
 
@@ -37,6 +39,11 @@ struct TodayView: View {
                             header
                                 .padding(.horizontal, 20)
                                 .padding(.top, 8)
+                            if let ritual = dayRitual {
+                                ritual
+                                    .padding(.horizontal, 16)
+                                    .padding(.top, 10)
+                            }
                             if let nudge = peakNudge {
                                 nudge
                                     .padding(.horizontal, 16)
@@ -144,6 +151,9 @@ struct TodayView: View {
             .sheet(isPresented: $showReview, onDismiss: { Task { await load() } }) {
                 ReviewSheet(date: date, zone: app.timezone, items: blocks) { }
             }
+            .sheet(isPresented: $showTemplates, onDismiss: { Task { await load() } }) {
+                NavigationStack { TemplatesView() }
+            }
             .refreshable { await load() }
         }
         .task { await load() }
@@ -174,6 +184,61 @@ struct TodayView: View {
     }
 
     private var doneCount: Int { blocks.filter(\.done).count }
+
+    /// Day Rituals (parity) — a morning kickoff on a sparse day, an evening
+    /// shutdown when things are still open. Time-windowed, once per day.
+    private var dayRitual: AnyView? {
+        guard dayOffset == 0 else { return nil }
+        let today = KTime.dateString(Date(), zone: .current)
+        guard ritualDismissedDay != today else { return nil }
+        let hour = Calendar.current.component(.hour, from: Date())
+        let unfinished = blocks.contains { !$0.done }
+
+        func dismiss() {
+            ritualDismissedDay = today
+            UserDefaults.standard.set(today, forKey: "kairo.ritualDismissed")
+        }
+
+        if hour < 11 && blocks.count < 2 {
+            return AnyView(ritualCard(
+                emoji: "🌤", tint: Color.kCatButter, ink: Color.kCatButterInk,
+                title: "Ease into today", body: "A light day so far. Want a ready-made block to start from?",
+                actionLabel: "Browse templates", action: { showTemplates = true }, dismiss: dismiss))
+        }
+        if hour >= 19 && unfinished {
+            return AnyView(ritualCard(
+                emoji: "🌙", tint: Color.kCatLilac, ink: Color.kCatLilacInk,
+                title: "Close the day gently", body: "A few things are still open. No pressure — just decide what they become.",
+                actionLabel: "Review today", action: { showReview = true }, dismiss: dismiss))
+        }
+        return nil
+    }
+
+    private func ritualCard(emoji: String, tint: Color, ink: Color, title: String, body: String,
+                            actionLabel: String, action: @escaping () -> Void, dismiss: @escaping () -> Void) -> some View {
+        HStack(spacing: 12) {
+            Text(emoji).font(.system(size: 22))
+                .frame(width: 34, height: 34)
+                .background(RoundedRectangle(cornerRadius: 10).fill(tint))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(.kBody(13.5, weight: .bold)).foregroundStyle(Color.kInk)
+                Text(body).font(.kBody(12)).foregroundStyle(Color.kInkSoft)
+            }
+            Spacer(minLength: 4)
+            Button(action: action) {
+                Text(actionLabel).font(.kBody(12.5, weight: .bold)).foregroundStyle(ink)
+                    .padding(.horizontal, 11).padding(.vertical, 7)
+                    .background(Capsule().fill(tint))
+            }
+            Button(action: dismiss) {
+                Image(systemName: "xmark").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.kInkFaint)
+            }
+            .accessibilityLabel("Dismiss for today")
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color.kSurface)
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.kBorder, lineWidth: 1)))
+    }
 
     /// Peak-focus nudge (R4) — shown only today, inside the personal peak
     /// window, once per day. Fed by the stats focus-hours data.
@@ -358,6 +423,7 @@ struct TodayView: View {
     /// Pull the peak-focus hour from stats (only worth showing today).
     private func loadPeak() async {
         peakDismissedDay = UserDefaults.standard.string(forKey: "kairo.peakNudgeDismissed") ?? ""
+        ritualDismissedDay = UserDefaults.standard.string(forKey: "kairo.ritualDismissed") ?? ""
         guard let stats = try? await KairoAPI.shared.stats(),
               let hours = stats.focusHours,
               Insights.focusSessionCount(hours.hours) >= Insights.peakMinSessions else {
