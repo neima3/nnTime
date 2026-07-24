@@ -34,7 +34,7 @@ struct MoreView: View {
                                 } icon: {
                                     Image(systemName: "sparkles").foregroundStyle(Color.kIris)
                                 }
-                                Text("AI planning, month view, templates and more live at time.neima.me — same account, same day.")
+                                Text("AI planning, calendar sync and more live at time.neima.me — same account, same day.")
                                     .font(.kBody(13.5))
                                     .foregroundStyle(Color.kInkSoft)
                                 Link(destination: URL(string: "https://time.neima.me/app/today")!) {
@@ -48,6 +48,10 @@ struct MoreView: View {
                         }
 
                         card {
+                            NavigationLink { MonthView() } label: {
+                                row(icon: "calendar", title: "Month", value: "Calendar view")
+                            }.buttonStyle(.plain)
+                            divider
                             NavigationLink { TemplatesView() } label: {
                                 row(icon: "square.grid.2x2", title: "Templates", value: "Quick-start blocks")
                             }.buttonStyle(.plain)

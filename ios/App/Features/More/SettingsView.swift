@@ -4,6 +4,9 @@ struct SettingsView: View {
     @Environment(AppState.self) private var app
     @State private var remindersOn = KairoPrefs.remindersEnabled
     @State private var permissionDenied = false
+    @State private var hourCycle = "h12"
+    @State private var weekStart = 0
+    @State private var settingsRevision: Int?
 
     var body: some View {
         ZStack {
@@ -54,6 +57,22 @@ struct SettingsView: View {
                             }
                         }
                         .tint(.kIris)
+                        .padding(16)
+                    }
+
+                    group("Formatting") {
+                        VStack(alignment: .leading, spacing: 14) {
+                            segmented(title: "Time", options: [("h12", "12-hour"), ("h24", "24-hour")],
+                                      selected: hourCycle) { v in
+                                hourCycle = v
+                                Task { await saveSettings(["hourCycle": v]) }
+                            }
+                            segmented(title: "Week starts", options: [("0", "Sunday"), ("1", "Monday")],
+                                      selected: String(weekStart)) { v in
+                                weekStart = Int(v) ?? 0
+                                Task { await saveSettings(["weekStart": Int(v) ?? 0]) }
+                            }
+                        }
                         .padding(16)
                     }
 
@@ -115,6 +134,47 @@ struct SettingsView: View {
             }
         }
         .toolbarBackground(Color.kCanvas, for: .navigationBar)
+        .task { await loadSettings() }
+    }
+
+    private func segmented(title: String, options: [(String, String)], selected: String, onPick: @escaping (String) -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title).font(.kBody(14, weight: .semibold)).foregroundStyle(Color.kInk)
+            HStack(spacing: 8) {
+                ForEach(options, id: \.0) { opt in
+                    Button {
+                        UISelectionFeedbackGenerator().selectionChanged()
+                        onPick(opt.0)
+                    } label: {
+                        Text(opt.1)
+                            .font(.kBody(13, weight: .semibold))
+                            .foregroundStyle(selected == opt.0 ? Color.kIris : Color.kInkSoft)
+                            .frame(maxWidth: .infinity).padding(.vertical, 10)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(selected == opt.0 ? Color.kIrisSoft : Color.kSurface)
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(selected == opt.0 ? Color.kIris : Color.kBorder, lineWidth: 1))
+                            )
+                    }
+                }
+            }
+        }
+    }
+
+    private func loadSettings() async {
+        guard let s = try? await KairoAPI.shared.settings() else { return }
+        await MainActor.run {
+            hourCycle = s.hourCycle ?? "h12"
+            weekStart = s.weekStart ?? 0
+            settingsRevision = s.revision
+        }
+    }
+
+    private func saveSettings(_ patch: [String: Any?]) async {
+        guard let rev = settingsRevision else { return }
+        if let updated = try? await KairoAPI.shared.updateSettings(patch: patch, revision: rev) {
+            await MainActor.run { settingsRevision = updated.revision }
+        }
     }
 
     private func setReminders(_ on: Bool) {

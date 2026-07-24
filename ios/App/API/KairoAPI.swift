@@ -138,6 +138,10 @@ actor KairoAPI {
         try await request("GET", "/api/v1/settings", as: UserSettings.self)
     }
 
+    func updateSettings(patch: [String: Any?], revision: Int) async throws -> UserSettings {
+        try await request("PATCH", "/api/v1/settings", body: patch, ifMatch: revision, as: UserSettings.self)
+    }
+
     // MARK: Day + activities
 
     func day(_ date: String) async throws -> DayResponse {
