@@ -6,12 +6,19 @@ struct WeekView: View {
     @Environment(AppState.self) private var app
     @State private var days: [WeekDay] = []
     @State private var loading = true
+    @State private var editTarget: EditTarget?
 
     struct WeekDay: Identifiable {
         let id: String        // YYYY-MM-DD
         let label: String     // "Mon 20"
         let isToday: Bool
         let blocks: [DayBlock]
+    }
+
+    struct EditTarget: Identifiable {
+        let date: String
+        let block: DayBlock?
+        var id: String { "\(date)-\(block?.id ?? "new")" }
     }
 
     var body: some View {
@@ -23,6 +30,7 @@ struct WeekView: View {
                 } else {
                     ScrollView {
                         VStack(spacing: 12) {
+                            WeeklyIntentionsCard()
                             ForEach(days) { day in
                                 dayCard(day)
                             }
@@ -41,6 +49,9 @@ struct WeekView: View {
                 }
             }
             .toolbarBackground(Color.kCanvas, for: .navigationBar)
+            .sheet(item: $editTarget, onDismiss: { Task { await load() } }) { t in
+                EditorSheet(date: t.date, startMin: t.block?.startMin ?? 9 * 60, editing: t.block)
+            }
         }
         .task { await load() }
     }
@@ -65,32 +76,52 @@ struct WeekView: View {
                         .font(.kMono(11, weight: .medium))
                         .foregroundStyle(Color.kInkFaint)
                 }
+                Button {
+                    editTarget = EditTarget(date: day.id, block: nil)
+                } label: {
+                    Image(systemName: "plus").font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(Color.kIris)
+                        .frame(width: 26, height: 26)
+                        .background(Circle().fill(Color.kIrisSoft))
+                }
+                .accessibilityLabel("Add activity on \(day.label)")
             }
 
             if day.blocks.isEmpty {
-                Text("Nothing planned — space is allowed.")
-                    .font(.kBody(13))
-                    .foregroundStyle(Color.kInkFaint)
+                Button {
+                    editTarget = EditTarget(date: day.id, block: nil)
+                } label: {
+                    Text("Nothing planned — tap + to add, or leave the space.")
+                        .font(.kBody(13))
+                        .foregroundStyle(Color.kInkFaint)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
             } else {
                 ForEach(day.blocks) { block in
-                    HStack(spacing: 9) {
-                        Text(block.emoji).font(.system(size: 14))
-                        Text(block.title)
-                            .font(.kBody(13.5, weight: .semibold))
-                            .strikethrough(block.done)
-                            .lineLimit(1)
-                        Spacer()
-                        Text(KTime.hhmm(block.startMin))
-                            .font(.kMono(12, weight: .medium))
-                            .opacity(0.75)
+                    Button {
+                        editTarget = EditTarget(date: day.id, block: block)
+                    } label: {
+                        HStack(spacing: 9) {
+                            Text(block.emoji).font(.system(size: 14))
+                            Text(block.title)
+                                .font(.kBody(13.5, weight: .semibold))
+                                .strikethrough(block.done)
+                                .lineLimit(1)
+                            Spacer()
+                            Text(KTime.hhmm(block.startMin))
+                                .font(.kMono(12, weight: .medium))
+                                .opacity(0.75)
+                        }
+                        .foregroundStyle(block.category.ink)
+                        .padding(.horizontal, 11).padding(.vertical, 7)
+                        .background(
+                            RoundedRectangle(cornerRadius: 11, style: .continuous)
+                                .fill(block.category.fill)
+                        )
+                        .opacity(block.done ? 0.6 : 1)
                     }
-                    .foregroundStyle(block.category.ink)
-                    .padding(.horizontal, 11).padding(.vertical, 7)
-                    .background(
-                        RoundedRectangle(cornerRadius: 11, style: .continuous)
-                            .fill(block.category.fill)
-                    )
-                    .opacity(block.done ? 0.6 : 1)
+                    .buttonStyle(.plain)
                 }
             }
         }

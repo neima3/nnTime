@@ -142,6 +142,18 @@ actor KairoAPI {
         try await request("PATCH", "/api/v1/settings", body: patch, ifMatch: revision, as: UserSettings.self)
     }
 
+    /// Raw settings JSON (for the flexible notificationPrefs blob), fetched
+    /// through the cookie session so auth works.
+    func settingsRaw() async throws -> [String: Any] {
+        var req = URLRequest(url: baseURL.appending(path: "/api/v1/settings"))
+        req.setValue(TimeZone.current.identifier, forHTTPHeaderField: "x-timezone")
+        let (data, response) = try await session.data(for: req)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw APIError.http((response as? HTTPURLResponse)?.statusCode ?? 0, nil)
+        }
+        return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    }
+
     // MARK: Day + activities
 
     func day(_ date: String) async throws -> DayResponse {
