@@ -28,6 +28,12 @@ struct RoutinesView: View {
                                 .buttonStyle(.plain)
                                 .disabled(r.orderedSteps.isEmpty)
                         }
+                        Link(destination: URL(string: "https://time.neima.me/app/routines")!) {
+                            Text("Edit or add routines on the web →")
+                                .font(.kBody(12.5, weight: .semibold)).foregroundStyle(Color.kIris)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .padding(.top, 4)
                     }
                     .padding(20)
                 }
