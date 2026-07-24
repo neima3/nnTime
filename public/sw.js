@@ -11,7 +11,7 @@
  * This is a minimal SW; the full ADR-002 offline mutation queue lands with 6B's
  * complete enablement.
  */
-const CACHE_VERSION = "kairo-v3-wave2adhd";
+const CACHE_VERSION = "kairo-v4-push";
 const APP_SHELL = ["/", "/app/today", "/manifest.json", "/icon-192.png"];
 
 self.addEventListener("install", (event) => {
@@ -66,7 +66,7 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// Web Push handler (Phase 3B).
+// Web Push handler (Phase 3B / F1).
 self.addEventListener("push", (event) => {
   const data = event.data ? event.data.json() : {};
   event.waitUntil(
@@ -75,6 +75,24 @@ self.addEventListener("push", (event) => {
       icon: "/icon-192.png",
       badge: "/icon-192.png",
       tag: data.tag,
+      data: { url: data.url || "/app/today" },
+    }),
+  );
+});
+
+// Focus (or open) the app when a notification is tapped.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/app/today";
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
+      for (const w of wins) {
+        if ("focus" in w) {
+          w.navigate(url).catch(() => {});
+          return w.focus();
+        }
+      }
+      return clients.openWindow(url);
     }),
   );
 });

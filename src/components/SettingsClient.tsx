@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { invalidateSettingsCache } from "@/lib/settings-cache";
 import { SignedOutCard, SkeletonRows } from "./EmptyState";
+import { PushReminders } from "./PushReminders";
 
 type Settings = {
   timezone: string;
@@ -423,6 +424,9 @@ export function SettingsClient() {
             />
           }
         />
+        <div className="px-5 py-4">
+          <PushReminders />
+        </div>
       </Section>
 
       <Section icon={Calendar} title="Calendars">
