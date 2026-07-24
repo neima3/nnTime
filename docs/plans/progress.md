@@ -1,5 +1,27 @@
 # Progress log
 
+## 2026-07-24 — Round 6: 10-phase program (Opus) — 3/10 (iOS parity depth)
+Roadmap: `docs/plans/2026-07-24-round6-10phase.md`.
+
+Done + verified (all iOS, simulator + full suite green):
+- **H2 Focus session checklist** — focus started from a Today block now carries
+  the activity id/occurrence/checklist through the kairoStartFocus flow; the
+  active session shows a STEPS card and ticking a step PATCHes checklistOverride.
+  Rituals start unlinked. Mirrors the web focus checklist.
+- **H5 Onboarding orientation** — a closing "Three things worth knowing" screen
+  (Pick for me / Focus a block / Brain breaks) → "Start my day". Verified:
+  `browser-qa/ios-11-orientation.png`; KairoNewScreensTour updated + passes.
+- **H6 Routines "edit on the web" note** on the populated list.
+- **H10 iOS ship gate** — full iOS suite green (12 suites). No web changes this
+  round, so web stays as last deployed (372 tests, live).
+
+**Remaining (H1, H3, H4, H7, H8, H9):** scheduled web-push delivery (needs the
+placeholder notifications schema fleshed out + external cron), iOS Search,
+iOS native AVAudioEngine soundscape, extract intentions/quiet-hours to a
+testable lib + tests, web reduced-stimulation/empty-state sweep.
+
+
+
 ## 2026-07-24 — Round 5: 10-phase program (Opus) — 6/10
 Roadmap: `docs/plans/2026-07-24-round5-10phase.md`.
 
