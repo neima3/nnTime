@@ -109,7 +109,11 @@ struct TimeFeelGame: View {
                     Text(feeling(last)).font(.kBody(15, weight: .semibold)).foregroundStyle(Color.kInk).multilineTextAlignment(.center).padding(.horizontal, 30)
                     Button("Next round") { round += 1; stage = 0 }.buttonStyle(PrimaryPill())
                 } else {
-                    Text("Inner clock: \(score())/100").font(.kDisplay(30)).foregroundStyle(Color.kInk)
+                    let s = score()
+                    let best = PlayScores.recordHigher(s, for: "timefeel")
+                    Text("Inner clock: \(s)/100").font(.kDisplay(30)).foregroundStyle(Color.kInk)
+                    Text(s >= best ? "New personal best 🎉" : "Your best: \(best)/100")
+                        .font(.kBody(13, weight: .semibold)).foregroundStyle(Color.kIris)
                     Text("Everyone's clock drifts — that's exactly why your timeline does the feeling for you.")
                         .font(.kBody(14)).foregroundStyle(Color.kInkSoft).multilineTextAlignment(.center).padding(.horizontal, 30)
                     Button("Back to my day") { onExit() }.buttonStyle(PrimaryPill())
@@ -126,6 +130,33 @@ struct TimeFeelGame: View {
         guard !results.isEmpty else { return 0 }
         let mean = results.map { abs($0.actual - Double($0.target)) / Double($0.target) }.reduce(0, +) / Double(results.count)
         return max(0, Int((1 - mean) * 100))
+    }
+}
+
+// MARK: - Personal bests (G8) — local, never shared, just your own.
+enum PlayScores {
+    private static let store = UserDefaults(suiteName: "group.me.neima.kairo") ?? .standard
+
+    /// Record a score where higher is better; returns the current best.
+    static func recordHigher(_ value: Int, for key: String) -> Int {
+        let k = "kairo-best-\(key)"
+        let prev = store.object(forKey: k) as? Int
+        let best = max(value, prev ?? value)
+        if prev == nil || value > prev! { store.set(best, forKey: k) }
+        return best
+    }
+
+    /// Record a score where lower is better (e.g. reaction ms); returns best.
+    static func recordLower(_ value: Int, for key: String) -> Int {
+        let k = "kairo-best-\(key)"
+        let prev = store.object(forKey: k) as? Int
+        let best = min(value, prev ?? value)
+        if prev == nil || value < prev! { store.set(best, forKey: k) }
+        return best
+    }
+
+    static func best(for key: String) -> Int? {
+        store.object(forKey: "kairo-best-\(key)") as? Int
     }
 }
 
@@ -165,7 +196,12 @@ struct QuickTapGame: View {
                     Button("Next round") { arm() }.buttonStyle(PrimaryPill())
                 default:
                     let avg = times.isEmpty ? 0 : times.reduce(0, +) / times.count
+                    let best = times.isEmpty ? PlayScores.best(for: "quicktap") : PlayScores.recordLower(avg, for: "quicktap")
                     Text(times.isEmpty ? "All jumps 😄" : "Average: \(avg) ms").font(.kDisplay(28)).foregroundStyle(Color.kInk)
+                    if let best, !times.isEmpty {
+                        Text(avg <= best ? "New personal best 🎉" : "Your best: \(best) ms")
+                            .font(.kBody(13, weight: .semibold)).foregroundStyle(Color.kIris)
+                    }
                     Text("Reaction wobbles with sleep, food, and interest. A snapshot, not a verdict.").font(.kBody(14)).foregroundStyle(Color.kInkSoft).multilineTextAlignment(.center).padding(.horizontal, 30)
                     Button("Back to my day") { onExit() }.buttonStyle(PrimaryPill())
                 }
