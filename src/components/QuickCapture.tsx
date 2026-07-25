@@ -16,6 +16,8 @@ import { notifyDayChanged } from "./NowBar";
 import { localMinutesToInstant } from "@/lib/adapters";
 import { clientToday } from "@/lib/client-date";
 import { fmt } from "@/lib/mock";
+import { enqueueMutation } from "@/lib/offline-queue";
+import { useSession } from "@/lib/auth-client";
 
 /** AI-parsed draft (SEC-05: suggestion only — nothing saves until accepted). */
 interface Proposal {
@@ -54,6 +56,8 @@ function getSpeechRecognition(): (new () => SpeechRecognitionLike) | null {
 }
 
 export function QuickCapture() {
+  const { data: session } = useSession();
+  const userId = session?.user?.id ?? null;
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
@@ -266,6 +270,33 @@ export function QuickCapture() {
       const title = text.trim();
       if (!title || saving) return;
       setSaving(true);
+
+      // Offline capture (T13): a thought you had on the train is exactly what
+      // this box is for, so losing it to a dead connection is the worst possible
+      // failure. Queue it in IndexedDB and let the offline queue replay it on
+      // reconnect. Inbox creates are safe to replay — a plain POST carrying an
+      // Idempotency-Key, no revision and no If-Match to go stale.
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        const queued = userId
+          ? await enqueueMutation(userId, {
+              method: "POST",
+              path: "/api/v1/tasks",
+              body: { bucket: "inbox", title },
+              idempotencyKey: crypto.randomUUID(),
+            })
+          : null;
+        setSaving(false);
+        if (queued) {
+          setText("");
+          setCaptured((n) => n + 1);
+          toast("Saved on this device — it'll land in your inbox when you're back");
+          if (!keepOpen) setOpen(false);
+        } else {
+          toast("You're offline and this device can't hold it — copy it somewhere safe");
+        }
+        return;
+      }
+
       try {
         const res = await fetch("/api/v1/tasks", {
           method: "POST",
@@ -306,7 +337,7 @@ export function QuickCapture() {
         setSaving(false);
       }
     },
-    [text, saving],
+    [text, saving, userId],
   );
 
   return (
