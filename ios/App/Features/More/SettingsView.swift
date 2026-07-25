@@ -43,21 +43,38 @@ struct SettingsView: View {
                         .padding(16)
                     }
 
-                    group("Comfort") {
-                        Toggle(isOn: Binding(
-                            get: { app.reducedStimulation },
-                            set: { v in app.reducedStimulation = v; KairoPrefs.reducedStimulation = v }
-                        )) {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Reduced stimulation")
-                                    .font(.kBody(15, weight: .medium))
-                                    .foregroundStyle(Color.kInk)
-                                Text("Softer motion and calmer entrances")
-                                    .font(.kBody(12.5))
-                                    .foregroundStyle(Color.kInkSoft)
-                            }
+                    // Access (I1) — the same four modes as the web's Settings →
+                    // Access, stored on the account so they follow you across
+                    // devices rather than living on this phone.
+                    group("Access") {
+                        VStack(alignment: .leading, spacing: 0) {
+                            a11yToggle(
+                                "High contrast",
+                                hint: "Stronger ink and visible edges on every surface",
+                                isOn: app.highContrast
+                            ) { app.setA11y(highContrast: $0) }
+
+                            divider
+                            a11yToggle(
+                                "Dyslexia-friendly font",
+                                hint: "Atkinson Hyperlegible — letters that don't mirror each other",
+                                isOn: app.dyslexiaFont
+                            ) { app.setA11y(dyslexiaFont: $0) }
+
+                            divider
+                            a11yToggle(
+                                "Larger text",
+                                hint: "Everything one comfortable step up",
+                                isOn: app.largerText
+                            ) { app.setA11y(largerText: $0) }
+
+                            divider
+                            a11yToggle(
+                                "Reduced stimulation",
+                                hint: "Softer motion and calmer entrances",
+                                isOn: app.reducedStimulation
+                            ) { app.setA11y(reducedStimulation: $0) }
                         }
-                        .tint(.kIris)
                         .padding(16)
                     }
 
@@ -101,13 +118,20 @@ struct SettingsView: View {
                             }
                             if remindersOn {
                                 Rectangle().fill(Color.kBorder).frame(height: 1).padding(.vertical, 12)
+                                // I2: quiet hours are one setting per account, not
+                                // per device — the same notificationPrefs.quietHours
+                                // the web writes and the server's push delivery reads.
                                 Toggle(isOn: Binding(
                                     get: { quietHours },
-                                    set: { v in quietHours = v; KairoPrefs.quietHoursEnabled = v }
+                                    set: { v in
+                                        quietHours = v
+                                        KairoPrefs.quietHoursEnabled = v
+                                        Task { await app.pushSharedPrefs() }
+                                    }
                                 )) {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("Quiet hours").font(.kBody(15, weight: .medium)).foregroundStyle(Color.kInk)
-                                        Text("No reminders \(hourText(KairoPrefs.quietStartHour))–\(hourText(KairoPrefs.quietEndHour)) — rest undisturbed")
+                                        Text("No reminders \(hourText(KairoPrefs.quietStartHour))–\(hourText(KairoPrefs.quietEndHour)) — rest undisturbed · also applies on the web")
                                             .font(.kBody(12.5)).foregroundStyle(Color.kInkSoft)
                                     }
                                 }
@@ -152,6 +176,32 @@ struct SettingsView: View {
         .task { await loadSettings() }
     }
 
+    private var divider: some View {
+        Rectangle().fill(Color.kBorder).frame(height: 1).padding(.vertical, 12)
+    }
+
+    /// One Access row. VoiceOver reads the label plus the hint.
+    private func a11yToggle(
+        _ title: String,
+        hint: String,
+        isOn: Bool,
+        onChange: @escaping (Bool) -> Void
+    ) -> some View {
+        Toggle(isOn: Binding(get: { isOn }, set: { onChange($0) })) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.kBody(15, weight: .medium))
+                    .foregroundStyle(Color.kInk)
+                Text(hint)
+                    .font(.kBody(12.5))
+                    .foregroundStyle(Color.kInkSoft)
+            }
+        }
+        .tint(.kIris)
+        .accessibilityLabel(title)
+        .accessibilityHint(hint)
+    }
+
     private func segmented(title: String, options: [(String, String)], selected: String, onPick: @escaping (String) -> Void) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title).font(.kBody(14, weight: .semibold)).foregroundStyle(Color.kInk)
@@ -178,10 +228,14 @@ struct SettingsView: View {
 
     private func loadSettings() async {
         guard let s = try? await KairoAPI.shared.settings() else { return }
+        // Adopt the account's shared prefs too, so opening Settings shows what
+        // the web (or another device) last set — not this phone's stale copy.
+        await app.adoptSharedPrefs()
         await MainActor.run {
             hourCycle = s.hourCycle ?? "h12"
             weekStart = s.weekStart ?? 0
             settingsRevision = s.revision
+            quietHours = KairoPrefs.quietHoursEnabled
         }
     }
 

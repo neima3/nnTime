@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 @main
 struct KairoApp: App {
@@ -31,6 +32,71 @@ final class AppState {
     var theme: KairoPrefs.Theme = KairoPrefs.theme
     var reducedStimulation: Bool = KairoPrefs.reducedStimulation
 
+    // MARK: Accessibility modes (I1)
+    //
+    // Mirrors the web's Settings → Access. Seeded from the local cache so launch
+    // renders correctly offline, then reconciled with the account in bootstrap().
+    var highContrast: Bool = KairoPrefs.highContrast
+    var dyslexiaFont: Bool = KairoPrefs.dyslexiaFont
+    var largerText: Bool = KairoPrefs.largerText
+
+    /// Bumped whenever a mode changes, so views that cache fonts re-render.
+    var a11yGeneration: Int = 0
+
+    /// Apply one mode: persist it, force UIKit to re-resolve the colour tokens
+    /// (high contrast rides `accessibilityContrast`, so overriding the trait is
+    /// what makes the in-app toggle behave like iOS "Increase Contrast"), and
+    /// nudge SwiftUI to rebuild.
+    func setA11y(
+        highContrast hc: Bool? = nil,
+        dyslexiaFont dys: Bool? = nil,
+        largerText larger: Bool? = nil,
+        reducedStimulation reduced: Bool? = nil
+    ) {
+        if let hc { highContrast = hc; KairoPrefs.highContrast = hc }
+        if let dys { dyslexiaFont = dys; KairoPrefs.dyslexiaFont = dys }
+        if let larger { largerText = larger; KairoPrefs.largerText = larger }
+        if let reduced { reducedStimulation = reduced; KairoPrefs.reducedStimulation = reduced }
+        applyContrastOverride()
+        a11yGeneration += 1
+        Task { await pushSharedPrefs() }
+    }
+
+    /// iOS 17+ trait override — switches contrast in-app without every view
+    /// knowing the mode exists. Nil-ing it hands control back to the OS setting,
+    /// so someone with system Increase Contrast on keeps it.
+    func applyContrastOverride() {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        for scene in scenes {
+            for window in scene.windows {
+                if highContrast {
+                    window.traitOverrides.accessibilityContrast = .high
+                } else {
+                    // Removing (not setting .unspecified) is what hands control
+                    // back to the OS, so system Increase Contrast still wins.
+                    window.traitOverrides.remove(UITraitAccessibilityContrast.self)
+                }
+            }
+        }
+    }
+
+    /// PATCH the shared prefs so the web sees the same modes. Merges onto the
+    /// server's current blob so keys this app doesn't model are preserved.
+    func pushSharedPrefs() async {
+        do {
+            let raw = try await KairoAPI.shared.settingsRaw()
+            let existing = raw["notificationPrefs"] as? [String: Any] ?? [:]
+            let revision = raw["revision"] as? Int ?? 1
+            let merged = KairoPrefs.sharedPrefsPatch(merging: existing)
+            _ = try await KairoAPI.shared.updateSettings(
+                patch: ["notificationPrefs": merged, "reducedStimulation": reducedStimulation],
+                revision: revision)
+        } catch {
+            // Offline or a revision conflict — the local cache still holds, and
+            // the next successful settings read reconciles.
+        }
+    }
+
     var colorScheme: ColorScheme? {
         switch theme {
         case .system: nil
@@ -44,14 +110,33 @@ final class AppState {
     var categoryIdByKey: [String: String] = [:]
 
     func bootstrap() async {
+        // The local cache may predate a change made on the web, so apply what we
+        // have first (no flash of the wrong surfaces), then reconcile.
+        applyContrastOverride()
         do {
             let settings = try await KairoAPI.shared.settings()
             timezone = TimeZone(identifier: settings.timezone) ?? .current
+            await adoptSharedPrefs()
             await loadCategories()
             auth = .signedIn
         } catch {
             auth = .signedOut
         }
+    }
+
+    /// Pull the account's shared prefs (accessibility modes + quiet hours) and
+    /// adopt them — this is what makes a change made on the web show up here.
+    func adoptSharedPrefs() async {
+        guard let raw = try? await KairoAPI.shared.settingsRaw() else { return }
+        let prefs = raw["notificationPrefs"] as? [String: Any] ?? [:]
+        let reduced = raw["reducedStimulation"] as? Bool ?? reducedStimulation
+        KairoPrefs.adopt(notificationPrefs: prefs, reducedStimulation: reduced)
+        highContrast = KairoPrefs.highContrast
+        dyslexiaFont = KairoPrefs.dyslexiaFont
+        largerText = KairoPrefs.largerText
+        reducedStimulation = KairoPrefs.reducedStimulation
+        applyContrastOverride()
+        a11yGeneration += 1
     }
 
     func loadCategories() async {

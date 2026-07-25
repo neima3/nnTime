@@ -25,6 +25,8 @@
 		<string>BricolageGrotesque[opsz,wdth,wght].ttf</string>
 		<string>Onest[wght].ttf</string>
 		<string>SplineSansMono[wght].ttf</string>
+		<string>AtkinsonHyperlegible-Regular.ttf</string>
+		<string>AtkinsonHyperlegible-Bold.ttf</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict>
