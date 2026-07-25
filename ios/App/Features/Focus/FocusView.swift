@@ -6,13 +6,13 @@ import ActivityKit
 
 struct FocusView: View {
     /// Named session presets (R3 — mirrors web Focus rituals).
-    struct Ritual { let id: String; let label: String; let emoji: String; let title: String; let min: Int }
+    struct Ritual { let id: String; let label: String; let emoji: String; let title: String; let min: Int; let sound: SoundscapeScene? }
     static let rituals: [Ritual] = [
-        .init(id: "deep", label: "Deep work", emoji: "🧠", title: "Deep work", min: 45),
-        .init(id: "quick", label: "Quick win", emoji: "⚡", title: "Quick win", min: 15),
-        .init(id: "double", label: "Body double", emoji: "👥", title: "Body double", min: 25),
-        .init(id: "wind", label: "Wind down", emoji: "🌙", title: "Wind down", min: 10),
-        .init(id: "flow", label: "Creative flow", emoji: "🎨", title: "Creative flow", min: 45),
+        .init(id: "deep", label: "Deep work", emoji: "🧠", title: "Deep work", min: 45, sound: .whitenoise),
+        .init(id: "quick", label: "Quick win", emoji: "⚡", title: "Quick win", min: 15, sound: nil),
+        .init(id: "double", label: "Body double", emoji: "👥", title: "Body double", min: 25, sound: .cafe),
+        .init(id: "wind", label: "Wind down", emoji: "🌙", title: "Wind down", min: 10, sound: .rain),
+        .init(id: "flow", label: "Creative flow", emoji: "🎨", title: "Creative flow", min: 45, sound: .forest),
     ]
 
     @State private var session: FocusSession?
@@ -30,6 +30,7 @@ struct FocusView: View {
     @State private var linkedOccurrenceKey: String?
     @State private var linkedRevision = 1
     @State private var checklist: [(label: String, done: Bool)] = []
+    @State private var scene: SoundscapeScene?
     @State private var liveActivity: ActivityKit.Activity<FocusAttributes>?
 
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -62,6 +63,7 @@ struct FocusView: View {
             .toolbarBackground(Color.kCanvas, for: .navigationBar)
         }
         .task { await hydrate() }
+        .onDisappear { SoundscapeEngine.shared.stop(); scene = nil }
         .onReceive(tick) { _ in
             if let bs = breakSec {
                 if bs > 1 { breakSec = bs - 1 }
@@ -135,6 +137,10 @@ struct FocusView: View {
                             // A ritual is a fresh, unlinked session.
                             linkedActivityId = nil
                             checklist = []
+                            // Auto-start the ritual's vibe (parity with web).
+                            scene = r.sound
+                            if let s = r.sound { SoundscapeEngine.shared.play(s) }
+                            else { SoundscapeEngine.shared.stop() }
                         } label: {
                             HStack(spacing: 5) {
                                 Text(r.emoji)
@@ -169,6 +175,17 @@ struct FocusView: View {
             }
             .padding(6)
             .kCard(radius: 26)
+
+            // Soundscape picker (H4) — generated ambient audio, no files.
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    soundPill(nil, "🔇 Off")
+                    ForEach(SoundscapeScene.allCases, id: \.self) { sc in
+                        soundPill(sc, sc.label)
+                    }
+                }
+                .padding(.horizontal, 4)
+            }
 
             Button {
                 Task { await start() }
@@ -367,6 +384,22 @@ struct FocusView: View {
         }
     }
 
+    private func soundPill(_ sc: SoundscapeScene?, _ label: String) -> some View {
+        let on = scene == sc
+        return Button {
+            scene = sc
+            if let sc { SoundscapeEngine.shared.play(sc) } else { SoundscapeEngine.shared.stop() }
+        } label: {
+            Text(label)
+                .font(.kBody(12.5, weight: .semibold))
+                .foregroundStyle(on ? Color.kIris : Color.kInkSoft)
+                .padding(.horizontal, 11).padding(.vertical, 7)
+                .background(Capsule().fill(on ? Color.kIrisSoft : Color.kSurface)
+                    .overlay(Capsule().stroke(on ? Color.kIris : Color.kBorder, lineWidth: 1)))
+        }
+        .accessibilityLabel("\(label) ambient sound")
+    }
+
     private func controlButton(_ symbol: String, size: CGFloat, filled: Bool = false, label: String = "", action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
@@ -431,6 +464,8 @@ struct FocusView: View {
             finishedMin = focused
             overtime = 0
             endLiveActivity()
+            SoundscapeEngine.shared.stop()
+            scene = nil
         } catch {}
     }
 }

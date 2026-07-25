@@ -43,7 +43,7 @@ Phase 1+ requires `DATABASE_URL`, `BETTER_AUTH_SECRET`, etc.
 | `BETTER_AUTH_SECRET` | Session signing |
 | `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL` | Canonical origin |
 | `TRUSTED_ORIGINS` | Optional comma-separated extra Origins allowed for cookie-auth API mutations (always allows `https://time.neima.me` + `http://localhost:3000`) |
-| `CRON_SECRET` | Bearer secret for `POST /api/v1/jobs/tick` (ADR-004 scheduler). When the tick route is wired, Coolify/external cron must send `Authorization: Bearer $CRON_SECRET`. The Origin/CSRF proxy guard skips this path because it uses bearer, not cookies. |
+| `CRON_SECRET` | Bearer secret for `POST /api/v1/jobs/tick` (ADR-004 scheduler). **Now wired** (H1): each tick materializes routines, computes notification jobs, AND delivers due web-push nudges (`deliverDueNudges`). To fire reminders on schedule, an external cron must `POST https://time.neima.me/api/v1/jobs/tick` with `Authorization: Bearer $CRON_SECRET` every 1–2 minutes (e.g. a Coolify scheduled task or an uptime-cron service). Without a cron, push works on-demand (Settings → test) but scheduled nudges won't fire. The Origin/CSRF proxy guard skips this path because it uses bearer, not cookies. |
 | `ANTHROPIC_API_KEY` | Optional; AI co-planner (503 if missing on AI routes) |
 
 ## Postgres provisioning (Phase 1A+)
