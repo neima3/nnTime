@@ -362,6 +362,15 @@ input:focus-visible,
   --cat-rose-ink: #ffc2d8;
 }
 
+/* Past blocks are dimmed + desaturated by default, which directly fights the
+   point of this mode — a high-contrast user was reading 0.55-opacity titles.
+   Keep them recognisably "past" (slightly back) but fully legible. */
+.high-contrast .timeline-past,
+.high-contrast.dark .timeline-past {
+  opacity: 0.88;
+  filter: none;
+}
+
 /* Depth by edge, not by blur — shadows are unreliable at high contrast. */
 .high-contrast {
   --shadow-card: 0 0 0 1px var(--border);

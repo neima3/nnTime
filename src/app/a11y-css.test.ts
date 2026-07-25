@@ -42,6 +42,16 @@ describe("accessibility mode CSS", () => {
     expect(css).toContain(".high-contrast.dark");
   });
 
+  it("does not leave past timeline blocks dimmed under high contrast", () => {
+    // Found in the browser: .timeline-past (opacity .55 + saturate .5) was
+    // applying on top of high contrast, so past titles were washed out.
+    const rule = css.match(/\.high-contrast[^{]*\.timeline-past[^{]*\{[^}]*\}/);
+    expect(rule, "no high-contrast override for .timeline-past").toBeTruthy();
+    expect(rule![0]).toMatch(/filter:\s*none/);
+    const opacity = rule![0].match(/opacity:\s*([\d.]+)/);
+    expect(Number(opacity![1])).toBeGreaterThanOrEqual(0.85);
+  });
+
   it("honours the OS contrast preference too", () => {
     expect(css).toMatch(/@media\s*\(prefers-contrast:\s*more\)/);
   });
