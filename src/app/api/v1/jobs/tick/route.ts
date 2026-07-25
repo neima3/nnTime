@@ -9,6 +9,7 @@
  */
 import { materializeRoutines } from "@/server/services/routine-materializer";
 import { computeNotificationJobs } from "@/server/services/notifications";
+import { deliverDueNudges } from "@/server/services/push";
 import { logger } from "@/server/log";
 
 export const dynamic = "force-dynamic";
@@ -59,6 +60,15 @@ export async function POST(request: Request) {
       });
     }
 
+    let delivery: { delivered: number; suppressed: number; considered: number } | null = null;
+    try {
+      delivery = await deliverDueNudges();
+    } catch (e) {
+      logger.warn("jobs/tick push delivery failed", {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+
     return Response.json(
       {
         ok: true,
@@ -66,6 +76,7 @@ export async function POST(request: Request) {
         materialize,
         notifications,
         notificationsError,
+        delivery,
       },
       { headers: { "cache-control": "no-store" } },
     );
