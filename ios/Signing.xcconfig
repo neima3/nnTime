@@ -1,0 +1,16 @@
+// Signing configuration for Kairo.
+//
+// Simulator builds need no Apple account: project.yml disables code signing for
+// the simulator SDK, so `xcodebuild test` works on a clean machine.
+//
+// Device builds (real iPhone, TestFlight) need a team. Put it in an untracked
+// Signing.local.xcconfig next to this file — the optional include below picks it
+// up if present, and everything keeps working if it isn't:
+//
+//     KAIRO_DEVELOPMENT_TEAM = ABCDE12345
+//
+// `scripts/ios-device-install.sh` writes that file for you.
+
+KAIRO_DEVELOPMENT_TEAM =
+
+#include? "Signing.local.xcconfig"

@@ -57,3 +57,6 @@ ios/Kairo/.swiftpm/
 ios/Kairo/Package.resolved
 live-hero.png
 live-night.png
+
+# iOS local signing (team id / local overrides)
+ios/Signing.local.xcconfig
