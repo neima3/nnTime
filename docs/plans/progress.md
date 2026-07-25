@@ -1,5 +1,85 @@
 # Progress log
 
+## 2026-07-24 — Round 7: cross-platform completion + backlog truth (Opus, session 2 cont.)
+
+Round 6 closed, so this round finished what it exposed: the accessibility work
+only existed on web, quiet hours were device-local on iOS, scheduled push had no
+cron, and the older roadmaps were lying about what was done.
+
+**I1 — iOS accessibility parity.** The four modes now exist on iOS and, more
+importantly, live on the **account** rather than the device: set high contrast on
+the web and the app adopts it, and vice versa.
+- High-contrast token variants are resolved from the **trait collection**, so iOS
+  "Increase Contrast" drives them for free; the in-app toggle works by setting
+  `traitOverrides.accessibilityContrast` on the window (iOS 17+), which makes
+  UIKit re-resolve every token without any view knowing the mode exists. Turning
+  it off *removes* the override rather than forcing `.unspecified`, so a user with
+  the system setting on keeps it. Hex values mirror globals.css exactly.
+- Atkinson Hyperlegible bundled (OFL, license alongside the TTFs), swapped for
+  display+body. The mono face is deliberately untouched — tabular time digits are
+  already unambiguous and swapping them would break timeline alignment.
+- Larger text multiplies the type scale by 1.125 (same step as the web's zoom) on
+  top of Dynamic Type, which every iOS font already rides via `relativeTo:`.
+- Evidence: `browser-qa/ios-r8/ios-9{0,1,2,3}*.png` — Settings and Today visibly
+  restyle, then restore. KairoRound8Tour (1 test executed, passed).
+
+**I2 — quiet hours became one setting, not two.** iOS kept them in local
+UserDefaults, so the web toggle shipped in H7 did nothing to iOS reminders and
+vice versa. `KairoPrefs.adopt()` / `sharedPrefsPatch()` now read and merge
+`settings.notificationPrefs` — the same keys the web writes and the server's push
+delivery reads — and the merge preserves keys iOS doesn't model (intentions,
+transition warnings). Opening iOS Settings reconciles with the account first, so
+it can't show a stale device copy.
+
+**I3 — scheduled push actually fires.** H1 built delivery but left "an external
+cron must call jobs/tick" as homework. Added a **Coolify scheduled task** on the
+app (`kairo-jobs-tick`, `* * * * *`) that calls the endpoint over loopback from
+inside the container, reading `CRON_SECRET` from the container env — no public
+round trip, no duplicated secret. Uses `node -e` + global fetch because the
+runtime image is `node:24-alpine` with no curl. **Verified by execution history,
+not by the task existing:** three consecutive runs a minute apart, each
+`200 {"ok":true,…,"delivery":{…}}`. Full details + management commands in
+`docs/DEPLOYMENT.md`.
+
+**T13 (partial) — the offline queue had zero callers.**
+`src/lib/offline-queue.ts` has been complete since 6B (IndexedDB store, ordered
+flush, backoff, terminal 4xx, pending count) and nothing ever called
+`enqueueMutation`. OfflineIndicator initialized the queue and displayed a count
+that could only ever be zero, so capturing a thought offline just failed — the
+same "infrastructure with no wiring" shape as the accessibility prefs. Wired the
+inbox capture path: the archetypal offline moment, and the only mutation that is
+unambiguously safe to replay (plain POST + Idempotency-Key, no revision, no
+If-Match to go stale). **Verified in-browser end to end:** offline → capture →
+"Saved on this device"; the pending POST visible in IndexedDB; reconnect → queue
+flushes → task in the inbox; queue drains to 0 with exactly one copy.
+**Deliberately not wired:** activity edits/completions, whose If-Match revisions
+are stale by replay time — that needs an ADR-002 conflict decision
+(last-write-wins vs re-read-and-merge), not a bolt-on. Left honest rather than
+half-done.
+
+**Backlog truth.** The round-3/4/5 trackers had 26 open checkboxes, 14 of which
+were shipped in later rounds and never ticked. Reconciled each with the round
+that actually shipped it (verified against code, not assumed). The **real**
+remaining backlog is now 12 items: iOS widget/Live-Activity accuracy (T8),
+body-doubling companion mode (T11 — only the Focus ritual preset exists),
+estimate calibration surfaced on the block (T12 — Insights-only today), the rest
+of the offline queue (T13), E2E tests (T15/F9/G9), performance pass (T16), copy
+audit round 2 (T18), landing refresh (T19), per-type notification toggles.
+
+**DEPLOYMENT.md corrections** (both learned the hard way): auto-deploy IS enabled,
+so pushing to `main` builds on its own — the doc said otherwise, and pushing plus
+triggering queues a redundant second build. Also documented the live-verification
+trap: pick a marker unique to the new build. I "confirmed" a deploy using a string
+the root layout has always emitted, which proved nothing.
+
+**Ship gate:** web lint + typecheck + 497 tests + build green; parity holds (web
+88.46%, iOS 86.52%, both gates pass); iOS suite green; deployed and live-verified.
+
+**Next:** the ADR-002 conflict decision that unblocks the rest of the offline
+queue, then E2E coverage (T15) — the largest real gap now that the false greens
+are gone.
+
+
 ## 2026-07-24 — Round 6 COMPLETE: 10/10 + one unplanned fix (Opus, session 2)
 Roadmap: `docs/plans/2026-07-24-round6-10phase.md`. Finished H3/H7/H8/H9 and
 found a production-class bug on the way.
