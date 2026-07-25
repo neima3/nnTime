@@ -69,6 +69,8 @@ tags:
     description: Ordered operations with ordered results (ADR-002).
   - name: Sync
     description: Incremental sync feed (`/changes`).
+  - name: Search
+    description: Ranked search across the caller's activity series and tasks.
 
 # ---------------------------------------------------------------------------
 # Paths (relative to the server URL, which already includes /api/v1)
@@ -946,6 +948,40 @@ paths:
               schema: { $ref: '#/components/schemas/ChangesResponse' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  # ---- Search --------------------------------------------------------------
+  /search:
+    get:
+      tags: [Search]
+      summary: Search the planner
+      description: |
+        Matches the caller's activity series and tasks by title, falling back to
+        notes, and returns them ranked (title prefix beats substring beats a note
+        match; ties break toward the nearer date). Series — not expanded
+        occurrences — are the unit: a recurring block matches once, and `repeats`
+        tells the client it recurs.
+
+        Matching and ranking live in `src/lib/search.ts` so the web command
+        palette and the iOS Search screen order results identically.
+      operationId: search
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Query text. Case- and accent-insensitive; blank is a 400.
+          schema: { type: string, minLength: 1 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 50, default: 25 }
+      responses:
+        '200':
+          description: Ranked matches.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SearchResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
 # ---------------------------------------------------------------------------
 # Components
 # ---------------------------------------------------------------------------
@@ -1636,6 +1672,63 @@ components:
         nextCursor:
           type: [string, 'null']
           description: Opaque cursor for the next page; `null` when exhausted.
+
+    # ---- Search (H3) -------------------------------------------------------
+    SearchHit:
+      type: object
+      description: |
+        One ranked search match. Activity hits are series, not expanded
+        occurrences, so a recurring block appears once and sets `repeats`.
+      required: [id, kind, title, emoji, date, startMin, categoryId, matchedOn, repeats]
+      properties:
+        id: { type: string, format: uuid }
+        kind:
+          type: string
+          enum: [activity, task]
+        title: { type: string }
+        emoji:
+          type: [string, 'null']
+        date:
+          type: [string, 'null']
+          format: date
+          description: Anchor date; `null` for inbox tasks, which have no date.
+        startMin:
+          type: [integer, 'null']
+          minimum: 0
+          maximum: 1439
+          description: Minutes from midnight for scheduled activities; `null` for tasks.
+        categoryId:
+          type: [string, 'null']
+          format: uuid
+        matchedOn:
+          type: string
+          enum: [title, notes]
+          description: Which field produced the match; clients label note matches.
+        repeats:
+          type: boolean
+          description: True when the matched activity series has an RRULE.
+
+    SearchResponse:
+      type: object
+      description: Ranked matches for `GET /search?q=`. Capped, not paginated.
+      required: [query, today, zone, items, nextCursor]
+      properties:
+        query:
+          type: string
+          description: The normalized query that produced these hits.
+        today:
+          type: string
+          format: date
+          description: Today in the caller's planning zone; clients label dates against it.
+        zone:
+          type: string
+          description: The planning zone used to resolve `today` and each anchor date.
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SearchHit' }
+        nextCursor:
+          type: 'null'
+          description: Always `null` — search is capped rather than paginated.
 
     # ---- Day read-model (ADR-001) -----------------------------------------
     DayResponse:

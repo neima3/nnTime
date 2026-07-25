@@ -4,6 +4,10 @@
  * Command palette (wave 4) — ⌘K / Ctrl+K. Fuzzy jump to any screen or
  * action without hunting through menus: for ADHD brains the shortest path
  * from intent to action wins. Client-only, keyboard-first, focus-trapped.
+ *
+ * H3: the palette also searches the planner itself via GET /api/v1/search — the
+ * same endpoint and ranking the iOS Search screen uses. Before that, typing a
+ * block's name here matched nothing, which is the first thing anyone tries.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFocusTrap } from "@/lib/useFocusTrap";
@@ -26,6 +30,24 @@ import {
   Timer,
 } from "lucide-react";
 import { clientToday } from "@/lib/client-date";
+import { searchDateLabel } from "@/lib/search";
+
+/** One planner match from GET /api/v1/search. */
+interface PlannerHit {
+  id: string;
+  kind: "activity" | "task";
+  title: string;
+  emoji: string | null;
+  date: string | null;
+  startMin: number | null;
+  matchedOn: "title" | "notes";
+  repeats: boolean;
+}
+
+/** A palette row: either a command or something the user actually planned. */
+type Row =
+  | { type: "command"; command: Command }
+  | { type: "hit"; hit: PlannerHit };
 
 interface Command {
   id: string;
@@ -74,6 +96,9 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
+  const [hits, setHits] = useState<PlannerHit[]>([]);
+  const [hitsFor, setHitsFor] = useState("");
+  const [today, setToday] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   useFocusTrap(dialogRef, open);
@@ -96,7 +121,7 @@ export function CommandPalette() {
     if (open) inputRef.current?.focus();
   }, [open]);
 
-  const results = useMemo(() => {
+  const commandResults = useMemo(() => {
     return COMMANDS.map((c) => ({
       c,
       score: fuzzyScore(query, `${c.label} ${c.keywords}`),
@@ -106,10 +131,62 @@ export function CommandPalette() {
       .map((x) => x.c);
   }, [query]);
 
-  const run = (c: Command) => {
+  // Planner search: debounced, aborted on each new keystroke, and silent when
+  // signed out (401) — the command rows still work either way. Results are
+  // tagged with the query that produced them and filtered during render, so a
+  // previous query's hits can never appear under a new one.
+  useEffect(() => {
+    const q = query.trim();
+    if (!open || q.length < 2) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      fetch(`/api/v1/search?q=${encodeURIComponent(q)}&limit=6`, {
+        signal: controller.signal,
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (!data) return;
+          setToday(data.today ?? clientToday());
+          setHits(data.items ?? []);
+          setHitsFor(q);
+        })
+        .catch(() => {
+          /* aborted or offline — keep the command rows */
+        });
+    }, 220);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query, open]);
+
+  // Only show hits that belong to what's currently typed.
+  const visibleHits = useMemo(
+    () => (query.trim().length >= 2 && query.trim() === hitsFor ? hits : []),
+    [query, hitsFor, hits],
+  );
+
+  const rows: Row[] = useMemo(
+    () => [
+      ...commandResults.map((command) => ({ type: "command" as const, command })),
+      ...visibleHits.map((hit) => ({ type: "hit" as const, hit })),
+    ],
+    [commandResults, visibleHits],
+  );
+
+  const run = (row: Row) => {
     setOpen(false);
     setQuery("");
-    c.run(router);
+    setHits([]);
+    setHitsFor("");
+    if (row.type === "command") {
+      row.command.run(router);
+      return;
+    }
+    // Undated to-dos live in the Inbox; everything else has a day to land on.
+    router.push(
+      row.hit.date ? `/app/today?date=${row.hit.date}` : "/app/inbox",
+    );
   };
 
   if (!open) return null;
@@ -140,15 +217,15 @@ export function CommandPalette() {
             onKeyDown={(e) => {
               if (e.key === "ArrowDown") {
                 e.preventDefault();
-                setIndex((i) => Math.min(i + 1, results.length - 1));
+                setIndex((i) => Math.min(i + 1, rows.length - 1));
               }
               if (e.key === "ArrowUp") {
                 e.preventDefault();
                 setIndex((i) => Math.max(i - 1, 0));
               }
-              if (e.key === "Enter" && results[index]) {
+              if (e.key === "Enter" && rows[index]) {
                 e.preventDefault();
-                run(results[index]);
+                run(rows[index]);
               }
             }}
             placeholder="Jump anywhere, do anything…"
@@ -159,32 +236,64 @@ export function CommandPalette() {
           </kbd>
         </div>
         <ul className="max-h-[46dvh] overflow-y-auto p-2" role="listbox">
-          {results.length === 0 && (
+          {rows.length === 0 && (
             <li className="px-3 py-6 text-center text-[13.5px] text-ink-soft">
               Nothing matches — try fewer letters.
             </li>
           )}
-          {results.map((c, i) => {
-            const Icon = c.icon;
+          {rows.map((row, i) => {
+            const selected = i === index;
+            const cls = `flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[14px] font-medium transition-colors ${
+              selected ? "bg-iris-soft text-iris" : "text-ink hover:bg-surface-sunken"
+            }`;
+
+            if (row.type === "command") {
+              const Icon = row.command.icon;
+              return (
+                <li key={row.command.id} role="option" aria-selected={selected}>
+                  <button
+                    type="button"
+                    onClick={() => run(row)}
+                    onMouseEnter={() => setIndex(i)}
+                    className={cls}
+                  >
+                    <Icon size={17} />
+                    <span className="flex-1">{row.command.label}</span>
+                    {row.command.hint && (
+                      <kbd className="rounded-md bg-surface-sunken px-1.5 py-0.5 font-mono text-[11px] font-bold text-ink-faint">
+                        {row.command.hint}
+                      </kbd>
+                    )}
+                  </button>
+                </li>
+              );
+            }
+
+            const hit = row.hit;
+            const first = visibleHits[0]?.id === hit.id;
             return (
-              <li key={c.id} role="option" aria-selected={i === index}>
+              <li key={`hit-${hit.id}`} role="option" aria-selected={selected}>
+                {first && (
+                  <p className="mt-2 px-3 pb-1 text-[11px] font-bold uppercase tracking-[0.12em] text-ink-faint">
+                    In your planner
+                  </p>
+                )}
                 <button
                   type="button"
-                  onClick={() => run(c)}
+                  onClick={() => run(row)}
                   onMouseEnter={() => setIndex(i)}
-                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[14px] font-medium transition-colors ${
-                    i === index
-                      ? "bg-iris-soft text-iris"
-                      : "text-ink hover:bg-surface-sunken"
-                  }`}
+                  className={cls}
                 >
-                  <Icon size={17} />
-                  <span className="flex-1">{c.label}</span>
-                  {c.hint && (
-                    <kbd className="rounded-md bg-surface-sunken px-1.5 py-0.5 font-mono text-[11px] font-bold text-ink-faint">
-                      {c.hint}
-                    </kbd>
+                  <span aria-hidden className="w-[17px] text-center text-[15px]">
+                    {hit.emoji ?? (hit.kind === "task" ? "📋" : "🕒")}
+                  </span>
+                  <span className="flex-1 truncate">{hit.title}</span>
+                  {hit.matchedOn === "notes" && (
+                    <span className="text-[11px] text-ink-faint">in notes</span>
                   )}
+                  <span className="shrink-0 text-[12px] font-semibold text-ink-soft">
+                    {searchDateLabel(hit.date, today || clientToday())}
+                  </span>
                 </button>
               </li>
             );

@@ -127,6 +127,15 @@ struct TodayView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 14) {
+                        // Quick-jump (H3): search is one tap from the day you're on.
+                        NavigationLink {
+                            SearchView()
+                        } label: {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(Color.kInkSoft)
+                        }
+                        .accessibilityLabel("Search")
                         if dayOffset == 0 && blocks.contains(where: { !$0.done }) {
                             Button { showPick = true } label: {
                                 Image(systemName: "dice").font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.kIris)

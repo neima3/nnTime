@@ -48,6 +48,11 @@ struct MoreView: View {
                         }
 
                         card {
+                            NavigationLink { SearchView() } label: {
+                                row(icon: "magnifyingglass", title: "Search",
+                                    value: "Find anything")
+                            }.buttonStyle(.plain)
+                            divider
                             NavigationLink { MonthView() } label: {
                                 row(icon: "calendar", title: "Month", value: "Calendar view")
                             }.buttonStyle(.plain)

@@ -25,6 +25,7 @@ export * from "./user-settings";
 export * from "./batch";
 export * from "./change";
 export * from "./day";
+export * from "./search";
 
 // Re-import the schema objects (named exports from above) to build the registry.
 import { errorEnvelope } from "./envelope";
@@ -45,6 +46,7 @@ import { userSettingsResponse } from "./user-settings";
 import { batchRequest, batchResponse } from "./batch";
 import { changeLogEntry, changesResponse } from "./change";
 import { dayResponse } from "./day";
+import { searchHit, searchResponse } from "./search";
 
 /**
  * Registry of response/component schemas keyed by the OpenAPI component name.
@@ -70,6 +72,8 @@ export const responseSchemaRegistry = {
   ChangeLogEntry: changeLogEntry,
   ChangesResponse: changesResponse,
   DayResponse: dayResponse,
+  SearchHit: searchHit,
+  SearchResponse: searchResponse,
 } as const;
 
 /** Type alias for the component-name keys, for consumers/tests. */

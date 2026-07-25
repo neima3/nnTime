@@ -57,6 +57,33 @@ struct TaskItem: Decodable, Identifiable {
     let createdAt: Date?
 }
 
+/// GET /api/v1/search (H3). One row per matched activity series or task.
+struct SearchResponse: Decodable {
+    let query: String
+    /// Today in the user's planning zone — the client labels dates against this.
+    let today: String
+    let zone: String
+    let items: [Hit]
+
+    struct Hit: Decodable, Identifiable {
+        let id: String
+        /// "activity" or "task".
+        let kind: String
+        let title: String
+        let emoji: String?
+        /// nil for inbox tasks (no date).
+        let date: String?
+        /// Minutes from midnight; nil for tasks.
+        let startMin: Int?
+        let categoryId: String?
+        /// "title" or "notes" — the UI says so when a note produced the match.
+        let matchedOn: String
+        let repeats: Bool
+
+        var isTask: Bool { kind == "task" }
+    }
+}
+
 struct StatsResponse: Decodable {
     struct DayStat: Decodable { let completed: Int; let focusMin: Int; let mood: String? }
     struct Estimate: Decodable { let sessions: Int; let avgTargetMin: Int; let avgActualMin: Int; let ratio: Double }

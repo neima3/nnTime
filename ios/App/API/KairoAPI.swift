@@ -235,6 +235,20 @@ actor KairoAPI {
         _ = try await request("DELETE", "/api/v1/tasks/\(id)", ifMatch: revision, as: EmptyResponse.self)
     }
 
+    // MARK: Search (H3)
+
+    /// Planner search across activity series + tasks. Matching/ranking is done
+    /// server-side by `src/lib/search.ts`, so results match the web exactly.
+    func search(_ query: String, limit: Int = 25) async throws -> SearchResponse {
+        try await request(
+            "GET", "/api/v1/search",
+            query: [
+                URLQueryItem(name: "q", value: query),
+                URLQueryItem(name: "limit", value: String(limit)),
+            ],
+            as: SearchResponse.self)
+    }
+
     // MARK: Stats
 
     func stats() async throws -> StatsResponse {
