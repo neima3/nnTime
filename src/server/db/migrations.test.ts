@@ -13,7 +13,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { v7 as uuidv7 } from "uuid";
-import { createEphemeralDb, insertUser, type EphemeralDb } from "./test-db";
+import { createEphemeralDb, rethrowIfMigrationFailure, insertUser, type EphemeralDb } from "./test-db";
 import { focusSessions, users } from "./schema";
 import { eq, sql } from "drizzle-orm";
 
@@ -29,6 +29,7 @@ beforeAll(async () => {
     env = await createEphemeralDb();
     dbAvailable = true;
   } catch (e) {
+    rethrowIfMigrationFailure(e);
     console.warn(
       "[migrations.test] skipping — no Postgres available:",
       (e as Error).message,

@@ -2,7 +2,7 @@
  * Activity occurrence tests — ADR-001 override model.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createEphemeralDb, insertUser, type EphemeralDb } from "../db/test-db";
+import { createEphemeralDb, rethrowIfMigrationFailure, insertUser, type EphemeralDb } from "../db/test-db";
 import { createActivitySeries, listOccurrences, upsertOccurrence, type Db } from "../dal";
 
 let env: EphemeralDb | null = null;
@@ -15,7 +15,10 @@ beforeAll(async () => {
     dbAvailable = true;
     userId = crypto.randomUUID();
     await insertUser(env.db, userId, "occ@test.com");
-  } catch { dbAvailable = false; }
+  } catch (e) {
+    rethrowIfMigrationFailure(e);
+    dbAvailable = false;
+  }
 }, 60000);
 
 afterAll(async () => { if (env) await env.teardown(); });

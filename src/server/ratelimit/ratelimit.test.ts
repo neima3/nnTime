@@ -8,7 +8,7 @@
  * 1C wires specific endpoint limits; here we prove the primitive works.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createEphemeralDb, type EphemeralDb } from "../db/test-db";
+import { createEphemeralDb, rethrowIfMigrationFailure, type EphemeralDb } from "../db/test-db";
 import { checkRateLimit, rateLimitedResponse } from "./index";
 
 let env: EphemeralDb | null = null;
@@ -18,7 +18,8 @@ beforeAll(async () => {
   try {
     env = await createEphemeralDb();
     dbAvailable = true;
-  } catch {
+  } catch (e) {
+    rethrowIfMigrationFailure(e);
     dbAvailable = false;
   }
 }, 60000);

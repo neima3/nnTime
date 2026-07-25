@@ -15,6 +15,14 @@ import {
 } from "lucide-react";
 import { invalidateSettingsCache } from "@/lib/settings-cache";
 import {
+  A11Y_STORAGE_KEY,
+  applyA11yPrefs,
+  parseA11yPrefs,
+  serializeA11yPrefs,
+  writeA11yPrefs,
+  type A11yPrefs,
+} from "@/lib/a11y-prefs";
+import {
   describeQuietHours,
   formatQuietHour,
   parseQuietHours,
@@ -184,6 +192,17 @@ function QuietHoursRows({
   );
 }
 
+/**
+ * Apply the accessibility modes now (classes on <html>) and remember them for
+ * the next first paint (localStorage, read by ThemeScript before hydration).
+ */
+function syncA11y(prefs: A11yPrefs) {
+  applyA11yPrefs(prefs, document.documentElement.classList);
+  try {
+    localStorage.setItem(A11Y_STORAGE_KEY, serializeA11yPrefs(prefs));
+  } catch {}
+}
+
 function applyTheme(theme: Settings["theme"]) {
   const root = document.documentElement;
   if (theme === "dark") root.classList.add("dark");
@@ -231,10 +250,7 @@ export function SettingsClient() {
         };
         setSettings(s);
         applyTheme(s.theme);
-        document.documentElement.classList.toggle(
-          "reduced-stimulation",
-          s.reducedStimulation,
-        );
+        syncA11y(parseA11yPrefs(s));
       })
       .catch(() => {
         if (!cancelled) setAuthed(false);
@@ -284,16 +300,40 @@ export function SettingsClient() {
       };
       setSettings(s);
       if (partial.theme !== undefined) applyTheme(s.theme);
-      if (partial.reducedStimulation !== undefined) {
-        document.documentElement.classList.toggle(
-          "reduced-stimulation",
-          s.reducedStimulation,
-        );
-      }
+      // Reconcile against what the server actually stored — cheap, and it keeps
+      // the optimistic class from sticking around if a PATCH was rejected.
+      syncA11y(parseA11yPrefs(s));
       setStatus("Saved");
       setTimeout(() => setStatus(null), 1500);
     },
     [settings],
+  );
+
+  /**
+   * Toggle one accessibility mode. Applied to <html> optimistically so the
+   * change is visible on the same tap, then reconciled by `patch`.
+   * reducedStimulation is its own settings column; the other three ride in
+   * notificationPrefs (the shape the personalization service reads).
+   */
+  const patchA11y = useCallback(
+    (change: Partial<A11yPrefs>) => {
+      if (!settings) return;
+      const next = { ...parseA11yPrefs(settings), ...change };
+      syncA11y(next);
+      const body: Partial<Settings> = {};
+      if (change.reducedStimulation !== undefined) {
+        body.reducedStimulation = change.reducedStimulation;
+      }
+      if (
+        change.highContrast !== undefined ||
+        change.dyslexiaFont !== undefined ||
+        change.largerText !== undefined
+      ) {
+        body.notificationPrefs = writeA11yPrefs(settings.notificationPrefs, next);
+      }
+      void patch(body);
+    },
+    [settings, patch],
   );
 
   const exportData = useCallback(async () => {
@@ -376,6 +416,9 @@ export function SettingsClient() {
     return <SkeletonRows count={6} />;
   }
 
+  // Derived during render rather than mirrored in state — settings is the source.
+  const a11y = parseA11yPrefs(settings);
+
   return (
     <div className="space-y-8">
       {status && (
@@ -410,8 +453,8 @@ export function SettingsClient() {
           right={
             <Toggle
               label="Reduced stimulation"
-              on={settings.reducedStimulation}
-              onChange={(v) => void patch({ reducedStimulation: v })}
+              on={a11y.reducedStimulation}
+              onChange={(v) => patchA11y({ reducedStimulation: v })}
             />
           }
         />
@@ -461,13 +504,46 @@ export function SettingsClient() {
 
       <Section icon={Accessibility} title="Access">
         <Row
+          label="High contrast"
+          hint="Stronger ink and visible edges on every surface"
+          right={
+            <Toggle
+              label="High contrast"
+              on={a11y.highContrast}
+              onChange={(v) => patchA11y({ highContrast: v })}
+            />
+          }
+        />
+        <Row
+          label="Dyslexia-friendly font"
+          hint="Atkinson Hyperlegible — letters that don't mirror each other"
+          right={
+            <Toggle
+              label="Dyslexia-friendly font"
+              on={a11y.dyslexiaFont}
+              onChange={(v) => patchA11y({ dyslexiaFont: v })}
+            />
+          }
+        />
+        <Row
+          label="Larger text"
+          hint="Everything one comfortable step up"
+          right={
+            <Toggle
+              label="Larger text"
+              on={a11y.largerText}
+              onChange={(v) => patchA11y({ largerText: v })}
+            />
+          }
+        />
+        <Row
           label="Reduced stimulation"
-          hint="Same as Appearance — kept here for discoverability"
+          hint="Same switch as Appearance — kept here where you'd look for it"
           right={
             <Toggle
               label="Reduced stimulation (access)"
-              on={settings.reducedStimulation}
-              onChange={(v) => void patch({ reducedStimulation: v })}
+              on={a11y.reducedStimulation}
+              onChange={(v) => patchA11y({ reducedStimulation: v })}
             />
           }
         />

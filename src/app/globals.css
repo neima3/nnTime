@@ -239,3 +239,187 @@ input:focus-visible,
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Accessibility modes (H9)
+
+   Four classes on <html>, applied pre-hydration by ThemeScript and kept in
+   sync by SettingsClient (see src/lib/a11y-prefs.ts for the mapping):
+     .reduced-stimulation  calmer surfaces, decorative motion off
+     .high-contrast        strengthened ink/border tokens (also prefers-contrast)
+     .dyslexia-font        Atkinson Hyperlegible everywhere
+     .larger-text          everything one comfortable step up
+--------------------------------------------------------------------------- */
+
+/* --- Reduced stimulation ---------------------------------------------------
+   Distinct from prefers-reduced-motion: that kills motion, this lowers the
+   overall volume of the interface. Decorative animation stops entirely;
+   progress motion (spinners) is kept but slowed, because a frozen spinner
+   reads as "broken", which is its own kind of stress. */
+.reduced-stimulation .rise-in,
+.reduced-stimulation .sheet-up,
+.reduced-stimulation .kairo-particle,
+.reduced-stimulation .animate-pulse,
+.reduced-stimulation .animate-ping,
+.reduced-stimulation .animate-bounce {
+  animation: none !important;
+}
+
+/* Skeletons and ping dots lose their animation above, so give them a settled
+   resting appearance instead of sitting at a random keyframe's opacity. */
+.reduced-stimulation .animate-pulse {
+  opacity: 0.55;
+}
+.reduced-stimulation .animate-ping {
+  opacity: 0.35;
+}
+
+.reduced-stimulation .animate-spin {
+  animation-duration: 1.6s !important;
+}
+
+.reduced-stimulation *,
+.reduced-stimulation *::before,
+.reduced-stimulation *::after {
+  transition-duration: 120ms !important;
+}
+
+/* Flatter surfaces: keep the card edges legible, drop the floating blur. */
+.reduced-stimulation {
+  --shadow-card: 0 1px 2px rgba(36, 31, 49, 0.06);
+  --shadow-float: 0 2px 6px rgba(36, 31, 49, 0.1);
+}
+.reduced-stimulation.dark {
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-float: 0 2px 8px rgba(0, 0, 0, 0.55);
+}
+
+/* --- High contrast --------------------------------------------------------
+   Token-level overrides only — no component knows this mode exists. Split by
+   theme so the light values can't leak into dark (equal specificity, so the
+   :not(.dark) / .dark pairing does the separating rather than source order).
+   Category fills stay (they are the colour-coding) with their ink pushed to
+   near-maximum contrast. */
+.high-contrast:not(.dark) {
+  --canvas: #fffdf7;
+  --surface: #fffefb;
+  --surface-raised: #fffefc;
+  --surface-sunken: #f2eee5;
+  --border: #8d8598;
+  --border-strong: #4a4258;
+
+  --ink: #120e1c;
+  --ink-soft: #302941;
+  --ink-faint: #3a3348;
+
+  --iris: #3d31b5;
+  --iris-deep: #2e2496;
+  --iris-soft: #e3dffb;
+  --iris-ghost: #eeebfd;
+
+  --now: #b8241a;
+  --success: #10603f;
+  --success-soft: #cdeddd;
+  --danger: #a3221f;
+  --danger-soft: #f8d6d6;
+
+  --cat-peach-ink: #6d2f0e;
+  --cat-butter-ink: #574200;
+  --cat-mint-ink: #0f5230;
+  --cat-sky-ink: #10456e;
+  --cat-lilac-ink: #3d2ca8;
+  --cat-rose-ink: #7a1f45;
+}
+
+.high-contrast.dark {
+  --canvas: #0a0810;
+  --surface: #14111d;
+  --surface-raised: #1b1727;
+  --surface-sunken: #060409;
+  --border: #7d7591;
+  --border-strong: #a9a1bd;
+
+  --ink: #fbf9ff;
+  --ink-soft: #d3cce4;
+  --ink-faint: #c2bbd4;
+
+  --iris: #b3aaff;
+  --iris-deep: #c9c2ff;
+  --iris-soft: #2e2757;
+  --iris-ghost: #241f45;
+
+  --now: #ff8a7d;
+  --success: #79e0b0;
+  --success-soft: #17402f;
+  --danger: #ff9d9d;
+  --danger-soft: #451f1f;
+
+  --cat-peach-ink: #ffd0b5;
+  --cat-butter-ink: #ffe9a8;
+  --cat-mint-ink: #a8ecc9;
+  --cat-sky-ink: #b3daf7;
+  --cat-lilac-ink: #d5cdff;
+  --cat-rose-ink: #ffc2d8;
+}
+
+/* Depth by edge, not by blur — shadows are unreliable at high contrast. */
+.high-contrast {
+  --shadow-card: 0 0 0 1px var(--border);
+  --shadow-float: 0 0 0 1.5px var(--border-strong);
+}
+
+.high-contrast a:focus-visible,
+.high-contrast button:focus-visible,
+.high-contrast [role="button"]:focus-visible,
+.high-contrast input:focus-visible,
+.high-contrast [tabindex]:focus-visible {
+  outline-width: 3px;
+  outline-offset: 3px;
+}
+
+/* Honour the OS setting (macOS/iOS Increase Contrast, Windows) even before the
+   in-app toggle is touched. Same declarations, driven by the media query. */
+@media (prefers-contrast: more) {
+  html:not(.dark) {
+    --border: #8d8598;
+    --border-strong: #4a4258;
+    --ink: #120e1c;
+    --ink-soft: #302941;
+    --ink-faint: #3a3348;
+    --iris: #3d31b5;
+    --iris-deep: #2e2496;
+  }
+  html.dark {
+    --border: #7d7591;
+    --border-strong: #a9a1bd;
+    --ink: #fbf9ff;
+    --ink-soft: #d3cce4;
+    --ink-faint: #c2bbd4;
+    --iris: #b3aaff;
+    --iris-deep: #c9c2ff;
+  }
+}
+
+/* --- Dyslexia-friendly font -----------------------------------------------
+   Atkinson Hyperlegible (Braille Institute) — letterforms disambiguated on
+   purpose. Replaces both the display and body faces; the mono face stays, since
+   tabular time digits are already unambiguous. */
+.dyslexia-font body,
+.dyslexia-font .font-display,
+.dyslexia-font h1,
+.dyslexia-font h2,
+.dyslexia-font h3 {
+  font-family: var(--font-atkinson), var(--font-onest), system-ui, sans-serif;
+}
+.dyslexia-font body {
+  letter-spacing: 0.01em;
+  word-spacing: 0.04em;
+}
+
+/* --- Larger text ----------------------------------------------------------
+   The type scale is in px (deliberately, so timeline blocks stay proportional),
+   so a root font-size change would do nothing. `zoom` scales the whole layout
+   one comfortable step instead, and unlike a transform it still reflows. */
+.larger-text body {
+  zoom: 1.125;
+}

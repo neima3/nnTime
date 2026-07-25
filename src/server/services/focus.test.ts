@@ -10,7 +10,7 @@
  *  - Remaining-time derivation is correct.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createEphemeralDb, insertUser, type EphemeralDb } from "../db/test-db";
+import { createEphemeralDb, rethrowIfMigrationFailure, insertUser, type EphemeralDb } from "../db/test-db";
 import {
   startFocusSession,
   transitionFocusSession,
@@ -29,7 +29,8 @@ beforeAll(async () => {
     dbAvailable = true;
     userId = crypto.randomUUID();
     await insertUser(env!.db, userId, "focus@test.com");
-  } catch {
+  } catch (e) {
+    rethrowIfMigrationFailure(e);
     dbAvailable = false;
   }
 }, 60000);

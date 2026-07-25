@@ -1,22 +1,20 @@
--- The prod push_subscriptions table carries leftover NOT-NULL columns from a
--- much older schema (positions 4-6 in the physical row), which the ORM insert
--- never fills → 23502 NOT NULL violations on every subscribe. The table has no
--- real data (subscribe has never once succeeded), so the safe, complete fix is
--- to drop the drifted table and recreate it to match the current schema exactly.
-
-DROP TABLE IF EXISTS "push_subscriptions" CASCADE;
---> statement-breakpoint
-CREATE TABLE "push_subscriptions" (
-  "id" uuid PRIMARY KEY NOT NULL,
-  "user_id" text NOT NULL REFERENCES "users"("id") ON DELETE CASCADE,
-  "endpoint" text NOT NULL,
-  "keys" jsonb NOT NULL,
-  "revision" integer NOT NULL DEFAULT 1,
-  "created_at" timestamptz NOT NULL DEFAULT now(),
-  "updated_at" timestamptz NOT NULL DEFAULT now(),
-  "deleted_at" timestamptz
-);
---> statement-breakpoint
-CREATE UNIQUE INDEX IF NOT EXISTS "push_subs_user_endpoint_idx" ON "push_subscriptions" ("user_id","endpoint");
---> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "push_subs_user_idx" ON "push_subscriptions" ("user_id");
+-- SUPERSEDED — intentionally a no-op.
+--
+-- This migration originally dropped and recreated push_subscriptions with a
+-- foreign key to "users" (plural). That table does not exist in this schema —
+-- the better-auth user table is "user" (singular), created by 0000_initial. So
+-- on any database migrated from scratch, this raised
+--   relation "users" does not exist
+-- and the chain stopped here: 0006, 0007 and 0008 were never applied and never
+-- recorded, leaving fresh environments without a usable push_subscriptions
+-- table (web push silently dead). The runner catches migration errors and exits
+-- 0, so nothing surfaced in deploy logs, and the DB test harness treated the
+-- same failure as "no Postgres available" and skipped.
+--
+-- 0008_push_subs_fk_fix.sql performs the same rebuild with the correct "user"
+-- FK, so the fix is to let the chain reach it. Databases that already recorded
+-- 0006 (prod, which still has a legacy "users" table) skip this file anyway, so
+-- neutering it is safe in both directions.
+--
+-- Do not restore statements here — add a new numbered migration instead.
+SELECT 1;

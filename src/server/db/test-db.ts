@@ -36,6 +36,37 @@ function parseUrl(url: string) {
 }
 
 /**
+ * A migration file failed to apply. Distinct from "Postgres isn't running" on
+ * purpose: DB test files skip themselves when there's no server (CI without a
+ * pg service), and that skip used to swallow migration breakage too — nine test
+ * files reported green while asserting nothing after 0006 started failing on
+ * fresh databases. Callers must rethrow this one.
+ */
+export class MigrationFailure extends Error {
+  constructor(
+    readonly file: string,
+    cause: unknown,
+  ) {
+    super(
+      `migration ${file} failed to apply to the ephemeral DB: ${
+        (cause as Error)?.message ?? String(cause)
+      }`,
+    );
+    this.name = "MigrationFailure";
+    this.cause = cause;
+  }
+}
+
+/**
+ * Rethrow migration breakage; report anything else as an unavailable server.
+ * Every DB test's `beforeAll` catch block runs this first, so a broken chain
+ * fails the suite instead of silently disabling it.
+ */
+export function rethrowIfMigrationFailure(e: unknown): void {
+  if (e instanceof MigrationFailure) throw e;
+}
+
+/**
  * Create an isolated ephemeral DB, run all migrations against it, and return
  * a drizzle client + teardown. The DB is dropped on teardown.
  */
@@ -75,7 +106,12 @@ export async function createEphemeralDb(): Promise<EphemeralDb> {
       .map((s) => s.trim())
       .filter(Boolean);
     for (const stmt of statements) {
-      await sql.unsafe(stmt);
+      try {
+        await sql.unsafe(stmt);
+      } catch (e) {
+        await sql.end({ timeout: 5 }).catch(() => {});
+        throw new MigrationFailure(file, e);
+      }
     }
   }
 

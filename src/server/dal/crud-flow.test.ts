@@ -3,7 +3,7 @@
  * Tests create → read → update → delete lifecycle against ephemeral DB.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createEphemeralDb, insertUser, type EphemeralDb } from "../db/test-db";
+import { createEphemeralDb, rethrowIfMigrationFailure, insertUser, type EphemeralDb } from "../db/test-db";
 import {
   createTask, getTask, updateTask, deleteTask, listTasks,
   createTag, listTags, updateTag, deleteTag,
@@ -20,7 +20,10 @@ beforeAll(async () => {
     dbAvailable = true;
     userId = crypto.randomUUID();
     await insertUser(env.db, userId, "crud-flow@test.com");
-  } catch { dbAvailable = false; }
+  } catch (e) {
+    rethrowIfMigrationFailure(e);
+    dbAvailable = false;
+  }
 }, 60000);
 
 afterAll(async () => { if (env) await env.teardown(); });

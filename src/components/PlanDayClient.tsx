@@ -50,14 +50,16 @@ export function PlanDayClient() {
         return;
       }
       if (!res.ok) {
-        setError(data?.error?.message ?? "Could not plan day.");
+        setError(data?.error?.message ?? "Couldn't put a plan together just now — try again?");
         setLoading(false);
         return;
       }
       setItems(data.items ?? []);
       setMessage(data.message ?? null);
       if (!(data.items ?? []).length && !data.message) {
-        setMessage("No suggestions — try adding inbox tasks first.");
+        setMessage(
+          "Nothing to place yet — drop a few thoughts in your Inbox and I'll find them room.",
+        );
       }
     } catch {
       setError("Couldn't reach the server. Please try again.");

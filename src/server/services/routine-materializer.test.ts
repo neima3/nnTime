@@ -8,7 +8,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { and, eq, isNull } from "drizzle-orm";
-import { createEphemeralDb, insertUser, type EphemeralDb } from "../db/test-db";
+import { createEphemeralDb, rethrowIfMigrationFailure, insertUser, type EphemeralDb } from "../db/test-db";
 import * as schema from "../db/schema";
 import { materializeRoutines } from "./routine-materializer";
 
@@ -22,7 +22,8 @@ beforeAll(async () => {
     dbAvailable = true;
     userId = crypto.randomUUID();
     await insertUser(env!.db, userId, "materializer@test.com");
-  } catch {
+  } catch (e) {
+    rethrowIfMigrationFailure(e);
     dbAvailable = false;
   }
 }, 60000);

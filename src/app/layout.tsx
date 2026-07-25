@@ -1,5 +1,10 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Onest, Spline_Sans_Mono } from "next/font/google";
+import {
+  Atkinson_Hyperlegible,
+  Bricolage_Grotesque,
+  Onest,
+  Spline_Sans_Mono,
+} from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { ThemeScript } from "./theme-script";
@@ -17,6 +22,13 @@ const onest = Onest({
 
 const splineMono = Spline_Sans_Mono({
   variable: "--font-spline-mono",
+  subsets: ["latin"],
+});
+
+/** Only paints under .dyslexia-font (H9) — loaded here so the swap is instant. */
+const atkinson = Atkinson_Hyperlegible({
+  variable: "--font-atkinson",
+  weight: ["400", "700"],
   subsets: ["latin"],
 });
 
@@ -47,7 +59,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${bricolage.variable} ${onest.variable} ${splineMono.variable} h-full antialiased`}
+      className={`${bricolage.variable} ${onest.variable} ${splineMono.variable} ${atkinson.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <head>

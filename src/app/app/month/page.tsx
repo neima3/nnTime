@@ -128,6 +128,8 @@ export default async function MonthPage({
   }
 
   const { days, label } = await loadMonth(year, month);
+  // A blank grid with no explanation reads as "broken", not as "free".
+  const emptyMonth = days.every((d) => d.otherMonth || d.dots.length === 0);
   const prev = shiftMonth(year, month, -1);
   const next = shiftMonth(year, month, 1);
   const prevYm = `${prev.year}-${String(prev.month + 1).padStart(2, "0")}`;
@@ -235,6 +237,16 @@ export default async function MonthPage({
             );
           })}
         </div>
+
+        {emptyMonth ? (
+          <p className="mt-5 text-center text-[13.5px] text-ink-soft">
+            Nothing on the calendar this month yet — a whole open runway.{" "}
+            <Link href="/app/today" className="font-semibold text-iris hover:underline">
+              Start with today
+            </Link>
+            .
+          </p>
+        ) : null}
       </div>
     </AppShell>
   );

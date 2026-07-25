@@ -15,6 +15,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   createEphemeralDb,
   insertUser,
+  rethrowIfMigrationFailure,
   type EphemeralDb,
 } from "../db/test-db";
 import {
@@ -42,7 +43,8 @@ beforeAll(async () => {
     userB = crypto.randomUUID();
     await insertUser(env.db, userA, "a@test.com");
     await insertUser(env.db, userB, "b@test.com");
-  } catch {
+  } catch (e) {
+    rethrowIfMigrationFailure(e);
     dbAvailable = false;
   }
 }, 60000);

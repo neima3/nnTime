@@ -22,6 +22,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "server-only": resolve(__dirname, "tests/stubs/server-only.ts"),
+      // Mirrors the tsconfig path alias so tests can import modules that use it
+      // (server services now pull shared logic from @/lib/*).
+      "@": resolve(__dirname, "src"),
     },
   },
 });
