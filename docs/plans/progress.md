@@ -72,8 +72,24 @@ triggering queues a redundant second build. Also documented the live-verificatio
 trap: pick a marker unique to the new build. I "confirmed" a deploy using a string
 the root layout has always emitted, which proved nothing.
 
-**Ship gate:** web lint + typecheck + 497 tests + build green; parity holds (web
-88.46%, iOS 86.52%, both gates pass); iOS suite green; deployed and live-verified.
+**One more fix, found only by testing on production.** The first live offline
+capture hit the honest-but-avoidable fallback ("this device can't hold it")
+because the page's client session hadn't resolved, leaving `userId` null — and
+offline is exactly when `useSession()` may never resolve. The queue only needs a
+stable per-user key, so the last signed-in user id is now remembered (id only, not
+a credential) and used as the fallback; `resolveQueueUser()` returns null only if
+nobody has ever signed in on this device. 6 tests, including denied storage
+(private mode). **This is the argument for verifying on prod and not just
+locally** — the local run passed because that browser happened to have a resolved
+session.
+
+**Ship gate:** web lint + typecheck + **503 tests** + build green; parity holds
+(web 88.46%, iOS 86.52%, both gates pass); iOS suite green (14 UI + 15 unit tests
+executed); deployed to time.neima.me. **Live-verified on production:** signed in,
+went offline, captured a thought → "Saved on this device", one row in IndexedDB →
+reconnected → queue drained to 0 and exactly one task in the inbox (no duplicate).
+Test rows deleted from the QA account afterwards. Build markers unique to the new
+code confirmed in the live bundles ("Saved on this device", "In your planner").
 
 **Next:** the ADR-002 conflict decision that unblocks the rest of the offline
 queue, then E2E coverage (T15) — the largest real gap now that the false greens
