@@ -27,6 +27,7 @@ export default async function AppLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   let prefs: A11yPrefs = { ...A11Y_DEFAULTS };
   let theme: "system" | "light" | "dark" = "system";
+  let known = false;
 
   const session = await getSession();
   if (session?.userId) {
@@ -39,11 +40,17 @@ export default async function AppLayout({
         dyslexiaFont: p.dyslexiaFont,
         largerText: p.largerText,
       };
+      known = true;
     } catch {
       // Settings unavailable (DB hiccup) — render the default surfaces rather
       // than failing the page. The client reconciles on the next settings read.
     }
   }
+
+  // Signed out (or settings unreadable) means we have no account preference to
+  // apply — and writing defaults here would clobber the local choice the root
+  // ThemeScript just restored. Do nothing instead.
+  if (!known) return <>{children}</>;
 
   // Reconcile <html> against the server's truth before the app paints. Runs
   // after the root ThemeScript (localStorage fast path), so a stored account
