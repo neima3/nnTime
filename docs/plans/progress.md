@@ -15,10 +15,29 @@ Done + verified (all iOS, simulator + full suite green):
 - **H10 iOS ship gate** — full iOS suite green (12 suites). No web changes this
   round, so web stays as last deployed (372 tests, live).
 
-**Remaining (H1, H3, H4, H7, H8, H9):** scheduled web-push delivery (needs the
-placeholder notifications schema fleshed out + external cron), iOS Search,
-iOS native AVAudioEngine soundscape, extract intentions/quiet-hours to a
-testable lib + tests, web reduced-stimulation/empty-state sweep.
+**"Do them both" follow-up — the two hard ones, done + verified:**
+- **H1 Scheduled web-push delivery** — jobs/tick now runs `deliverDueNudges()`:
+  finds notification jobs due within ±2 min, sends a push per activity via
+  sendToUser, respects per-user quiet hours (overnight-wrap, per timezone),
+  marks each job sent in-place (jsonb) so ticks don't repeat. **Verified live:**
+  set CRON_SECRET in Coolify, redeployed, and `POST /api/v1/jobs/tick` (Bearer)
+  returns 200 with `delivery:{delivered,suppressed,considered}` — the full path
+  executes. Automatic firing needs an external cron hitting that endpoint every
+  1–2 min (documented in DEPLOYMENT.md); on-demand push already works.
+- **H4 Native iOS soundscape** — `SoundscapeEngine` (AVAudioEngine +
+  AVAudioSourceNode) generates rain/forest(+chirps)/ocean(swell)/cafe/white in
+  real time (one-pole filters + leaky integrator + LFO), gain-smoothed. Focus
+  rituals auto-start their vibe; a soundscape picker row on the Focus setup;
+  stops on complete/leave. Build-verified + KairoRound6Tour passes (audio isn't
+  verifiable headlessly). Note: a stale xcodegen cache initially dropped the new
+  file — cleared it.
+
+**Still remaining (H3, H7, H8, H9):** iOS Search, extract intentions/quiet-hours
+to a testable lib + tests, web reduced-stimulation/empty-state sweep.
+
+⚠️ Machine memory is exhausted (swap ~5.4 GB used) — `next build` gets
+OOM-killed unless `NODE_OPTIONS=--max-old-space-size=2048` caps the heap; iOS
+UI tests are flaky under the pressure. Worth freeing RAM before next session.
 
 
 
