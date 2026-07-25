@@ -18,19 +18,27 @@ retrieve with `op item get 4apenih3hzviy2o2jjlonbdh54 --fields credential --reve
 
 ## Deploy procedure
 1. Gates: `pnpm lint && pnpm typecheck && pnpm test && pnpm build` green. Commit +
-   push to `main` (Coolify builds from git — pushing alone does NOT deploy unless
-   auto-deploy webhook is enabled).
-2. Trigger:
+   push to `main`.
+2. **Auto-deploy IS enabled** (verified 2026-07-24): pushing to `main` starts a
+   build on its own. A manual trigger is only needed to redeploy the same commit
+   (e.g. after changing env vars) — and if you push *and* trigger, you get two
+   builds, the second queued behind the first:
    ```bash
    set -a; source .env.local; set +a
    curl -s -H "Authorization: Bearer $COOLIFY_API_TOKEN" \
      "$COOLIFY_API_URL/deploy?uuid=$COOLIFY_APP_UUID"
    ```
 3. Poll: `GET $COOLIFY_API_URL/deployments/{deployment_uuid}` until
-   `status: finished` (or list via `GET /applications/$COOLIFY_APP_UUID`).
+   `status: finished`, or watch the queue drain with
+   `GET $COOLIFY_API_URL/deployments` (it lists only queued/in-progress builds).
 4. Verify live (mandatory): `curl -sSI https://time.neima.me` → 200, then load the
    site in a browser, smoke the changed routes, screenshot to `browser-qa/`.
    A 200 homepage alone doesn't prove the new code is live — check for the change.
+   Pick a marker unique to the new code: a string only the new build emits, or a
+   rule only the new stylesheet contains
+   (`curl -s <page> | grep -o '/_next/static/[^"]*\.css'`, then grep that file).
+   Markers shared with the old build (a token both versions reference) will
+   "confirm" a deploy that never landed.
 5. Report truthfully what was and wasn't verified.
 
 ## App env vars
@@ -43,7 +51,7 @@ Phase 1+ requires `DATABASE_URL`, `BETTER_AUTH_SECRET`, etc.
 | `BETTER_AUTH_SECRET` | Session signing |
 | `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL` | Canonical origin |
 | `TRUSTED_ORIGINS` | Optional comma-separated extra Origins allowed for cookie-auth API mutations (always allows `https://time.neima.me` + `http://localhost:3000`) |
-| `CRON_SECRET` | Bearer secret for `POST /api/v1/jobs/tick` (ADR-004 scheduler). **Now wired** (H1): each tick materializes routines, computes notification jobs, AND delivers due web-push nudges (`deliverDueNudges`). To fire reminders on schedule, an external cron must `POST https://time.neima.me/api/v1/jobs/tick` with `Authorization: Bearer $CRON_SECRET` every 1–2 minutes (e.g. a Coolify scheduled task or an uptime-cron service). Without a cron, push works on-demand (Settings → test) but scheduled nudges won't fire. The Origin/CSRF proxy guard skips this path because it uses bearer, not cookies. |
+| `CRON_SECRET` | Bearer secret for `POST /api/v1/jobs/tick` (ADR-004 scheduler). Each tick materializes routines, computes notification jobs, and delivers due web-push nudges (`deliverDueNudges`). The Origin/CSRF proxy guard skips this path because it uses bearer, not cookies. **The cron now exists — see below.** |
 | `ANTHROPIC_API_KEY` | Optional; AI co-planner (503 if missing on AI routes) |
 
 ## Postgres provisioning (Phase 1A+)
@@ -140,3 +148,37 @@ on every non-static response:
 URL (`curl -sSI https://time.neima.me | grep -i 'content-security\|x-frame\|nosniff'`).
 Headers may also be set at the Coolify proxy layer; the app-level ones are the
 source of truth.
+
+## Scheduled push cron (H1 → I3, live 2026-07-24)
+
+Scheduled reminders need something to call `POST /api/v1/jobs/tick`. That is now
+a **Coolify scheduled task** on the `kairo` app — not an external service — so it
+lives and dies with the app:
+
+| field | value |
+|---|---|
+| name | `kairo-jobs-tick` |
+| task uuid | `hfhf3aequ16o5si78jh7uq5i` |
+| frequency | `* * * * *` (every minute; the delivery window is ±2 min) |
+| command | `node -e "fetch('http://127.0.0.1:3000/api/v1/jobs/tick', …Bearer process.env.CRON_SECRET…)"` |
+
+The command runs **inside the app container**, so it reaches the server over
+loopback and reads `CRON_SECRET` straight from the container env — no public
+round trip, no secret duplicated anywhere. It uses `node -e` with global fetch
+because the runtime image is `node:24-alpine`, which has no `curl`.
+
+Manage it with:
+```bash
+set -a; source .env.local; set +a
+# list tasks
+curl -s -H "Authorization: Bearer $COOLIFY_API_TOKEN" \
+  "$COOLIFY_API_URL/applications/$COOLIFY_APP_UUID/scheduled-tasks"
+# execution history — the only proof it actually fires
+curl -s -H "Authorization: Bearer $COOLIFY_API_TOKEN" \
+  "$COOLIFY_API_URL/applications/$COOLIFY_APP_UUID/scheduled-tasks/hfhf3aequ16o5si78jh7uq5i/executions"
+```
+**Verified:** consecutive executions one minute apart, each returning
+`200 {"ok":true,…,"delivery":{…}}`. A created task is not evidence — always read
+the executions list. Note the singular endpoint
+(`/scheduled-tasks/{uuid}`) returns 404 on this Coolify version; only
+`…/executions` works, so use that to inspect a task.
