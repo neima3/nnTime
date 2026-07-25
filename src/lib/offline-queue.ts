@@ -34,6 +34,36 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
+/**
+ * Last signed-in user id, remembered so an offline mutation can still be keyed
+ * correctly when the session hook hasn't resolved yet.
+ *
+ * `useSession()` resolves asynchronously, and offline is exactly when it may not
+ * resolve at all — without this, a capture made in the first moments after load
+ * (or on a cold offline start) had no user to file itself under and was refused.
+ * Only the id is stored; it is not a credential and the queue is per-origin.
+ */
+const LAST_USER_KEY = "kairo-last-user";
+
+export function rememberUser(userId: string): void {
+  try {
+    localStorage.setItem(LAST_USER_KEY, userId);
+  } catch {}
+}
+
+/** The session's user id if known, else the last one seen on this device. */
+export function resolveQueueUser(userId: string | null | undefined): string | null {
+  if (userId) {
+    rememberUser(userId);
+    return userId;
+  }
+  try {
+    return localStorage.getItem(LAST_USER_KEY);
+  } catch {
+    return null;
+  }
+}
+
 export interface QueuedMutation {
   id?: number;
   userId: string;

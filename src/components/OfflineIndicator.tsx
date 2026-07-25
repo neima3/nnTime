@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from "react";
 import { CloudOff } from "lucide-react";
-import { initOfflineQueue, getPendingCount } from "@/lib/offline-queue";
+import { initOfflineQueue, getPendingCount, rememberUser } from "@/lib/offline-queue";
 
 export function OfflineIndicator({ userId }: { userId: string | null }) {
   const [online, setOnline] = useState(true);
@@ -17,6 +17,9 @@ export function OfflineIndicator({ userId }: { userId: string | null }) {
 
   useEffect(() => {
     if (!userId) return;
+    // Remember who this is, so an offline capture before the session hook
+    // resolves can still key its queue entry correctly.
+    rememberUser(userId);
     const cleanup = initOfflineQueue(userId);
 
     const updateStatus = () => {

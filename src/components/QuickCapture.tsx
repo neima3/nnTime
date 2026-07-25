@@ -16,7 +16,7 @@ import { notifyDayChanged } from "./NowBar";
 import { localMinutesToInstant } from "@/lib/adapters";
 import { clientToday } from "@/lib/client-date";
 import { fmt } from "@/lib/mock";
-import { enqueueMutation } from "@/lib/offline-queue";
+import { enqueueMutation, resolveQueueUser } from "@/lib/offline-queue";
 import { useSession } from "@/lib/auth-client";
 
 /** AI-parsed draft (SEC-05: suggestion only — nothing saves until accepted). */
@@ -277,8 +277,9 @@ export function QuickCapture() {
       // reconnect. Inbox creates are safe to replay — a plain POST carrying an
       // Idempotency-Key, no revision and no If-Match to go stale.
       if (typeof navigator !== "undefined" && !navigator.onLine) {
-        const queued = userId
-          ? await enqueueMutation(userId, {
+        const queueUser = resolveQueueUser(userId);
+        const queued = queueUser
+          ? await enqueueMutation(queueUser, {
               method: "POST",
               path: "/api/v1/tasks",
               body: { bucket: "inbox", title },
