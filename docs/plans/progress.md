@@ -1,5 +1,97 @@
 # Progress log
 
+## 2026-07-24 — Round 6 COMPLETE: 10/10 + one unplanned fix (Opus, session 2)
+Roadmap: `docs/plans/2026-07-24-round6-10phase.md`. Finished H3/H7/H8/H9 and
+found a production-class bug on the way.
+
+**H7/H8 — extraction + tests.** `src/lib/quiet-hours.ts` (parse/normalize the
+notificationPrefs blob, overnight-wrap membership, formatting) and
+`src/lib/intentions.ts` (week-keyed parse, cap of 3, reducers that return the
+same reference on a no-op). push.ts and WeeklyIntentions now consume them.
+**Gap closed:** the web had no quiet-hours UI at all, so the server's
+quiet-hours branch was unreachable for web users. Added a toggle + window rows;
+verified the full round trip UI → PATCH → DB
+(`{"quietHours":{"end":7,"start":23,"enabled":true}}`) → reload.
+
+**⚠️ H11 (unplanned, highest-value find): the migration chain was broken.**
+Migrations 0006/0007 referenced a `"users"` table that does not exist (the
+better-auth table is `"user"`). On any database migrated from scratch — a fresh
+Coolify DB, staging, local dev — the chain died at 0006, so 0006/0007/0008 were
+never applied *or recorded*: `push_subscriptions` was absent and **web push was
+silently dead on every new environment**. Prod only worked because it still has
+a legacy `users` table. Hidden twice over: `scripts/migrate.ts` catches and
+`exit(0)`s, and the DB test harness treated the same error as "no Postgres
+available" and skipped — so **nine DB test files (migrations, schema-invariants,
+dal, crud-flow, focus, focus-extend, recurrence, occurrence, ratelimit,
+routine-materializer) reported green while asserting nothing**. Fixes: 0006/0007
+are now documented no-ops (0008 is the correct rebuild; prod already recorded
+them, so it skips either way); `test-db.ts` throws a distinct `MigrationFailure`
+and `rethrowIfMigrationFailure()` is wired into all nine `beforeAll` catches;
+new `migration-chain.test.ts` guards numbering, the `"users"` reference, FKs to
+tables no earlier migration creates, and the 0006/0007 no-op contract. Suite
+went **453 passed | 17 skipped → 475 passed, 0 skipped**. Verified end to end on
+an ephemeral from-scratch DB and on the dev DB.
+
+**H9 — the accessibility prefs were theatre; now they're real.**
+`.reduced-stimulation` was toggled onto `<html>` and checked by three components
+in JS but had **zero CSS rules**, so the toggle left 18 `animate-pulse`, 10
+`animate-spin`, 2 `animate-ping` and every entrance animation running. Worse,
+`personalization.ts` had exposed highContrast/dyslexiaFont/largerText since 5B
+with nothing consuming them — **parity rows I04 and M04 were credited SHIPPED on
+preferences a user could not turn on** (both rows rewritten with the real
+status). Now shipped and live-verified:
+- Reduced stimulation: decorative keyframes off with settled resting states,
+  spinners kept but slowed to 1.6s (a frozen spinner reads as a hung app),
+  transitions capped, shadows flattened per theme.
+- High contrast: token overrides split per theme, edges instead of blur, 3px
+  focus rings, `prefers-contrast: more` honoured before the toggle is touched.
+- Dyslexia-friendly font (Atkinson Hyperlegible) and larger text (body zoom
+  1.125 — the px type scale makes root font-size a no-op).
+- `src/lib/a11y-prefs.ts` is the single settings→classes mapping (33 tests), and
+  `src/app/a11y-css.test.ts` asserts every toggleable class actually styles
+  something, so "a class with no CSS" cannot recur.
+- Two gaps found while verifying: nothing applied these classes outside Settings
+  (so a **new device** showed the default UI until you opened Settings) — fixed
+  with a server-rendered `src/app/app/layout.tsx` (marketing routes stay static)
+  plus `A11yApply` for client-side navigation, where React never runs an inline
+  script; and `.timeline-past` (opacity .55 + saturate .5) was washing out past
+  blocks for exactly the users who opted into high contrast.
+- Empty-state sweep: month view had no explanation when a month is blank; two
+  flat PlanDayClient strings warmed.
+
+**H3 — planner search, both platforms.** Needed a REST endpoint first (AGENTS.md:
+core data ops must be `/api/v1/*` for iOS), which closed a web gap too — ⌘K
+searched only *commands*, never the user's own blocks.
+- `src/lib/search.ts` — shared matching/ranking (title exact > prefix >
+  word-prefix > substring > notes; accent/case-insensitive; ties toward the
+  nearer date, capped so proximity can't outrank a better field match). 21 tests.
+- `GET /api/v1/search` — series not expanded occurrences (a recurring block
+  matches once and carries `repeats`); zone-aware `today`; 400 blank / 401 anon /
+  limit clamped. The ADR-002 inventory gate caught the missing OpenAPI entry —
+  added path, components, tag, zod schemas; verified no dangling `$ref`s.
+- iOS `SearchView` — debounced 280ms, generation-guarded so a slow response can't
+  overwrite a newer query, four honest states, reachable from the Today toolbar
+  and More, taps through to the day. `KairoRound7Tour` covers it.
+- Web ⌘K now lists "In your planner" hits under the commands.
+
+**Ship gate:** web lint + typecheck + **497 tests** + build green; landing page
+still static (`○ /`). Deployed to time.neima.me (auto-deploy is enabled — a push
+builds without a manual trigger) and **live-verified**: search returns ranked
+real data with a session, 400/401 correct; all four a11y modes toggle live
+(`--ink #120e1c`, zoom 1.125, classes + localStorage) and toggle back off.
+iOS: `KairoRound7Tour` passed against the live API — result row "Live QA block ·
+Sat, Jul 18 · 22:36" (`browser-qa/ios-r7/ios-81-search-results.png`).
+
+**Trap worth remembering:** `xcodebuild ... -only-testing:` printed
+**TEST SUCCEEDED with "Executed 0 tests"** because the new test file wasn't in
+the generated project — run `xcodegen generate` after adding any Swift file, and
+always check the "Executed N tests" line, not just the SUCCEEDED banner.
+
+**Next:** iOS ports of the accessibility modes (7D — Increase Contrast, dyslexia
+font, larger text on iOS), and an external cron hitting `/api/v1/jobs/tick` so
+scheduled push fires without a manual call.
+
+
 ## 2026-07-24 — Round 6: 10-phase program (Opus) — 3/10 (iOS parity depth)
 Roadmap: `docs/plans/2026-07-24-round6-10phase.md`.
 

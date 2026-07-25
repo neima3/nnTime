@@ -124,7 +124,7 @@ energy-pattern learning, and related rows — see table.
 | I01 | 3,000+ color options | I | both | 5B | partial | 0.5 | Same design decision as B05 (6 semantic categories, not a freeform palette). |
 | I02 | Custom icon library | I | both | 1D | partial | 0.5 | Same design decision as B04 (emoji picker, not a curated icon library). |
 | I03 | Light / Dark / System theme | I | both | 5B, 7D | planned | 1 | SHIPPED: personalization service (src/server/services/personalization.ts) — theme enum (system/light/dark) in user_settings. |
-| I04 | Dyslexia-friendly font | I | both | 5B | planned | 1 | SHIPPED: personalization service exposes dyslexiaFont preference. Atkinson Hyperlegible. |
+| I04 | Dyslexia-friendly font | I | both | 5B, H9 | planned | 1 | SHIPPED (web, H9 2026-07-24): Atkinson Hyperlegible loaded via next/font, applied to display+body under `.dyslexia-font`, real toggle in Settings → Access, persisted in notificationPrefs and applied server-side per account. NOTE: before H9 this row was credited on the personalization service merely *exposing* the pref — nothing consumed it, so a user could not turn it on. iOS port still owed (7D). |
 | I05 | Adjustable text size | I | both | 5B, 6C | planned | 1 | — |
 | I06 | Family/shared profiles | I | both | — | deferred | 0 | Named deferred in the roadmap. |
 | I07 | Apple Family Sharing support | I | ios | — | deferred | 0 | Rolls into the family/shared-profiles deferral; no Kairo phase covers multi-person billing. |
@@ -146,7 +146,7 @@ energy-pattern learning, and related rows — see table.
 | M01 | VoiceOver / screen reader support | M | both | 6C, 7D | planned | 1 | SHIPPED: 6C accessibility audit — ARIA landmarks, focus-visible, skip link, sr-only; Lighthouse a11y score 96. |
 | M02 | Dynamic Type support | M | ios | 7D | planned | 1 | — |
 | M03 | Dyslexia-friendly font toggle | M | both | 5B | planned | 1 | Duplicate of I04. |
-| M04 | High-contrast / dark mode | M | both | 5B, 7D | planned | 1 | SHIPPED: personalization service exposes highContrast + theme; dark mode tokens in globals.css. Roadmap 5B itemizes a dedicated high-contrast mode (strengthened tokens, prefers-contrast + iOS Increase Contrast) alongside dark/light/system theming; 7D ports to iOS. |
+| M04 | High-contrast / dark mode | M | both | 5B, 7D, H9 | planned | 1 | SHIPPED (web, H9 2026-07-24): dedicated high-contrast mode — token overrides split per theme (`.high-contrast:not(.dark)` / `.high-contrast.dark`), edges instead of blur, 3px focus rings, `prefers-contrast: more` honoured before the toggle is touched, past-block dimming suppressed. Live-verified on time.neima.me (--ink #120e1c). Same NOTE as I04: pre-H9 this row was credited on an unconsumed preference. iOS Increase Contrast still owed (7D). |
 | M05 | Sound toggles | M | both | 3B, 3C | planned | 1 | SHIPPED: AmbientSounds has mute button + volume slider. |
 | M06 | Sensory-friendly design ethos | M | both | 5B | planned | 1 | SHIPPED: reducedStimulation mode in user_settings + personalization service. Reduced-stimulation mode is Kairo's concrete analogue. |
 | M07 | Reduced-motion setting | M | both | — | excluded | 0 | Research doc marks Tiimo's support as "Unverified"; excluded per the unverified-source rule even though Kairo implements reduced motion anyway (6C/7D) as good practice. |
