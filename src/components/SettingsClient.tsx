@@ -14,6 +14,12 @@ import {
   User,
 } from "lucide-react";
 import { invalidateSettingsCache } from "@/lib/settings-cache";
+import {
+  describeQuietHours,
+  formatQuietHour,
+  parseQuietHours,
+  writeQuietHours,
+} from "@/lib/quiet-hours";
 import { SignedOutCard, SkeletonRows } from "./EmptyState";
 import { PushReminders } from "./PushReminders";
 
@@ -95,6 +101,86 @@ function Section({
         {children}
       </div>
     </section>
+  );
+}
+
+const HOURS = Array.from({ length: 24 }, (_, h) => h);
+
+/**
+ * Quiet hours (H7) — a nightly window where reminders hold off. Persisted in
+ * notificationPrefs.quietHours, which is the same blob the server push delivery
+ * and the iOS scheduler read, so setting it here quiets every surface.
+ */
+function QuietHoursRows({
+  prefs,
+  hourCycle,
+  onChange,
+}: {
+  prefs: Record<string, unknown>;
+  hourCycle: "h12" | "h24";
+  onChange: (nextPrefs: Record<string, unknown>) => void;
+}) {
+  const quiet = parseQuietHours(prefs);
+
+  return (
+    <>
+      <Row
+        label="Quiet hours"
+        hint={describeQuietHours(quiet, hourCycle)}
+        right={
+          <Toggle
+            label="Quiet hours"
+            on={quiet.enabled}
+            onChange={(v) => onChange(writeQuietHours(prefs, { ...quiet, enabled: v }))}
+          />
+        }
+      />
+      {quiet.enabled ? (
+        <Row
+          label="Window"
+          hint="Reminders inside this window are skipped, not stacked up"
+          right={
+            <div className="flex items-center gap-2">
+              <select
+                aria-label="Quiet hours start"
+                value={quiet.start}
+                onChange={(e) =>
+                  onChange(
+                    writeQuietHours(prefs, { ...quiet, start: Number(e.target.value) }),
+                  )
+                }
+                className="rounded-xl border border-border bg-surface px-3 py-2 text-[13px] font-semibold"
+              >
+                {HOURS.map((h) => (
+                  <option key={h} value={h}>
+                    {formatQuietHour(h, hourCycle)}
+                  </option>
+                ))}
+              </select>
+              <span aria-hidden className="text-[13px] text-ink-faint">
+                to
+              </span>
+              <select
+                aria-label="Quiet hours end"
+                value={quiet.end}
+                onChange={(e) =>
+                  onChange(
+                    writeQuietHours(prefs, { ...quiet, end: Number(e.target.value) }),
+                  )
+                }
+                className="rounded-xl border border-border bg-surface px-3 py-2 text-[13px] font-semibold"
+              >
+                {HOURS.map((h) => (
+                  <option key={h} value={h}>
+                    {formatQuietHour(h, hourCycle)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          }
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -423,6 +509,11 @@ export function SettingsClient() {
               }}
             />
           }
+        />
+        <QuietHoursRows
+          prefs={settings.notificationPrefs}
+          hourCycle={settings.hourCycle}
+          onChange={(nextPrefs) => void patch({ notificationPrefs: nextPrefs })}
         />
         <div className="px-5 py-4">
           <PushReminders />

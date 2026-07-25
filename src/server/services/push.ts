@@ -12,6 +12,7 @@ import dbDefault from "../db";
 import * as schema from "../db/schema";
 import { getOrCreateSettings } from "../dal";
 import { instantToWallFields } from "../temporal/zone";
+import { isQuietAt } from "@/lib/quiet-hours";
 import { and, eq, isNull, gte, lte, sql } from "drizzle-orm";
 
 let configured = false;
@@ -82,21 +83,6 @@ export async function sendToUser(
   return { sent, pruned };
 }
 
-/** Is `hour` inside the user's quiet-hours window? Overnight-wrap aware. */
-function inQuietHours(
-  hour: number,
-  prefs: Record<string, unknown>,
-): boolean {
-  const q = prefs.quietHours as
-    | { enabled?: boolean; start?: number; end?: number }
-    | undefined;
-  if (!q?.enabled) return false;
-  const s = q.start ?? 22;
-  const e = q.end ?? 7;
-  if (s === e) return false;
-  return s < e ? hour >= s && hour < e : hour >= s || hour < e;
-}
-
 /**
  * Deliver due "start" nudges (H1). Finds notification jobs whose fire time is
  * within [now-2m, now+2m], sends a push for each (respecting the user's quiet
@@ -144,7 +130,7 @@ export async function deliverDueNudges(
     // Quiet hours (per user timezone).
     const settings = await getOrCreateSettings(job.userId);
     const hour = instantToWallFields(job.occurredAt, settings.timezone).hour;
-    if (inQuietHours(hour, settings.notificationPrefs as Record<string, unknown>)) {
+    if (isQuietAt(settings.notificationPrefs, hour)) {
       suppressed++;
       await markSent(db, job.id);
       continue;

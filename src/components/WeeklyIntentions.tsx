@@ -10,9 +10,16 @@
 
 import { useEffect, useState } from "react";
 import { Check, Target } from "lucide-react";
-
-type Intention = { text: string; done: boolean };
-type Stored = { week: string; items: Intention[] };
+import {
+  addIntention,
+  MAX_INTENTIONS,
+  MAX_INTENTION_LENGTH,
+  parseIntentions,
+  removeIntention,
+  toggleIntention,
+  writeIntentions,
+  type Intention,
+} from "@/lib/intentions";
 
 export function WeeklyIntentions({ weekStart }: { weekStart: string }) {
   const [items, setItems] = useState<Intention[]>([]);
@@ -37,10 +44,7 @@ export function WeeklyIntentions({ weekStart }: { weekStart: string }) {
         setRevision(s.revision ?? null);
         const np = (s.notificationPrefs ?? {}) as Record<string, unknown>;
         setPrefs(np);
-        const stored = np.intentions as Stored | undefined;
-        if (stored && stored.week === weekStart && Array.isArray(stored.items)) {
-          setItems(stored.items.slice(0, 3));
-        }
+        setItems(parseIntentions(np, weekStart));
         setLoaded(true);
       })
       .catch(() => {});
@@ -52,7 +56,7 @@ export function WeeklyIntentions({ weekStart }: { weekStart: string }) {
   async function persist(next: Intention[]) {
     setItems(next);
     if (revision == null) return;
-    const nextPrefs = { ...prefs, intentions: { week: weekStart, items: next } };
+    const nextPrefs = writeIntentions(prefs, weekStart, next);
     setPrefs(nextPrefs);
     try {
       const res = await fetch("/api/v1/settings", {
@@ -70,18 +74,19 @@ export function WeeklyIntentions({ weekStart }: { weekStart: string }) {
   }
 
   function add() {
-    const t = draft.trim();
-    if (!t || items.length >= 3) return;
+    const next = addIntention(items, draft);
     setDraft("");
-    void persist([...items, { text: t, done: false }]);
+    // Same reference = blank, duplicate, or at the cap. Nothing to save.
+    if (next === items) return;
+    void persist(next);
   }
 
   function toggle(i: number) {
-    void persist(items.map((it, k) => (k === i ? { ...it, done: !it.done } : it)));
+    void persist(toggleIntention(items, i));
   }
 
   function remove(i: number) {
-    void persist(items.filter((_, k) => k !== i));
+    void persist(removeIntention(items, i));
   }
 
   if (!authed || !loaded) return null;
@@ -130,7 +135,7 @@ export function WeeklyIntentions({ weekStart }: { weekStart: string }) {
         ))}
       </ul>
 
-      {items.length < 3 && (
+      {items.length < MAX_INTENTIONS && (
         <div className="mt-3 flex items-center gap-2">
           <input
             value={draft}
@@ -139,7 +144,7 @@ export function WeeklyIntentions({ weekStart }: { weekStart: string }) {
               if (e.key === "Enter") add();
             }}
             placeholder={items.length === 0 ? "e.g. move my body 3 times" : "add another…"}
-            maxLength={80}
+            maxLength={MAX_INTENTION_LENGTH}
             className="flex-1 rounded-xl border border-border bg-surface-raised px-3 py-2 text-[14px] outline-none focus:ring-2 focus:ring-iris"
           />
           <button
