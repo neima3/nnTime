@@ -49,16 +49,22 @@ echo "→ Team ID: $TEAM"
 
 # ---- Signing identity ------------------------------------------------------
 
+# A missing certificate is NOT fatal: with an Apple ID registered in Xcode,
+# `-allowProvisioningUpdates` below mints the development certificate on the first
+# signed build. Only warn — and let the build produce the real error if the
+# account genuinely isn't signed in.
 if ! security find-identity -v -p codesigning 2>/dev/null | grep -q "Apple Development"; then
-  cat >&2 <<'MSG'
+  echo "→ no development certificate yet; the build will request one from Apple"
+  if ! defaults read com.apple.dt.Xcode DVTDeveloperAccountManagerAppleIDLists >/dev/null 2>&1; then
+    cat >&2 <<'MSG'
 
-No "Apple Development" signing identity on this Mac.
+…and no Apple ID is registered in Xcode either.
 
-Sign in first: Xcode → Settings → Accounts → "+" → Apple ID. Xcode creates the
-certificate on sign-in. This step needs your password and 2FA, so it cannot be
-scripted.
+Sign in first: Xcode → Settings (⌘,) → Accounts → "+" → Apple ID. That step needs
+your password and 2FA, so it cannot be scripted.
 MSG
-  exit 1
+    exit 1
+  fi
 fi
 
 # ---- Device ----------------------------------------------------------------
