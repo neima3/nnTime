@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
-import { catClasses, fmt, type CategoryId } from "@/lib/mock";
+import { catClasses, type CategoryId } from "@/lib/mock";
 import { getSession } from "@/server/auth-session";
 import {
   listActivitySeries,
@@ -12,6 +12,7 @@ import {
 import { buildCategoryMap, dateToMinutesFromMidnight } from "@/lib/adapters";
 import { expandActivitiesForDay } from "@/server/services/day";
 import { instantToDateStr, resolveDayBounds } from "@/server/temporal/zone";
+import { formatTime, toHourCycle } from "@/lib/time-format";
 import { WeeklyIntentions } from "@/components/WeeklyIntentions";
 
 type Block = {
@@ -140,7 +141,7 @@ async function loadWeek(weekParam?: string) {
         id: `${s.id}:${occKey}`,
         emoji: s.emoji ?? "📋",
         title: s.title,
-        time: fmt(startMin),
+        time: formatTime(startMin, toHourCycle(settings.hourCycle)),
         category: cat,
       };
     });

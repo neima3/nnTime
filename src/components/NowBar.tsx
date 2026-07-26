@@ -19,9 +19,10 @@ import {
 } from "react";
 import { clientToday } from "@/lib/client-date";
 import { dateToMinutesFromMidnight } from "@/lib/adapters";
-import { fmt } from "@/lib/mock";
 import { getSettingsCached } from "@/lib/settings-cache";
 import { toast } from "./Toast";
+import { formatTime, type HourCycle } from "@/lib/time-format";
+import { useHourCycle } from "@/lib/use-hour-cycle";
 
 interface DayActivity {
   title: string;
@@ -216,7 +217,7 @@ export function NowProvider({ children }: { children: React.ReactNode }) {
   return <NowContext.Provider value={value}>{children}</NowContext.Provider>;
 }
 
-function nowLine(info: NowInfo): {
+function nowLine(info: NowInfo, hourCycle: HourCycle): {
   label: string;
   title: string;
   emoji: string;
@@ -234,10 +235,10 @@ function nowLine(info: NowInfo): {
   if (info.next) {
     const inMin = info.next.startMin - info.nowMin;
     return {
-      label: `Free until ${fmt(info.next.startMin)}`,
+      label: `Free until ${formatTime(info.next.startMin, hourCycle)}`,
       title: info.next.title,
       emoji: info.next.emoji,
-      meta: inMin <= 90 ? `in ${inMin} min` : `at ${fmt(info.next.startMin)}`,
+      meta: inMin <= 90 ? `in ${inMin} min` : `at ${formatTime(info.next.startMin, hourCycle)}`,
     };
   }
   return null;
@@ -246,8 +247,9 @@ function nowLine(info: NowInfo): {
 /** Desktop sidebar card — sits under the nav list. */
 export function NowCard({ active }: { active: string }) {
   const info = useNowInfo();
+  const hourCycle = useHourCycle();
   if (!info || active === "focus") return null;
-  const line = nowLine(info);
+  const line = nowLine(info, hourCycle);
   if (!line) return null;
   const isNow = line.label === "Now";
   return (
@@ -301,8 +303,9 @@ export function NowCard({ active }: { active: string }) {
 /** Mobile strip — floats just above the tab bar. */
 export function NowStrip({ active }: { active: string }) {
   const info = useNowInfo();
+  const hourCycle = useHourCycle();
   if (!info || active === "focus" || active === "today") return null;
-  const line = nowLine(info);
+  const line = nowLine(info, hourCycle);
   if (!line) return null;
   const isNow = line.label === "Now";
   return (

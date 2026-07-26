@@ -7,7 +7,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { dateToMinutesFromMidnight } from "@/lib/adapters";
-import { fmt } from "@/lib/mock";
+import { formatTime } from "@/lib/time-format";
+import { useHourCycle } from "@/lib/use-hour-cycle";
 
 const DAY_START = 7 * 60;
 const DAY_END = 23 * 60;
@@ -52,6 +53,7 @@ export function LiveNowLine({
   dayStartMin?: number;
   dayEndMin?: number;
 } = {}) {
+  const hourCycle = useHourCycle();
   const top = (min: number) => (min - dayStartMin) * PX_PER_MIN;
   const internal = useLiveNowMin(external === undefined, zone);
   const nowMin = external ?? internal;
@@ -93,7 +95,7 @@ export function LiveNowLine({
         style={{ top: top(clampedMin) }}
       >
         <span className="tnum w-10 -translate-y-1/2 rounded-md bg-now text-center text-[11px] font-bold text-now-ink">
-          {fmt(Math.floor(clampedMin))}
+          {formatTime(Math.floor(clampedMin), hourCycle)}
         </span>
         <div className="relative h-0.5 flex-1 rounded bg-now">
           <span className="absolute -left-1 top-1/2 size-2.5 -translate-y-1/2 rounded-full bg-now" />

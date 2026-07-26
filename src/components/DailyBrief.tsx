@@ -13,8 +13,9 @@
 import { useEffect, useState } from "react";
 import { Sun, X } from "lucide-react";
 import { clientToday } from "@/lib/client-date";
-import { fmt } from "@/lib/mock";
 import { hourLabel, focusSessionCount, PEAK_MIN_SESSIONS } from "@/lib/insights";
+import { formatTime } from "@/lib/time-format";
+import { useHourCycle } from "@/lib/use-hour-cycle";
 
 export type BriefBlock = {
   title: string;
@@ -24,6 +25,7 @@ export type BriefBlock = {
 };
 
 export function DailyBrief({ blocks }: { blocks: BriefBlock[] }) {
+  const hourCycle = useHourCycle();
   const [dismissed, setDismissed] = useState(true);
   const [peakHour, setPeakHour] = useState<number | null>(null);
 
@@ -85,7 +87,7 @@ export function DailyBrief({ blocks }: { blocks: BriefBlock[] }) {
           </p>
           {first && (
             <p className="mt-0.5 text-[13px] font-medium text-ink-soft">
-              First up · {first.emoji} {first.title} at {fmt(first.start)}
+              First up · {first.emoji} {first.title} at {formatTime(first.start, hourCycle)}
             </p>
           )}
           {peakHour != null && (

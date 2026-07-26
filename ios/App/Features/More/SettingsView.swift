@@ -83,6 +83,10 @@ struct SettingsView: View {
                             segmented(title: "Time", options: [("h12", "12-hour"), ("h24", "24-hour")],
                                       selected: hourCycle) { v in
                                 hourCycle = v
+                                // Cache it before the round trip so every time
+                                // label re-renders in the new format immediately.
+                                KairoPrefs.hourCycle = v
+                                app.a11yGeneration += 1
                                 Task { await saveSettings(["hourCycle": v]) }
                             }
                             segmented(title: "Week starts", options: [("0", "Sunday"), ("1", "Monday")],
@@ -233,6 +237,7 @@ struct SettingsView: View {
         await app.adoptSharedPrefs()
         await MainActor.run {
             hourCycle = s.hourCycle ?? "h12"
+            KairoPrefs.hourCycle = hourCycle
             weekStart = s.weekStart ?? 0
             settingsRevision = s.revision
             quietHours = KairoPrefs.quietHoursEnabled

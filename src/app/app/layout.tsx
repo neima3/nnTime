@@ -27,6 +27,7 @@ export default async function AppLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   let prefs: A11yPrefs = { ...A11Y_DEFAULTS };
   let theme: "system" | "light" | "dark" = "system";
+  let hourCycle: "h12" | "h24" = "h24";
   let known = false;
 
   const session = await getSession();
@@ -34,6 +35,7 @@ export default async function AppLayout({
     try {
       const p = await getPersonalization(session.userId);
       theme = p.theme;
+      hourCycle = p.hourCycle === "h12" ? "h12" : "h24";
       prefs = {
         reducedStimulation: p.reducedStimulation,
         highContrast: p.highContrast,
@@ -67,6 +69,7 @@ export default async function AppLayout({
         var dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
         el.classList.toggle('dark', dark);
         el.dataset.theme = t;
+        el.dataset.hourCycle = ${JSON.stringify(hourCycle)};
         localStorage.setItem('kairo-theme', t);
         localStorage.setItem(${JSON.stringify(A11Y_STORAGE_KEY)}, ${JSON.stringify(
           serializeA11yPrefs(prefs),
@@ -81,7 +84,7 @@ export default async function AppLayout({
           result when /app is reached by client-side navigation, where React
           never runs an inline script. */}
       <script dangerouslySetInnerHTML={{ __html: code }} />
-      <A11yApply tokens={serializeA11yPrefs(prefs)} theme={theme} />
+      <A11yApply tokens={serializeA11yPrefs(prefs)} theme={theme} hourCycle={hourCycle} />
       {children}
     </>
   );

@@ -130,7 +130,10 @@ final class AppState {
         guard let raw = try? await KairoAPI.shared.settingsRaw() else { return }
         let prefs = raw["notificationPrefs"] as? [String: Any] ?? [:]
         let reduced = raw["reducedStimulation"] as? Bool ?? reducedStimulation
-        KairoPrefs.adopt(notificationPrefs: prefs, reducedStimulation: reduced)
+        KairoPrefs.adopt(
+            notificationPrefs: prefs,
+            reducedStimulation: reduced,
+            hourCycle: raw["hourCycle"] as? String)
         highContrast = KairoPrefs.highContrast
         dyslexiaFont = KairoPrefs.dyslexiaFont
         largerText = KairoPrefs.largerText

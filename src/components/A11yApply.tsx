@@ -22,10 +22,13 @@ import {
 export function A11yApply({
   tokens,
   theme,
+  hourCycle,
 }: {
   /** Serialized pref tokens — a primitive so the effect can't churn. */
   tokens: string;
   theme: "system" | "light" | "dark";
+  /** Stamped onto <html> for useHourCycle(); see src/lib/time-format.ts. */
+  hourCycle: "h12" | "h24";
 }) {
   useEffect(() => {
     const root = document.documentElement;
@@ -36,11 +39,12 @@ export function A11yApply({
         window.matchMedia("(prefers-color-scheme: dark)").matches);
     root.classList.toggle("dark", dark);
     root.dataset.theme = theme;
+    root.dataset.hourCycle = hourCycle;
     try {
       localStorage.setItem(A11Y_STORAGE_KEY, tokens);
       localStorage.setItem("kairo-theme", theme);
     } catch {}
-  }, [tokens, theme]);
+  }, [tokens, theme, hourCycle]);
 
   return null;
 }

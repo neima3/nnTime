@@ -15,9 +15,10 @@ import { toast } from "./Toast";
 import { notifyDayChanged } from "./NowBar";
 import { localMinutesToInstant } from "@/lib/adapters";
 import { clientToday } from "@/lib/client-date";
-import { fmt } from "@/lib/mock";
 import { enqueueMutation, resolveQueueUser } from "@/lib/offline-queue";
 import { useSession } from "@/lib/auth-client";
+import { formatTime } from "@/lib/time-format";
+import { useHourCycle } from "@/lib/use-hour-cycle";
 
 /** AI-parsed draft (SEC-05: suggestion only — nothing saves until accepted). */
 interface Proposal {
@@ -56,6 +57,7 @@ function getSpeechRecognition(): (new () => SpeechRecognitionLike) | null {
 }
 
 export function QuickCapture() {
+  const hourCycle = useHourCycle();
   const { data: session } = useSession();
   const userId = session?.user?.id ?? null;
   const [open, setOpen] = useState(false);
@@ -204,7 +206,7 @@ export function QuickCapture() {
           }),
         });
         if (!res.ok) throw new Error("create failed");
-        toast(`On the timeline — ${date === clientToday(zone) ? "today" : date} ${fmt(proposal.startMin)}`);
+        toast(`On the timeline — ${date === clientToday(zone) ? "today" : date} ${formatTime(proposal.startMin, hourCycle)}`);
       } else {
         const res = await fetch("/api/v1/tasks", {
           method: "POST",
@@ -229,7 +231,7 @@ export function QuickCapture() {
       toast("Couldn't save — try again");
     }
     setSaving(false);
-  }, [proposal, saving]);
+  }, [proposal, saving, hourCycle]);
 
   const toggleVoice = useCallback(() => {
     if (listening) {
@@ -454,7 +456,7 @@ export function QuickCapture() {
                   </p>
                   <p className="tnum text-[12px] font-medium text-ink-soft">
                     {proposal.startMin != null
-                      ? `${proposal.date ?? "today"} · ${fmt(proposal.startMin)} · ${proposal.durationMin ?? 30} min`
+                      ? `${proposal.date ?? "today"} · ${formatTime(proposal.startMin, hourCycle)} · ${proposal.durationMin ?? 30} min`
                       : proposal.date
                         ? `${proposal.date} · anytime`
                         : "no date — goes to inbox"}

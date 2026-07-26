@@ -2,16 +2,16 @@ import { AppShell } from "@/components/AppShell";
 import { ReviewClient, type ReviewItem } from "@/components/ReviewClient";
 import {
   reviewItems as mockReviewItems,
-  fmt,
   type CategoryId,
 } from "@/lib/mock";
 import { getResolvedDay } from "@/server/services/day";
-import { listCategories } from "@/server/dal";
+import { getOrCreateSettings, listCategories } from "@/server/dal";
 import {
   buildCategoryMap,
   dateToMinutesFromMidnight,
 } from "@/lib/adapters";
 import { instantToDateStr } from "@/server/temporal/zone";
+import { formatTime, toHourCycle } from "@/lib/time-format";
 
 async function loadReview(): Promise<{
   items: ReviewItem[];
@@ -42,6 +42,9 @@ async function loadReview(): Promise<{
     };
   }
 
+  const settings = await getOrCreateSettings(resolved.userId).catch(() => null);
+  const hourCycle = toHourCycle(settings?.hourCycle);
+
   const categories = await listCategories(resolved.userId).catch(() => []);
   const categoryMap = buildCategoryMap(
     categories as unknown as Parameters<typeof buildCategoryMap>[0],
@@ -65,7 +68,7 @@ async function loadReview(): Promise<{
         title: s.title,
         emoji: s.emoji ?? "📋",
         category: cat,
-        time: `${fmt(startMin)} – ${fmt(startMin + s.durationMin)}`,
+        time: `${formatTime(startMin, hourCycle)} – ${formatTime(startMin + s.durationMin, hourCycle)}`,
         revision: s.revision,
         occurrenceKey: s.occurrenceKey.toISOString(),
         startMin,

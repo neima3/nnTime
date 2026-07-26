@@ -14,6 +14,8 @@ import {
   User,
 } from "lucide-react";
 import { invalidateSettingsCache } from "@/lib/settings-cache";
+import { publishHourCycle } from "@/lib/use-hour-cycle";
+import { toHourCycle } from "@/lib/time-format";
 import {
   A11Y_STORAGE_KEY,
   applyA11yPrefs,
@@ -300,6 +302,9 @@ export function SettingsClient() {
       };
       setSettings(s);
       if (partial.theme !== undefined) applyTheme(s.theme);
+      // Every time label reads this off <html>; republish so 12/24-hour takes
+      // effect across the app immediately instead of on the next full load.
+      if (partial.hourCycle !== undefined) publishHourCycle(toHourCycle(s.hourCycle));
       // Reconcile against what the server actually stored — cheap, and it keeps
       // the optimistic class from sticking around if a PATCH was rejected.
       syncA11y(parseA11yPrefs(s));

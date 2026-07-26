@@ -58,6 +58,16 @@ enum KairoPrefs {
     /// Matches `.larger-text body { zoom: 1.125 }` on the web.
     static let largerTextScale: CGFloat = 1.125
 
+    /// "h12" or "h24" — the account's clock format, cached so times render
+    /// correctly at launch and offline, before the settings request lands.
+    /// Server-side this is a real column (not part of notificationPrefs).
+    static var hourCycle: String {
+        get { store.string(forKey: "kairo-hour-cycle") ?? "h12" }
+        set { store.set(newValue, forKey: "kairo-hour-cycle") }
+    }
+
+    static var uses12Hour: Bool { hourCycle != "h24" }
+
     static var hasOnboarded: Bool {
         get { store.bool(forKey: "kairo-onboarded") }
         set { store.set(newValue, forKey: "kairo-onboarded") }
@@ -116,8 +126,15 @@ enum KairoPrefs {
 extension KairoPrefs {
     /// Adopt the server's view of the shared prefs. Called after every settings
     /// read; the local copies stay as the offline/launch cache.
-    static func adopt(notificationPrefs prefs: [String: Any], reducedStimulation: Bool) {
+    static func adopt(
+        notificationPrefs prefs: [String: Any],
+        reducedStimulation: Bool,
+        hourCycle: String? = nil
+    ) {
         self.reducedStimulation = reducedStimulation
+        if let hourCycle, hourCycle == "h12" || hourCycle == "h24" {
+            self.hourCycle = hourCycle
+        }
         highContrast = prefs["highContrast"] as? Bool ?? highContrast
         dyslexiaFont = prefs["dyslexiaFont"] as? Bool ?? dyslexiaFont
         largerText = prefs["largerText"] as? Bool ?? largerText

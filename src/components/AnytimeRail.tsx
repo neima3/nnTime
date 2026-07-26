@@ -7,11 +7,13 @@
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarPlus, Check, Wand2 } from "lucide-react";
-import { catClasses, fmt, type CategoryId } from "@/lib/mock";
+import { catClasses, type CategoryId } from "@/lib/mock";
 import { localMinutesToInstant } from "@/lib/adapters";
 import { toast } from "./Toast";
 import { firstFreeSlot } from "@/lib/slots";
 import { notifyDayChanged } from "./NowBar";
+import { formatTime } from "@/lib/time-format";
+import { useHourCycle } from "@/lib/use-hour-cycle";
 
 
 export type AnytimeItem = {
@@ -36,6 +38,7 @@ export function AnytimeRail({
   busy?: { start: number; end: number }[];
   zone?: string;
 }) {
+  const hourCycle = useHourCycle();
   const router = useRouter();
   const [items, setItems] = useState(initial);
   const [slotting, setSlotting] = useState<string | null>(null);
@@ -72,7 +75,7 @@ export function AnytimeRail({
           headers: { "If-Match": String(item.revision) },
         });
         setItems((prev) => prev.filter((x) => x.id !== item.id));
-        toast(`Slotted at ${fmt(start)} — no deciding required`);
+        toast(`Slotted at ${formatTime(start, hourCycle)} — no deciding required`);
         notifyDayChanged();
         router.refresh();
       } catch {
@@ -80,7 +83,7 @@ export function AnytimeRail({
       }
       setSlotting(null);
     },
-    [authed, zone, busy, date, router],
+    [authed, zone, busy, date, router, hourCycle],
   );
 
   const schedule = useCallback(

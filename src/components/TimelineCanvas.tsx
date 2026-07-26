@@ -16,9 +16,11 @@
 
 import { useCallback, useRef, useState } from "react";
 import { Check, Timer } from "lucide-react";
-import { catClasses, fmt, fmtDuration, type Activity } from "@/lib/mock";
+import { catClasses, fmtDuration, type Activity } from "@/lib/mock";
 import { LiveNowLine, useLiveNowMin } from "./LiveNowLine";
 import { celebrate } from "./Celebration";
+import { formatHourLabel, formatTime } from "@/lib/time-format";
+import { useHourCycle } from "@/lib/use-hour-cycle";
 
 const DAY_START_DEFAULT = 7 * 60; // 07:00
 const DAY_END_DEFAULT = 23 * 60; // 23:00
@@ -115,6 +117,7 @@ export function TimelineCanvas({
   onFocus,
   onToggleStep,
 }: TimelineCanvasProps) {
+  const hourCycle = useHourCycle();
   const [drag, setDrag] = useState<DragState | null>(null);
   const [optimistic, setOptimistic] = useState<Map<string, { start: number; duration: number }>>(
     new Map(),
@@ -321,7 +324,7 @@ export function TimelineCanvas({
             style={{ top: top(h * 60) }}
           >
             <span className="tnum w-10 -translate-y-1/2 text-right text-[12px] font-medium text-ink-faint">
-              {h}:00
+              {formatHourLabel(h, hourCycle)}
             </span>
             <div className="mt-px h-px flex-1 bg-border" />
           </div>
@@ -370,7 +373,7 @@ export function TimelineCanvas({
               key={a.id}
               role="button"
               tabIndex={0}
-              aria-label={`${a.title}, ${fmt(a.start)} to ${fmt(a.start + a.duration)}, ${fmtDuration(a.duration)}. Use arrow keys to move, plus or minus to resize. Enter to edit.`}
+              aria-label={`${a.title}, ${formatTime(a.start, hourCycle)} to ${formatTime(a.start + a.duration, hourCycle)}, ${fmtDuration(a.duration)}. Use arrow keys to move, plus or minus to resize. Enter to edit.`}
               aria-keyshortcuts="ArrowUp ArrowDown + - Enter"
               className={`group absolute flex gap-3 overflow-hidden rounded-2xl px-3.5 outline-none transition-transform hover:-translate-y-px hover:shadow-card focus-visible:ring-2 focus-visible:ring-iris ${cat.fill} ${
                 past && !a.done ? "timeline-past" : ""
@@ -419,7 +422,7 @@ export function TimelineCanvas({
                       ↻{" "}
                     </span>
                   )}
-                  {fmt(a.start)} – {fmt(a.start + a.duration)} · {fmtDuration(a.duration)}
+                  {formatTime(a.start, hourCycle)} – {formatTime(a.start + a.duration, hourCycle)} · {fmtDuration(a.duration)}
                   {a.checklist && a.checklist.length > 0
                     ? ` · ${a.checklist.filter((c) => c.done).length}/${a.checklist.length} steps`
                     : ""}

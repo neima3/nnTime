@@ -9,13 +9,12 @@ import { AppShell } from "@/components/AppShell";
 import {
   activities as mockActivities,
   DAY,
-  fmt,
   inbox as mockInbox,
   NOW_MIN,
   type Activity,
 } from "@/lib/mock";
 import { getResolvedDay } from "@/server/services/day";
-import { listCategories } from "@/server/dal";
+import { getOrCreateSettings, listCategories } from "@/server/dal";
 import {
   buildCategoryMap,
   dateToMinutesFromMidnight,
@@ -34,6 +33,7 @@ import { SoftStreaks } from "@/components/SoftStreaks";
 import { AmbientSounds } from "@/components/AmbientSounds";
 import { AnytimeRail } from "@/components/AnytimeRail";
 import { instantToDateStr } from "@/server/temporal/zone";
+import { formatTime, toHourCycle, type HourCycle } from "@/lib/time-format";
 
 function shiftDate(dateStr: string, deltaDays: number): string {
   const [y, m, d] = dateStr.split("-").map(Number);
@@ -73,9 +73,13 @@ async function loadTodayData(dateParam?: string) {
       // (a fixed zone would show the demo's "now" at the wrong time of day).
       zone: "",
       authed: false,
+      hourCycle: "h24" as HourCycle,
       isToday: true,
       nowMin: NOW_MIN,
     };
+
+  const settings = await getOrCreateSettings(resolved.userId).catch(() => null);
+  const hourCycle = toHourCycle(settings?.hourCycle);
 
   const categories = await listCategories(resolved.userId).catch(() => []);
   const categoryMap = buildCategoryMap(
@@ -105,6 +109,7 @@ async function loadTodayData(dateParam?: string) {
     date: resolved.date,
     zone: resolved.zone,
     authed: true,
+    hourCycle,
     isToday,
     nowMin: isToday ? NOW_MIN : 0, // client LiveNowLine handles live time
   };
@@ -226,6 +231,7 @@ export default async function TodayPage({
     date,
     zone,
     authed,
+    hourCycle,
     isToday,
     nowMin,
   } = await loadTodayData(dateParam);
@@ -249,8 +255,8 @@ export default async function TodayPage({
   const upNextMeta =
     upNext != null && nowMinutes != null
       ? upNextIsCurrent
-        ? `${fmt(upNext.start)} · ${upNext.start + upNext.duration - nowMinutes} min left`
-        : `${fmt(upNext.start)} · in ${upNext.start - nowMinutes} min`
+        ? `${formatTime(upNext.start, hourCycle)} · ${upNext.start + upNext.duration - nowMinutes} min left`
+        : `${formatTime(upNext.start, hourCycle)} · in ${upNext.start - nowMinutes} min`
       : "";
   const focusParams = upNext
     ? new URLSearchParams({

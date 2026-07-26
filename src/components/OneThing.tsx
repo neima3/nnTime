@@ -13,7 +13,8 @@ import Link from "next/link";
 import { Timer, X } from "lucide-react";
 import { useNowInfo } from "./NowBar";
 import { useFocusTrap } from "@/lib/useFocusTrap";
-import { fmt } from "@/lib/mock";
+import { formatTime } from "@/lib/time-format";
+import { useHourCycle } from "@/lib/use-hour-cycle";
 
 const EVENT = "kairo:one-thing";
 
@@ -23,6 +24,7 @@ export function openOneThing() {
 }
 
 export function OneThing() {
+  const hourCycle = useHourCycle();
   const [open, setOpen] = useState(false);
   const info = useNowInfo();
   const primaryRef = useRef<HTMLAnchorElement>(null);
@@ -92,7 +94,7 @@ export function OneThing() {
               current ? "text-now" : "text-ink-faint"
             }`}
           >
-            {current ? "This is the only thing" : `Next · at ${fmt(subject.startMin)}`}
+            {current ? "This is the only thing" : `Next · at ${formatTime(subject.startMin, hourCycle)}`}
           </p>
           <span className="mt-8 text-7xl" aria-hidden>
             {subject.emoji}

@@ -190,8 +190,24 @@ extension Activity {
 // MARK: - Time formatting
 
 enum KTime {
-    static func hhmm(_ minutes: Int) -> String {
-        String(format: "%d:%02d", minutes / 60, minutes % 60)
+    /// A wall-clock time label honouring the account's hour-cycle setting.
+    ///
+    /// This used to hardcode 24-hour, so Settings → Formatting → Time saved and
+    /// synced but changed nothing on screen. Every time label in the app goes
+    /// through here, so the setting now reaches all of them.
+    ///
+    /// Format matches the web (src/lib/time-format.ts):
+    ///   h24 → "9:00", "13:30"      (no leading zero, unchanged)
+    ///   h12 → "9:00 AM", "1:30 PM", "12:00 PM" noon, "12:15 AM" past midnight
+    static func hhmm(_ minutes: Int, hourCycle: String? = nil) -> String {
+        let total = ((minutes % 1440) + 1440) % 1440   // tolerate overnight math
+        let h = total / 60
+        let m = total % 60
+        let twelve = (hourCycle ?? KairoPrefs.hourCycle) != "h24"
+        guard twelve else { return String(format: "%d:%02d", h, m) }
+        let suffix = h < 12 ? "AM" : "PM"
+        let display = h % 12 == 0 ? 12 : h % 12
+        return String(format: "%d:%02d %@", display, m, suffix)
     }
 
     static func duration(_ minutes: Int) -> String {
