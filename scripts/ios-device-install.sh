@@ -118,6 +118,7 @@ xcodebuild \
   -destination "platform=iOS,id=$UDID" \
   -derivedDataPath "$DERIVED" \
   -allowProvisioningUpdates \
+  -allowProvisioningDeviceRegistration \
   DEVELOPMENT_TEAM="$TEAM" \
   build
 
