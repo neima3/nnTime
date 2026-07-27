@@ -151,9 +151,36 @@ Today load (was 4)**, and the promise cache absorbs StrictMode's doubled
 dev effects too. 5 new tests (dedupe, per-key isolation, TTL expiry,
 failure not cached, invalidation); 533 total, 6/6 E2E.
 
-**Next:** landing refresh (T19), iOS widget/Live-Activity accuracy (T8),
-body-doubling companion mode (T11), and the iOS "not done" label follow-up
-above.
+**T19 — landing refresh (continued same session).** The feature grid caught
+up to the product: 6 → 9 cards (clean 3×3) adding reminders + quiet hours,
+offline capture/completions, and the brain-breaks arcade (with the Play
+hub's own honesty line). Verified light/dark/375px
+(`browser-qa/t19-grid-*.png`); `/` stays static; all three cards
+live-verified on time.neima.me.
+
+**T11 — body-doubling companion (continued same session).** An ambient
+"focus with someone" presence, honest about being the app and not a fake
+human. `src/lib/companion.ts` (pure, 8 tests): deterministic line rotation
+every 4 minutes derived from elapsed time — no new timers, a re-render can
+never flicker the copy — with steady dedicated lines for paused ("Paused
+together — take your moment") and overtime ("Still with you — wrap up
+whenever it feels right"); a never-shames test locks the register. Device-
+local preference (a vibe, not data — never synced); the Body double ritual
+switches it on; a Companion toggle on Focus setup; during a session a calm
+card under the ring (breathing dot rides `animate-pulse`, so H9's
+reduced-stimulation rules already quiet it) with a "Solo" escape that also
+clears the pref. New E2E spec covers ritual→on→card→Solo→pref-cleared and
+completes its session so the shared account stays clean. 541 unit tests,
+7/7 E2E. Evidence: `browser-qa/t11-{setup,session}.png`.
+
+**Round-3 tracker reconciled again:** T14 (PWA polish) was shipped across
+waves — InstallPrompt (wave 1), SW cached-shell offline fallback (6B),
+icons/manifest shortcuts (wave 4) — now ticked with provenance. Remaining
+open: **T8** (iOS widget accuracy) and **T20's iOS-suite-green half** —
+both need the simulator toolchain, plus the iOS "not done" label.
+
+**Next:** T8 + iOS suite green (one simulator cycle closes the whole
+round-3 tracker), then the iOS "not done" label.
 
 
 ## 2026-07-24 — Round 7: cross-platform completion + backlog truth (Opus, session 2 cont.)

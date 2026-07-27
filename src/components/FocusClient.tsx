@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Coffee, Pause, Play, Plus, SkipForward } from "lucide-react";
 import { celebrate } from "./Celebration";
+import { companionLine, readCompanionPref, writeCompanionPref } from "@/lib/companion";
 
 /**
  * Named session presets (P14 — rituals). One tap sets the whole frame: what
@@ -142,6 +143,22 @@ export function FocusClient({
   const [checklist, setChecklist] = useState<{ label: string; done: boolean }[] | null>(null);
   const [checklistRev, setChecklistRev] = useState<number | null>(null);
   const [linkedTitle, setLinkedTitle] = useState<string | null>(null);
+  /** Companion mode (T11 — body doubling): quiet presence during the session.
+   *  Device-local preference; the "Body double" ritual switches it on. */
+  const [companion, setCompanion] = useState(false);
+
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setCompanion(readCompanionPref());
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
+
+  const toggleCompanion = useCallback(() => {
+    setCompanion((prev) => {
+      writeCompanionPref(!prev);
+      return !prev;
+    });
+  }, []);
 
   useEffect(() => {
     if (!activityId) return;
@@ -563,6 +580,8 @@ export function FocusClient({
                     setTitle(r.title);
                     setEmoji(r.emoji);
                     setDurationMin(r.min);
+                    // The body-double ritual is the companion's front door.
+                    if (r.id === "double" && !companion) toggleCompanion();
                     // Auto-start the ritual's vibe (the click is the gesture
                     // Web Audio needs). AmbientSounds, mounted in the shell,
                     // picks this up and plays it.
@@ -585,8 +604,23 @@ export function FocusClient({
           </div>
         )}
 
+        <button
+          type="button"
+          aria-pressed={companion}
+          onClick={toggleCompanion}
+          title="A quiet presence that stays with you through the session"
+          className={`mt-6 inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none ${
+            companion
+              ? "border-iris bg-iris-soft text-iris"
+              : "border-border bg-surface text-ink-soft hover:text-ink"
+          }`}
+        >
+          <span aria-hidden>🫂</span>
+          Companion {companion ? "on" : "off"} · quiet company while you work
+        </button>
+
         <div
-          className="mt-6 flex items-center gap-1.5 rounded-full border border-border bg-surface p-1 shadow-card"
+          className="mt-4 flex items-center gap-1.5 rounded-full border border-border bg-surface p-1 shadow-card"
           role="group"
           aria-label="Session length"
         >
@@ -698,6 +732,38 @@ export function FocusClient({
             </button>
           </div>
         </div>
+      )}
+
+      {companion && (
+        <section
+          aria-label="Companion"
+          className="mt-6 flex w-full max-w-sm items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3 shadow-card"
+        >
+          <span
+            className="relative grid size-9 shrink-0 place-items-center rounded-full bg-iris-soft"
+            aria-hidden
+          >
+            <span className="size-2.5 animate-pulse rounded-full bg-iris" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">
+              Companion
+            </p>
+            <p className="text-[13.5px] font-semibold text-ink-soft">
+              {companionLine(
+                Math.max(0, session.targetDurationMin - Math.ceil(remainingSec / 60)),
+                isPaused ? "paused" : inOvertime ? "overtime" : "running",
+              )}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={toggleCompanion}
+            className="shrink-0 rounded-lg px-2 py-1 text-[12px] font-semibold text-ink-faint transition-colors hover:bg-surface-sunken hover:text-ink"
+          >
+            Solo
+          </button>
+        </section>
       )}
 
       {(checklist ?? steps.map((s) => ({ label: s, done: false }))).length > 0 && (
