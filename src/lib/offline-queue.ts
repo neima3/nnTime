@@ -51,6 +51,14 @@ export function rememberUser(userId: string): void {
   } catch {}
 }
 
+/** Forget the remembered user — called on sign-out so a signed-out device
+ *  stops initializing the queue (ADR-002: purge on logout/account switch). */
+export function forgetUser(): void {
+  try {
+    localStorage.removeItem(LAST_USER_KEY);
+  } catch {}
+}
+
 /** The session's user id if known, else the last one seen on this device. */
 export function resolveQueueUser(userId: string | null | undefined): string | null {
   if (userId) {

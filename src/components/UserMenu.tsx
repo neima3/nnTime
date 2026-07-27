@@ -2,8 +2,19 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSyncExternalStore } from "react";
 import { LogIn, LogOut } from "lucide-react";
 import { signOut, useSession } from "@/lib/auth-client";
+import { forgetUser, purgeUserCache } from "@/lib/offline-queue";
+
+function subscribeOnline(onChange: () => void): () => void {
+  window.addEventListener("online", onChange);
+  window.addEventListener("offline", onChange);
+  return () => {
+    window.removeEventListener("online", onChange);
+    window.removeEventListener("offline", onChange);
+  };
+}
 
 /**
  * Session-aware footer control for the app shell. Shows the signed-in user and
@@ -13,8 +24,16 @@ import { signOut, useSession } from "@/lib/auth-client";
 export function UserMenu() {
   const router = useRouter();
   const { data, isPending } = useSession();
+  const online = useSyncExternalStore(
+    subscribeOnline,
+    () => navigator.onLine,
+    () => true,
+  );
 
-  if (isPending) {
+  // Offline, the session fetch can fail or never resolve — that is not
+  // evidence the user signed out, and "Sign in" is a dead end without a
+  // network anyway. Hold the neutral placeholder instead.
+  if (isPending || (!data?.user && !online)) {
     return <div className="h-11 animate-pulse rounded-xl bg-surface-sunken" aria-hidden />;
   }
 
@@ -32,8 +51,12 @@ export function UserMenu() {
 
   const label = data.user.name || data.user.email;
   const initial = (label ?? "?").trim().charAt(0).toUpperCase();
+  const userId = data.user.id;
 
   async function handleSignOut() {
+    // ADR-002: offline caches are personal data — purge them with the session.
+    await purgeUserCache(userId).catch(() => {});
+    forgetUser();
     await signOut();
     router.push("/");
     router.refresh();
