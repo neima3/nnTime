@@ -7,6 +7,7 @@ import {
 } from "next/font/google";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { InstallPrompt } from "@/components/InstallPrompt";
+import { HydrationMarker } from "@/components/HydrationMarker";
 import { ThemeScript } from "./theme-script";
 import "./globals.css";
 
@@ -68,6 +69,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <ServiceWorkerRegister />
         <InstallPrompt />
+        <HydrationMarker />
         {children}
       </body>
     </html>
