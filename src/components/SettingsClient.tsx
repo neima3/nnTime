@@ -591,6 +591,24 @@ export function SettingsClient() {
             />
           }
         />
+        <Row
+          label="Start-of-block reminders"
+          hint="The push nudge when a scheduled activity begins — off silences just these, other nudges stay"
+          right={
+            <Toggle
+              label="Start-of-block reminders"
+              on={settings.notificationPrefs.startNudges !== false}
+              onChange={(v) =>
+                void patch({
+                  notificationPrefs: {
+                    ...settings.notificationPrefs,
+                    startNudges: v,
+                  },
+                })
+              }
+            />
+          }
+        />
         <QuietHoursRows
           prefs={settings.notificationPrefs}
           hourCycle={settings.hourCycle}

@@ -8,6 +8,7 @@ import {
   parseQuietHours,
   quietWindowHours,
   writeQuietHours,
+  startNudgesEnabled,
 } from "./quiet-hours";
 
 describe("parseQuietHours", () => {
@@ -195,5 +196,23 @@ describe("describeQuietHours", () => {
       describeQuietHours({ enabled: false, start: 22, end: 7 }),
     ].join(" ");
     expect(copy).not.toMatch(/error|failed|cannot|must|warning/i);
+  });
+});
+
+describe("startNudgesEnabled (per-type toggle)", () => {
+  it("defaults ON for absent, empty, or malformed prefs", () => {
+    expect(startNudgesEnabled(undefined)).toBe(true);
+    expect(startNudgesEnabled(null)).toBe(true);
+    expect(startNudgesEnabled({})).toBe(true);
+    expect(startNudgesEnabled([])).toBe(true);
+    expect(startNudgesEnabled("nope")).toBe(true);
+    expect(startNudgesEnabled({ quietHours: { enabled: true } })).toBe(true);
+  });
+
+  it("only an explicit false disables", () => {
+    expect(startNudgesEnabled({ startNudges: false })).toBe(false);
+    expect(startNudgesEnabled({ startNudges: true })).toBe(true);
+    expect(startNudgesEnabled({ startNudges: 0 })).toBe(true);
+    expect(startNudgesEnabled({ startNudges: "false" })).toBe(true);
   });
 });

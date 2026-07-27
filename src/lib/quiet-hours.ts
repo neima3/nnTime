@@ -73,6 +73,16 @@ export function isQuietAt(prefs: unknown, hour: number): boolean {
   return inQuietHours(hour, parseQuietHours(prefs));
 }
 
+/**
+ * Per-type toggle: start-of-block push nudges. Absent means ON — they are the
+ * core reminder and predate the toggle — so only an explicit `false` (the
+ * Settings switch) turns them off. Same flat-key shape as transitionWarnings.
+ */
+export function startNudgesEnabled(prefs: unknown): boolean {
+  if (!prefs || typeof prefs !== "object" || Array.isArray(prefs)) return true;
+  return (prefs as Record<string, unknown>).startNudges !== false;
+}
+
 /** Merge a window back into a prefs blob, leaving every other key untouched. */
 export function writeQuietHours(
   prefs: Record<string, unknown> | null | undefined,

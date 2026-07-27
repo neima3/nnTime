@@ -1,5 +1,99 @@
 # Progress log
 
+## 2026-07-26 — Round 8: offline conflict decision + E2E suite land (Fable)
+
+Picked up the two items Round 7 named as the real gaps: the ADR-002 conflict
+decision blocking the rest of the offline queue (T13), and E2E coverage (T15).
+Also shipped the previous session's stranded commit: fcc546c (the 12/24-hour
+fix) was sitting unpushed while production ran without it.
+
+**T13 — offline completions, decided and shipped.** ADR-002 already contained
+the answer ("stale revision → 409, client must rebase"; completion conflicts
+resolve by planner_events ordering) — recorded it as three mutation classes in
+the ADR and implemented class 2:
+- **Rebase-on-replay**: a queued complete/uncomplete PATCH carries no pinned
+  revision; at flush time the queue GETs the resource and uses the *fresh*
+  revision as If-Match. Safe because a status-only patch touches no other
+  field group. 404 on re-read (deleted while offline) → terminal conflict UI;
+  409 on replay → retry (next flush re-reads again). The activities [id] PATCH
+  now honors Idempotency-Key (withIdempotency existed since 1A but only
+  creates used it), so a replay whose response was lost can't double-apply.
+- Today's timeline queues status flips offline with an optimistic overlay;
+  a new `kairo:queue-drained` event refreshes pages when a flush lands.
+- Field edits / checklist overrides / deletes stay honestly unqueued (class 3)
+  until a real merge UI exists.
+- +7 unit tests pin the rebase contract. Verified in-browser both directions
+  (offline complete → reconnect → server completed; offline uncomplete →
+  server pending; queue drains to 0, exactly one PATCH each).
+
+**Found while verifying: the SSR clock-format flash.** A fresh h12 account's
+served HTML rendered 7:00/13:00, then hydration repainted to 7 AM/1:00 PM —
+useHourCycle's server snapshot was hardcoded "h24", the exact flash its own
+comment claimed to prevent. The /app layout now provides the account's hour
+cycle via HourCycleContext; the served HTML carries the right format in the
+first byte (fetch-verified: no '7:00' anywhere in an h12 account's payload).
+
+**T15 — Playwright E2E suite, in CI.** Five specs against a real browser +
+real server: settled-auth setup (one sign-up/run via storageState — stays
+clear of the 10/10min auth rate limit), plan→complete→persists, quick capture
+→ inbox, clock format (including the SSR payload assertion), and offline
+replay under real network emulation (context.setOffline). Two consecutive
+cold-server full-suite runs green locally; CI gained an `e2e` job (service
+Postgres + pnpm start; the app self-migrates on boot). Test-enabling product
+change: `HydrationMarker` stamps data-hydrated on <html> — pre-hydration
+fills are wiped and a pre-hydration submit degrades to a native GET reload,
+so the marker is the only honest "safe to interact" signal.
+
+**The suite immediately earned its keep — two real bugs manual drills missed
+(a warm client-session cache had hidden both):**
+1. **Offline masqueraded as signed-out.** With a cold cache, useSession()
+   fails/never resolves offline: the sidebar flipped to "Sign in" for a
+   signed-in user, and OfflineShell passed userId=null — which silently
+   killed the offline banner AND the reconnect flush. OfflineShell now falls
+   back to the device's remembered user (resolveQueueUser — Round 7's own
+   fix, finally applied at the shell), and UserMenu holds its placeholder
+   instead of claiming signed-out while the network is down.
+2. **purgeUserCache had ZERO callers** — ADR-002's "purge on logout" was
+   never wired (the same infrastructure-without-wiring shape Round 7 found
+   twice). Sign-out now purges the user's queued mutations and forgets the
+   remembered id, which is also what makes the shell fallback safe.
+
+**Trap for later sessions:** `pnpm add` while the dev server runs leaves it
+serving a stale turbopack chunk graph — hydration dies page-wide with
+"module factory is not available", and every browser that visited keeps the
+broken chunks in cache (a plain reload does NOT recover; hard-reload or a
+fresh profile does). Restart the dev server (rm -rf .next) after installs.
+
+**Per-type notification toggles (backlog item, closed).** notificationPrefs
+gains a flat `startNudges` key (absent = ON — they're the core reminder, so
+only the explicit Settings switch turns them off); `startNudgesEnabled()` in
+quiet-hours.ts is the single read point and deliverDueNudges suppresses before
+the quiet-hours check. New "Start-of-block reminders" row in web Settings →
+Notifications. Verified in-browser: toggle → PATCH → `startNudges:false` in
+the DB → survives reload → restored. Syncs to iOS via the same prefs blob
+(iOS merge preserves keys it doesn't model). 524 tests.
+
+**Ship gate:** lint + typecheck + **524 tests** + build green; E2E 5/5 twice
+from cold; parity holds (web 88.46%, iOS 86.52%, both gates PASS); CI green
+including the first e2e-job run; deployed to time.neima.me.
+
+**Live-verified on production (QA account, evidence in-transcript):**
+- 12/24 fix live: timeline gutter "7 AM…11 PM", block "1:00 PM – 1:45 PM",
+  `data-hour-cycle="h12"` stamped, and the SERVED payload carries "9 AM"/
+  "1:00 PM" with zero "9:00" — the SSR fix live end to end.
+- T13 on prod: offline → complete → one PATCH queued in IndexedDB with the
+  rebase marker, offline banner up, NO "Sign in" masquerade → reconnect →
+  queue drained to 0 → `status:"completed"` from the day API. QA row deleted
+  afterwards (204).
+- `data-hydrated` marker present on the live document (build-unique to this
+  round's code).
+
+**Next:** estimate calibration surfaced on the block (T12 — design-sensitive,
+left clean for a fresh session), landing refresh (T19), performance pass
+(T16), copy audit round 2 (T18), iOS widget/Live-Activity accuracy (T8),
+body-doubling companion mode (T11).
+
+
 ## 2026-07-24 — Round 7: cross-platform completion + backlog truth (Opus, session 2 cont.)
 
 Round 6 closed, so this round finished what it exposed: the accessibility work

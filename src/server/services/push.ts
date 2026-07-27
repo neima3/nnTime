@@ -12,7 +12,7 @@ import dbDefault from "../db";
 import * as schema from "../db/schema";
 import { getOrCreateSettings } from "../dal";
 import { instantToWallFields } from "../temporal/zone";
-import { isQuietAt } from "@/lib/quiet-hours";
+import { isQuietAt, startNudgesEnabled } from "@/lib/quiet-hours";
 import { and, eq, isNull, gte, lte, sql } from "drizzle-orm";
 
 let configured = false;
@@ -127,8 +127,13 @@ export async function deliverDueNudges(
       continue;
     }
 
-    // Quiet hours (per user timezone).
+    // Per-type toggle + quiet hours (per user timezone).
     const settings = await getOrCreateSettings(job.userId);
+    if (!startNudgesEnabled(settings.notificationPrefs)) {
+      suppressed++;
+      await markSent(db, job.id);
+      continue;
+    }
     const hour = instantToWallFields(job.occurredAt, settings.timezone).hour;
     if (isQuietAt(settings.notificationPrefs, hour)) {
       suppressed++;
