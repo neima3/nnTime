@@ -5,7 +5,7 @@
  * interactive TimelineCanvas. Handles optimistic mutations via /api/v1.
  */
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TimelineCanvas } from "./TimelineCanvas";
 import type { Activity } from "@/lib/mock";
@@ -13,6 +13,7 @@ import { localMinutesToInstant } from "@/lib/adapters";
 import { toast } from "./Toast";
 import { notifyDayChanged } from "./NowBar";
 import { useLowBattery } from "./LowBattery";
+import { enqueueMutation, resolveQueueUser } from "@/lib/offline-queue";
 
 interface TodayTimelineProps {
   activities: Activity[];
@@ -34,6 +35,20 @@ export function TodayTimeline({
 }: TodayTimelineProps) {
   const router = useRouter();
   const lowBattery = useLowBattery(date);
+
+  // Done-state toggled while offline, shown until the queue replays it and the
+  // server re-render takes over (T13 / ADR-002 rebase-on-replay).
+  const [offlineDone, setOfflineDone] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const onDrained = () => {
+      setOfflineDone({});
+      router.refresh();
+      notifyDayChanged();
+    };
+    window.addEventListener("kairo:queue-drained", onDrained);
+    return () => window.removeEventListener("kairo:queue-drained", onDrained);
+  }, [router]);
 
   const handleUpdateActivity = useCallback(
     async (id: string, start: number, duration: number): Promise<{ ok: boolean }> => {
@@ -109,14 +124,46 @@ export function TodayTimeline({
       if (!authed) return { ok: false };
       try {
         const act = activities.find((a) => a.id === id);
+        const occurrenceKey = act?.occurrenceKey;
+        const currentDone = offlineDone[id] ?? act?.done ?? false;
+        const nextStatus = currentDone ? "pending" : "completed";
+
+        // Offline (T13): a status flip is the one edit that's safe to replay —
+        // it touches nothing else, so the queue re-reads the revision on
+        // reconnect (rebase-on-replay) and can't clobber a concurrent edit.
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          const queueUser = resolveQueueUser(null);
+          const queued = queueUser
+            ? await enqueueMutation(queueUser, {
+                method: "PATCH",
+                path: `/api/v1/activities/${id}`,
+                rebasePath: `/api/v1/activities/${id}`,
+                body: {
+                  editScope: "this",
+                  occurrenceKey,
+                  status: nextStatus,
+                  completedAt:
+                    nextStatus === "completed" ? new Date().toISOString() : null,
+                },
+                idempotencyKey: crypto.randomUUID(),
+              })
+            : null;
+          if (!queued) return { ok: false };
+          setOfflineDone((prev) => ({ ...prev, [id]: nextStatus === "completed" }));
+          toast(
+            nextStatus === "completed"
+              ? "Done — saved on this device, syncs when you're back"
+              : "Restored — syncs when you're back",
+          );
+          return { ok: true };
+        }
+
         let revision = act?.revision;
         if (revision == null) {
           const getRes = await fetch(`/api/v1/activities/${id}`);
           if (!getRes.ok) return { ok: false };
           revision = (await getRes.json()).revision;
         }
-        const occurrenceKey = act?.occurrenceKey;
-        const nextStatus = act?.done ? "pending" : "completed";
 
         const res = await fetch(`/api/v1/activities/${id}`, {
           method: "PATCH",
@@ -141,7 +188,7 @@ export function TodayTimeline({
         return { ok: false };
       }
     },
-    [activities, authed, router],
+    [activities, authed, router, offlineDone],
   );
 
   const handleToggleStep = useCallback(
@@ -213,9 +260,19 @@ export function TodayTimeline({
     [activities, router],
   );
 
+  const shownActivities = useMemo(
+    () =>
+      Object.keys(offlineDone).length === 0
+        ? activities
+        : activities.map((a) =>
+            offlineDone[a.id] == null ? a : { ...a, done: offlineDone[a.id] },
+          ),
+    [activities, offlineDone],
+  );
+
   return (
     <TimelineCanvas
-      activities={activities}
+      activities={shownActivities}
       lowBattery={lowBattery}
       nowMin={nowMin}
       showNowLine={isToday}

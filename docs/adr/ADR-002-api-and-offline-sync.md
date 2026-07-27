@@ -44,6 +44,27 @@ Status: **Accepted** (2026-07-12). Binding on web AND iOS clients.
   id), never store auth responses, and are purged on logout/account switch.
   iOS local store uses an appropriate data-protection class.
 
+### Which mutations may be queued offline (decided 2026-07-26)
+A queued mutation replays minutes-to-days later; whether that replay is safe
+depends on what the mutation can clobber, so mutations fall into three classes:
+1. **Replay-safe creates** — plain POSTs carrying an `Idempotency-Key`, no
+   revision to go stale (e.g. inbox capture). Queue freely.
+2. **Rebase-on-replay status changes** — complete / uncomplete / skip. The
+   queue entry carries **no pinned revision**; at flush time the client GETs
+   the resource, uses the *fresh* `revision` as `If-Match`, and replays. This
+   is safe precisely because a status-only patch touches no other field group
+   — under LWW-per-field-group it cannot clobber a concurrent edit, and
+   completion conflicts already resolve by `planner_events` ordering (above).
+   A 404 on the re-read (deleted while offline) is terminal → conflict UI.
+   A 409 on the replay retries (the next flush re-reads again). The server
+   endpoint MUST honor `Idempotency-Key` so a replay whose response was lost
+   cannot double-apply.
+3. **Never queued** — general field edits, checklist overrides, deletes, and
+   anything focus-session (server-authoritative). These require a live
+   `If-Match` against the revision the user actually saw; replaying them later
+   could silently overwrite another device's edits. They fail honestly while
+   offline until a real merge UI exists.
+
 ## Caching rules (Next.js cacheComponents)
 - All user data responses `Cache-Control: private, no-store`.
 - `use cache` never wraps user-scoped queries unless the cache key provably

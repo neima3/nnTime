@@ -7,8 +7,13 @@
  * `useSession()` had not resolved, so a signed-in user's offline capture was
  * refused with "this device can't hold it".
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { rememberUser, resolveQueueUser } from "./offline-queue";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import {
+  rememberUser,
+  resolveQueueUser,
+  executeMutation,
+  type QueuedMutation,
+} from "./offline-queue";
 
 const KEY = "kairo-last-user";
 
@@ -76,5 +81,101 @@ describe("resolveQueueUser", () => {
 
   it("does nothing surprising with an empty string", () => {
     expect(resolveQueueUser("")).toBeNull();
+  });
+});
+
+/**
+ * Rebase-on-replay (ADR-002 §offline mutation classes): a queued status change
+ * carries no pinned revision — at flush time the queue re-reads the resource
+ * and uses the fresh revision as If-Match. These tests pin that contract.
+ */
+describe("executeMutation rebase-on-replay", () => {
+  const baseMutation: QueuedMutation = {
+    userId: "user-1",
+    method: "PATCH",
+    path: "/api/v1/activities/act-1",
+    rebasePath: "/api/v1/activities/act-1",
+    body: { editScope: "this", status: "completed" },
+    idempotencyKey: "key-1",
+    createdAt: "2026-07-26T12:00:00Z",
+    attempts: 0,
+    status: "pending",
+  };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function jsonResponse(status: number, body: unknown): Response {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  it("re-reads the resource and replays with the fresh revision as If-Match", async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+      calls.push({ url, init });
+      if (!init) return jsonResponse(200, { id: "act-1", revision: 7 });
+      return jsonResponse(200, { id: "act-1", revision: 8 });
+    });
+
+    const result = await executeMutation(baseMutation);
+    expect(result).toEqual({ success: true, terminal: false });
+    expect(calls).toHaveLength(2);
+    // First call is the bare re-read, second the PATCH with the fresh revision.
+    expect(calls[0].init).toBeUndefined();
+    const headers = calls[1].init?.headers as Record<string, string>;
+    expect(headers["If-Match"]).toBe("7");
+    expect(headers["Idempotency-Key"]).toBe("key-1");
+    expect(calls[1].init?.method).toBe("PATCH");
+  });
+
+  it("is terminal when the item was deleted while offline (404 on re-read)", async () => {
+    vi.stubGlobal("fetch", async () => jsonResponse(404, { error: { message: "gone" } }));
+    const result = await executeMutation(baseMutation);
+    expect(result.terminal).toBe(true);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/deleted while you were offline/);
+  });
+
+  it("retries (not terminal) when the re-read hits a 5xx", async () => {
+    vi.stubGlobal("fetch", async () => jsonResponse(503, {}));
+    const result = await executeMutation(baseMutation);
+    expect(result).toMatchObject({ success: false, terminal: false });
+  });
+
+  it("retries a 409 on the replay — the next flush re-reads again", async () => {
+    let first = true;
+    vi.stubGlobal("fetch", async () => {
+      if (first) {
+        first = false;
+        return jsonResponse(200, { revision: 7 });
+      }
+      return jsonResponse(409, { error: { message: "conflict" } });
+    });
+    const result = await executeMutation(baseMutation);
+    expect(result).toMatchObject({ success: false, terminal: false });
+  });
+
+  it("keeps a 409 terminal for non-rebase mutations (pinned revision truly stale)", async () => {
+    vi.stubGlobal("fetch", async () => jsonResponse(409, { error: { message: "conflict" } }));
+    const result = await executeMutation({ ...baseMutation, rebasePath: undefined });
+    expect(result.terminal).toBe(true);
+  });
+
+  it("is terminal when the re-read returns a body without a revision", async () => {
+    vi.stubGlobal("fetch", async () => jsonResponse(200, { id: "act-1" }));
+    const result = await executeMutation(baseMutation);
+    expect(result.terminal).toBe(true);
+  });
+
+  it("retries on a network error during the re-read", async () => {
+    vi.stubGlobal("fetch", async () => {
+      throw new TypeError("Failed to fetch");
+    });
+    const result = await executeMutation(baseMutation);
+    expect(result).toMatchObject({ success: false, terminal: false });
   });
 });

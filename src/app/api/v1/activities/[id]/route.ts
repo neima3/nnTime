@@ -12,8 +12,12 @@ import {
   appendPlannerEvent,
 } from "@/server/dal";
 import { handleErrors, errorResponse, parseBody } from "@/server/api-errors";
-import { activitySeriesUpdate } from "@/server/schemas/activity-series";
+import {
+  activitySeriesUpdate,
+  type ActivitySeriesUpdate,
+} from "@/server/schemas/activity-series";
 import { editSeriesOccurrence } from "@/server/services/recurrence";
+import { withIdempotency } from "@/server/idempotency";
 
 export async function GET(
   _request: Request,
@@ -47,77 +51,91 @@ export async function PATCH(
     const body = await parseBody(request, activitySeriesUpdate);
     if (body instanceof Response) return body;
 
-    const {
-      editScope,
-      occurrenceKey: occurrenceKeyRaw,
-      status,
-      startAt,
-      completedAt,
-      ...seriesFields
-    } = body;
-
-    const scope = editScope ?? "all";
-    const series = await getActivitySeries(userId, id);
-    const occurrenceKey = occurrenceKeyRaw
-      ? new Date(occurrenceKeyRaw)
-      : series.dtstartLocal;
-
-    // Coerce ISO strings → Date for DB columns.
-    const patch: Record<string, unknown> = { ...seriesFields };
-    if (typeof patch.dtstartLocal === "string") {
-      patch.dtstartLocal = new Date(patch.dtstartLocal);
-    }
-    if (Array.isArray(patch.rdate)) {
-      patch.rdate = (patch.rdate as string[]).map((d) => new Date(d));
-    }
-    if (status !== undefined) patch.status = status;
-    if (startAt !== undefined) patch.startAt = new Date(startAt);
-    if (completedAt !== undefined) {
-      patch.completedAt = completedAt === null ? null : new Date(completedAt);
-    }
-
-    await editSeriesOccurrence(
-      userId,
-      id,
-      occurrenceKey,
-      scope,
-      patch,
-      Number(ifMatch),
+    // Offline replays (ADR-002): a queued status change whose response was
+    // lost must not double-apply on retry — replay the stored result instead.
+    const idemKey = request.headers.get("idempotency-key");
+    return withIdempotency(userId, idemKey, "PATCH", `/api/v1/activities/${id}`, () =>
+      applyPatch(userId, id, ifMatch, body),
     );
+  });
+}
 
-    // History for stats/streaks (ADR-001 planner_events).
-    if (status === "completed") {
-      await appendPlannerEvent(userId, {
-        entityType: "activity_series",
-        entityId: id,
-        eventType: "complete",
-        payload: { occurrenceKey: occurrenceKey.toISOString() },
-      }).catch(() => {});
-    } else if (status === "skipped") {
-      await appendPlannerEvent(userId, {
-        entityType: "activity_series",
-        entityId: id,
-        eventType: "skip",
-        payload: { occurrenceKey: occurrenceKey.toISOString() },
-      }).catch(() => {});
-    } else if (status === "pending" && completedAt === null) {
-      await appendPlannerEvent(userId, {
-        entityType: "activity_series",
-        entityId: id,
-        eventType: "uncomplete",
-        payload: {},
-      }).catch(() => {});
-    }
+async function applyPatch(
+  userId: string,
+  id: string,
+  ifMatch: string,
+  body: ActivitySeriesUpdate,
+): Promise<Response> {
+  const {
+    editScope,
+    occurrenceKey: occurrenceKeyRaw,
+    status,
+    startAt,
+    completedAt,
+    ...seriesFields
+  } = body;
 
-    // For this_and_future the "current" series may be the truncated original;
-    // clients re-fetch the day. For all/this return the still-current master.
-    const updated = await getActivitySeries(userId, id);
-    return Response.json(updated, {
-      headers: {
-        "cache-control": "private, no-store",
-        ETag: String(updated.revision),
-      },
-    });
+  const scope = editScope ?? "all";
+  const series = await getActivitySeries(userId, id);
+  const occurrenceKey = occurrenceKeyRaw
+    ? new Date(occurrenceKeyRaw)
+    : series.dtstartLocal;
+
+  // Coerce ISO strings → Date for DB columns.
+  const patch: Record<string, unknown> = { ...seriesFields };
+  if (typeof patch.dtstartLocal === "string") {
+    patch.dtstartLocal = new Date(patch.dtstartLocal);
+  }
+  if (Array.isArray(patch.rdate)) {
+    patch.rdate = (patch.rdate as string[]).map((d) => new Date(d));
+  }
+  if (status !== undefined) patch.status = status;
+  if (startAt !== undefined) patch.startAt = new Date(startAt);
+  if (completedAt !== undefined) {
+    patch.completedAt = completedAt === null ? null : new Date(completedAt);
+  }
+
+  await editSeriesOccurrence(
+    userId,
+    id,
+    occurrenceKey,
+    scope,
+    patch,
+    Number(ifMatch),
+  );
+
+  // History for stats/streaks (ADR-001 planner_events).
+  if (status === "completed") {
+    await appendPlannerEvent(userId, {
+      entityType: "activity_series",
+      entityId: id,
+      eventType: "complete",
+      payload: { occurrenceKey: occurrenceKey.toISOString() },
+    }).catch(() => {});
+  } else if (status === "skipped") {
+    await appendPlannerEvent(userId, {
+      entityType: "activity_series",
+      entityId: id,
+      eventType: "skip",
+      payload: { occurrenceKey: occurrenceKey.toISOString() },
+    }).catch(() => {});
+  } else if (status === "pending" && completedAt === null) {
+    await appendPlannerEvent(userId, {
+      entityType: "activity_series",
+      entityId: id,
+      eventType: "uncomplete",
+      payload: {},
+    }).catch(() => {});
+  }
+
+  // For this_and_future the "current" series may be the truncated original;
+  // clients re-fetch the day. For all/this return the still-current master.
+  const updated = await getActivitySeries(userId, id);
+  return Response.json(updated, {
+    headers: {
+      "cache-control": "private, no-store",
+      ETag: String(updated.revision),
+    },
   });
 }
 

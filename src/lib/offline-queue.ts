@@ -75,6 +75,14 @@ export interface QueuedMutation {
   attempts: number;
   lastError?: string;
   status: "pending" | "terminal";
+  /**
+   * Rebase-on-replay (ADR-002): GET this path at flush time and use the
+   * fresh `revision` as If-Match, instead of a revision pinned at enqueue
+   * time (stale by replay). Only status-only mutations may opt in — they
+   * touch no other fields, so replaying against any revision is safe.
+   * A 404 on the re-read means the item was deleted while offline → terminal.
+   */
+  rebasePath?: string;
 }
 
 /**
@@ -139,6 +147,7 @@ export async function flushQueue(userId: string): Promise<void> {
     .filter((m) => m.userId === userId && m.status === "pending")
     .sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
 
+  let flushed = 0;
   for (const mut of pending) {
     const result = await executeMutation(mut);
     if (result.terminal) {
@@ -163,27 +172,64 @@ export async function flushQueue(userId: string): Promise<void> {
     } else {
       // Success — remove from queue.
       await removeMutation(mut.id!);
+      flushed++;
     }
+  }
+
+  // Something landed on the server — let mounted pages re-read truth
+  // (Today re-renders replayed completions, the inbox shows captures).
+  if (flushed > 0) {
+    window.dispatchEvent(
+      new CustomEvent("kairo:queue-drained", { detail: { flushed } }),
+    );
   }
 }
 
-/** Execute a single mutation via fetch. */
-async function executeMutation(
+/** Execute a single mutation via fetch. Exported for tests only. */
+export async function executeMutation(
   mut: QueuedMutation,
 ): Promise<{ success: boolean; terminal: boolean; error?: string }> {
   try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Idempotency-Key": mut.idempotencyKey,
+    };
+
+    // Rebase-on-replay: re-read the resource for a fresh If-Match revision.
+    if (mut.rebasePath) {
+      const readRes = await fetch(mut.rebasePath);
+      if (readRes.status === 404 || readRes.status === 410) {
+        return {
+          success: false,
+          terminal: true,
+          error: "This item was deleted while you were offline",
+        };
+      }
+      if (readRes.status === 429 || readRes.status >= 500) {
+        return { success: false, terminal: false, error: `HTTP ${readRes.status} on re-read` };
+      }
+      if (!readRes.ok) {
+        return { success: false, terminal: true, error: `HTTP ${readRes.status} on re-read` };
+      }
+      const current = (await readRes.json().catch(() => null)) as
+        | { revision?: number }
+        | null;
+      if (current?.revision == null) {
+        return { success: false, terminal: true, error: "Couldn't read the current version" };
+      }
+      headers["If-Match"] = String(current.revision);
+    }
+
     const res = await fetch(mut.path, {
       method: mut.method,
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": mut.idempotencyKey,
-        ...(mut.body ? {} : {}),
-      },
+      headers,
       body: mut.body ? JSON.stringify(mut.body) : undefined,
     });
 
     if (res.ok) return { success: true, terminal: false };
-    if (res.status === 429 || res.status >= 500) {
+    // Under rebase a 409 means a write landed between our re-read and the
+    // replay — the next flush re-reads again, so retry rather than give up.
+    if (res.status === 429 || res.status >= 500 || (res.status === 409 && mut.rebasePath)) {
       const body = await res.json().catch(() => ({}));
       return { success: false, terminal: false, error: body?.error?.message ?? `HTTP ${res.status}` };
     }
