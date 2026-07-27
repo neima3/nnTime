@@ -179,8 +179,27 @@ icons/manifest shortcuts (wave 4) — now ticked with provenance. Remaining
 open: **T8** (iOS widget accuracy) and **T20's iOS-suite-green half** —
 both need the simulator toolchain, plus the iOS "not done" label.
 
-**Next:** T8 + iOS suite green (one simulator cycle closes the whole
-round-3 tracker), then the iOS "not done" label.
+**iOS cycle — T8 + labels + suite green (continued same session).** The
+up-next widget's accuracy gap was exactly the suspected shape: the day
+snapshot records its `date` but the provider never checked it, so after
+midnight (or days of not opening the app) the widget confidently rendered
+yesterday's plan as "next up". The provider now rejects snapshots from
+another day (honest empty state) and schedules a midnight flip entry so
+the change happens on time, not at the next hourly refresh. Also carried
+the copy audit's "incomplete → not done" into the iOS timeline
+(accessibilityLabel + custom action) with KairoFlowUITests updated to
+match. xcodegen + build + **full suite green against production:
+Executed 14 tests, 0 failures** (the real Executed line, per the
+false-green rule).
+
+**ROUND-3 TRACKER: 20/20 COMPLETE.** T8 and T20 were the last open boxes —
+T20's record: web 541 tests + 7/7 E2E + CI green (incl. e2e job),
+deployed + live-verified on time.neima.me; iOS full suite green. Every
+item now carries provenance for which round shipped it.
+
+**Next round candidates** (nothing tracked is open): deepen T11 (companion
+sounds/co-working timers), Apple Health writes (8B stretch), Android
+exploration, or a fresh feature-parity sweep against Tiimo's latest.
 
 
 ## 2026-07-24 — Round 7: cross-platform completion + backlog truth (Opus, session 2 cont.)

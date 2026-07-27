@@ -40,10 +40,26 @@ struct NextUpProvider: TimelineProvider {
                 .sorted()
                 .prefix(12)
             entries.append(contentsOf: boundaries.map { entry(at: $0.addingTimeInterval(1)) })
+
+            // T8: flip to the honest empty state the moment the day changes —
+            // without this, a snapshot written yesterday keeps rendering
+            // yesterday's plan as "next up" until the hourly refresh.
+            if let midnight = cal.nextDate(
+                after: now,
+                matching: DateComponents(hour: 0, minute: 0),
+                matchingPolicy: .nextTime
+            ) {
+                entries.append(entry(at: midnight.addingTimeInterval(1)))
+            }
         }
 
         // Refresh from the cache at least hourly.
         completion(Timeline(entries: entries, policy: .after(now.addingTimeInterval(3600))))
+    }
+
+    private func dayKey(_ date: Date, calendar cal: Calendar) -> String {
+        let c = cal.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
     }
 
     private func entry(at date: Date) -> NextUpEntry {
@@ -52,6 +68,14 @@ struct NextUpProvider: TimelineProvider {
         }
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = zone
+
+        // T8: a snapshot from another day must not masquerade as today. After
+        // midnight (or days of not opening the app) the cache holds an old
+        // plan — the honest empty state beats confidently-wrong blocks.
+        guard dayKey(date, calendar: cal) == snap.date else {
+            return NextUpEntry(date: date, block: nil, isCurrent: false, blocks: [], nowMin: 0)
+        }
+
         let comps = cal.dateComponents([.hour, .minute], from: date)
         let nowMin = (comps.hour ?? 0) * 60 + (comps.minute ?? 0)
 

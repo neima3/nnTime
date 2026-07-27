@@ -51,7 +51,7 @@ final class KairoFlowUITests: XCTestCase {
         let complete = app.buttons["Complete iOS flight check"].firstMatch
         XCTAssertTrue(complete.waitForExistence(timeout: 8))
         complete.tap()
-        let undo = app.buttons["Mark iOS flight check incomplete"].firstMatch
+        let undo = app.buttons["Mark iOS flight check not done"].firstMatch
         XCTAssertTrue(undo.waitForExistence(timeout: 10), "block should flip to done")
 
         // Drag-to-reschedule: long-press lift then pull down; label's time changes.

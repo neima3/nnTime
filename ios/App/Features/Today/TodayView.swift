@@ -678,7 +678,7 @@ struct BlockCard: View {
                 }
                 .frame(width: compact ? 26 : 30, height: compact ? 26 : 30)
             }
-            .accessibilityLabel(block.done ? "Mark \(block.title) incomplete" : "Complete \(block.title)")
+            .accessibilityLabel(block.done ? "Mark \(block.title) not done" : "Complete \(block.title)")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, compact ? 5 : 10)
@@ -725,7 +725,7 @@ struct BlockCard: View {
         .accessibilityLabel("\(block.title), \(KTime.hhmm(block.startMin)) to \(KTime.hhmm(block.endMin)), \(block.category.rawValue), \(block.done ? "done" : "not done")")
         .accessibilityAddTraits(.isButton)
         .accessibilityHint("Double tap to edit")
-        .accessibilityAction(named: block.done ? "Mark incomplete" : "Complete") { onComplete() }
+        .accessibilityAction(named: block.done ? "Mark not done" : "Complete") { onComplete() }
         .accessibilityAction(named: "Focus on this") { onFocus() }
         .accessibilityAction(named: "Delete") { onDelete() }
     }
