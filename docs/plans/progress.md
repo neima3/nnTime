@@ -101,9 +101,16 @@ sessions. New E2E spec pins: hint renders under the override, hint stays
 away without signal, aria-label carries the sentence. Visual evidence:
 `browser-qa/t12-usually-hint{,-block}.png`. 528 tests, 6/6 E2E.
 
-**Next:** landing refresh (T19), performance pass (T16), copy audit round 2
-(T18), iOS widget/Live-Activity accuracy (T8), body-doubling companion mode
-(T11).
+**T16 (measurement half).** Live landing re-measured post-rounds-7/8:
+Lighthouse mobile **perf 96** (FCP/LCP 2.1 s throttled, CLS 0, TBT 70 ms) and
+**a11y 100, zero failing audits** — the 6D ≥90 gate and P8's a11y bar both
+hold. Small drift from P8's perf 100 (2.1 s LCP vs 1.6 s); nothing regressed
+below gate, so the deep-perf work (bundle audit, /app/today measurement)
+stays queued rather than reactive.
+
+**Next:** landing refresh (T19), performance pass deep half (T16), copy audit
+round 2 (T18), iOS widget/Live-Activity accuracy (T8), body-doubling
+companion mode (T11).
 
 
 ## 2026-07-24 — Round 7: cross-platform completion + backlog truth (Opus, session 2 cont.)
