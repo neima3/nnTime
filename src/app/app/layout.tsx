@@ -11,6 +11,7 @@
  * session), while every product route gets the right surfaces from first paint.
  */
 import { A11yApply } from "@/components/A11yApply";
+import { HourCycleProvider } from "@/lib/use-hour-cycle";
 import { getSession } from "@/server/auth-session";
 import { getPersonalization } from "@/server/services/personalization";
 import {
@@ -52,7 +53,7 @@ export default async function AppLayout({
   // Signed out (or settings unreadable) means we have no account preference to
   // apply — and writing defaults here would clobber the local choice the root
   // ThemeScript just restored. Do nothing instead.
-  if (!known) return <>{children}</>;
+  if (!known) return <HourCycleProvider value="h24">{children}</HourCycleProvider>;
 
   // Reconcile <html> against the server's truth before the app paints. Runs
   // after the root ThemeScript (localStorage fast path), so a stored account
@@ -85,7 +86,7 @@ export default async function AppLayout({
           never runs an inline script. */}
       <script dangerouslySetInnerHTML={{ __html: code }} />
       <A11yApply tokens={serializeA11yPrefs(prefs)} theme={theme} hourCycle={hourCycle} />
-      {children}
+      <HourCycleProvider value={hourCycle}>{children}</HourCycleProvider>
     </>
   );
 }

@@ -10,7 +10,13 @@
  * Settings updates dispatch `kairo:hour-cycle`, which re-renders every consumer
  * without a reload.
  */
-import { useSyncExternalStore } from "react";
+import {
+  createContext,
+  createElement,
+  useContext,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import { toHourCycle, type HourCycle } from "./time-format";
 
 export const HOUR_CYCLE_EVENT = "kairo:hour-cycle";
@@ -26,9 +32,19 @@ function getSnapshot(): HourCycle {
   return toHourCycle(document.documentElement.dataset.hourCycle);
 }
 
-/** SSR has no DOM; 24-hour matches the pre-hydration markup the server emits. */
-function getServerSnapshot(): HourCycle {
-  return "h24";
+/**
+ * The server-known hour cycle, provided by the /app layout so SSR emits the
+ * right format in the first byte of HTML. A hardcoded server snapshot here
+ * meant every 12-hour account got 24-hour markup, visibly repainted after
+ * hydration — the exact flash this hook exists to prevent.
+ */
+const HourCycleContext = createContext<HourCycle>("h24");
+
+export function HourCycleProvider(props: {
+  value: HourCycle;
+  children: ReactNode;
+}) {
+  return createElement(HourCycleContext.Provider, { value: props.value }, props.children);
 }
 
 /** Publish a new hour cycle: stamp the DOM and tell every consumer. */
@@ -44,5 +60,6 @@ export function publishHourCycle(value: HourCycle): void {
  * and re-renders only when the value actually changes.
  */
 export function useHourCycle(): HourCycle {
-  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const serverValue = useContext(HourCycleContext);
+  return useSyncExternalStore(subscribe, getSnapshot, () => serverValue);
 }
