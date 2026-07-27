@@ -1,9 +1,12 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  BellRing,
   Brain,
   CalendarSync,
+  CloudOff,
   Eye,
+  Gamepad2,
   ListChecks,
   Repeat,
   Timer,
@@ -48,6 +51,21 @@ const features = [
     icon: CalendarSync,
     title: "Your calendars, one view",
     body: "Google, Apple, and Outlook events flow into your timeline so nothing lives in two places.",
+  },
+  {
+    icon: BellRing,
+    title: "Reminders that respect rest",
+    body: "A gentle nudge when a block begins — and quiet hours that keep every night yours. Silence any kind you don't want.",
+  },
+  {
+    icon: CloudOff,
+    title: "Works when the Wi-Fi doesn't",
+    body: "Capture thoughts and check things off offline. Kairo keeps them safe on your device and syncs the moment you're back.",
+  },
+  {
+    icon: Gamepad2,
+    title: "Brain breaks, built in",
+    body: "Tiny games that reset a racing mind between focus sessions. Breaks, not brain training — we're honest about that.",
   },
 ];
 
