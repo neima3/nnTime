@@ -19,7 +19,7 @@ test("plan an activity, complete it, and it sticks", async ({ page }) => {
 
   await page.getByRole("button", { name: "Complete E2E flight check" }).click();
   await expect(
-    page.getByRole("button", { name: "Mark E2E flight check incomplete" }),
+    page.getByRole("button", { name: "Mark E2E flight check not done" }),
   ).toBeVisible();
   // Header progress reflects the server round trip (router.refresh).
   await expect(page.getByText("all 1 done")).toBeVisible({ timeout: 15_000 });
@@ -28,7 +28,7 @@ test("plan an activity, complete it, and it sticks", async ({ page }) => {
   await page.reload();
   await page.waitForSelector('html[data-hydrated="true"]');
   await expect(
-    page.getByRole("button", { name: "Mark E2E flight check incomplete" }),
+    page.getByRole("button", { name: "Mark E2E flight check not done" }),
   ).toBeVisible();
 });
 

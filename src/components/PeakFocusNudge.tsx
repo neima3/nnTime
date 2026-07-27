@@ -91,7 +91,7 @@ export function PeakFocusNudge() {
       setProtectedDaily(true);
       toast(`Your ${hourLabel(peakHour)} focus hour is protected, daily`);
     } catch {
-      toast("Couldn't reach the server. Please try again.");
+      toast("Couldn't reach the server — try again?");
     }
     setProtecting(false);
   }

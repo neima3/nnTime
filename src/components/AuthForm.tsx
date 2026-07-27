@@ -40,7 +40,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
           })
         : await signIn.email({ email, password });
       if (res.error) {
-        setError(res.error.message ?? "Something went wrong. Please try again.");
+        setError(res.error.message ?? "That didn't go through — check your email and password?");
         setPending(false);
         return;
       }
@@ -54,7 +54,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
       router.push("/app/today");
       router.refresh();
     } catch {
-      setError("Couldn't reach the server. Please try again.");
+      setError("Couldn't reach the server — try again?");
       setPending(false);
     }
   }
@@ -73,15 +73,15 @@ export function AuthForm({ mode }: { mode: Mode }) {
         callbackURL: "/app/today",
       });
       if (res.error) {
-        setError(res.error.message ?? "Could not send magic link.");
+        setError(res.error.message ?? "Couldn't send that link — try again?");
         setMagicPending(false);
         return;
       }
       setInfo(
-        "If that address is valid, a sign-in link is on the way. Check your inbox (and spam). Local dev logs the link in the server console when email isn't configured.",
+        "If that address is valid, a sign-in link is on the way. Check your inbox (and spam).",
       );
     } catch {
-      setError("Couldn't reach the server. Please try again.");
+      setError("Couldn't reach the server — try again?");
     }
     setMagicPending(false);
   }

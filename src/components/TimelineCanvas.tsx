@@ -524,7 +524,7 @@ export function TimelineCanvas({
                 {onComplete && (
                   <button
                     type="button"
-                    aria-label={a.done ? `Mark ${a.title} incomplete` : `Complete ${a.title}`}
+                    aria-label={a.done ? `Mark ${a.title} not done` : `Complete ${a.title}`}
                     className={`grid place-items-center rounded-full border-2 transition-colors ${
                       compact ? "size-7" : "size-8"
                     } ${

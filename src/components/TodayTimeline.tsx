@@ -126,7 +126,7 @@ export function TodayTimeline({
         });
 
         if (patchRes.status === 409) {
-          toast("Conflict — refresh and try again");
+          toast("Someone else just touched this — refresh to see the latest");
           return { ok: false };
         }
         if (!patchRes.ok) return { ok: false };
@@ -256,7 +256,7 @@ export function TodayTimeline({
           }),
         });
         if (res.status === 409) {
-          toast("Conflict — refresh and try again");
+          toast("Someone else just touched this — refresh to see the latest");
           return { ok: false };
         }
         if (!res.ok) return { ok: false };

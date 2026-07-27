@@ -62,7 +62,7 @@ export function PlanDayClient() {
         );
       }
     } catch {
-      setError("Couldn't reach the server. Please try again.");
+      setError("Couldn't reach the server — try again?");
     }
     setLoading(false);
   }
@@ -87,7 +87,7 @@ export function PlanDayClient() {
         <h2 className="font-display text-xl font-bold text-ink">Plan my day</h2>
       </div>
       <p className="mt-1.5 text-[14px] text-ink-soft">
-        AI proposes times for your inbox/anytime tasks. Nothing lands until you
+        AI proposes times for your inbox and Anytime thoughts. Nothing lands until you
         accept each chip.
       </p>
 

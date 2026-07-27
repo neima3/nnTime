@@ -34,7 +34,7 @@ function ResetForm() {
       }
       router.push("/sign-in");
     } catch {
-      setError("Couldn't reach the server.");
+      setError("Couldn't reach the server — try again?");
       setPending(false);
     }
   }

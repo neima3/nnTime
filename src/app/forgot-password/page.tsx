@@ -22,13 +22,13 @@ export default function ForgotPasswordPage() {
       });
       if (res.error) {
         // Still show generic success for enumeration safety if API is odd.
-        setError(res.error.message ?? "Could not start reset.");
+        setError(res.error.message ?? "Couldn't start the reset — try again?");
         setPending(false);
         return;
       }
       setDone(true);
     } catch {
-      setError("Couldn't reach the server.");
+      setError("Couldn't reach the server — try again?");
     }
     setPending(false);
   }

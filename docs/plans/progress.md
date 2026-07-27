@@ -108,9 +108,31 @@ hold. Small drift from P8's perf 100 (2.1 s LCP vs 1.6 s); nothing regressed
 below gate, so the deep-perf work (bundle audit, /app/today measurement)
 stays queued rather than reactive.
 
-**Next:** landing refresh (T19), performance pass deep half (T16), copy audit
-round 2 (T18), iOS widget/Live-Activity accuracy (T8), body-doubling
-companion mode (T11).
+**T18 — copy audit round 2 (subagent sweep, 13 findings, all applied).** The
+pattern: failure paths lagged the happy paths — round 1 warmed the toasts
+people see when things work; what remained was almost entirely catch blocks,
+!res.ok branches, and aria-labels. Fixed: the sign-in fallback ("Something
+went wrong. Please try again." on the app's highest-traffic error surface),
+"An unexpected error occurred." opener in the error boundary, four surviving
+"Could not X." strings, a dev note shipped verbatim in the magic-link info
+("Local dev logs the link in the server console…"), raw HTTP "Conflict"
+leaking into two Today toasts (now reuses TimelineCanvas's warm 409 copy),
+the network-error standard unified across all 12 sites ("Couldn't reach the
+server — try again?"), inbox terminology drift (items/tasks → thoughts),
+"revision" jargon in the editor, two cold Settings→Calendars strings, and
+three aria-label issues — including "Mark X incomplete" → "Mark X not done"
+(deficit connotation; WeeklyIntentions already said "not done") and a
+WCAG 2.5.3 label-in-name violation ("Stop tending" on a button reading
+"Done"). E2E specs updated for the aria change; 528 tests + 6/6 E2E green.
+The audit confirmed zero shame/guilt framing anywhere, and named the strong
+surfaces so round 3 doesn't re-litigate them (audit text in the session
+transcript). **iOS follow-up:** the native app still says "Mark X
+incomplete" (KairoFlowUITests asserts it) — same one-word change + test
+update next time the simulator toolchain is warm.
+
+**Next:** landing refresh (T19), performance pass deep half (T16), iOS
+widget/Live-Activity accuracy (T8), body-doubling companion mode (T11), and
+the iOS "not done" label follow-up above.
 
 
 ## 2026-07-24 — Round 7: cross-platform completion + backlog truth (Opus, session 2 cont.)

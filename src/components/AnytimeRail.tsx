@@ -168,7 +168,7 @@ export function AnytimeRail({
                   <button
                     type="button"
                     aria-label={`Clear ${t.title}`}
-                    title="Done / clear"
+                    title="Done — clear it from Anytime"
                     onClick={() => void dismiss(t)}
                     className={`grid size-7 place-items-center rounded-lg ${cat.ink} hover:bg-surface-raised/50`}
                   >

@@ -27,7 +27,7 @@ export default function Error({
           Something slipped.
         </h1>
         <p className="mt-2 max-w-sm text-[15px] text-ink-soft">
-          An unexpected error occurred. Your data is safe — this is just a
+          Your data is safe — this is just a
           rendering hiccup. Try again, or head back to Today.
         </p>
       </div>

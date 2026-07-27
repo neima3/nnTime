@@ -305,7 +305,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
         }
       } else {
         if (!props.activityId || revision == null) {
-          setError("Missing activity revision — refresh and try again.");
+          setError("Lost track of this one — refresh and try again?");
           setSaving(false);
           return;
         }
@@ -346,7 +346,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
       router.push(`/app/today?date=${date}`);
       router.refresh();
     } catch {
-      setError("Network error — try again.");
+      setError("Couldn't reach the server — try again?");
       setSaving(false);
     }
   }, [

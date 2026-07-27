@@ -32,7 +32,7 @@ test("an offline completion queues, replays on reconnect, and sticks", async ({
 
   // Optimistic overlay + honest offline copy.
   await expect(
-    page.getByRole("button", { name: "Mark Offline E2E block incomplete" }),
+    page.getByRole("button", { name: "Mark Offline E2E block not done" }),
   ).toBeVisible();
   await expect(page.getByText("saved on this device", { exact: false })).toBeVisible();
 
@@ -86,7 +86,7 @@ test("an offline completion queues, replays on reconnect, and sticks", async ({
   await page.reload();
   await page.waitForSelector('html[data-hydrated="true"]');
   await expect(
-    page.getByRole("button", { name: "Mark Offline E2E block incomplete" }),
+    page.getByRole("button", { name: "Mark Offline E2E block not done" }),
   ).toBeVisible();
   await expect(page.getByText("all 1 done")).toBeVisible();
 });

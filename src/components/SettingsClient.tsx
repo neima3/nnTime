@@ -377,14 +377,14 @@ export function SettingsClient() {
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        setStatus(data?.error?.message ?? "ICS import failed");
+        setStatus(data?.error?.message ?? "Couldn't read that calendar — check the link?");
         setIcsBusy(false);
         return;
       }
       setStatus(`Imported ${data.imported ?? 0} events to your planner`);
       setIcsUrl("");
     } catch {
-      setStatus("Network error importing calendar");
+      setStatus("Couldn't reach the server — try again?");
     }
     setIcsBusy(false);
   }, [icsUrl]);

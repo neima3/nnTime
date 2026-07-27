@@ -66,7 +66,7 @@ export function TemplatesClient({
         }),
       });
       if (!res.ok) {
-        setMsg("Could not apply template.");
+        setMsg("Couldn't apply that template — try again");
         setBusy(null);
         return;
       }
@@ -74,7 +74,7 @@ export function TemplatesClient({
       router.push(`/app/today?date=${date}`);
       router.refresh();
     } catch {
-      setMsg("Couldn't reach the server. Please try again.");
+      setMsg("Couldn't reach the server — try again?");
     }
     setBusy(null);
   }

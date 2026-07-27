@@ -110,9 +110,9 @@ export function InboxClient({
         const rank = { high: 0, low: 1, none: 2 };
         return next.sort((a, b) => rank[a.priority] - rank[b.priority]);
       });
-      toast("Grouped by priority (suggestion — save via edit later)");
+      toast("Grouped by priority — just a suggestion, nothing saved yet");
     } catch {
-      setGroupMsg("Couldn't reach the server. Please try again.");
+      setGroupMsg("Couldn't reach the server — try again?");
     }
     setBusy(null);
   }, [authed]);
@@ -121,7 +121,7 @@ export function InboxClient({
     const title = draft.trim();
     if (!title) return;
     if (!authed) {
-      setError("Sign in to save inbox items.");
+      setError("Sign in to save your thoughts.");
       return;
     }
     setBusy("create");
@@ -158,7 +158,7 @@ export function InboxClient({
       setDraft("");
       router.refresh();
     } catch {
-      setError("Couldn't reach the server. Please try again.");
+      setError("Couldn't reach the server — try again?");
     }
     setBusy(null);
   }, [draft, authed, router]);
@@ -190,7 +190,7 @@ export function InboxClient({
                 }),
               });
               if (!recreate.ok) {
-                toast("Could not restore item");
+                toast("Couldn't bring it back — it may be gone for good");
                 return;
               }
               const task = await recreate.json();
@@ -355,7 +355,7 @@ export function InboxClient({
             </button>
             <button
               type="button"
-              aria-label="Stop tending"
+              aria-label="Done tending"
               onClick={() => setTending(null)}
               className="ml-auto rounded-xl px-2.5 py-2 text-[13px] font-semibold text-ink-faint hover:bg-surface-sunken"
             >

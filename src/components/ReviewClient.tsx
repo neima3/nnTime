@@ -105,7 +105,7 @@ export function ReviewClient({
         router.refresh();
         notifyDayChanged();
       } catch {
-        setError("Couldn't reach the server. Please try again.");
+        setError("Couldn't reach the server — try again?");
         setBusy(false);
       }
     },
@@ -145,7 +145,7 @@ export function ReviewClient({
 
       <div
         className="mt-5 flex items-center gap-2"
-        aria-label={`Item ${index + 1} of ${items.length + index}`}
+        aria-label={`Thing ${index + 1} of ${items.length + index}`}
       >
         {items.map((_, i) => (
           <span
