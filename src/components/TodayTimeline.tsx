@@ -40,6 +40,39 @@ export function TodayTimeline({
   // server re-render takes over (T13 / ADR-002 rebase-on-replay).
   const [offlineDone, setOfflineDone] = useState<Record<string, boolean>>({});
 
+  // Focus-session calibration ratio (T12) — same source the editor hint reads.
+  // Progressive enhancement: blocks render immediately, the "usually ~Xm"
+  // labels appear once Stats answers.
+  const [estimateRatio, setEstimateRatio] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!authed) return;
+    // Localhost-only debug override, matching the ?ritualDebug precedent —
+    // the real signal needs ≥5 qualifying focus sessions, which a fresh QA
+    // account never has.
+    if (window.location.hostname === "localhost") {
+      const p = new URLSearchParams(window.location.search).get("calibrationDebug");
+      const forced = p ? Number(p) : NaN;
+      if (Number.isFinite(forced) && forced > 0) {
+        /* eslint-disable react-hooks/set-state-in-effect */
+        setEstimateRatio(forced);
+        /* eslint-enable react-hooks/set-state-in-effect */
+        return;
+      }
+    }
+    let cancelled = false;
+    fetch("/api/v1/stats")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const ratio = data?.estimate?.ratio;
+        if (!cancelled && typeof ratio === "number") setEstimateRatio(ratio);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [authed]);
+
   useEffect(() => {
     const onDrained = () => {
       setOfflineDone({});
@@ -283,6 +316,7 @@ export function TodayTimeline({
       onOpen={handleOpen}
       onFocus={handleFocus}
       onToggleStep={authed ? handleToggleStep : undefined}
+      estimateRatio={estimateRatio}
     />
   );
 }

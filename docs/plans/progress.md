@@ -88,10 +88,22 @@ including the first e2e-job run; deployed to time.neima.me.
 - `data-hydrated` marker present on the live document (build-unique to this
   round's code).
 
-**Next:** estimate calibration surfaced on the block (T12 — design-sensitive,
-left clean for a fresh session), landing refresh (T19), performance pass
-(T16), copy audit round 2 (T18), iOS widget/Live-Activity accuracy (T8),
-body-doubling companion mode (T11).
+**T12 — estimate calibration on the block (continued same session).** The
+Stats-only calibration signal now lives where plans are made: pending future
+blocks ≥25 min show "· usually ~Xm" (semibold, category ink — no red, no
+shame) when the user's focus-session ratio is ≥1.3, with "Usually runs about
+X minutes" in the block's accessible label. `calibratedDurationMin` in
+insights.ts (pure, +4 tests) rounds to friendly 5s; TodayTimeline reads the
+same /api/v1/stats estimate the editor hint uses (progressive enhancement —
+blocks never wait on Stats). Localhost-only `?calibrationDebug=<ratio>`
+override (ritualDebug pattern) because the real signal needs ≥5 qualifying
+sessions. New E2E spec pins: hint renders under the override, hint stays
+away without signal, aria-label carries the sentence. Visual evidence:
+`browser-qa/t12-usually-hint{,-block}.png`. 528 tests, 6/6 E2E.
+
+**Next:** landing refresh (T19), performance pass (T16), copy audit round 2
+(T18), iOS widget/Live-Activity accuracy (T8), body-doubling companion mode
+(T11).
 
 
 ## 2026-07-24 — Round 7: cross-platform completion + backlog truth (Opus, session 2 cont.)

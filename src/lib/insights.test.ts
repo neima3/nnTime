@@ -11,6 +11,7 @@ import {
   isInPeakWindow,
   reflectionNotes,
   type ReflectionInput,
+  calibratedDurationMin,
 } from "./insights";
 
 // ---------------------------------------------------------------------------
@@ -500,5 +501,30 @@ describe("isInPeakWindow", () => {
   it("is false outside the +/-1 hour window", () => {
     expect(isInPeakWindow(12, 14)).toBe(false);
     expect(isInPeakWindow(16, 14)).toBe(false);
+  });
+});
+
+describe("calibratedDurationMin (T12 — block hint)", () => {
+  it("returns the ratio-adjusted duration rounded to 5", () => {
+    expect(calibratedDurationMin(45, 1.4)).toBe(65);
+    expect(calibratedDurationMin(60, 1.3)).toBe(80);
+    expect(calibratedDurationMin(25, 1.3)).toBe(35);
+  });
+
+  it("stays silent without a meaningful ratio", () => {
+    expect(calibratedDurationMin(45, null)).toBeNull();
+    expect(calibratedDurationMin(45, undefined)).toBeNull();
+    expect(calibratedDurationMin(45, 1.2)).toBeNull();
+    expect(calibratedDurationMin(45, Number.NaN)).toBeNull();
+  });
+
+  it("stays silent for short blocks", () => {
+    expect(calibratedDurationMin(20, 1.5)).toBeNull();
+    expect(calibratedDurationMin(0, 1.5)).toBeNull();
+  });
+
+  it("rounds to friendly 5-minute steps", () => {
+    expect(calibratedDurationMin(45, 1.3)).toBe(60);
+    expect(calibratedDurationMin(30, 1.3)).toBe(40);
   });
 });

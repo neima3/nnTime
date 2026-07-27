@@ -156,3 +156,32 @@ export function focusSessionCount(hours: number[] | undefined | null): number {
 export function isInPeakWindow(nowHour: number, peakHour: number): boolean {
   return Math.abs(nowHour - peakHour) <= 1;
 }
+
+// ---------------------------------------------------------------------------
+// Estimate calibration on the block (T12) — time truth where the plan lives.
+// ---------------------------------------------------------------------------
+
+/** Below this focus-session ratio the plan is close enough — say nothing. */
+export const CALIBRATION_BLOCK_MIN_RATIO = 1.3;
+/** Short blocks absorb overruns; only speak up from 25 planned minutes. */
+export const CALIBRATION_BLOCK_MIN_DURATION = 25;
+
+/**
+ * Planned duration adjusted by the user's focus-session calibration ratio
+ * (Stats' computeEstimateCalibration), rounded to a friendly 5 minutes.
+ * Null when the signal is too weak to be worth a label — no ratio yet,
+ * a ratio under the threshold, a short block, or an adjustment that rounds
+ * back to the plan itself.
+ */
+export function calibratedDurationMin(
+  durationMin: number,
+  ratio: number | null | undefined,
+): number | null {
+  if (typeof ratio !== "number" || !Number.isFinite(ratio)) return null;
+  if (ratio < CALIBRATION_BLOCK_MIN_RATIO) return null;
+  if (!Number.isFinite(durationMin) || durationMin < CALIBRATION_BLOCK_MIN_DURATION) {
+    return null;
+  }
+  const adjusted = Math.round((durationMin * ratio) / 5) * 5;
+  return adjusted > durationMin ? adjusted : null;
+}

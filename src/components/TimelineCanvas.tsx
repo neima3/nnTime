@@ -20,6 +20,7 @@ import { catClasses, fmtDuration, type Activity } from "@/lib/mock";
 import { LiveNowLine, useLiveNowMin } from "./LiveNowLine";
 import { celebrate } from "./Celebration";
 import { formatHourLabel, formatTime } from "@/lib/time-format";
+import { calibratedDurationMin } from "@/lib/insights";
 import { useHourCycle } from "@/lib/use-hour-cycle";
 
 const DAY_START_DEFAULT = 7 * 60; // 07:00
@@ -50,6 +51,9 @@ interface TimelineCanvasProps {
   onOpen?: (id: string) => void;
   onFocus?: (id: string) => void;
   onToggleStep?: (id: string, stepIndex: number) => Promise<{ ok: boolean }>;
+  /** Focus-session calibration ratio (Stats); pending blocks show a gentle
+   *  "usually ~Xm" when the user's plans tend to run long (T12). */
+  estimateRatio?: number | null;
 }
 
 /** Compute overlap lanes for side-by-side layout (design-spec addendum 1). */
@@ -116,6 +120,7 @@ export function TimelineCanvas({
   onOpen,
   onFocus,
   onToggleStep,
+  estimateRatio = null,
 }: TimelineCanvasProps) {
   const hourCycle = useHourCycle();
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -361,6 +366,11 @@ export function TimelineCanvas({
             ? 0
             : Math.max(0, Math.min(3, Math.floor((h - 72) / 18)));
           const heavy = lowBattery && a.energy === "high" && !a.done;
+          // Time truth on the plan itself (T12): things like this usually run
+          // longer for this user. Pending future blocks only — the past has
+          // already told its own story.
+          const usuallyMin =
+            !a.done && !past ? calibratedDurationMin(a.duration, estimateRatio) : null;
           const laneInfo = lanes.get(a.id);
           const lane = laneInfo?.lane ?? 0;
           const laneCount = laneInfo?.laneCount ?? 0;
@@ -373,7 +383,9 @@ export function TimelineCanvas({
               key={a.id}
               role="button"
               tabIndex={0}
-              aria-label={`${a.title}, ${formatTime(a.start, hourCycle)} to ${formatTime(a.start + a.duration, hourCycle)}, ${fmtDuration(a.duration)}. Use arrow keys to move, plus or minus to resize. Enter to edit.`}
+              aria-label={`${a.title}, ${formatTime(a.start, hourCycle)} to ${formatTime(a.start + a.duration, hourCycle)}, ${fmtDuration(a.duration)}.${
+                usuallyMin != null ? ` Usually runs about ${usuallyMin} minutes.` : ""
+              } Use arrow keys to move, plus or minus to resize. Enter to edit.`}
               aria-keyshortcuts="ArrowUp ArrowDown + - Enter"
               className={`group absolute flex gap-3 overflow-hidden rounded-2xl px-3.5 outline-none transition-transform hover:-translate-y-px hover:shadow-card focus-visible:ring-2 focus-visible:ring-iris ${cat.fill} ${
                 past && !a.done ? "timeline-past" : ""
@@ -423,6 +435,14 @@ export function TimelineCanvas({
                     </span>
                   )}
                   {formatTime(a.start, hourCycle)} – {formatTime(a.start + a.duration, hourCycle)} · {fmtDuration(a.duration)}
+                  {usuallyMin != null && (
+                    <span
+                      className="font-semibold"
+                      title="Based on your recent focus sessions"
+                    >
+                      {" "}· usually ~{usuallyMin}m
+                    </span>
+                  )}
                   {a.checklist && a.checklist.length > 0
                     ? ` · ${a.checklist.filter((c) => c.done).length}/${a.checklist.length} steps`
                     : ""}
