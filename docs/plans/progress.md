@@ -1,5 +1,46 @@
 # Progress log
 
+## 2026-07-26 — Round 9: E07 energy-pattern learning ("charged hours") (Fable)
+
+Roadmap: `docs/plans/2026-07-26-round9-energy-pattern.md`. With the round-3
+tracker at 20/20, the next real work was the one deferred parity row that is
+genuinely Kairo-shaped: learn when this user's HIGH-energy work actually gets
+completed, show it honestly, and let it inform scheduling. (The other sub-1
+rows are deliberate design decisions — emoji over icon packs, six token
+categories over 3,000 freeform colors — chasing them would break our own
+design contract, so they stay 0.5 on purpose.)
+
+- **Derivation (server-side, once):** `computeEnergyPattern` in stats.ts —
+  high-energy completions joined to their series (so it learns from ALL
+  history immediately, not just future events), scheduled hour projected
+  from occurrenceKey into the planning zone (completion time as fallback
+  for older rows), fixed 60-day window. Evidence-gated: ≥8 samples AND the
+  best 3-hour window must hold ≥3 or the app says nothing. Wrap-aware
+  (22–01 is a real evening pattern); ties anchor to an hour with signal
+  ("9–12" reads truer than "8–11" when everything landed at 9 and 10 —
+  found by seeding real data, fixed with a test). 6 unit tests.
+- **Web:** "Your charged hours" Stats card — mint heat strip with the
+  window highlighted, copy that observes rather than prescribes. Both new
+  cards format hours via useHourCycle (and the focus-hours card's raw
+  ":00" was upgraded along the way). Evidence:
+  `browser-qa/r9-charged-hours.png` (seeded 8 high-energy completions).
+- **Plan-my-day:** the route hands the learned window to planMyDay as a
+  `<learned>` data block (same delimiting discipline as every untrusted
+  field, SEC-05 intact); the system prompt prefers placing high-tagged
+  tasks inside charged hours when a slot overlaps. Pattern failures never
+  block planning.
+- **iOS:** StatsResponse gains the optional energyPattern block (older
+  builds unaffected); Insights renders the same card from the same
+  payload — no double-implemented math. `KTime.hourLabel` added mirroring
+  the web's formatHourLabel, pinned by unit tests.
+- **Parity: E07 0 → 1. Web 89.74%, iOS 87.64%** (was 88.46/86.52), both
+  gates PASS.
+
+Note: `/api/v1/stats` predates this round in being absent from
+openapi.yaml (the inventory gate passes — it was accepted as outside the
+pinned contract). Additive change, nothing new owed; recorded here so the
+gap is known rather than discovered.
+
 ## 2026-07-26 — Round 8: offline conflict decision + E2E suite land (Fable)
 
 Picked up the two items Round 7 named as the real gaps: the ADR-002 conflict

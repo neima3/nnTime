@@ -10,7 +10,7 @@ import "server-only";
 import dbDefault from "../db";
 import type { Db } from "../dal";
 import * as schema from "../db/schema";
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import { getOrCreateSettings } from "../dal";
 import { instantToDateStr, instantToWallFields } from "../temporal/zone";
 
@@ -81,6 +81,16 @@ export async function getStats(
     }
   }
 
+  // Energy pattern (Round 9 / E07): join high-energy completions to their
+  // series and learn WHEN heavy work actually gets done. Like focusHours,
+  // this looks at its own fixed window (60 d) independent of `range`.
+  const patternStart = new Date(now.getTime() - ENERGY_PATTERN_WINDOW_DAYS * 86400000);
+  const preloaded =
+    range.from <= patternStart && range.to >= now
+      ? events.filter((e) => e.eventType === "complete")
+      : null;
+  const patternInput = await loadEnergyCompletions(db, userId, zone, now, preloaded);
+
   return {
     byDate,
     streak,
@@ -91,6 +101,7 @@ export async function getStats(
       .reduce((sum, e) => sum + ((e.payload as { durationMin?: number })?.durationMin ?? 0), 0),
     estimate: computeEstimateCalibration(events),
     focusHours: computeFocusHours(focusEvents, zone, { now }),
+    energyPattern: computeEnergyPattern(patternInput),
   };
 }
 
@@ -306,4 +317,148 @@ export function computeFocusHours(
   }
 
   return { hours, peakHour };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Energy-pattern learning (Round 9 / parity E07)                             */
+/* -------------------------------------------------------------------------- */
+
+export interface EnergyPattern {
+  /** High-energy completions per scheduled hour-of-day (planning zone). */
+  byHour: number[];
+  /** How many high-energy completions the window is built on. */
+  sampled: number;
+  /** Best 3-hour window (start inclusive, end exclusive, wraps at 24), or
+   *  null when the evidence is too thin to claim one. */
+  window: { start: number; end: number } | null;
+}
+
+/** Learn from a fixed trailing window, independent of the requested range. */
+export const ENERGY_PATTERN_WINDOW_DAYS = 60;
+
+interface CompletionEventRow {
+  entityId: string | null;
+  occurredAt: Date;
+  payload: unknown;
+}
+
+/** Load and join the pattern's inputs: high-energy completions with their
+ *  scheduled hour projected into the planning zone. `preloaded` lets getStats
+ *  reuse events it already fetched when its range covers the window. */
+async function loadEnergyCompletions(
+  db: Db,
+  userId: string,
+  zone: string,
+  now: Date,
+  preloaded: CompletionEventRow[] | null,
+): Promise<Array<{ hourOfDay: number; energy: "low" | "medium" | "high" | null }>> {
+  const patternStart = new Date(now.getTime() - ENERGY_PATTERN_WINDOW_DAYS * 86400000);
+  const completeEvents =
+    preloaded ??
+    (await db
+      .select()
+      .from(schema.plannerEvents)
+      .where(
+        and(
+          eq(schema.plannerEvents.userId, userId),
+          eq(schema.plannerEvents.eventType, "complete"),
+          gte(schema.plannerEvents.occurredAt, patternStart),
+          lte(schema.plannerEvents.occurredAt, now),
+        ),
+      ));
+
+  const seriesIds = [...new Set(completeEvents.map((e) => e.entityId).filter(Boolean))];
+  const energyBySeries = new Map<string, "low" | "medium" | "high" | null>();
+  if (seriesIds.length > 0) {
+    const rows = await db
+      .select({ id: schema.activitySeries.id, energy: schema.activitySeries.energy })
+      .from(schema.activitySeries)
+      .where(
+        and(
+          eq(schema.activitySeries.userId, userId),
+          inArray(schema.activitySeries.id, seriesIds as string[]),
+        ),
+      );
+    for (const r of rows) energyBySeries.set(r.id, r.energy);
+  }
+
+  return completeEvents.map((ev) => {
+    // Prefer the occurrence's SCHEDULED hour; an event without a key (older
+    // rows) falls back to when it was completed — still a real signal for
+    // "when does heavy work happen".
+    const key = (ev.payload as { occurrenceKey?: string })?.occurrenceKey;
+    const when = key ? new Date(key) : ev.occurredAt;
+    const instant = Number.isNaN(when.getTime()) ? ev.occurredAt : when;
+    return {
+      hourOfDay: instantToWallFields(instant, zone).hour,
+      energy: energyBySeries.get(ev.entityId ?? "") ?? null,
+    };
+  });
+}
+
+/** The learned pattern alone — the plan-day route asks for just this. */
+export async function getEnergyPattern(
+  userId: string,
+  opts: { db?: Db; now?: Date } = {},
+): Promise<EnergyPattern> {
+  const db = opts.db ?? dbDefault;
+  const now = opts.now ?? new Date();
+  const settings = await getOrCreateSettings(userId, opts);
+  const input = await loadEnergyCompletions(db, userId, settings.timezone, now, null);
+  return computeEnergyPattern(input);
+}
+/** Below this many high-energy completions we say nothing at all. */
+export const ENERGY_PATTERN_MIN_SAMPLES = 8;
+/** The best window must itself hold at least this many to be a pattern. */
+export const ENERGY_PATTERN_MIN_IN_WINDOW = 3;
+const ENERGY_PATTERN_WINDOW_HOURS = 3;
+
+/**
+ * Pure: learn when this user's HIGH-energy work actually gets completed.
+ * Input is pre-joined `{hourOfDay, energy}` completions (the service joins
+ * completion events to their series' energy and projects the occurrence's
+ * scheduled hour into the planning zone). Honest by construction: below the
+ * evidence gates `window` is null and callers show nothing.
+ */
+export function computeEnergyPattern(
+  completions: Array<{ hourOfDay: number; energy: "low" | "medium" | "high" | null }>,
+): EnergyPattern {
+  const byHour = new Array(24).fill(0) as number[];
+  let sampled = 0;
+  for (const c of completions) {
+    if (c.energy !== "high") continue;
+    const h = Math.trunc(c.hourOfDay);
+    if (h < 0 || h > 23) continue;
+    byHour[h]++;
+    sampled++;
+  }
+
+  if (sampled < ENERGY_PATTERN_MIN_SAMPLES) {
+    return { byHour, sampled, window: null };
+  }
+
+  // Best 3-hour window, wrap-aware (22–01 is a real evening pattern). Ties
+  // prefer a window that STARTS on an hour with signal — "9–12" reads truer
+  // than "8–11" when everything landed at 9 and 10.
+  let best = { start: 0, count: -1 };
+  for (let start = 0; start < 24; start++) {
+    let count = 0;
+    for (let i = 0; i < ENERGY_PATTERN_WINDOW_HOURS; i++) {
+      count += byHour[(start + i) % 24];
+    }
+    const beats =
+      count > best.count ||
+      (count === best.count && byHour[start] > 0 && byHour[best.start] === 0);
+    if (beats) best = { start, count };
+  }
+
+  if (best.count < ENERGY_PATTERN_MIN_IN_WINDOW) {
+    return { byHour, sampled, window: null };
+  }
+
+  return {
+    byHour,
+    sampled,
+    window: { start: best.start, end: (best.start + ENERGY_PATTERN_WINDOW_HOURS) % 24 },
+  };
 }

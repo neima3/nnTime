@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { BarChart3, Flame } from "lucide-react";
 import { toast } from "./Toast";
 import { SignedOutCard, SkeletonCards } from "./EmptyState";
+import { formatHourLabel } from "@/lib/time-format";
+import { useHourCycle } from "@/lib/use-hour-cycle";
 import { RewardGarden } from "./RewardGarden";
 import { WeeklyReflection } from "./WeeklyReflection";
 
@@ -19,6 +21,12 @@ type FocusHours = {
   peakHour: number;
 };
 
+type EnergyPattern = {
+  byHour: number[];
+  sampled: number;
+  window: { start: number; end: number } | null;
+};
+
 type Stats = {
   byDate: Record<string, { completed: number; focusMin: number; mood: string | null }>;
   streak: { current: number; best: number };
@@ -27,6 +35,7 @@ type Stats = {
   days: number;
   estimate: EstimateCalibration | null;
   focusHours: FocusHours | null;
+  energyPattern?: EnergyPattern | null;
 };
 
 const MOODS = [
@@ -64,6 +73,7 @@ export function StatsClient() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [authed, setAuthed] = useState(true);
   const [moodBusy, setMoodBusy] = useState(false);
+  const hourCycle = useHourCycle();
 
   useEffect(() => {
     let cancelled = false;
@@ -232,7 +242,51 @@ export function StatsClient() {
             <span className="absolute left-3/4 -translate-x-1/2">6p</span>
           </div>
           <p className="mt-2 text-[13px] text-ink-soft">
-            Focus lands most often around {stats.focusHours.peakHour}:00.
+            Focus lands most often around {formatHourLabel(stats.focusHours.peakHour, hourCycle)}.
+          </p>
+        </Card>
+      )}
+
+      {stats.energyPattern?.window && (
+        <Card
+          title="Your charged hours"
+          hint="When heavy plans actually get done · last 60 days"
+          wide
+        >
+          <div className="grid grid-cols-[repeat(24,minmax(0,1fr))] gap-[2px]">
+            {stats.energyPattern.byHour.map((count, hour) => {
+              const w = stats.energyPattern!.window!;
+              const inWindow =
+                w.start < w.end
+                  ? hour >= w.start && hour < w.end
+                  : hour >= w.start || hour < w.end;
+              const max = Math.max(1, ...stats.energyPattern!.byHour);
+              const intensity = count > 0 ? 0.25 + (count / max) * 0.75 : 0.08;
+              return (
+                <div
+                  key={hour}
+                  className={`h-5 rounded-sm bg-cat-mint-ink ${
+                    inWindow ? "ring-1 ring-cat-mint-ink/60" : ""
+                  }`}
+                  style={{ opacity: inWindow ? Math.max(intensity, 0.35) : intensity }}
+                  title={`${formatHourLabel(hour, hourCycle)} — ${count} heavy ${
+                    count === 1 ? "thing" : "things"
+                  } done`}
+                />
+              );
+            })}
+          </div>
+          <div className="relative mt-1 h-3.5 text-[10px] font-semibold text-ink-faint">
+            <span className="absolute left-1/4 -translate-x-1/2">6a</span>
+            <span className="absolute left-1/2 -translate-x-1/2">12p</span>
+            <span className="absolute left-3/4 -translate-x-1/2">6p</span>
+          </div>
+          <p className="mt-2 text-[13px] text-ink-soft">
+            Your high-energy work tends to land{" "}
+            {formatHourLabel(stats.energyPattern.window.start, hourCycle)}–
+            {formatHourLabel(stats.energyPattern.window.end, hourCycle)}. When you
+            plan something heavy, that&apos;s friendly ground — Plan my day knows
+            it too.
           </p>
         </Card>
       )}

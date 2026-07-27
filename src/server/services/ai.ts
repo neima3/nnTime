@@ -156,18 +156,25 @@ export async function planMyDay(
   tasks: { id: string; title: string; durationMin?: number; energy?: string }[],
   currentEnergy: "low" | "medium" | "high",
   freeSlots: { start: string; end: string }[],
+  learned?: { chargedStart: number; chargedEnd: number } | null,
 ) {
   const quota = await checkAiQuota(userId);
   if (!quota.allowed) throw new Error("AI daily quota exceeded");
 
+  // Round 9 (E07): the learned pattern travels as data, described in the
+  // system prompt — same delimiting discipline as every other untrusted field.
+  const learnedBlock = learned
+    ? `\n<learned>{"chargedHours":"${String(learned.chargedStart).padStart(2, "0")}:00-${String(learned.chargedEnd).padStart(2, "0")}:00"}</learned>`
+    : "";
+
   const response = await getClient().messages.create({
     model: "claude-haiku-4-5",
     max_tokens: 800,
-    system: `You help plan a day for someone with ADHD. Given tasks (each may carry an "energy" tag), the person's current energy, and free time slots, propose a gentle schedule. Respond ONLY with JSON: {"items":[{"taskId":"uuid","scheduledStart":"HH:MM","reason":"brief"}]}. Never schedule more than comfortably fits — under-fill rather than over-pack. Honor energy: current=low means quick/low-energy tasks only and LEAVE OUT tasks tagged "high" (don't force a hard task on a depleted day); current=high favors deep/high-energy work. When matched to energy, the "reason" should be kind and brief (e.g. "gentle start", "you're sharp now"). It's fine to schedule fewer tasks than given.`,
+    system: `You help plan a day for someone with ADHD. Given tasks (each may carry an "energy" tag), the person's current energy, and free time slots, propose a gentle schedule. Respond ONLY with JSON: {"items":[{"taskId":"uuid","scheduledStart":"HH:MM","reason":"brief"}]}. Never schedule more than comfortably fits — under-fill rather than over-pack. Honor energy: current=low means quick/low-energy tasks only and LEAVE OUT tasks tagged "high" (don't force a hard task on a depleted day); current=high favors deep/high-energy work. A <learned> block, when present, gives the clock hours where this person's high-energy work has historically been completed — when a free slot overlaps those hours, prefer placing "high"-tagged tasks there (reason e.g. "your charged hours"). When matched to energy, the "reason" should be kind and brief (e.g. "gentle start", "you're sharp now"). It's fine to schedule fewer tasks than given.`,
     messages: [
       {
         role: "user",
-        content: `<tasks>${JSON.stringify(tasks)}</tasks>\n<energy>${currentEnergy}</energy>\n<slots>${JSON.stringify(freeSlots)}</slots>`,
+        content: `<tasks>${JSON.stringify(tasks)}</tasks>\n<energy>${currentEnergy}</energy>\n<slots>${JSON.stringify(freeSlots)}</slots>${learnedBlock}`,
       },
     ],
   });

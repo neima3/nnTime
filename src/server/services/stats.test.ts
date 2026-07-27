@@ -1,5 +1,6 @@
 /**
- * Pure unit tests for computeEstimateCalibration, bucketEventsByZoneDate,
+ * Pure unit tests for computeEstimateCalibration,
+  computeEnergyPattern, bucketEventsByZoneDate,
  * computeStreak, and computeFocusHours (Phase 6 — time-estimation
  * calibration + stats-truth zone bucketing + focus-hours strip). No DB —
  * mirrors the pure-derivation pattern used for getRemainingSec in
@@ -11,6 +12,7 @@ import {
   computeEstimateCalibration,
   computeFocusHours,
   computeStreak,
+  computeEnergyPattern,
 } from "./stats";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -255,5 +257,60 @@ describe("computeFocusHours", () => {
     ];
     const result = computeFocusHours(events, "UTC", { now });
     expect(result?.hours.reduce((a, b) => a + b, 0)).toBe(5);
+  });
+});
+
+describe("computeEnergyPattern (Round 9 / E07)", () => {
+  const hi = (hourOfDay: number) => ({ hourOfDay, energy: "high" as const });
+
+  it("says nothing below the sample gate", () => {
+    const p = computeEnergyPattern([hi(9), hi(9), hi(10), hi(10), hi(9), hi(9), hi(10)]);
+    expect(p.sampled).toBe(7);
+    expect(p.window).toBeNull();
+  });
+
+  it("finds the best 3-hour window once evidence exists", () => {
+    const p = computeEnergyPattern([
+      hi(9), hi(9), hi(9), hi(10), hi(10), hi(11), hi(15), hi(20),
+    ]);
+    expect(p.sampled).toBe(8);
+    expect(p.window).toEqual({ start: 9, end: 12 });
+    expect(p.byHour[9]).toBe(3);
+  });
+
+  it("ties anchor to an hour with signal, not an empty lead-in", () => {
+    // 5 at 9:00 + 3 at 10:00 — windows 8-11 and 9-12 tie at 8; the honest
+    // read starts where the work actually happened.
+    const p = computeEnergyPattern([
+      hi(9), hi(9), hi(9), hi(9), hi(9), hi(10), hi(10), hi(10),
+    ]);
+    expect(p.window).toEqual({ start: 9, end: 12 });
+  });
+
+  it("wraps across midnight for evening owls", () => {
+    const p = computeEnergyPattern([
+      hi(22), hi(22), hi(23), hi(23), hi(0), hi(0), hi(1), hi(14),
+    ]);
+    expect(p.window).toEqual({ start: 22, end: 1 });
+  });
+
+  it("ignores low/medium/null energy and junk hours", () => {
+    const p = computeEnergyPattern([
+      { hourOfDay: 9, energy: "low" },
+      { hourOfDay: 9, energy: "medium" },
+      { hourOfDay: 9, energy: null },
+      { hourOfDay: 42, energy: "high" },
+      { hourOfDay: -1, energy: "high" },
+      hi(9),
+    ]);
+    expect(p.sampled).toBe(1);
+    expect(p.window).toBeNull();
+  });
+
+  it("empty input is honest, not an error", () => {
+    const p = computeEnergyPattern([]);
+    expect(p.sampled).toBe(0);
+    expect(p.window).toBeNull();
+    expect(p.byHour).toHaveLength(24);
   });
 });

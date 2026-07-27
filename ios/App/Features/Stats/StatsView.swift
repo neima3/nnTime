@@ -28,6 +28,7 @@ struct StatsView: View {
                             totalsCard(stats)
                         }
                         if let hours = stats.focusHours { focusHoursCard(hours) }
+                        if let pattern = stats.energyPattern, pattern.window != nil { chargedHoursCard(pattern) }
                         if let est = stats.estimate { timeTruthCard(est) }
                         moodCard()
                     }
@@ -117,6 +118,37 @@ struct StatsView: View {
                 Text("6a").font(.kBody(9)); Spacer(); Text("12p").font(.kBody(9)); Spacer(); Text("6p").font(.kBody(9))
             }.foregroundStyle(Color.kInkFaint)
             Text("Focus lands most often around \(h.peakHour):00.").font(.kBody(12.5)).foregroundStyle(Color.kInkSoft)
+        }
+        .padding(16).frame(maxWidth: .infinity, alignment: .leading).kCard(radius: 20)
+    }
+
+    private func chargedHoursCard(_ p: StatsResponse.EnergyPattern) -> some View {
+        let maxH = max(1, p.byHour.max() ?? 1)
+        let w = p.window
+        func inWindow(_ hr: Int) -> Bool {
+            guard let w else { return false }
+            return w.start < w.end ? (hr >= w.start && hr < w.end) : (hr >= w.start || hr < w.end)
+        }
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("Your charged hours").font(.kBody(16, weight: .bold)).foregroundStyle(Color.kInk)
+            Text("When heavy plans actually get done · last 60 days").font(.kBody(12.5)).foregroundStyle(Color.kInkSoft)
+            HStack(spacing: 2) {
+                ForEach(0..<24, id: \.self) { hr in
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(Color.kCatMintInk.opacity(
+                            p.byHour[hr] == 0
+                                ? (inWindow(hr) ? 0.35 : 0.08)
+                                : max(inWindow(hr) ? 0.35 : 0, 0.25 + 0.75 * Double(p.byHour[hr]) / Double(maxH))))
+                        .frame(height: 20)
+                }
+            }
+            HStack {
+                Text("6a").font(.kBody(9)); Spacer(); Text("12p").font(.kBody(9)); Spacer(); Text("6p").font(.kBody(9))
+            }.foregroundStyle(Color.kInkFaint)
+            if let w {
+                Text("Your high-energy work tends to land \(KTime.hourLabel(w.start))–\(KTime.hourLabel(w.end)). When you plan something heavy, that's friendly ground.")
+                    .font(.kBody(12.5)).foregroundStyle(Color.kInkSoft)
+            }
         }
         .padding(16).frame(maxWidth: .infinity, alignment: .leading).kCard(radius: 20)
     }

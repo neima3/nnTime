@@ -8,6 +8,14 @@ import XCTest
 /// stayed 24-hour. These cases must stay identical to `formatTime` in
 /// src/lib/time-format.ts so the two platforms never drift.
 final class TimeFormatTests: XCTestCase {
+    func testHourLabelMirrorsWeb() {
+        XCTAssertEqual(KTime.hourLabel(9, hourCycle: "h24"), "9:00")
+        XCTAssertEqual(KTime.hourLabel(9, hourCycle: "h12"), "9 AM")
+        XCTAssertEqual(KTime.hourLabel(0, hourCycle: "h12"), "12 AM")
+        XCTAssertEqual(KTime.hourLabel(12, hourCycle: "h12"), "12 PM")
+        XCTAssertEqual(KTime.hourLabel(25, hourCycle: "h24"), "1:00")
+    }
+
     func test24HourIsUnchanged() {
         XCTAssertEqual(KTime.hhmm(9 * 60, hourCycle: "h24"), "9:00")
         XCTAssertEqual(KTime.hhmm(13 * 60 + 30, hourCycle: "h24"), "13:30")

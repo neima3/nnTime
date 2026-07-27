@@ -88,6 +88,12 @@ struct StatsResponse: Decodable {
     struct DayStat: Decodable { let completed: Int; let focusMin: Int; let mood: String? }
     struct Estimate: Decodable { let sessions: Int; let avgTargetMin: Int; let avgActualMin: Int; let ratio: Double }
     struct FocusHours: Decodable { let hours: [Int]; let peakHour: Int }
+    struct EnergyPattern: Decodable {
+        struct Window: Decodable { let start: Int; let end: Int }
+        let byHour: [Int]
+        let sampled: Int
+        let window: Window?
+    }
 
     struct Streak: Decodable { let current: Int; let best: Int }
     let byDate: [String: DayStat]
@@ -96,6 +102,7 @@ struct StatsResponse: Decodable {
     let totalFocusMin: Int
     let estimate: Estimate?
     let focusHours: FocusHours?
+    let energyPattern: EnergyPattern?
     let days: Int?
 }
 
@@ -208,6 +215,17 @@ enum KTime {
         let suffix = h < 12 ? "AM" : "PM"
         let display = h % 12 == 0 ? 12 : h % 12
         return String(format: "%d:%02d %@", display, m, suffix)
+    }
+
+    /// Compact hour mark for heat strips ("9 AM" / "9:00") — mirrors the web's
+    /// formatHourLabel so both platforms read the same.
+    static func hourLabel(_ hour: Int, hourCycle: String? = nil) -> String {
+        let h = ((hour % 24) + 24) % 24
+        let twelve = (hourCycle ?? KairoPrefs.hourCycle) != "h24"
+        guard twelve else { return String(format: "%d:00", h) }
+        let suffix = h < 12 ? "AM" : "PM"
+        let display = h % 12 == 0 ? 12 : h % 12
+        return "\(display) \(suffix)"
     }
 
     static func duration(_ minutes: Int) -> String {
