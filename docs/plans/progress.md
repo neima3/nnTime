@@ -130,9 +130,30 @@ transcript). **iOS follow-up:** the native app still says "Mark X
 incomplete" (KairoFlowUITests asserts it) — same one-word change + test
 update next time the simulator toolchain is warm.
 
-**Next:** landing refresh (T19), performance pass deep half (T16), iOS
-widget/Live-Activity accuracy (T8), body-doubling companion mode (T11), and
-the iOS "not done" label follow-up above.
+**T16 — deep half done: bundle audit + the one real win.** Audit method and
+findings (so nobody re-audits blind): per-route First-Load JS computed from
+the live site; /app/today ships 14 chunks ≈762 kB raw. The three biggest are
+react-dom (224 kB), the app-router client runtime (140 kB), and the
+**nomodule polyfill file (112 kB) that modern browsers never download** —
+naive transfer sums over-count by exactly that file. Real modern-browser
+cost ≈145 kB gzip framework floor + ~60 kB app code: lean, no misplaced
+deps (zod/web-push are server-only; lucide tree-shakes per icon). No bundle
+action warranted — fabricating trims there would be motion, not value.
+The actual win was runtime: one Today view fired **four** /api/v1/stats
+requests (DailyBrief + PeakFocusNudge duplicating days=30, SoftStreaks
+days=60, and T12's new calibration read), each re-aggregating
+planner_events server-side. New `src/lib/stats-cache.ts` (keyed promise
+memo, 60 s TTL, failure-never-cached — the settings-cache pattern) now
+serves all five consumers; ActivityEditor and the calibration hint share
+the 30-day entry since the estimate uses a fixed 14-day window server-side
+regardless of ?days. **Measured in a real browser: 2 stats requests per
+Today load (was 4)**, and the promise cache absorbs StrictMode's doubled
+dev effects too. 5 new tests (dedupe, per-key isolation, TTL expiry,
+failure not cached, invalidation); 533 total, 6/6 E2E.
+
+**Next:** landing refresh (T19), iOS widget/Live-Activity accuracy (T8),
+body-doubling companion mode (T11), and the iOS "not done" label follow-up
+above.
 
 
 ## 2026-07-24 — Round 7: cross-platform completion + backlog truth (Opus, session 2 cont.)

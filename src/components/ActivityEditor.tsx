@@ -5,6 +5,7 @@
  * Design reference: /app/editor mock. Tokens only; Soft Focus system.
  */
 
+import { getStatsCached } from "@/lib/stats-cache";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -162,8 +163,9 @@ export function ActivityEditor(props: ActivityEditorProps) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/v1/stats?days=14")
-      .then((r) => (r.ok ? r.json() : null))
+    // The estimate uses a fixed 14-day window server-side, so the 30-day
+    // entry (already warm from Today) returns the identical ratio.
+    getStatsCached(30)
       .then((data) => {
         if (cancelled || !data?.estimate) return;
         const ratio = data.estimate.ratio as number;

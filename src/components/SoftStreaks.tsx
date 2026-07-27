@@ -11,6 +11,7 @@
  * Mount-gated (no SSR streak display to avoid mismatch).
  */
 
+import { getStatsCached } from "@/lib/stats-cache";
 import { useEffect, useState } from "react";
 import { Flame } from "lucide-react";
 
@@ -32,8 +33,7 @@ export function SoftStreaks({ optOut }: SoftStreaksProps) {
     // Mount-gated: real streak from planner_events via stats service.
     /* eslint-disable react-hooks/set-state-in-effect */
     setMounted(true);
-    fetch("/api/v1/stats?days=60")
-      .then((r) => (r.ok ? r.json() : null))
+    getStatsCached(60)
       .then((data) => {
         if (!data?.streak) return;
         setStreak({

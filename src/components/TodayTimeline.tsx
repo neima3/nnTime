@@ -14,6 +14,7 @@ import { toast } from "./Toast";
 import { notifyDayChanged } from "./NowBar";
 import { useLowBattery } from "./LowBattery";
 import { enqueueMutation, resolveQueueUser } from "@/lib/offline-queue";
+import { getStatsCached } from "@/lib/stats-cache";
 
 interface TodayTimelineProps {
   activities: Activity[];
@@ -61,8 +62,7 @@ export function TodayTimeline({
       }
     }
     let cancelled = false;
-    fetch("/api/v1/stats")
-      .then((r) => (r.ok ? r.json() : null))
+    getStatsCached(30)
       .then((data) => {
         const ratio = data?.estimate?.ratio;
         if (!cancelled && typeof ratio === "number") setEstimateRatio(ratio);

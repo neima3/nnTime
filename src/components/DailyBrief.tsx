@@ -10,6 +10,7 @@
  * the focus-hours stat; no new API.
  */
 
+import { getStatsCached } from "@/lib/stats-cache";
 import { useEffect, useState } from "react";
 import { Sun, X } from "lucide-react";
 import { clientToday } from "@/lib/client-date";
@@ -39,8 +40,7 @@ export function DailyBrief({ blocks }: { blocks: BriefBlock[] }) {
     setDismissed(false);
     /* eslint-enable react-hooks/set-state-in-effect */
 
-    fetch("/api/v1/stats?days=30")
-      .then((r) => (r.ok ? r.json() : null))
+    getStatsCached(30)
       .then((data) => {
         if (!data?.focusHours) return;
         if (focusSessionCount(data.focusHours.hours) < PEAK_MIN_SESSIONS) return;

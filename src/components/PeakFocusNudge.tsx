@@ -10,6 +10,7 @@
  * history to mean something.
  */
 
+import { getStatsCached } from "@/lib/stats-cache";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CalendarPlus, Check, Sparkles, X } from "lucide-react";
@@ -37,8 +38,7 @@ export function PeakFocusNudge() {
       return;
     }
     let cancelled = false;
-    fetch("/api/v1/stats?days=30")
-      .then((r) => (r.ok ? r.json() : null))
+    getStatsCached(30)
       .then((data) => {
         if (cancelled || !data?.focusHours) return;
         // Need a real pattern before we claim one.
