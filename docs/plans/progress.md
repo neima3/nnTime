@@ -1,5 +1,43 @@
 # Progress log
 
+## 2026-07-27 — Production-readiness pass + a launch crash caught before it shipped (Fable)
+
+**Ops hardening (goal: production ready):**
+- `Strict-Transport-Security` joined the proxy's security headers
+  (max-age=31536000; includeSubDomains; deliberately no preload) —
+  **live-verified** after deploy.
+- The Dockerfile now carries a `HEALTHCHECK` on `/api/health` (node global
+  fetch; 30 s interval). Safe by construction — health 503s only on hard
+  dependencies. **Kairo now reads `running:healthy` in Coolify** (was
+  `running:unknown` since launch).
+- Access finding, recorded in DEPLOYMENT.md: the Coolify API token in
+  `.env.local` is read-only (PATCH → Unauthenticated), so the Coolify-side
+  healthcheck toggle and scheduled-backup verification remain UI/owner
+  steps — documented, not claimed.
+
+**⚠️ The launch crash (highest-value find of the pass).** Verifying the
+externally-committed R11 (HealthKit mindful minutes, 476ae8c) surfaced an
+app-killing bug: on a fresh simulator the app crashed AT LAUNCH for every
+UI test (16/17 failures, `EXC_CRASH SIGABRT`). Root cause from the crash
+report, not guesswork: `AppState` was `@Observable` but **not main-actor
+isolated** — `bootstrap()` is nonisolated-async, so `applyContrastOverride()`
+(I1's window `traitOverrides` mutation) could run UIKit work off the main
+thread. A latent race since I1 that had always won its timing — until R11's
+HealthKit framework link shifted startup enough to lose deterministically.
+Fix: `@MainActor` on `AppState` (every call site was already main-actor —
+the isolation was the only thing missing). This would have shipped in the
+next device build.
+
+**Second find while stabilizing:** a crashed KairoRound8Tour had left
+high-contrast + dyslexia-font ON on the shared QA **account** (the modes
+sync server-side), restyling every later tour. Restored via the API. Trap
+recorded: when tours die mid-run, check the account's prefs, not just
+local state.
+
+**Definitive suite, fresh simulator + clean account: unit 37/37 (incl.
+R11's HealthKitManagerTests 9/9), UI 16/16 — 0 failures, TEST SUCCEEDED.**
+R11 is now genuinely verified, not just committed.
+
 ## 2026-07-27 — Round 11: HealthKit mindful minutes (Codex)
 
 Roadmap: `docs/plans/2026-07-27-round11-healthkit.md`. Finished the deferred

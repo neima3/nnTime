@@ -23,7 +23,13 @@ struct KairoApp: App {
 
 // MARK: - App-wide state
 
-@Observable
+// Main-actor isolated on purpose: this class mutates UIKit (window trait
+// overrides) and SwiftUI-observed state. Before this, `bootstrap()` was
+// nonisolated-async, so `applyContrastOverride()` could touch
+// `window.traitOverrides` off the main thread — a latent race since I1 that
+// began crashing at launch (UIKit commit-timing assertion) the moment R11's
+// HealthKit framework link shifted startup timing.
+@Observable @MainActor
 final class AppState {
     enum Auth { case unknown, signedOut, signedIn }
 
