@@ -1,5 +1,79 @@
 # Progress log
 
+## 2026-07-28 — Round 16: generated client in the shipping native app (Codex)
+
+Roadmap:
+`docs/plans/2026-07-28-round16-generated-native-client.md`. Closed the boundary
+left intentionally open by Round 15: generated Swift compiled in isolation, but
+the real SwiftUI application still used independently handwritten planner
+requests and response decoders.
+
+- **Correct canonical contracts.** The day response now documents and validates
+  the real occurrence-enriched activity shape and exact response keys. Dedicated
+  mutation inputs no longer require server-owned ids, revisions, user ids, or
+  timestamps. Routine lists retain steps, schedules, counts, and duration.
+  Generator-safe nullability is compile-tested across energy, batch, search,
+  stats, mood, and focus shapes.
+- **Generated client is the shipping transport.** The package exposes the
+  collision-free `KairoAPIClient` module and the XcodeGen application target
+  links it directly. `KairoAPI` remains the stable app-facing actor, but all 17
+  planner operations across settings, categories, day, activities, tasks,
+  search, stats, mood, routines, and focus now call generated operations.
+  Better Auth `/api/auth/*` is the only manual HTTP boundary.
+- **One transport policy.** `KairoClient` centrally supplies the shared cookie
+  session, planning-zone middleware, mockable transport, and composed RFC3339
+  transcoder. The transcoder accepts whole seconds, fractional seconds, and
+  offset-equivalent instants and emits stable RFC3339 requests. App adapters
+  preserve the polished presentation models without exposing generated wire
+  types to feature views.
+- **Mutation correctness is operational.** Native settings, activity, task,
+  mood, routine, and focus writes use generated idempotency and `If-Match`
+  fields. Focus updates enforce compare-and-swap server-side. Web focus now
+  retains revisions, uses one idempotency key per logical action, serializes
+  rapid taps, survives post-commit response-body loss, refreshes on stale
+  revisions, reports failed reconciliation honestly, and converges across
+  running or paused tabs.
+- **Fail-closed adoption and CI.** The scanner rejects planner literals,
+  aliased/optional/qualified `URLSession` escape hatches, nonliteral endpoints,
+  and incomplete generated-operation inventory across all 30 shipping Swift
+  files. The macOS job checks canonical sync and adoption, forces clean Swift
+  generation, regenerates the Xcode project, runs package and app-hosted tests,
+  and builds the shipping simulator app.
+- **Real QA found and closed two high-severity defects.** First, the web focus
+  client did not send the newly required revision and then did not reconcile a
+  stale second tab. Second, the generated native runtime rejected valid server
+  timestamps with fractional seconds. Both were reproduced through their real
+  transports, fixed, regression-tested, and cleared by independent re-review.
+  The ignored report and evidence are under
+  `browser-qa/round16-generated-native-client/`.
+- **Full local proof.** ESLint, TypeScript, production build, and **70 files /
+  745 Vitest tests** passed. OpenAPI sync and generated-client adoption passed
+  at **17 operations / 30 shipping Swift files**. Swift package validation
+  passed **57 tests / 9 suites**; the app-hosted main-thread gate passed **77
+  tests** with zero Main Thread Checker findings; a fresh unsigned app build
+  succeeded. The direct, no-proxy serial simulator flight passed **17/17** after
+  a cold reboot; a focused screenshot tour also passed and exported six
+  signed-in screens.
+- **Browser and data-safety proof.** The complete Playwright suite passed
+  **10/10**, including real server-commit/idempotent-replay, two-tab conflict
+  convergence, failed-refresh copy, and offline queue replay. A synthetic local
+  tenant exercised settings, categories, day, activity, task, search, stats,
+  mood, routine, and focus mutations. Desktop and 390 px mobile web screens and
+  the six-screen native contact sheet were visually inspected. Production was
+  not accessed or mutated during local acceptance.
+- **Parity remains honest.** Contract and transport hardening add no feature
+  credit: web remains **89.74%** and iOS/combined remains **87.08%**, both above
+  the 85% gates.
+- **Independent review.** Successive adversarial reviews found focus
+  revision/idempotency/reconciliation gaps and missing date boundaries. The
+  final re-review reported no remaining Important or Minor findings.
+
+**External release proof:** collected only after the immutable source SHA is
+committed and pushed. GitHub Actions, exact-SHA Coolify deployment, live health,
+authenticated read-only APIs, desktop/mobile UI, security headers, console, and
+failed-network state are intentionally not claimed by this pre-release note.
+Production planner and mood mutations remain prohibited.
+
 ## 2026-07-28 — Round 15: executable native API contract (Codex)
 
 Roadmap:

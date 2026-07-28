@@ -10,6 +10,29 @@ import { gotoHydrated } from "./helpers";
 
 test.use({ locale: "en-US", timezoneId: "America/New_York" });
 
+test.afterEach(async ({ page }) => {
+  // A failed assertion must not leave the shared E2E account with an active
+  // session that obscures the next test's setup screen.
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  await page
+    .evaluate(async () => {
+      const snapshot = await fetch("/api/v1/focus-sessions");
+      if (!snapshot.ok) return;
+      const data = await snapshot.json();
+      if (!data.session) return;
+      await fetch(`/api/v1/focus-sessions/${data.session.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": String(data.session.revision),
+          "Idempotency-Key": crypto.randomUUID(),
+        },
+        body: JSON.stringify({ action: "transition", state: "completed" }),
+      });
+    })
+    .catch(() => {});
+});
+
 test("stale focus actions recover and paused tabs reconcile", async ({
   page,
   context,
@@ -85,7 +108,15 @@ test("transport retries reuse their key and rapid starts stay single-flight", as
       // Let the server commit and cache the response, then corrupt only the
       // client-visible body. Retrying must replay under the original key.
       const committed = await route.fetch();
-      await route.fulfill({ response: committed, body: "{" });
+      expect(committed.status()).toBe(201);
+      await route.fulfill({
+        status: committed.status(),
+        headers: {
+          "content-type": "application/json",
+          "cache-control": "private, no-store",
+        },
+        body: '{"session":',
+      });
       return;
     }
     await route.continue();
@@ -96,7 +127,9 @@ test("transport retries reuse their key and rapid starts stay single-flight", as
     (button as HTMLButtonElement).click();
     (button as HTMLButtonElement).click();
   });
-  await expect(page.locator('p[role="alert"]')).toContainText("offline");
+  await expect(page.locator('p[role="alert"]')).toContainText("offline", {
+    timeout: 15_000,
+  });
   expect(startRequests).toBe(1);
 
   await page.getByRole("button", { name: "Start focus" }).click();

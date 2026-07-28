@@ -353,7 +353,14 @@ uptime monitoring, dependency audit. **Round 15 hardening (2026-07-28):**
 copy is byte-for-byte checked, every shipping manual Swift operation is
 checked against documented method/path pairs, generated Swift compiles and
 tests in a dedicated macOS CI job, and stats/mood/focus snapshot drift found by
-the new gates is corrected. 8D privacy declarations, public policy,
+the new gates is corrected. **Round 16 hardening (2026-07-28):** the shipping
+SwiftUI app now imports and calls the generated `KairoAPIClient` for every
+planner operation; manual native HTTP is confined to Better Auth. Generated
+requests carry shared cookies, planning timezone, idempotency keys, and
+conditional revisions, while CI fails on contract drift, handwritten planner
+transport, dirty generation, package regressions, or a shipping app build/test
+failure. The canonical day/mutation/routine shapes and fractional RFC3339
+transport behavior are executable cross-platform contracts. 8D privacy declarations, public policy,
 review-prep contract, and final scripted parity audit for iOS ≥85%. App Store
 upload, processing, review, and launch remain per-release states and are never
 inferred from this historical phase checkbox.
