@@ -66,5 +66,9 @@ describe("native API contract CI", () => {
     expect(macCommands).toContain(
       "tests/ios-release-contract.test.ts tests/ios-release-script.test.ts",
     );
+    expect(macCommands).toContain("brew install xcodegen");
+    expect(macCommands.indexOf("brew install xcodegen")).toBeLessThan(
+      macCommands.indexOf("tests/ios-release-contract.test.ts"),
+    );
   });
 });

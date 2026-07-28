@@ -99,6 +99,9 @@ jobs:
           pnpm api:check-ios
           pnpm api:check-ios-client
 
+      - name: Install Apple release tooling
+        run: brew install xcodegen
+
       - name: Test Apple release contracts
         run: >-
           pnpm exec vitest run
