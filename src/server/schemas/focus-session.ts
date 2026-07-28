@@ -25,7 +25,8 @@ export const focusSessionResponse = z.object({
   ...managedRowFields,
   createdAt: databaseInstant,
   updatedAt: databaseInstant,
-  userId: uuid,
+  // Better Auth owns user IDs as opaque text; UUID formatting is not guaranteed.
+  userId: z.string().min(1),
   /** Nullable for ad-hoc sessions not tied to an occurrence. */
   activityOccurrenceId: uuid.nullable(),
   state: focusStateEnum,

@@ -25,7 +25,12 @@ interface Spec {
     string,
     { get?: Operation; post?: Operation; patch?: Operation }
   >;
-  components?: { schemas?: Record<string, unknown> };
+  components?: {
+    schemas?: Record<
+      string,
+      { properties?: Record<string, { type?: string; format?: string }> }
+    >;
+  };
 }
 
 const spec = parseYaml(
@@ -69,5 +74,8 @@ describe("focus OpenAPI contract", () => {
     expect(spec.components?.schemas?.FocusSessionCreateRequest).toBeDefined();
     expect(spec.components?.schemas?.FocusSessionPatchRequest).toBeDefined();
     expect(spec.components?.schemas?.FocusSnapshot).toBeDefined();
+    expect(
+      spec.components?.schemas?.FocusSession?.properties?.userId,
+    ).toEqual({ type: "string" });
   });
 });

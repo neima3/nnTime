@@ -7,7 +7,7 @@ import {
 
 const session = {
   id: "01980000-7000-8000-8000-000000000001",
-  userId: "01980000-7000-8000-8000-000000000002",
+  userId: "opaque-better-auth-user-id",
   activityOccurrenceId: null,
   state: "running",
   startedAt: "2026-07-28T12:00:00.000Z",

@@ -1602,7 +1602,7 @@ components:
         - updatedAt
       properties:
         id: { type: string, format: uuid }
-        userId: { type: string, format: uuid }
+        userId: { type: string }
         activityOccurrenceId:
           type: [string, 'null']
           format: uuid

@@ -45,7 +45,15 @@ with no operation inventory, and CI did not compile generated Swift.
   duplicate stats query handling, and both same-key and bounded-pool
   idempotency races. The final re-review reported no remaining Critical or
   Important findings.
-- **Full local proof.** Lint, typecheck, build, and **59 files / 629 tests**
+- **First-push feedback became release coverage.** GitHub’s Linux unit job
+  exposed that the Round 14 Apple release-contract suites require `plutil`;
+  those 15 tests now run on the macOS native-contract worker while the other
+  615 remain on the Postgres-backed Linux worker. The first E2E flight also
+  proved Better Auth user IDs are opaque text, not guaranteed UUIDs. The focus
+  runtime/OpenAPI contract now reflects that real identity shape, and the
+  previously failing Companion flow passes in the complete 7-test browser
+  suite.
+- **Full local proof.** Lint, typecheck, build, and **59 files / 630 tests**
   passed; both contract checks passed; parity intentionally remains web
   **89.74%** and iOS/combined **87.08%**. The app-hosted native gate passed
   **56 tests** with no Main Thread Checker diagnostic. The definitive serial

@@ -48,4 +48,23 @@ describe("native API contract CI", () => {
       commands.indexOf("swift test --package-path ios/Kairo"),
     );
   });
+
+  it("runs Apple-tooling release tests on macOS instead of Linux", () => {
+    const linuxCommands = (
+      workflow.jobs?.["build-test"]?.steps ?? []
+    ).map((step) => step.run ?? "").join("\n");
+    const macCommands = (
+      workflow.jobs?.["native-contract"]?.steps ?? []
+    ).map((step) => step.run ?? "").join("\n");
+
+    expect(linuxCommands).toContain(
+      "--exclude tests/ios-release-contract.test.ts",
+    );
+    expect(linuxCommands).toContain(
+      "--exclude tests/ios-release-script.test.ts",
+    );
+    expect(macCommands).toContain(
+      "tests/ios-release-contract.test.ts tests/ios-release-script.test.ts",
+    );
+  });
 });

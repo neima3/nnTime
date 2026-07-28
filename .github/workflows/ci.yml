@@ -64,7 +64,12 @@ jobs:
         run: pnpm typecheck
 
       - name: Test (unit + DB integration + contract parity)
-        run: pnpm test
+        # The release-contract suites require Apple's plutil and run below on
+        # macOS; every other Vitest suite remains on the Postgres-backed runner.
+        run: >-
+          pnpm exec vitest run
+          --exclude tests/ios-release-contract.test.ts
+          --exclude tests/ios-release-script.test.ts
 
       - name: Build
         run: pnpm build
@@ -93,6 +98,11 @@ jobs:
         run: |
           pnpm api:check-ios
           pnpm api:check-ios-client
+
+      - name: Test Apple release contracts
+        run: >-
+          pnpm exec vitest run
+          tests/ios-release-contract.test.ts tests/ios-release-script.test.ts
 
       - name: Build and test generated Swift client
         run: swift test --package-path ios/Kairo
