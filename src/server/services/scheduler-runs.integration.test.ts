@@ -80,7 +80,10 @@ describe("scheduler run ledger", () => {
 
   itDb("records a sanitized bounded failure without payload details", async () => {
     const id = await startSchedulerRun(env!.db, NOW);
-    const sensitive = `push failed\nhttps://push.invalid/secret ${"x".repeat(900)}`;
+    const sensitive =
+      `push failed\nhttps://push.invalid/secret ` +
+      `Authorization: Bearer cron-top-secret ` +
+      `api_key=provider-key user@example.com ${"x".repeat(900)}`;
     await failSchedulerRun(env!.db, id, new Date(NOW.getTime() + 500), sensitive);
     const [run] = await env!.db
       .select()
@@ -91,10 +94,13 @@ describe("scheduler run ledger", () => {
     expect(run.lastError).toHaveLength(500);
     expect(run.lastError).not.toContain("\n");
     expect(run.lastError).not.toContain("push.invalid");
+    expect(run.lastError).not.toContain("cron-top-secret");
+    expect(run.lastError).not.toContain("provider-key");
+    expect(run.lastError).not.toContain("user@example.com");
     expect(run.summary).toEqual({});
   });
 
-  itDb("prunes only completed runs older than the retention window", async () => {
+  itDb("prunes completed and abandoned runs older than the retention window", async () => {
     const oldSucceeded = await startSchedulerRun(
       env!.db,
       new Date("2026-06-01T00:00:00.000Z"),
@@ -125,7 +131,7 @@ describe("scheduler run ledger", () => {
     );
     await succeedSchedulerRun(env!.db, recent, NOW, {});
 
-    await expect(pruneSchedulerRuns(env!.db, NOW, 30)).resolves.toBe(2);
+    await expect(pruneSchedulerRuns(env!.db, NOW, 30)).resolves.toBe(3);
     const remaining = await env!.db
       .select()
       .from(schedulerRuns)
@@ -138,9 +144,7 @@ describe("scheduler run ledger", () => {
         ]),
       );
 
-    expect(remaining.map((run) => run.id).sort()).toEqual(
-      [oldRunning, recent].sort(),
-    );
+    expect(remaining.map((run) => run.id)).toEqual([recent]);
   });
 });
 

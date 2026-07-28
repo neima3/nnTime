@@ -26,19 +26,55 @@ const PREF_KEY = {
   "review-today": "reviewTodayNudges",
   "weekly-review": "weeklyReviewNudges",
 } as const satisfies Record<NotificationType, string>;
+const OFFSET_KEY = {
+  start: "startOffsetMin",
+  halfway: "halfwayOffsetMin",
+  "wrap-up": "wrapUpOffsetMin",
+} as const;
+
+function prefsRecord(prefs: unknown): Record<string, unknown> {
+  return prefs && typeof prefs === "object" && !Array.isArray(prefs)
+    ? (prefs as Record<string, unknown>)
+    : {};
+}
+
+function reminderOffsetMin(
+  prefs: unknown,
+  type: "start" | "halfway" | "wrap-up",
+): number {
+  const value = prefsRecord(prefs)[OFFSET_KEY[type]];
+  return typeof value === "number" &&
+    Number.isInteger(value) &&
+    value >= -60 &&
+    value <= 60
+    ? value
+    : 0;
+}
 
 export function activityFireTimes(
   startAt: Date,
   durationMin: number,
+  prefs?: unknown,
 ): CandidateFire[] {
   const duration =
     Number.isFinite(durationMin) && durationMin > 0 ? durationMin : 1;
-  const halfwayAt = new Date(startAt.getTime() + (duration * MINUTE_MS) / 2);
+  const shifted = (
+    type: "start" | "halfway" | "wrap-up",
+    base: Date,
+  ) =>
+    new Date(
+      base.getTime() + reminderOffsetMin(prefs, type) * MINUTE_MS,
+    );
+  const startReminderAt = shifted("start", startAt);
+  const halfwayAt = shifted(
+    "halfway",
+    new Date(startAt.getTime() + (duration * MINUTE_MS) / 2),
+  );
   const candidates: CandidateFire[] = [
     {
       type: "start",
-      fireAt: new Date(startAt),
-      expiresAt: new Date(startAt.getTime() + 30 * MINUTE_MS),
+      fireAt: startReminderAt,
+      expiresAt: new Date(startReminderAt.getTime() + 30 * MINUTE_MS),
     },
     {
       type: "halfway",
@@ -48,8 +84,9 @@ export function activityFireTimes(
   ];
 
   if (duration > 10) {
-    const wrapUpAt = new Date(
-      startAt.getTime() + (duration - 5) * MINUTE_MS,
+    const wrapUpAt = shifted(
+      "wrap-up",
+      new Date(startAt.getTime() + (duration - 5) * MINUTE_MS),
     );
     candidates.push({
       type: "wrap-up",
@@ -67,6 +104,10 @@ export function notificationTypeEnabled(
 ): boolean {
   if (!prefs || typeof prefs !== "object" || Array.isArray(prefs)) return true;
   return (prefs as Record<string, unknown>)[PREF_KEY[type]] !== false;
+}
+
+export function hideActivityTitlesOnLockScreen(prefs: unknown): boolean {
+  return prefsRecord(prefs).hideActivityTitlesOnLockScreen === true;
 }
 
 export function retryDelayMs(attempt: number): number {
@@ -93,29 +134,37 @@ export function activityDedupKey(input: {
 
 export function buildPushPayload(
   type: NotificationType,
-  input: { title?: string; emoji?: string; entityId?: string },
+  input: {
+    title?: string;
+    emoji?: string;
+    entityId?: string;
+    hideActivityTitle?: boolean;
+  },
 ): NotificationPushPayload {
   const title = input.title?.trim() || "Next activity";
   const entityId = input.entityId?.trim() || "activity";
+  const hidden = input.hideActivityTitle === true;
 
   switch (type) {
     case "start":
       return {
-        title: `${input.emoji?.trim() || "⏰"} ${title}`,
+        title: hidden
+          ? "Activity starting"
+          : `${input.emoji?.trim() || "⏰"} ${title}`,
         body: "Starting now — no rush, just a nudge.",
         tag: `start-${entityId}`,
         url: "/app/today",
       };
     case "halfway":
       return {
-        title: `Halfway through ${title}`,
+        title: hidden ? "Halfway check-in" : `Halfway through ${title}`,
         body: "A gentle check-in — keep going or adjust the plan.",
         tag: `halfway-${entityId}`,
         url: "/app/today",
       };
     case "wrap-up":
       return {
-        title: `${title} is wrapping up`,
+        title: hidden ? "Time to wrap up" : `${title} is wrapping up`,
         body: "About five minutes left — finish softly or extend.",
         tag: `wrap-up-${entityId}`,
         url: "/app/focus",

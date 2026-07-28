@@ -93,7 +93,7 @@ energy-pattern learning, and related rows — see table.
 | D07 | Widget / Live Activity / Dynamic Island timer | D | ios | 8A | planned | 1 | — |
 | D08 | Ambient sounds / "Focus tunes" | D | both | 3C | planned | 1 | SHIPPED: AmbientSounds component (src/components/AmbientSounds.tsx) with 5 CC0 sounds; live-verified (screenshot browser-qa/3c-today-live.png). |
 | D09 | Hyperfocus support | D | both | 3B, 3C | planned | 1 | Matches Tiimo's own mechanism (break reminders + visible timer + mood insights), not a dedicated hyperfocus mode. |
-| D10 | Break prompts | D | both | 3B | planned | 1 | SHIPPED: notification scheduler (src/server/services/notifications.ts) computes halfway + wrap-up notifications. |
+| D10 | Break prompts | D | both | 3B | planned | 1 | SHIPPED (Round 18): durable `notification_jobs` compute and deliver halfway + wrap-up prompts with stable deduplication, atomic claims, retry/expiry, cancellation, and source revalidation (`notification-policy.test.ts`, `notifications.integration.test.ts`, `notification-delivery.integration.test.ts`). |
 | D11 | Known gap: screen dimming during timer | D | both | — | excluded | 0 | Research doc marks this a reported bug/gap in Tiimo itself, not a feature to replicate. |
 | E01 | AI Co-Planner (conversational planning) | E | both | 4, 7D | planned | 1 | SHIPPED UI+API (2026-07-15 Wave 2/3): /app/planner PlanDayClient + POST /api/v1/ai/plan-day, breakdown, parse. SEC-05 no auto-mutate; 503 without ANTHROPIC_API_KEY. Live plan-day 401 unauth. |
 | E02 | AI task breakdown / subtask generation | E | both | 4, 7D | planned | 1 | SHIPPED: editor “Break it down” → POST /api/v1/ai/breakdown (SEC-05); server breakDownTask + UI wired 2026-07-15. |
@@ -107,13 +107,13 @@ energy-pattern learning, and related rows — see table.
 | F03 | One-way sync only, by design | F | both | 5A | planned | 1 | SHIPPED: calendar import is read-only (source='calendar', read-only locked blocks). Kairo's calendar import is read-only/one-way by the same design choice. |
 | F04 | Per-device import step | F | both | 5A | planned | 1 | Superseded by account-level OAuth sync (server-side, not per-device) — same end-user outcome via a better mechanism. |
 | F05 | Imported events are "locked" | F | both | 2C, 5A | planned | 1 | — |
-| G01 | Per-notification-type toggles | G | both | 3B | planned | 1 | — |
+| G01 | Per-notification-type toggles | G | both | 3B | planned | 1 | SHIPPED: the durable compute and delivery boundaries independently re-check start, halfway, wrap-up, daily review, and weekly review preferences; an explicit false cancels or suppresses the affected work. |
 | G02 | Custom timing | G | both | 3B | planned | 1 | — |
 | G03 | Custom sounds | G | both | 3B | planned | 1 | — |
-| G04 | "Review Today" daily check-in | G | both | 2D, 3B | planned | 1 | — |
-| G05 | "Review your week" | G | both | 3B | planned | 1 | — |
-| G06 | Gentle/soft notification design | G | both | 3B | planned | 1 | — |
-| G07 | Halfway/mid-task nudges | G | both | 3B | planned | 1 | 3B explicitly schedules halfway/wrap-up notifications reliably (Tiimo's own version is reported inconsistent). |
+| G04 | "Review Today" daily check-in | G | both | 2D, 3B | planned | 1 | SHIPPED (Round 18): one deduplicated daily review job at 20:00 in the account planning zone, preference/quiet-hour checked again at delivery. |
+| G05 | "Review your week" | G | both | 3B | planned | 1 | SHIPPED (Round 18): one deduplicated week-ending review job at 18:00 in the account planning zone and configured week-start convention. |
+| G06 | Gentle/soft notification design | G | both | 3B | planned | 1 | SHIPPED: privacy-minimal, calm copy is generated centrally by `notification-policy.ts`; arbitrary activity notes and push endpoints never enter job payloads. |
+| G07 | Halfway/mid-task nudges | G | both | 3B | planned | 1 | SHIPPED (Round 18): recurrence- and override-aware halfway jobs are delivered through the same durable claim/retry state machine as start and wrap-up prompts. |
 | G08 | Per-task notification granularity | G | both | — | excluded | 0 | Research doc marks this a user-requested gap not yet available in Tiimo itself ("N/A feature gap"). |
 | H01 | Home Screen widgets | H | ios | 8A | planned | 1 | — |
 | H02 | Lock Screen widgets | H | ios | 8A | planned | 1 | — |

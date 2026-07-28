@@ -88,7 +88,7 @@ Phase 1+ requires `DATABASE_URL`, `BETTER_AUTH_SECRET`, etc.
 | `BETTER_AUTH_SECRET` | Session signing |
 | `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL` | Canonical origin |
 | `TRUSTED_ORIGINS` | Optional comma-separated extra Origins allowed for cookie-auth API mutations (always allows `https://time.neima.me` + `http://localhost:3000`) |
-| `CRON_SECRET` | Bearer secret for `POST /api/v1/jobs/tick` (ADR-004 scheduler). Each tick materializes routines, computes notification jobs, and delivers due web-push nudges (`deliverDueNudges`). The Origin/CSRF proxy guard skips this path because it uses bearer, not cookies. **The cron now exists — see below.** |
+| `CRON_SECRET` | Bearer secret for `POST /api/v1/jobs/tick` (ADR-004 scheduler). Each tick records a scheduler run, materializes routines, computes deduplicated `notification_jobs`, atomically claims due work, and delivers or durably retries Web Push. The Origin/CSRF proxy guard skips this path because it uses bearer, not cookies. **The cron now exists — see below.** |
 | `ANTHROPIC_API_KEY` | Optional; AI co-planner (503 if missing on AI routes) |
 
 ## Postgres provisioning (Phase 1A+)
@@ -193,11 +193,13 @@ source of truth.
 ## Container health + monitoring (8C, 2026-07-27)
 
 - The **Dockerfile carries a `HEALTHCHECK`** hitting `/api/health` every 30 s
-  (node global fetch — the runtime image has no curl). `/api/health` 503s
-  only on the hard dependencies (DB unreachable / migrations failed); AI and
-  scheduler are explicitly optional there, so the check cannot flap on soft
-  failures. After a deploy the app should read `running:healthy` in Coolify —
-  if it reads `running:unknown`, the image predates this section.
+  (node global fetch — the runtime image has no curl). `/api/health` 503s when
+  migrations or the database fail and, in production, when the scheduler is
+  unconfigured, its newest completed run failed, or its latest success is more
+  than five minutes old. A new process receives a five-minute `warming` grace
+  period before the first recorded run. AI remains an optional check. After a
+  deploy the app should read `running:healthy` in Coolify — if it reads
+  `running:unknown`, the image predates this section.
 - The **Coolify-side healthcheck toggle** (app → Health Checks → path
   `/api/health`, port 3000) is complementary and needs the UI or a
   write-scoped token: the CLI/API token in `.env.local` is **read-only**
@@ -234,8 +236,10 @@ curl -s -H "Authorization: Bearer $COOLIFY_API_TOKEN" \
 curl -s -H "Authorization: Bearer $COOLIFY_API_TOKEN" \
   "$COOLIFY_API_URL/applications/$COOLIFY_APP_UUID/scheduled-tasks/hfhf3aequ16o5si78jh7uq5i/executions"
 ```
-**Verified:** consecutive executions one minute apart, each returning
-`200 {"ok":true,…,"delivery":{…}}`. A created task is not evidence — always read
-the executions list. Note the singular endpoint
+**Verification contract:** consecutive executions one minute apart must return
+`200 {"ok":true,…,"notifications":{…},"delivery":{…}}`, `/api/health` must
+report `checks.scheduler:"ok"` with a recent `schedulerLagSeconds`, and the
+latest `scheduler_runs` row must be `succeeded`. A created task is not evidence
+— always read the executions list. Note the singular endpoint
 (`/scheduled-tasks/{uuid}`) returns 404 on this Coolify version; only
 `…/executions` works, so use that to inspect a task.

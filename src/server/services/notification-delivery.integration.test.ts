@@ -173,6 +173,51 @@ describe("deliverDueNotificationJobs", () => {
     expect((await getJob(jobId)).state).toBe("sent");
   });
 
+  itDb("fences a stale worker before another owner sends", async () => {
+    const userId = await seedUser();
+    const jobId = await seedJob(userId);
+    const firstSend = vi.fn().mockResolvedValue(SUCCESS);
+    const secondSend = vi.fn().mockResolvedValue(SUCCESS);
+    let enteredResolve!: () => void;
+    let releaseResolve!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      enteredResolve = resolve;
+    });
+    const release = new Promise<void>((resolve) => {
+      releaseResolve = resolve;
+    });
+
+    const firstWorker = deliverDueNotificationJobs({
+      db: env!.db,
+      now: NOW,
+      send: firstSend,
+      beforeSend: async () => {
+        enteredResolve();
+        await release;
+      },
+    });
+    await entered;
+
+    const reclaimedAt = new Date(NOW.getTime() + 6 * 60_000);
+    const secondResult = await deliverDueNotificationJobs({
+      db: env!.db,
+      now: reclaimedAt,
+      send: secondSend,
+    });
+    releaseResolve();
+    const firstResult = await firstWorker;
+
+    expect(secondResult.delivered).toBe(1);
+    expect(firstResult.delivered).toBe(0);
+    expect(secondSend).toHaveBeenCalledTimes(1);
+    expect(firstSend).not.toHaveBeenCalled();
+    expect(await getJob(jobId)).toMatchObject({
+      state: "sent",
+      deliveredAt: reclaimedAt,
+      claimToken: null,
+    });
+  });
+
   itDb("suppresses disabled, quiet, missing, unconfigured, and unsubscribed jobs", async () => {
     const disabledUser = await seedUser({ startNudges: false });
     const quietUser = await seedUser({
@@ -253,7 +298,11 @@ describe("deliverDueNotificationJobs", () => {
     const retry = await getJob(retryId);
     const exhausted = await getJob(exhaustedId);
 
-    expect(first).toMatchObject({ retried: 1, expired: 1 });
+    expect(first).toMatchObject({
+      retried: 1,
+      expired: 1,
+      retryableFailures: 2,
+    });
     expect(retry).toMatchObject({
       state: "retry",
       attempts: 1,
@@ -316,6 +365,96 @@ describe("deliverDueNotificationJobs", () => {
     });
   });
 
+  itDb("revalidates the current recurrence rule before sending", async () => {
+    const userId = await seedUser();
+    const seriesId = await seedSeries(userId);
+    const jobId = await seedJob(userId, { entityId: seriesId });
+    await env!.db
+      .update(activitySeries)
+      .set({ exdate: [OCCURRENCE] })
+      .where(eq(activitySeries.id, seriesId));
+    const send = vi.fn().mockResolvedValue(SUCCESS);
+
+    const result = await deliverDueNotificationJobs({
+      db: env!.db,
+      now: NOW,
+      send,
+    });
+
+    expect(result).toMatchObject({ delivered: 0, suppressed: 1 });
+    expect(send).not.toHaveBeenCalled();
+    expect(await getJob(jobId)).toMatchObject({
+      state: "suppressed",
+      lastError: "source-missing",
+    });
+  });
+
+  itDb("uses the live per-job clock for quiet hours and expiry", async () => {
+    const quietUser = await seedUser({
+      quietHours: { enabled: true, start: 22, end: 7 },
+    });
+    const expiredUser = await seedUser();
+    const batchStartedAt = new Date("2026-07-28T21:59:00.000Z");
+    const sendTime = new Date("2026-07-28T22:00:00.000Z");
+    const quietId = await seedJob(quietUser, {
+      type: "review-today",
+      fireAt: new Date("2026-07-28T21:58:00.000Z"),
+      expiresAt: new Date("2026-07-28T22:30:00.000Z"),
+      nextAttemptAt: new Date("2026-07-28T21:58:00.000Z"),
+    });
+    const expiredId = await seedJob(expiredUser, {
+      type: "weekly-review",
+      fireAt: new Date("2026-07-28T21:58:00.000Z"),
+      expiresAt: new Date("2026-07-28T21:59:30.000Z"),
+      nextAttemptAt: new Date("2026-07-28T21:58:00.000Z"),
+    });
+    const send = vi.fn().mockResolvedValue(SUCCESS);
+
+    const result = await deliverDueNotificationJobs({
+      db: env!.db,
+      now: batchStartedAt,
+      clock: () => sendTime,
+      limit: 20,
+      send,
+    });
+
+    expect(send).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ suppressed: 1, expired: 1 });
+    expect(await getJob(quietId)).toMatchObject({
+      state: "suppressed",
+      lastError: "quiet-hours",
+    });
+    expect(await getJob(expiredId)).toMatchObject({
+      state: "expired",
+      lastError: "delivery-window-expired",
+    });
+  });
+
+  itDb("uses delivery-time offsets and lock-screen privacy", async () => {
+    const userId = await seedUser({
+      startOffsetMin: -5,
+      hideActivityTitlesOnLockScreen: true,
+    });
+    const seriesId = await seedSeries(userId);
+    await seedJob(userId, {
+      entityId: seriesId,
+      fireAt: new Date(OCCURRENCE.getTime() - 5 * 60_000),
+    });
+    const send = vi.fn().mockResolvedValue(SUCCESS);
+
+    const result = await deliverDueNotificationJobs({
+      db: env!.db,
+      now: NOW,
+      send,
+    });
+
+    expect(result.delivered).toBe(1);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]?.[1]).toMatchObject({
+      title: "Activity starting",
+    });
+  });
+
   itDb("expires work whose delivery window has passed without sending", async () => {
     const userId = await seedUser();
     const jobId = await seedJob(userId, {
@@ -374,6 +513,7 @@ describe("deliverDueNotificationJobs", () => {
 
     expect(jobs.every((job) => job.state === "sent")).toBe(true);
     expect(jobs.every((job) => job.claimedAt === null)).toBe(true);
+    expect(jobs.every((job) => job.claimToken === null)).toBe(true);
     expect(seenTags).toEqual(
       expect.arrayContaining([
         expect.stringMatching(/^start-/),

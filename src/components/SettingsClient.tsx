@@ -115,6 +115,85 @@ function Section({
 }
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
+const REMINDER_SELECT_CLASS =
+  "min-h-11 rounded-xl border border-border bg-surface px-3 py-2 text-[13px] font-semibold";
+
+function reminderOffset(
+  prefs: Record<string, unknown>,
+  key: string,
+): number {
+  const value = prefs[key];
+  return typeof value === "number" && Number.isInteger(value) ? value : 0;
+}
+
+function ReminderTimingRows({
+  prefs,
+  onChange,
+}: {
+  prefs: Record<string, unknown>;
+  onChange: (nextPrefs: Record<string, unknown>) => void;
+}) {
+  const timingRows = [
+    {
+      label: "Start reminder timing",
+      hint: "Choose how much runway you want before a block begins",
+      key: "startOffsetMin",
+      options: [
+        [-15, "15 min before"],
+        [-10, "10 min before"],
+        [-5, "5 min before"],
+        [0, "At start"],
+      ],
+    },
+    {
+      label: "Halfway reminder timing",
+      hint: "Move the gentle midpoint check-in earlier or later",
+      key: "halfwayOffsetMin",
+      options: [
+        [-5, "5 min before"],
+        [0, "At halfway"],
+        [5, "5 min after"],
+      ],
+    },
+    {
+      label: "Wrap-up reminder timing",
+      hint: "Default is five minutes before the planned end",
+      key: "wrapUpOffsetMin",
+      options: [
+        [-5, "10 min before end"],
+        [0, "5 min before end"],
+        [5, "At end"],
+      ],
+    },
+  ] as const;
+
+  return timingRows.map((row) => (
+    <Row
+      key={row.key}
+      label={row.label}
+      hint={row.hint}
+      right={
+        <select
+          aria-label={row.label}
+          value={reminderOffset(prefs, row.key)}
+          onChange={(event) =>
+            onChange({
+              ...prefs,
+              [row.key]: Number(event.target.value),
+            })
+          }
+          className={REMINDER_SELECT_CLASS}
+        >
+          {row.options.map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      }
+    />
+  ));
+}
 
 /**
  * Quiet hours (H7) — a nightly window where reminders hold off. Persisted in
@@ -603,6 +682,33 @@ export function SettingsClient() {
                   notificationPrefs: {
                     ...settings.notificationPrefs,
                     startNudges: v,
+                  },
+                })
+              }
+            />
+          }
+        />
+        <ReminderTimingRows
+          prefs={settings.notificationPrefs}
+          onChange={(nextPrefs) =>
+            void patch({ notificationPrefs: nextPrefs })
+          }
+        />
+        <Row
+          label="Hide activity names on lock screen"
+          hint="Use generic reminder text while still opening the right Kairo screen"
+          right={
+            <Toggle
+              label="Hide activity names on lock screen"
+              on={
+                settings.notificationPrefs
+                  .hideActivityTitlesOnLockScreen === true
+              }
+              onChange={(value) =>
+                void patch({
+                  notificationPrefs: {
+                    ...settings.notificationPrefs,
+                    hideActivityTitlesOnLockScreen: value,
                   },
                 })
               }

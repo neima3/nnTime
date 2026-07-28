@@ -44,6 +44,22 @@ describe("durable notification regression contract", () => {
     }
   });
 
+  it("keeps reminder timing and lock-screen privacy user-configurable", () => {
+    const settings = source("src/components/SettingsClient.tsx");
+    for (const key of [
+      "startOffsetMin",
+      "halfwayOffsetMin",
+      "wrapUpOffsetMin",
+      "hideActivityTitlesOnLockScreen",
+    ]) {
+      expect(settings).toContain(key);
+    }
+    expect(settings).toContain("Hide activity names on lock screen");
+    expect(settings).toContain("Start reminder timing");
+    expect(settings).toContain("Halfway reminder timing");
+    expect(settings).toContain("Wrap-up reminder timing");
+  });
+
   it("adds infrastructure without rewriting production planner history", () => {
     const migration = source(
       "drizzle/0009_durable_notification_jobs.sql",

@@ -3,6 +3,7 @@ import {
   activityDedupKey,
   activityFireTimes,
   buildPushPayload,
+  hideActivityTitlesOnLockScreen,
   notificationTypeEnabled,
   retryDelayMs,
 } from "./notification-policy";
@@ -41,6 +42,36 @@ describe("activityFireTimes", () => {
     const candidates = activityFireTimes(START, Number.NaN);
     expect(candidates).toHaveLength(2);
     expect(candidates[1]?.fireAt.toISOString()).toBe("2026-07-28T14:00:30.000Z");
+  });
+
+  it("applies bounded per-user offsets to each activity reminder", () => {
+    const candidates = activityFireTimes(START, 30, {
+      startOffsetMin: -10,
+      halfwayOffsetMin: 5,
+      wrapUpOffsetMin: -2,
+    });
+
+    expect(
+      candidates.map((candidate) => [
+        candidate.type,
+        candidate.fireAt.toISOString(),
+      ]),
+    ).toEqual([
+      ["start", "2026-07-28T13:50:00.000Z"],
+      ["halfway", "2026-07-28T14:20:00.000Z"],
+      ["wrap-up", "2026-07-28T14:23:00.000Z"],
+    ]);
+    expect(
+      activityFireTimes(START, 30, {
+        startOffsetMin: -61,
+        halfwayOffsetMin: 1.5,
+        wrapUpOffsetMin: "5",
+      }).map((candidate) => candidate.fireAt.toISOString()),
+    ).toEqual([
+      "2026-07-28T14:00:00.000Z",
+      "2026-07-28T14:15:00.000Z",
+      "2026-07-28T14:25:00.000Z",
+    ]);
   });
 });
 
@@ -141,5 +172,36 @@ describe("buildPushPayload", () => {
     });
     expect(payload).toEqual(expected);
     expect(JSON.stringify(payload)).not.toContain("private note");
+  });
+
+  it("can hide activity names and emoji from lock-screen copy", () => {
+    for (const type of ["start", "halfway", "wrap-up"] as const) {
+      const payload = buildPushPayload(type, {
+        title: "Private therapy appointment",
+        emoji: "🩺",
+        entityId: "series-1",
+        hideActivityTitle: true,
+      });
+      expect(JSON.stringify(payload)).not.toContain("therapy");
+      expect(JSON.stringify(payload)).not.toContain("🩺");
+      expect(payload.tag).toBe(`${type}-series-1`);
+    }
+  });
+});
+
+describe("hideActivityTitlesOnLockScreen", () => {
+  it("requires an explicit privacy opt-in", () => {
+    expect(hideActivityTitlesOnLockScreen(undefined)).toBe(false);
+    expect(hideActivityTitlesOnLockScreen({})).toBe(false);
+    expect(
+      hideActivityTitlesOnLockScreen({
+        hideActivityTitlesOnLockScreen: true,
+      }),
+    ).toBe(true);
+    expect(
+      hideActivityTitlesOnLockScreen({
+        hideActivityTitlesOnLockScreen: "true",
+      }),
+    ).toBe(false);
   });
 });

@@ -575,6 +575,7 @@ export const notificationJobs = pgTable(
       withTimezone: true,
       mode: "date",
     }),
+    claimToken: uuid("claim_token"),
     deliveredAt: timestamp("delivered_at", {
       withTimezone: true,
       mode: "date",

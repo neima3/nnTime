@@ -21,6 +21,7 @@ CREATE TABLE "notification_jobs" (
 	"next_attempt_at" timestamp with time zone NOT NULL,
 	"last_error" text,
 	"claimed_at" timestamp with time zone,
+	"claim_token" uuid,
 	"delivered_at" timestamp with time zone,
 	"payload" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,

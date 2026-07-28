@@ -370,7 +370,16 @@ revision before retry. Queue rows and requests are bound to one account,
 retryable failures honor backoff, conflicts survive reload with an explicit
 server-version outcome, and queue drain refreshes rendered server truth.
 Production-mode browser coverage exercises offline create, status convergence,
-conflict acknowledgment, and responsive notification-layer layout. 8D privacy declarations, public policy,
+conflict acknowledgment, and responsive notification-layer layout.
+**Round 18 hardening (2026-07-28):** the minute scheduler now computes
+recurrence- and override-aware notification rows in a dedicated durable table
+with stable deduplication, bounded cancellation, atomic claims, five-attempt
+backoff, expiry, quiet-hour and preference revalidation, stale-subscription
+pruning, and all five ADR-004 notification types. Each tick has a durable run
+ledger and fails closed at the route boundary; production health reports real
+scheduler failure or lag instead of treating secret presence as success.
+Notification computation no longer writes planner history or sync feed rows.
+8D privacy declarations, public policy,
 review-prep contract, and final scripted parity audit for iOS ≥85%. App Store
 upload, processing, review, and launch remain per-release states and are never
 inferred from this historical phase checkbox.

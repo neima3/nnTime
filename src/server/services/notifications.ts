@@ -19,6 +19,7 @@ import {
   activityDedupKey,
   activityFireTimes,
   buildPushPayload,
+  hideActivityTitlesOnLockScreen,
   notificationTypeEnabled,
   type NotificationPushPayload,
   type NotificationType,
@@ -338,6 +339,7 @@ export async function computeNotificationJobs(
       for (const candidate of activityFireTimes(
         activity.dtstartLocal,
         activity.durationMin,
+        prefs,
       )) {
         if (
           candidate.fireAt < now ||
@@ -365,6 +367,8 @@ export async function computeNotificationJobs(
             title: activity.title,
             emoji: activity.emoji ?? undefined,
             entityId: activity.id,
+            hideActivityTitle:
+              hideActivityTitlesOnLockScreen(prefs),
           }),
         });
       }
@@ -383,6 +387,7 @@ export async function computeNotificationJobs(
           nextAttemptAt: sql`${schema.notificationJobs.fireAt}`,
           lastError: null,
           claimedAt: null,
+          claimToken: null,
           updatedAt: now,
         })
         .where(
@@ -420,6 +425,7 @@ export async function computeNotificationJobs(
         state: "cancelled",
         lastError: "no-longer-desired",
         claimedAt: null,
+        claimToken: null,
         updatedAt: now,
       })
       .where(

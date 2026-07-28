@@ -111,6 +111,33 @@ describe("computeNotificationJobs", () => {
     expect(await env!.db.select().from(changeLog)).toHaveLength(0);
   });
 
+  itDb("applies reminder offsets and privacy before persisting jobs", async () => {
+    const userId = await seedUser({
+      ...NO_REVIEWS,
+      startOffsetMin: -10,
+      hideActivityTitlesOnLockScreen: true,
+    });
+    await seedSeries(userId, {
+      start: new Date("2026-07-28T13:00:00.000Z"),
+      title: "Private appointment",
+    });
+
+    await computeNotificationJobs({ db: env!.db, now: NOW });
+    const jobs = await env!.db
+      .select()
+      .from(notificationJobs)
+      .where(eq(notificationJobs.userId, userId));
+    const start = jobs.find((job) => job.type === "start");
+
+    expect(start?.fireAt.toISOString()).toBe(
+      "2026-07-28T12:50:00.000Z",
+    );
+    expect(start?.payload).toMatchObject({ title: "Activity starting" });
+    expect(JSON.stringify(start?.payload)).not.toContain(
+      "Private appointment",
+    );
+  });
+
   itDb("expands recurring activity occurrences across the horizon", async () => {
     const userId = await seedUser();
     await seedSeries(userId, {

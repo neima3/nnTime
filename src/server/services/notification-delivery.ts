@@ -5,9 +5,11 @@ import * as schema from "../db/schema";
 import type { Db } from "../dal";
 import { isQuietAt } from "@/lib/quiet-hours";
 import { instantToWallFields } from "../temporal/zone";
+import { expandActivitiesForDay } from "./day";
 import {
   activityFireTimes,
   buildPushPayload,
+  hideActivityTitlesOnLockScreen,
   notificationTypeEnabled,
   retryDelayMs,
 } from "./notification-policy";
@@ -28,6 +30,7 @@ interface ClaimedJob {
   state: schema.DbNotificationJob["state"];
   attempts: number;
   payload: unknown;
+  claimToken: string;
 }
 
 function rowsFromResult(result: unknown): Record<string, unknown>[] {
@@ -68,6 +71,7 @@ function normalizeClaimedJobs(result: unknown): ClaimedJob[] {
     state: String(row.state) as ClaimedJob["state"],
     attempts: Number(row.attempts ?? 0),
     payload: row.payload,
+    claimToken: String(row.claimToken ?? row.claim_token),
   }));
 }
 
@@ -99,6 +103,7 @@ async function claimDueJobs(
     SET
       state = 'processing',
       claimed_at = ${nowIso}::timestamptz,
+      claim_token = gen_random_uuid(),
       updated_at = ${nowIso}::timestamptz
     FROM due
     WHERE jobs.id = due.id
@@ -113,20 +118,40 @@ async function claimDueJobs(
       jobs.expires_at AS "expiresAt",
       jobs.state,
       jobs.attempts,
-      jobs.payload
+      jobs.payload,
+      jobs.claim_token AS "claimToken"
   `);
   return normalizeClaimedJobs(result);
 }
 
 async function transitionJob(
   db: Db,
-  id: string,
+  job: ClaimedJob,
   values: Partial<typeof schema.notificationJobs.$inferInsert>,
-) {
-  await db
+): Promise<boolean> {
+  const transitioned = await db
     .update(schema.notificationJobs)
     .set(values)
-    .where(eq(schema.notificationJobs.id, id));
+    .where(
+      and(
+        eq(schema.notificationJobs.id, job.id),
+        eq(schema.notificationJobs.state, "processing"),
+        eq(schema.notificationJobs.claimToken, job.claimToken),
+      ),
+    )
+    .returning({ id: schema.notificationJobs.id });
+  return transitioned.length === 1;
+}
+
+async function renewClaim(
+  db: Db,
+  job: ClaimedJob,
+  now: Date,
+): Promise<boolean> {
+  return transitionJob(db, job, {
+    claimedAt: now,
+    updatedAt: now,
+  });
 }
 
 export async function deliverDueNotificationJobs(
@@ -135,6 +160,8 @@ export async function deliverDueNotificationJobs(
     now?: Date;
     limit?: number;
     send?: typeof sendToUser;
+    clock?: () => Date;
+    beforeSend?: () => Promise<void>;
   } = {},
 ): Promise<{
   considered: number;
@@ -142,10 +169,13 @@ export async function deliverDueNotificationJobs(
   suppressed: number;
   retried: number;
   expired: number;
-  pruned: number;
-}> {
+    pruned: number;
+    retryableFailures: number;
+  }> {
   const db = opts.db ?? dbDefault;
   const now = opts.now ?? new Date();
+  const clock =
+    opts.clock ?? (opts.now ? () => opts.now! : () => new Date());
   const limit = Math.min(Math.max(Math.floor(opts.limit ?? 200), 1), 500);
   const send = opts.send ?? sendToUser;
   const claimed = await claimDueJobs(db, now, limit);
@@ -156,17 +186,21 @@ export async function deliverDueNotificationJobs(
     retried: 0,
     expired: 0,
     pruned: 0,
+    retryableFailures: 0,
   };
 
   for (const job of claimed) {
-    if (job.expiresAt <= now) {
-      await transitionJob(db, job.id, {
+    const decisionAt = clock();
+    if (job.expiresAt <= decisionAt) {
+      if (await transitionJob(db, job, {
         state: "expired",
         lastError: "delivery-window-expired",
         claimedAt: null,
-        updatedAt: now,
-      });
-      summary.expired++;
+        claimToken: null,
+        updatedAt: decisionAt,
+      })) {
+        summary.expired++;
+      }
       continue;
     }
 
@@ -179,25 +213,29 @@ export async function deliverDueNotificationJobs(
     const prefs = settings?.notificationPrefs ?? {};
 
     if (!notificationTypeEnabled(prefs, job.type)) {
-      await transitionJob(db, job.id, {
+      if (await transitionJob(db, job, {
         state: "suppressed",
         lastError: "preference-disabled",
         claimedAt: null,
-        updatedAt: now,
-      });
-      summary.suppressed++;
+        claimToken: null,
+        updatedAt: decisionAt,
+      })) {
+        summary.suppressed++;
+      }
       continue;
     }
 
-    const quietHour = instantToWallFields(now, timezone).hour;
+    const quietHour = instantToWallFields(decisionAt, timezone).hour;
     if (isQuietAt(prefs, quietHour)) {
-      await transitionJob(db, job.id, {
+      if (await transitionJob(db, job, {
         state: "suppressed",
         lastError: "quiet-hours",
         claimedAt: null,
-        updatedAt: now,
-      });
-      summary.suppressed++;
+        claimToken: null,
+        updatedAt: decisionAt,
+      })) {
+        summary.suppressed++;
+      }
       continue;
     }
 
@@ -215,13 +253,15 @@ export async function deliverDueNotificationJobs(
         )
         .limit(1);
       if (!series) {
-        await transitionJob(db, job.id, {
+        if (await transitionJob(db, job, {
           state: "suppressed",
           lastError: "source-missing",
           claimedAt: null,
-          updatedAt: now,
-        });
-        summary.suppressed++;
+          claimToken: null,
+          updatedAt: decisionAt,
+        })) {
+          summary.suppressed++;
+        }
         continue;
       }
       const [occurrence] = await db
@@ -239,95 +279,152 @@ export async function deliverDueNotificationJobs(
           ),
         )
         .limit(1);
-      const startAt = occurrence?.startAt ?? job.occurrenceKey!;
-      const durationMin =
-        occurrence?.durationMin ?? series.durationMin;
+      const occurrenceKey = job.occurrenceKey!;
+      const [activity] = expandActivitiesForDay(
+        [series],
+        occurrence ? [occurrence] : [],
+        {
+          start: occurrenceKey,
+          end: new Date(occurrenceKey.getTime() + 1),
+        },
+      );
       const stillDesired =
-        (occurrence?.status ?? "pending") === "pending" &&
-        activityFireTimes(startAt, durationMin).some(
+        activity?.status === "pending" &&
+        activityFireTimes(
+          activity.dtstartLocal,
+          activity.durationMin,
+          prefs,
+        ).some(
           (candidate) =>
             candidate.type === job.type &&
             candidate.fireAt.getTime() === job.fireAt.getTime(),
         );
       if (!stillDesired) {
-        await transitionJob(db, job.id, {
+        if (await transitionJob(db, job, {
           state: "suppressed",
           lastError: "source-missing",
           claimedAt: null,
-          updatedAt: now,
-        });
-        summary.suppressed++;
+          claimToken: null,
+          updatedAt: decisionAt,
+        })) {
+          summary.suppressed++;
+        }
         continue;
       }
       payload = buildPushPayload(job.type, {
-        title: occurrence?.title ?? series.title,
+        title: activity.title,
         emoji: series.emoji ?? undefined,
         entityId: series.id,
+        hideActivityTitle:
+          hideActivityTitlesOnLockScreen(prefs),
       });
     } else {
       payload = buildPushPayload(job.type, {});
     }
 
+    await opts.beforeSend?.();
+    const sendStartedAt = clock();
+    if (!(await renewClaim(db, job, sendStartedAt))) continue;
+    if (job.expiresAt <= sendStartedAt) {
+      if (await transitionJob(db, job, {
+        state: "expired",
+        lastError: "delivery-window-expired",
+        claimedAt: null,
+        claimToken: null,
+        updatedAt: sendStartedAt,
+      })) {
+        summary.expired++;
+      }
+      continue;
+    }
+    const sendHour = instantToWallFields(sendStartedAt, timezone).hour;
+    if (isQuietAt(prefs, sendHour)) {
+      if (await transitionJob(db, job, {
+        state: "suppressed",
+        lastError: "quiet-hours",
+        claimedAt: null,
+        claimToken: null,
+        updatedAt: sendStartedAt,
+      })) {
+        summary.suppressed++;
+      }
+      continue;
+    }
+
     const attempt = job.attempts + 1;
     const outcome = await send(job.userId, payload, { db });
+    const completedAt = clock();
     summary.pruned += outcome.pruned;
+    summary.retryableFailures += outcome.retryableFailures;
 
     if (!outcome.configured) {
-      await transitionJob(db, job.id, {
+      if (await transitionJob(db, job, {
         state: "suppressed",
         lastError: "push-unconfigured",
         claimedAt: null,
-        updatedAt: now,
-      });
-      summary.suppressed++;
+        claimToken: null,
+        updatedAt: completedAt,
+      })) {
+        summary.suppressed++;
+      }
       continue;
     }
 
     if (outcome.sent > 0) {
-      await transitionJob(db, job.id, {
+      if (await transitionJob(db, job, {
         state: "sent",
         attempts: attempt,
         lastError: null,
         claimedAt: null,
-        deliveredAt: now,
-        updatedAt: now,
-      });
-      summary.delivered++;
+        claimToken: null,
+        deliveredAt: completedAt,
+        updatedAt: completedAt,
+      })) {
+        summary.delivered++;
+      }
       continue;
     }
 
     if (outcome.retryableFailures > 0) {
       if (attempt >= MAX_ATTEMPTS) {
-        await transitionJob(db, job.id, {
+        if (await transitionJob(db, job, {
           state: "expired",
           attempts: attempt,
           lastError: "retry-exhausted",
           claimedAt: null,
-          updatedAt: now,
-        });
-        summary.expired++;
+          claimToken: null,
+          updatedAt: completedAt,
+        })) {
+          summary.expired++;
+        }
       } else {
-        await transitionJob(db, job.id, {
+        if (await transitionJob(db, job, {
           state: "retry",
           attempts: attempt,
-          nextAttemptAt: new Date(now.getTime() + retryDelayMs(attempt)),
+          nextAttemptAt: new Date(
+            completedAt.getTime() + retryDelayMs(attempt),
+          ),
           lastError: "transient-push-failure",
           claimedAt: null,
-          updatedAt: now,
-        });
-        summary.retried++;
+          claimToken: null,
+          updatedAt: completedAt,
+        })) {
+          summary.retried++;
+        }
       }
       continue;
     }
 
-    await transitionJob(db, job.id, {
+    if (await transitionJob(db, job, {
       state: "suppressed",
       attempts: attempt,
       lastError: "no-subscriptions",
       claimedAt: null,
-      updatedAt: now,
-    });
-    summary.suppressed++;
+      claimToken: null,
+      updatedAt: completedAt,
+    })) {
+      summary.suppressed++;
+    }
   }
 
   return summary;

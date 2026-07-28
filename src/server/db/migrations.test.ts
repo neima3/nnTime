@@ -134,6 +134,19 @@ describe("migrations apply and schema is complete", () => {
     expect(indexNames).toContain("notification_jobs_due_idx");
     expect(indexNames).toContain("notification_jobs_user_entity_idx");
   });
+
+  itDb("notification claims carry a UUID fencing token", async () => {
+    const result = await getDb().execute<{
+      data_type: string;
+      is_nullable: string;
+    }>(
+      sql`SELECT data_type, is_nullable FROM information_schema.columns WHERE table_name='notification_jobs' AND column_name='claim_token'`,
+    );
+    expect(result[0]).toEqual({
+      data_type: "uuid",
+      is_nullable: "YES",
+    });
+  });
 });
 
 describe("ADR-004: durable notification jobs", () => {

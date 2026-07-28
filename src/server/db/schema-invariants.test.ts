@@ -154,6 +154,7 @@ describe("ADR-004: durable notification infrastructure", () => {
       "nextAttemptAt",
       "lastError",
       "claimedAt",
+      "claimToken",
       "deliveredAt",
       "createdAt",
       "updatedAt",

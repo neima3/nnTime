@@ -63,7 +63,7 @@ One row represents one computed delivery attempt for one user-visible reminder.
 - `dedup_key` text with a database unique index;
 - `state`: `pending`, `processing`, `retry`, `sent`, `suppressed`,
   `expired`, or `cancelled`;
-- `attempts`, `next_attempt_at`, `last_error`, `claimed_at`,
+- `attempts`, `next_attempt_at`, `last_error`, `claimed_at`, `claim_token`,
   `delivered_at`, `created_at`, and `updated_at`;
 - a small JSON payload containing only delivery copy metadata needed after the
   source entity changes.
@@ -135,8 +135,10 @@ background scan from inventing planner state for dormant auth records.
 ## Claim and delivery state machine
 
 Claiming uses one SQL update over a `FOR UPDATE SKIP LOCKED` selection so two
-workers cannot own the same job. A stale `processing` claim becomes eligible
-again after five minutes.
+workers cannot own the same job. Every ownership change gets a UUID fencing
+token; transitions compare-and-set both state and token, and the owner renews
+the lease immediately before external delivery. A stale `processing` claim
+becomes eligible again after five minutes.
 
 Each claimed job reaches exactly one transition:
 
@@ -157,6 +159,11 @@ sent; failures on sibling subscriptions are reported in the run summary.
 
 Payloads use calm, privacy-minimal copy and route to the relevant Kairo surface.
 The job table never stores push endpoints or arbitrary activity notes.
+Account preferences can hide activity names from lock-screen copy and shift
+start, halfway, and wrap-up reminders by bounded per-type minute offsets. The
+same preference parser is used during compute and delivery revalidation.
+Expiry, quiet-hours, delivery timestamps, and retry backoff use a fresh clock
+reading for each claimed job rather than the batch-start timestamp.
 
 ## Failure and health semantics
 

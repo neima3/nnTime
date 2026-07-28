@@ -1,5 +1,13 @@
 import "server-only";
-import { and, desc, eq, inArray, isNotNull, lt } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  lt,
+  or,
+} from "drizzle-orm";
 import type { Db } from "../dal";
 import * as schema from "../db/schema";
 
@@ -7,6 +15,19 @@ function sanitizeSchedulerError(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error);
   return raw
     .replace(/https?:\/\/\S+/gi, "[redacted]")
+    .replace(
+      /\b(authorization)\b\s*[:=]\s*(?:bearer\s+)?[^\s,;]+/gi,
+      "$1=[redacted]",
+    )
+    .replace(/\bbearer\s+[^\s,;]+/gi, "Bearer [redacted]")
+    .replace(
+      /\b(api[_-]?key|token|secret|password|passwd)\b\s*[:=]\s*[^\s,;]+/gi,
+      "$1=[redacted]",
+    )
+    .replace(
+      /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,
+      "[redacted-email]",
+    )
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 500);
@@ -70,9 +91,15 @@ export async function pruneSchedulerRuns(
   const removed = await db
     .delete(schema.schedulerRuns)
     .where(
-      and(
-        inArray(schema.schedulerRuns.state, ["succeeded", "failed"]),
-        lt(schema.schedulerRuns.finishedAt, cutoff),
+      or(
+        and(
+          inArray(schema.schedulerRuns.state, ["succeeded", "failed"]),
+          lt(schema.schedulerRuns.finishedAt, cutoff),
+        ),
+        and(
+          eq(schema.schedulerRuns.state, "running"),
+          lt(schema.schedulerRuns.startedAt, cutoff),
+        ),
       ),
     )
     .returning({ id: schema.schedulerRuns.id });
