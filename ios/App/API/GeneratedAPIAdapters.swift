@@ -4,7 +4,27 @@ import OpenAPIRuntime
 
 enum GeneratedAPIAdapterError: Error, Equatable {
     case malformedValue(path: String)
-    case unexpectedOutput(operation: String, statusCode: Int)
+    case http(
+        operation: String,
+        statusCode: Int,
+        error: ServerErrorData
+    )
+    case unauthorized(
+        operation: String,
+        statusCode: Int,
+        error: ServerErrorData
+    )
+    case notFound(
+        operation: String,
+        statusCode: Int,
+        error: ServerErrorData
+    )
+    case conflict(
+        operation: String,
+        statusCode: Int,
+        error: ServerErrorData
+    )
+    case undocumented(operation: String, statusCode: Int)
 }
 
 enum GeneratedAPIAdapters {
@@ -15,19 +35,21 @@ enum GeneratedAPIAdapters {
         case let .ok(response):
             return try day(response.body.json)
         case let .undocumented(statusCode, _):
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+            throw GeneratedAPIAdapterError.undocumented(
                 operation: Operations.getDay.id,
                 statusCode: statusCode
             )
-        case .badRequest:
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+        case let .badRequest(response):
+            throw try documentedError(
                 operation: Operations.getDay.id,
-                statusCode: 400
+                statusCode: 400,
+                envelope: response.body.json
             )
-        case .unauthorized:
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+        case let .unauthorized(response):
+            throw try documentedError(
                 operation: Operations.getDay.id,
-                statusCode: 401
+                statusCode: 401,
+                envelope: response.body.json
             )
         }
     }
@@ -51,31 +73,33 @@ enum GeneratedAPIAdapters {
     ) throws -> UserSettings {
         switch output {
         case let .ok(response):
-            return settings(try response.body.json)
+            return try settings(response.body.json)
         case let .undocumented(statusCode, _):
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+            throw GeneratedAPIAdapterError.undocumented(
                 operation: Operations.getUserSettings.id,
                 statusCode: statusCode
             )
-        case .unauthorized:
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+        case let .unauthorized(response):
+            throw try documentedError(
                 operation: Operations.getUserSettings.id,
-                statusCode: 401
+                statusCode: 401,
+                envelope: response.body.json
             )
         }
     }
 
     static func settings(
         _ value: Components.Schemas.UserSettings
-    ) -> UserSettings {
-        UserSettings(
+    ) throws -> UserSettings {
+        try UserSettings(
             timezone: value.timezone,
             theme: value.theme.rawValue,
             reducedStimulation: value.reducedStimulation,
             hourCycle: value.hourCycle.rawValue,
             weekStart: Int(value.weekStart),
-            notificationPrefs: notificationPreferences(
-                value.notificationPrefs.additionalProperties.value
+            notificationPrefs: jsonObject(
+                value.notificationPrefs.additionalProperties.value,
+                path: "UserSettings.notificationPrefs"
             ),
             revision: Int(value.revision)
         )
@@ -88,24 +112,27 @@ enum GeneratedAPIAdapters {
         case let .created(response):
             return try activity(response.body.json)
         case let .undocumented(statusCode, _):
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+            throw GeneratedAPIAdapterError.undocumented(
                 operation: Operations.createActivitySeries.id,
                 statusCode: statusCode
             )
-        case .badRequest:
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+        case let .badRequest(response):
+            throw try documentedError(
                 operation: Operations.createActivitySeries.id,
-                statusCode: 400
+                statusCode: 400,
+                envelope: response.body.json
             )
-        case .unauthorized:
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+        case let .unauthorized(response):
+            throw try documentedError(
                 operation: Operations.createActivitySeries.id,
-                statusCode: 401
+                statusCode: 401,
+                envelope: response.body.json
             )
-        case .conflict:
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+        case let .conflict(response):
+            throw try documentedError(
                 operation: Operations.createActivitySeries.id,
-                statusCode: 409
+                statusCode: 409,
+                envelope: response.body.json
             )
         }
     }
@@ -141,16 +168,11 @@ enum GeneratedAPIAdapters {
             durationMin: Int(value.durationMin),
             rrule: value.rrule,
             categoryId: value.categoryId,
-            checklistTemplate: try value.checklistTemplate.map {
-                let object = $0.additionalProperties.value
-                guard let label = object["label"] as? String else {
-                    throw GeneratedAPIAdapterError.malformedValue(
-                        path: "DayActivity.checklistTemplate.label"
-                    )
-                }
-                return Activity.ChecklistItem(
-                    label: label,
-                    done: object["done"] as? Bool
+            checklistTemplate: try value.checklistTemplate.enumerated().map {
+                index, item in
+                try checklistItem(
+                    item.additionalProperties.value,
+                    path: "DayActivity.checklistTemplate[\(index)]"
                 )
             },
             revision: Int(value.revision),
@@ -166,24 +188,27 @@ enum GeneratedAPIAdapters {
         case let .created(response):
             return task(try response.body.json)
         case let .undocumented(statusCode, _):
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+            throw GeneratedAPIAdapterError.undocumented(
                 operation: Operations.createTask.id,
                 statusCode: statusCode
             )
-        case .badRequest:
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+        case let .badRequest(response):
+            throw try documentedError(
                 operation: Operations.createTask.id,
-                statusCode: 400
+                statusCode: 400,
+                envelope: response.body.json
             )
-        case .unauthorized:
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+        case let .unauthorized(response):
+            throw try documentedError(
                 operation: Operations.createTask.id,
-                statusCode: 401
+                statusCode: 401,
+                envelope: response.body.json
             )
-        case .conflict:
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+        case let .conflict(response):
+            throw try documentedError(
                 operation: Operations.createTask.id,
-                statusCode: 409
+                statusCode: 409,
+                envelope: response.body.json
             )
         }
     }
@@ -207,19 +232,21 @@ enum GeneratedAPIAdapters {
         case let .ok(response):
             return search(try response.body.json)
         case let .undocumented(statusCode, _):
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+            throw GeneratedAPIAdapterError.undocumented(
                 operation: Operations.search.id,
                 statusCode: statusCode
             )
-        case .badRequest:
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+        case let .badRequest(response):
+            throw try documentedError(
                 operation: Operations.search.id,
-                statusCode: 400
+                statusCode: 400,
+                envelope: response.body.json
             )
-        case .unauthorized:
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+        case let .unauthorized(response):
+            throw try documentedError(
                 operation: Operations.search.id,
-                statusCode: 401
+                statusCode: 401,
+                envelope: response.body.json
             )
         }
     }
@@ -254,19 +281,21 @@ enum GeneratedAPIAdapters {
         case let .ok(response):
             return stats(try response.body.json)
         case let .undocumented(statusCode, _):
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+            throw GeneratedAPIAdapterError.undocumented(
                 operation: Operations.getStats.id,
                 statusCode: statusCode
             )
-        case .badRequest:
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+        case let .badRequest(response):
+            throw try documentedError(
                 operation: Operations.getStats.id,
-                statusCode: 400
+                statusCode: 400,
+                envelope: response.body.json
             )
-        case .unauthorized:
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+        case let .unauthorized(response):
+            throw try documentedError(
                 operation: Operations.getStats.id,
-                statusCode: 401
+                statusCode: 401,
+                envelope: response.body.json
             )
         }
     }
@@ -317,14 +346,15 @@ enum GeneratedAPIAdapters {
         case let .ok(response):
             return routines(try response.body.json.items)
         case let .undocumented(statusCode, _):
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+            throw GeneratedAPIAdapterError.undocumented(
                 operation: Operations.listRoutines.id,
                 statusCode: statusCode
             )
-        case .unauthorized:
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+        case let .unauthorized(response):
+            throw try documentedError(
                 operation: Operations.listRoutines.id,
-                statusCode: 401
+                statusCode: 401,
+                envelope: response.body.json
             )
         }
     }
@@ -367,14 +397,15 @@ enum GeneratedAPIAdapters {
         case let .ok(response):
             return focus(try response.body.json)
         case let .undocumented(statusCode, _):
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+            throw GeneratedAPIAdapterError.undocumented(
                 operation: Operations.getActiveFocusSession.id,
                 statusCode: statusCode
             )
-        case .unauthorized:
-            throw GeneratedAPIAdapterError.unexpectedOutput(
+        case let .unauthorized(response):
+            throw try documentedError(
                 operation: Operations.getActiveFocusSession.id,
-                statusCode: 401
+                statusCode: 401,
+                envelope: response.body.json
             )
         }
     }
@@ -410,12 +441,8 @@ enum GeneratedAPIAdapters {
             timezone: value.timezone,
             locale: value.locale,
             weekStart: value.weekStart.map { Int32($0.rawValue) },
-            hourCycle: value.hourCycle.flatMap {
-                Components.Schemas.HourCycle(rawValue: $0.rawValue)
-            },
-            theme: value.theme.flatMap {
-                Components.Schemas.ThemeMode(rawValue: $0.rawValue)
-            },
+            hourCycle: value.hourCycle.map(hourCycle),
+            theme: value.theme.map(theme),
             reducedStimulation: value.reducedStimulation,
             notificationPrefs: notificationPrefs
         )
@@ -425,9 +452,7 @@ enum GeneratedAPIAdapters {
         _ value: ActivityUpdate
     ) throws -> Components.Schemas.ActivitySeriesUpdateRequest {
         .init(
-            editScope: value.editScope.flatMap {
-                Components.Schemas.EditScope(rawValue: $0.rawValue)
-            },
+            editScope: value.editScope.map(editScope),
             occurrenceKey: value.occurrenceKey,
             tz: value.tz,
             dtstartLocal: value.dtstartLocal,
@@ -448,18 +473,12 @@ enum GeneratedAPIAdapters {
                 case .high: .high
                 }
             },
-            priority: value.priority.flatMap {
-                Components.Schemas.Priority(rawValue: $0.rawValue)
-            },
+            priority: value.priority.map(priority),
             tags: patch(value.tags),
             notes: patch(value.notes),
-            source: value.source.flatMap {
-                Components.Schemas.ActivitySource(rawValue: $0.rawValue)
-            },
+            source: value.source.map(source),
             sourceRef: patch(value.sourceRef),
-            status: value.status.flatMap {
-                Components.Schemas.OccurrenceStatus(rawValue: $0.rawValue)
-            },
+            status: value.status.map(status),
             startAt: value.startAt,
             completedAt: patch(value.completedAt),
             checklistOverride: patch(value.checklistOverride) {
@@ -478,23 +497,15 @@ enum GeneratedAPIAdapters {
     ) throws -> Components.Schemas.FocusSessionPatchRequest {
         switch value {
         case let .transition(state):
-            guard let state = Components.Schemas.FocusState(
-                rawValue: state.rawValue
-            ) else {
-                throw GeneratedAPIAdapterError.malformedValue(
-                    path: "FocusCommand.state"
-                )
-            }
-            return .case1(.init(action: .transition, state: state))
+            return .case1(.init(
+                action: .transition,
+                state: focusState(state)
+            ))
         case let .extend(minutes):
-            guard let minutes = Components.Schemas.FocusSessionPatchRequest
-                .Case2Payload.addMinutesPayload(rawValue: minutes.rawValue)
-            else {
-                throw GeneratedAPIAdapterError.malformedValue(
-                    path: "FocusCommand.minutes"
-                )
-            }
-            return .case2(.init(action: .extend, addMinutes: minutes))
+            return .case2(.init(
+                action: .extend,
+                addMinutes: focusExtension(minutes)
+            ))
         }
     }
 
@@ -502,15 +513,35 @@ enum GeneratedAPIAdapters {
         _ values: [Components.Schemas.ActivitySeries
             .checklistTemplatePayloadPayload]
     ) throws -> [Activity.ChecklistItem] {
-        try values.map {
-            let object = $0.additionalProperties.value
-            guard let label = object["label"] as? String else {
-                throw GeneratedAPIAdapterError.malformedValue(
-                    path: "ActivitySeries.checklistTemplate.label"
-                )
-            }
-            return .init(label: label, done: object["done"] as? Bool)
+        try values.enumerated().map { index, item in
+            try checklistItem(
+                item.additionalProperties.value,
+                path: "ActivitySeries.checklistTemplate[\(index)]"
+            )
         }
+    }
+
+    private static func checklistItem(
+        _ object: [String: (any Sendable)?],
+        path: String
+    ) throws -> Activity.ChecklistItem {
+        guard let label = object["label"] as? String else {
+            throw GeneratedAPIAdapterError.malformedValue(
+                path: "\(path).label"
+            )
+        }
+        guard object.keys.contains("done") else {
+            return .init(label: label, done: nil)
+        }
+        guard
+            let rawDone = object["done"] ?? nil,
+            let done = rawDone as? Bool
+        else {
+            throw GeneratedAPIAdapterError.malformedValue(
+                path: "\(path).done"
+            )
+        }
+        return .init(label: label, done: done)
     }
 
     private static func checklistObject(
@@ -523,32 +554,89 @@ enum GeneratedAPIAdapters {
         return try OpenAPIObjectContainer(unvalidatedValue: object)
     }
 
-    private static func notificationPreferences(
-        _ object: [String: (any Sendable)?]
-    ) -> NotificationPreferences {
-        object.mapValues(notificationPreference)
+    static func documentedError(
+        operation: String,
+        statusCode: Int,
+        envelope: Components.Schemas.ErrorEnvelope
+    ) throws -> GeneratedAPIAdapterError {
+        let details = try envelope.error.details.map {
+            JSONValue.object(
+                try jsonObject(
+                    $0.additionalProperties.value,
+                    path: "ErrorEnvelope.error.details"
+                )
+            )
+        }
+        let error = ServerErrorData(
+            code: envelope.error.code,
+            message: envelope.error.message,
+            retryable: envelope.error.retryable,
+            details: details
+        )
+        switch statusCode {
+        case 401:
+            return .unauthorized(
+                operation: operation,
+                statusCode: statusCode,
+                error: error
+            )
+        case 404:
+            return .notFound(
+                operation: operation,
+                statusCode: statusCode,
+                error: error
+            )
+        case 409:
+            return .conflict(
+                operation: operation,
+                statusCode: statusCode,
+                error: error
+            )
+        default:
+            return .http(
+                operation: operation,
+                statusCode: statusCode,
+                error: error
+            )
+        }
     }
 
-    private static func notificationPreference(
-        _ value: (any Sendable)?
-    ) -> NotificationPreferenceValue {
+    private static func jsonObject(
+        _ object: [String: (any Sendable)?],
+        path: String
+    ) throws -> [String: JSONValue] {
+        try object.reduce(into: [:]) { result, item in
+            result[item.key] = try jsonValue(
+                item.value,
+                path: "\(path).\(item.key)"
+            )
+        }
+    }
+
+    private static func jsonValue(
+        _ value: (any Sendable)?,
+        path: String
+    ) throws -> JSONValue {
         switch value {
         case nil, is NSNull: .null
         case let value as Bool: .boolean(value)
         case let value as Int: .integer(value)
         case let value as Double: .number(value)
+        case let value as Float: .number(Double(value))
         case let value as String: .string(value)
         case let value as [String: (any Sendable)?]:
-            .object(notificationPreferences(value))
+            .object(try jsonObject(value, path: path))
         case let value as [(any Sendable)?]:
-            .array(value.map(notificationPreference))
+            .array(try value.enumerated().map {
+                try jsonValue($0.element, path: "\(path)[\($0.offset)]")
+            })
         default:
-            .null
+            throw GeneratedAPIAdapterError.malformedValue(path: path)
         }
     }
 
     private static func notificationValue(
-        _ value: NotificationPreferenceValue
+        _ value: JSONValue
     ) -> (any Sendable)? {
         switch value {
         case let .string(value): value
@@ -558,6 +646,90 @@ enum GeneratedAPIAdapters {
         case let .object(value): value.mapValues(notificationValue)
         case let .array(value): value.map(notificationValue)
         case .null: nil
+        }
+    }
+
+    private static func hourCycle(
+        _ value: HourCyclePreference
+    ) -> Components.Schemas.HourCycle {
+        switch value {
+        case .h12: .h12
+        case .h24: .h24
+        }
+    }
+
+    private static func theme(
+        _ value: ThemePreference
+    ) -> Components.Schemas.ThemeMode {
+        switch value {
+        case .system: .system
+        case .light: .light
+        case .dark: .dark
+        }
+    }
+
+    private static func editScope(
+        _ value: ActivityEditScope
+    ) -> Components.Schemas.EditScope {
+        switch value {
+        case .this: .this
+        case .thisAndFuture: .this_and_future
+        case .all: .all
+        }
+    }
+
+    private static func priority(
+        _ value: ActivityPriority
+    ) -> Components.Schemas.Priority {
+        switch value {
+        case .none: .none
+        case .low: .low
+        case .high: .high
+        }
+    }
+
+    private static func source(
+        _ value: ActivitySource
+    ) -> Components.Schemas.ActivitySource {
+        switch value {
+        case .manual: .manual
+        case .routine: .routine
+        case .calendar: .calendar
+        }
+    }
+
+    private static func status(
+        _ value: ActivityStatus
+    ) -> Components.Schemas.OccurrenceStatus {
+        switch value {
+        case .pending: .pending
+        case .completed: .completed
+        case .skipped: .skipped
+        case .cancelled: .cancelled
+        }
+    }
+
+    private static func focusState(
+        _ value: FocusTransitionState
+    ) -> Components.Schemas.FocusState {
+        switch value {
+        case .running: .running
+        case .paused: .paused
+        case .completed: .completed
+        case .skipped: .skipped
+        case .cancelled: .cancelled
+        }
+    }
+
+    private static func focusExtension(
+        _ value: FocusExtensionMinutes
+    ) -> Components.Schemas.FocusSessionPatchRequest
+        .Case2Payload.addMinutesPayload
+    {
+        switch value {
+        case .one: ._1
+        case .five: ._5
+        case .ten: ._10
         }
     }
 

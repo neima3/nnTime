@@ -154,9 +154,10 @@ struct FocusSession: Decodable, Identifiable {
 
 // MARK: - Typed mutation models
 
-typealias NotificationPreferences = [String: NotificationPreferenceValue]
+typealias NotificationPreferences = [String: JSONValue]
+typealias NotificationPreferenceValue = JSONValue
 
-indirect enum NotificationPreferenceValue:
+indirect enum JSONValue:
     Codable,
     Equatable,
     Sendable
@@ -166,7 +167,7 @@ indirect enum NotificationPreferenceValue:
     case number(Double)
     case boolean(Bool)
     case object(NotificationPreferences)
-    case array([NotificationPreferenceValue])
+    case array([JSONValue])
     case null
 
     init(from decoder: Decoder) throws {
@@ -185,7 +186,7 @@ indirect enum NotificationPreferenceValue:
             self = .object(value)
         } else {
             self = .array(
-                try container.decode([NotificationPreferenceValue].self)
+                try container.decode([JSONValue].self)
             )
         }
     }
@@ -202,6 +203,13 @@ indirect enum NotificationPreferenceValue:
         case .null: try container.encodeNil()
         }
     }
+}
+
+struct ServerErrorData: Equatable, Sendable {
+    let code: String
+    let message: String
+    let retryable: Bool
+    let details: JSONValue?
 }
 
 enum UpdateField<Value: Equatable & Sendable>: Equatable, Sendable {
@@ -238,7 +246,7 @@ struct SettingsUpdate: Equatable, Sendable {
     }
 }
 
-enum WeekStart: Int, Equatable, Sendable {
+enum WeekStart: Int, CaseIterable, Equatable, Sendable {
     case sunday = 0
     case monday
     case tuesday
@@ -248,43 +256,43 @@ enum WeekStart: Int, Equatable, Sendable {
     case saturday
 }
 
-enum HourCyclePreference: String, Equatable, Sendable {
+enum HourCyclePreference: String, CaseIterable, Equatable, Sendable {
     case h12
     case h24
 }
 
-enum ThemePreference: String, Equatable, Sendable {
+enum ThemePreference: String, CaseIterable, Equatable, Sendable {
     case system
     case light
     case dark
 }
 
-enum ActivityEditScope: String, Equatable, Sendable {
+enum ActivityEditScope: String, CaseIterable, Equatable, Sendable {
     case this
     case thisAndFuture = "this_and_future"
     case all
 }
 
-enum ActivityEnergy: String, Equatable, Sendable {
+enum ActivityEnergy: String, CaseIterable, Equatable, Sendable {
     case low
     case medium
     case high
 }
 
-enum ActivityPriority: String, Equatable, Sendable {
+enum ActivityPriority: String, CaseIterable, Equatable, Sendable {
     case none
     case low
     case high
 }
 
-enum ActivityStatus: String, Equatable, Sendable {
+enum ActivityStatus: String, CaseIterable, Equatable, Sendable {
     case pending
     case completed
     case skipped
     case cancelled
 }
 
-enum ActivitySource: String, Equatable, Sendable {
+enum ActivitySource: String, CaseIterable, Equatable, Sendable {
     case manual
     case routine
     case calendar
@@ -368,7 +376,7 @@ struct ActivityUpdate: Equatable, Sendable {
     }
 }
 
-enum FocusTransitionState: String, Equatable, Sendable {
+enum FocusTransitionState: String, CaseIterable, Equatable, Sendable {
     case running
     case paused
     case completed
@@ -381,7 +389,7 @@ enum FocusCommand: Equatable, Sendable {
     case extend(FocusExtensionMinutes)
 }
 
-enum FocusExtensionMinutes: Int, Equatable, Sendable {
+enum FocusExtensionMinutes: Int, CaseIterable, Equatable, Sendable {
     case one = 1
     case five = 5
     case ten = 10

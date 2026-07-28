@@ -392,7 +392,7 @@ final class GeneratedAPIAdapterTests: XCTestCase {
         ) { error in
             XCTAssertEqual(
                 error as? GeneratedAPIAdapterError,
-                .unexpectedOutput(operation: "getDay", statusCode: 502)
+                .undocumented(operation: "getDay", statusCode: 502)
             )
         }
 
@@ -433,8 +433,359 @@ final class GeneratedAPIAdapterTests: XCTestCase {
             XCTAssertEqual(
                 error as? GeneratedAPIAdapterError,
                 .malformedValue(
-                    path: "DayActivity.checklistTemplate.label"
+                    path: "DayActivity.checklistTemplate[0].label"
                 )
+            )
+        }
+    }
+
+    func testDocumentedErrorsPreserveEnvelopeStatusAndConflictState() throws {
+        let badRequest = try errorEnvelope(
+            code: "bad_request",
+            message: "Date must use YYYY-MM-DD.",
+            retryable: false
+        )
+        XCTAssertThrowsError(
+            try GeneratedAPIAdapters.day(
+                .badRequest(.init(body: .json(badRequest)))
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? GeneratedAPIAdapterError,
+                .http(
+                    operation: "getDay",
+                    statusCode: 400,
+                    error: .init(
+                        code: "bad_request",
+                        message: "Date must use YYYY-MM-DD.",
+                        retryable: false,
+                        details: nil
+                    )
+                )
+            )
+        }
+
+        let unauthorized = try errorEnvelope(
+            code: "unauthenticated",
+            message: "Sign in again.",
+            retryable: false
+        )
+        XCTAssertThrowsError(
+            try GeneratedAPIAdapters.settings(
+                .unauthorized(.init(body: .json(unauthorized)))
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? GeneratedAPIAdapterError,
+                .unauthorized(
+                    operation: "getUserSettings",
+                    statusCode: 401,
+                    error: .init(
+                        code: "unauthenticated",
+                        message: "Sign in again.",
+                        retryable: false,
+                        details: nil
+                    )
+                )
+            )
+        }
+
+        let conflict = try errorEnvelope(
+            code: "conflict",
+            message: "The task changed on another device.",
+            retryable: false,
+            details: [
+                "current": [
+                    "revision": 8,
+                    "tags": ["home", NSNull()] as [Any],
+                ] as [String: Any],
+            ]
+        )
+        XCTAssertThrowsError(
+            try GeneratedAPIAdapters.task(
+                .conflict(.init(body: .json(conflict)))
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? GeneratedAPIAdapterError,
+                .conflict(
+                    operation: "createTask",
+                    statusCode: 409,
+                    error: .init(
+                        code: "conflict",
+                        message: "The task changed on another device.",
+                        retryable: false,
+                        details: .object([
+                            "current": .object([
+                                "revision": .integer(8),
+                                "tags": .array([.string("home"), .null]),
+                            ]),
+                        ])
+                    )
+                )
+            )
+        }
+
+        let notFound = try errorEnvelope(
+            code: "not_found",
+            message: "Task not found.",
+            retryable: false
+        )
+        XCTAssertEqual(
+            try GeneratedAPIAdapters.documentedError(
+                operation: "getTask",
+                statusCode: 404,
+                envelope: notFound
+            ),
+            .notFound(
+                operation: "getTask",
+                statusCode: 404,
+                error: .init(
+                    code: "not_found",
+                    message: "Task not found.",
+                    retryable: false,
+                    details: nil
+                )
+            )
+        )
+    }
+
+    func testMalformedDocumentedErrorDetailsFailAtTheirExactPath() throws {
+        var envelope = try errorEnvelope(
+            code: "conflict",
+            message: "Conflict.",
+            retryable: false,
+            details: ["current": ["revision": 8]]
+        )
+        envelope.error.details?.additionalProperties.value["current"] =
+            Date(timeIntervalSince1970: 0)
+
+        XCTAssertThrowsError(
+            try GeneratedAPIAdapters.documentedError(
+                operation: "createTask",
+                statusCode: 409,
+                envelope: envelope
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? GeneratedAPIAdapterError,
+                .malformedValue(path: "ErrorEnvelope.error.details.current")
+            )
+        }
+    }
+
+    func testFreeformJSONPreservesNestedArraysScalarsAndExplicitNull() throws {
+        let generated = try decode(
+            Components.Schemas.UserSettings.self,
+            """
+            {
+              "userId":"user-1",
+              "timezone":"UTC",
+              "locale":"en-US",
+              "weekStart":1,
+              "hourCycle":"h24",
+              "theme":"system",
+              "reducedStimulation":false,
+              "notificationPrefs":{
+                "nested":{
+                  "items":[1,2.5,true,"quiet",null,{"deep":false}]
+                }
+              },
+              "schemaVersion":1,
+              "revision":1,
+              "createdAt":"2026-07-28T12:00:00Z",
+              "updatedAt":"2026-07-28T12:00:00Z"
+            }
+            """
+        )
+
+        let settings = try GeneratedAPIAdapters.settings(generated)
+        XCTAssertEqual(
+            settings.notificationPrefs?["nested"],
+            .object([
+                "items": .array([
+                    .integer(1),
+                    .number(2.5),
+                    .boolean(true),
+                    .string("quiet"),
+                    .null,
+                    .object(["deep": .boolean(false)]),
+                ]),
+            ])
+        )
+    }
+
+    func testUnsupportedFreeformValuesFailInsteadOfBecomingNull() throws {
+        var generated = try decode(
+            Components.Schemas.UserSettings.self,
+            """
+            {
+              "userId":"user-1",
+              "timezone":"UTC",
+              "locale":"en-US",
+              "weekStart":1,
+              "hourCycle":"h24",
+              "theme":"system",
+              "reducedStimulation":false,
+              "notificationPrefs":{"enabled":true},
+              "schemaVersion":1,
+              "revision":1,
+              "createdAt":"2026-07-28T12:00:00Z",
+              "updatedAt":"2026-07-28T12:00:00Z"
+            }
+            """
+        )
+        generated.notificationPrefs.additionalProperties.value["unsupported"] =
+            Date(timeIntervalSince1970: 0)
+
+        XCTAssertThrowsError(
+            try GeneratedAPIAdapters.settings(generated)
+        ) { error in
+            XCTAssertEqual(
+                error as? GeneratedAPIAdapterError,
+                .malformedValue(
+                    path: "UserSettings.notificationPrefs.unsupported"
+                )
+            )
+        }
+    }
+
+    func testChecklistDoneIsOptionalButExplicitNullAndWrongTypesFail() throws {
+        let absent = try dayWithChecklist(#"{"label":"Water"}"#)
+        XCTAssertNil(
+            try GeneratedAPIAdapters.day(absent)
+                .activities[0].checklistTemplate?[0].done
+        )
+
+        let present = try dayWithChecklist(
+            #"{"label":"Water","done":false}"#
+        )
+        XCTAssertEqual(
+            try GeneratedAPIAdapters.day(present)
+                .activities[0].checklistTemplate?[0].done,
+            false
+        )
+
+        for malformed in [
+            #"{"label":"Water","done":null}"#,
+            #"{"label":"Water","done":"yes"}"#,
+        ] {
+            XCTAssertThrowsError(
+                try GeneratedAPIAdapters.day(
+                    try dayWithChecklist(malformed)
+                )
+            ) { error in
+                XCTAssertEqual(
+                    error as? GeneratedAPIAdapterError,
+                    .malformedValue(
+                        path: "DayActivity.checklistTemplate[0].done"
+                    )
+                )
+            }
+        }
+    }
+
+    func testAllMutationEnumCasesMapWithoutRawValueFallbacks() throws {
+        let settingsCases: [
+            (
+                HourCyclePreference,
+                ThemePreference,
+                Components.Schemas.HourCycle,
+                Components.Schemas.ThemeMode
+            )
+        ] = [
+            (.h12, .system, .h12, .system),
+            (.h24, .light, .h24, .light),
+            (.h12, .dark, .h12, .dark),
+        ]
+        for (hourCycle, theme, expectedHourCycle, expectedTheme)
+            in settingsCases
+        {
+            let body = try GeneratedAPIAdapters.settingsUpdate(
+                .init(hourCycle: hourCycle, theme: theme)
+            )
+            XCTAssertEqual(body.hourCycle, expectedHourCycle)
+            XCTAssertEqual(body.theme, expectedTheme)
+        }
+
+        let scopeCases: [
+            (ActivityEditScope, Components.Schemas.EditScope)
+        ] = [
+            (.this, .this),
+            (.thisAndFuture, .this_and_future),
+            (.all, .all),
+        ]
+        for (input, expected) in scopeCases {
+            XCTAssertEqual(
+                try GeneratedAPIAdapters.activityUpdate(
+                    .init(editScope: input)
+                ).editScope,
+                expected
+            )
+        }
+
+        let energyCases: [
+            (ActivityEnergy, Components.Schemas.EnergyLevel)
+        ] = [
+            (.low, .low),
+            (.medium, .medium),
+            (.high, .high),
+        ]
+        for (input, expected) in energyCases {
+            XCTAssertEqual(
+                try GeneratedAPIAdapters.activityUpdate(
+                    .init(energy: .value(input))
+                ).energy,
+                .value(expected)
+            )
+        }
+
+        let priorityCases: [
+            (ActivityPriority, Components.Schemas.Priority)
+        ] = [
+            (.none, .none),
+            (.low, .low),
+            (.high, .high),
+        ]
+        for (input, expected) in priorityCases {
+            XCTAssertEqual(
+                try GeneratedAPIAdapters.activityUpdate(
+                    .init(priority: input)
+                ).priority,
+                expected
+            )
+        }
+
+        let sourceCases: [
+            (ActivitySource, Components.Schemas.ActivitySource)
+        ] = [
+            (.manual, .manual),
+            (.routine, .routine),
+            (.calendar, .calendar),
+        ]
+        for (input, expected) in sourceCases {
+            XCTAssertEqual(
+                try GeneratedAPIAdapters.activityUpdate(
+                    .init(source: input)
+                ).source,
+                expected
+            )
+        }
+
+        let statusCases: [
+            (ActivityStatus, Components.Schemas.OccurrenceStatus)
+        ] = [
+            (.pending, .pending),
+            (.completed, .completed),
+            (.skipped, .skipped),
+            (.cancelled, .cancelled),
+        ]
+        for (input, expected) in statusCases {
+            XCTAssertEqual(
+                try GeneratedAPIAdapters.activityUpdate(
+                    .init(status: input)
+                ).status,
+                expected
             )
         }
     }
@@ -446,6 +797,63 @@ final class GeneratedAPIAdapterTests: XCTestCase {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return try decoder.decode(type, from: Data(json.utf8))
+    }
+
+    private func dayWithChecklist(
+        _ checklistItem: String
+    ) throws -> Components.Schemas.DayResponse {
+        try decode(
+            Components.Schemas.DayResponse.self,
+            """
+            {
+              "date":"2026-07-28",
+              "zone":"UTC",
+              "start":"2026-07-28T00:00:00Z",
+              "end":"2026-07-29T00:00:00Z",
+              "activities":[{
+                "id":"activity-1",
+                "userId":"user-1",
+                "tz":"UTC",
+                "dtstartLocal":"2026-07-28T13:00:00Z",
+                "title":"Checklist",
+                "durationMin":30,
+                "checklistTemplate":[\(checklistItem)],
+                "priority":"none",
+                "source":"manual",
+                "revision":1,
+                "createdAt":"2026-07-28T12:00:00Z",
+                "updatedAt":"2026-07-28T12:00:00Z",
+                "occurrenceKey":"2026-07-28T13:00:00Z",
+                "status":"pending"
+              }],
+              "anytimeTasks":[],
+              "occurrenceStatusBySeries":{}
+            }
+            """
+        )
+    }
+
+    private func errorEnvelope(
+        code: String,
+        message: String,
+        retryable: Bool,
+        details: [String: Any]? = nil
+    ) throws -> Components.Schemas.ErrorEnvelope {
+        let details = try details.map {
+            Components.Schemas._Error.detailsPayload(
+                additionalProperties: try OpenAPIObjectContainer(
+                    unvalidatedValue: $0
+                )
+            )
+        }
+        return .init(
+            error: .init(
+                code: code,
+                message: message,
+                details: details,
+                retryable: retryable
+            )
+        )
     }
 
     private func assertSendable<T: Sendable>(_ value: T) {

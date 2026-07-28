@@ -60,6 +60,58 @@ import Testing
         #expect(await headers.latest == "Europe/Paris")
     }
 
+    @Test func timezoneMiddlewareEvaluatesItsProviderForEveryRequest() async throws {
+        let name = try #require(HTTPField.Name("x-timezone"))
+        let source = MutableTimezoneSource("America/New_York")
+        let middleware = TimezoneMiddleware(
+            timezoneIdentifierProvider: { source.timezoneIdentifier }
+        )
+        let headers = HeaderRecorder()
+        let request = HTTPRequest(
+            method: .get,
+            scheme: "https",
+            authority: "time.neima.me",
+            path: "/api/v1/settings"
+        )
+
+        _ = try await middleware.intercept(
+            request,
+            body: nil,
+            baseURL: KairoClient.productionServerURL,
+            operationID: "getUserSettings"
+        ) { request, _, _ in
+            await headers.record(request.headerFields[name])
+            return (HTTPResponse(status: .ok), nil)
+        }
+        #expect(await headers.latest == "America/New_York")
+
+        source.timezoneIdentifier = "America/Chicago"
+        _ = try await middleware.intercept(
+            request,
+            body: nil,
+            baseURL: KairoClient.productionServerURL,
+            operationID: "getUserSettings"
+        ) { request, _, _ in
+            await headers.record(request.headerFields[name])
+            return (HTTPResponse(status: .ok), nil)
+        }
+        #expect(await headers.latest == "America/Chicago")
+
+        var explicit = request
+        explicit.headerFields[name] = "Europe/Paris"
+        source.timezoneIdentifier = "America/Los_Angeles"
+        _ = try await middleware.intercept(
+            explicit,
+            body: nil,
+            baseURL: KairoClient.productionServerURL,
+            operationID: "getUserSettings"
+        ) { request, _, _ in
+            await headers.record(request.headerFields[name])
+            return (HTTPResponse(status: .ok), nil)
+        }
+        #expect(await headers.latest == "Europe/Paris")
+    }
+
     @Test func injectedTransportCapturesGeneratedMethodPathQueryHeadersAndBody() async throws {
         let recorder = RequestRecorder()
         let kairo = KairoClient(
@@ -119,6 +171,24 @@ private actor HeaderRecorder {
 
     func record(_ value: String?) {
         latest = value
+    }
+}
+
+private final class MutableTimezoneSource: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: String
+
+    init(_ value: String) {
+        self.value = value
+    }
+
+    var timezoneIdentifier: String {
+        get {
+            lock.withLock { value }
+        }
+        set {
+            lock.withLock { value = newValue }
+        }
     }
 }
 

@@ -3,12 +3,20 @@ import HTTPTypes
 import OpenAPIRuntime
 
 public struct TimezoneMiddleware: ClientMiddleware {
-    public let timezoneIdentifier: String
+    private let timezoneIdentifierProvider: @Sendable () -> String
+
+    public init() {
+        timezoneIdentifierProvider = { TimeZone.current.identifier }
+    }
+
+    public init(timezoneIdentifier: String) {
+        timezoneIdentifierProvider = { timezoneIdentifier }
+    }
 
     public init(
-        timezoneIdentifier: String = TimeZone.current.identifier
+        timezoneIdentifierProvider: @escaping @Sendable () -> String
     ) {
-        self.timezoneIdentifier = timezoneIdentifier
+        self.timezoneIdentifierProvider = timezoneIdentifierProvider
     }
 
     public func intercept(
@@ -25,7 +33,7 @@ public struct TimezoneMiddleware: ClientMiddleware {
         var request = request
         let headerName = HTTPField.Name("x-timezone")!
         if request.headerFields[headerName] == nil {
-            request.headerFields[headerName] = timezoneIdentifier
+            request.headerFields[headerName] = timezoneIdentifierProvider()
         }
         return try await next(request, body, baseURL)
     }
