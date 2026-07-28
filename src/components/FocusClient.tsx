@@ -220,16 +220,16 @@ export function FocusClient({
     [activityId, checklist, checklistRev, occurrenceKey],
   );
 
-  const hydrate = useCallback(async () => {
+  const hydrate = useCallback(async (): Promise<boolean> => {
     try {
       const res = await fetch("/api/v1/focus-sessions");
       if (res.status === 401) {
         setLoading(false);
-        return;
+        return false;
       }
       if (!res.ok) {
         setLoading(false);
-        return;
+        return false;
       }
       const data = await res.json();
       if (data.session) {
@@ -238,10 +238,13 @@ export function FocusClient({
       } else {
         setSession(null);
       }
+      setLoading(false);
+      return true;
     } catch {
       /* offline */
+      setLoading(false);
+      return false;
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -348,8 +351,8 @@ export function FocusClient({
         },
         body: JSON.stringify(body),
       });
-      startAttemptRef.current = null;
       if (res.status === 401) {
+        startAttemptRef.current = null;
         setError("Sign in to start a focus session.");
         return;
       }
@@ -360,6 +363,7 @@ export function FocusClient({
       const data = await res.json();
       setSession(data.session);
       setRemainingSec(data.remainingSec);
+      startAttemptRef.current = null;
     } catch {
       setError("You're offline. Reconnect and try again.");
     } finally {
@@ -395,10 +399,14 @@ export function FocusClient({
           },
           body: JSON.stringify(body),
         });
-        patchAttemptRef.current = null;
         if (res.status === 409) {
-          await hydrate();
-          setError("Focus changed elsewhere — refreshed to the latest session.");
+          patchAttemptRef.current = null;
+          const refreshed = await hydrate();
+          setError(
+            refreshed
+              ? "Focus changed elsewhere — refreshed to the latest session."
+              : "Focus changed elsewhere, but the latest session couldn't be loaded. Try again.",
+          );
           return;
         }
         if (!res.ok) {
@@ -419,6 +427,7 @@ export function FocusClient({
           setSession(null);
           setRemainingSec(durationMin * 60);
           router.refresh();
+          patchAttemptRef.current = null;
           return;
         }
         setSession(data.session);
@@ -431,6 +440,7 @@ export function FocusClient({
           setRemainingSec(durationMin * 60);
           router.refresh();
         }
+        patchAttemptRef.current = null;
       } catch {
         setError("You're offline. Reconnect and try again.");
       } finally {
