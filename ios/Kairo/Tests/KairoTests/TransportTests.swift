@@ -45,6 +45,56 @@ import Testing
         #expect(settings.createdAt == settings.updatedAt)
     }
 
+    @Test func offsetRFC3339TimestampMatchesEquivalentUTCInstant() async throws {
+        let utc = KairoClient(
+            baseURL: URL(string: "http://127.0.0.1:3456/api/v1")!,
+            transport: SettingsTransport(
+                timestamp: "2026-07-28T16:02:47.872Z"
+            )
+        )
+        let offset = KairoClient(
+            baseURL: URL(string: "http://127.0.0.1:3456/api/v1")!,
+            transport: SettingsTransport(
+                timestamp: "2026-07-28T18:02:47.872+02:00"
+            )
+        )
+
+        let utcSettings = try await utc.client.getUserSettings().ok.body.json
+        let offsetSettings = try await offset.client
+            .getUserSettings().ok.body.json
+
+        #expect(offsetSettings.createdAt == utcSettings.createdAt)
+        #expect(offsetSettings.updatedAt == utcSettings.updatedAt)
+    }
+
+    @Test func generatedRequestsEncodeDatesAsRFC3339Strings() async throws {
+        let recorder = RequestRecorder()
+        let kairo = KairoClient(
+            baseURL: URL(string: "http://127.0.0.1:3456/api/v1")!,
+            transport: RecordingTransport(recorder: recorder)
+        )
+        let output = try await kairo.client.createActivitySeries(
+            body: .json(.init(
+                tz: "America/New_York",
+                dtstartLocal: Date(timeIntervalSince1970: 1_785_254_567),
+                title: "Date boundary",
+                durationMin: 25
+            ))
+        )
+
+        guard case .undocumented(500, _) = output else {
+            Issue.record("Expected capture-only response")
+            return
+        }
+        let capture = try #require(await recorder.captures.last)
+        let json = try #require(
+            JSONSerialization.jsonObject(with: Data(capture.body.utf8))
+                as? [String: Any]
+        )
+
+        #expect(json["dtstartLocal"] as? String == "2026-07-28T16:02:47Z")
+    }
+
     @Test func timezoneMiddlewareInjectsHeaderWithoutClobberingExplicitValue() async throws {
         let name = try #require(HTTPField.Name("x-timezone"))
         let middleware = TimezoneMiddleware(timezoneIdentifier: "America/New_York")
@@ -241,13 +291,17 @@ private struct RecordingTransport: ClientTransport {
             body: bodyText
         ))
 
-        let (status, payload): (HTTPResponse.Status, String) = if operationID == "listTasks" {
+        let (status, payload): (HTTPResponse.Status, String) = if operationID
+            == "listTasks"
+        {
             (
                 .ok,
                 """
                 {"items":[],"nextCursor":null}
                 """
             )
+        } else if operationID == "createActivitySeries" {
+            (.internalServerError, "")
         } else {
             (
                 .created,
