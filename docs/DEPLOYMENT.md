@@ -41,6 +41,41 @@ retrieve with `op item get 4apenih3hzviy2o2jjlonbdh54 --fields credential --reve
    "confirm" a deploy that never landed.
 5. Report truthfully what was and wasn't verified.
 
+## Native iOS distribution
+
+Kairo's iOS release is produced from the XcodeGen application target and kept
+separate from the Coolify web deployment. The authoritative commands are:
+
+```bash
+pnpm ios:release preflight
+pnpm ios:release archive
+pnpm ios:release export
+pnpm ios:release upload
+```
+
+The driver writes only to git-ignored `artifacts/ios-release/`, preserves Xcode
+logs, and refuses a dirty release checkout. It derives a positive build number
+from `KAIRO_BUILD_NUMBER` or the git commit count and embeds both the exact git
+SHA and UTC build date. The archive gate verifies the app and widget identities,
+signature, HealthKit/App Group entitlements, root privacy manifest, and
+provenance before export or upload.
+
+`export` uses App Store Connect distribution signing but does not upload.
+`upload` is the Apple-side mutation and requires an existing verified archive.
+Authentication comes from the signed-in Xcode account or from all three
+optional environment variables below; their values are never printed:
+
+| Var | Purpose |
+|-----|---------|
+| `KAIRO_ASC_KEY_PATH` | Absolute path to the App Store Connect API `.p8` key |
+| `KAIRO_ASC_KEY_ID` | App Store Connect API Key ID |
+| `KAIRO_ASC_ISSUER_ID` | App Store Connect API Issuer ID |
+
+Never report “available in TestFlight” from a successful `xcodebuild` upload
+alone. Confirm that App Store Connect accepted the build and completed
+processing. Keep the exact Apple validation error when upload or processing
+fails; do not weaken the repository or archive gate to work around it.
+
 ## App env vars
 Set in Coolify UI (app → Environment Variables) AND mirrored in `.env.local`.
 Phase 1+ requires `DATABASE_URL`, `BETTER_AUTH_SECRET`, etc.

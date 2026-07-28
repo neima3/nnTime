@@ -110,10 +110,33 @@ Do not treat a successful signed build, install, or simulator tour as proof of
 these user-controlled HealthKit interactions.
 
 ### TestFlight (over-the-air, no cable)
-Preferable for daily use: builds install from the TestFlight app and last 90
-days. Needs an App Store Connect app record for `me.neima.kairo` plus an App
-Store Connect API key (Issuer ID + Key ID + `.p8`), after which archive and
-upload are fully scriptable. Not set up yet.
 
-- Next phases per ios-adaptation.md: medium/large widgets, Live Activity
-  focus timer, VoiceOver rotor pass
+The app is released from the real `ios/Kairo.xcodeproj` target, not from the
+contract-proof Swift package. From the repository root:
+
+```bash
+pnpm ios:release preflight
+pnpm ios:release archive
+pnpm ios:release export
+pnpm ios:release upload
+```
+
+`archive` creates `artifacts/ios-release/Kairo.xcarchive`; `export` creates an
+App Store Connect IPA without changing Apple-side state; `upload` sends the
+verified archive to App Store Connect. All generated artifacts and logs are
+git-ignored.
+
+The release gate requires:
+
+- a clean checkout and a positive integer `KAIRO_BUILD_NUMBER` (otherwise the
+  git commit count is used);
+- the team in ignored `ios/Signing.local.xcconfig`;
+- an Xcode Apple account with distribution access, or the complete optional
+  `KAIRO_ASC_KEY_PATH`, `KAIRO_ASC_KEY_ID`, and `KAIRO_ASC_ISSUER_ID` triplet;
+- an App Store Connect app record for `me.neima.kairo`.
+
+The archive embeds the exact git SHA and UTC build date, then verifies bundle
+IDs, build number, widget embedding, signature, HealthKit/App Group
+entitlements, and the root `PrivacyInfo.xcprivacy`. Upload success means Apple
+accepted the upload command; it is not described as available in TestFlight
+until App Store Connect finishes processing it.
