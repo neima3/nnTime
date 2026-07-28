@@ -8,6 +8,7 @@ import {
 import { schedulerRuns } from "../db/schema";
 import {
   failSchedulerRun,
+  getSchedulerHealth,
   pruneSchedulerRuns,
   startSchedulerRun,
   succeedSchedulerRun,
@@ -140,5 +141,122 @@ describe("scheduler run ledger", () => {
     expect(remaining.map((run) => run.id).sort()).toEqual(
       [oldRunning, recent].sort(),
     );
+  });
+});
+
+describe("getSchedulerHealth", () => {
+  itDb("reports unconfigured without reading run freshness", async () => {
+    await expect(
+      getSchedulerHealth({
+        db: env!.db,
+        now: NOW,
+        configured: false,
+        processStartedAt: new Date(NOW.getTime() - 60 * 60_000),
+      }),
+    ).resolves.toEqual({ state: "unconfigured", lagSeconds: null });
+  });
+
+  itDb("reports warming only during the bounded first-run grace period", async () => {
+    await env!.db.delete(schedulerRuns);
+
+    await expect(
+      getSchedulerHealth({
+        db: env!.db,
+        now: NOW,
+        configured: true,
+        processStartedAt: new Date(NOW.getTime() - 4 * 60_000),
+      }),
+    ).resolves.toEqual({ state: "warming", lagSeconds: null });
+    await expect(
+      getSchedulerHealth({
+        db: env!.db,
+        now: NOW,
+        configured: true,
+        processStartedAt: new Date(NOW.getTime() - 6 * 60_000),
+      }),
+    ).resolves.toEqual({ state: "lagging", lagSeconds: null });
+  });
+
+  itDb("reports recent success and then lag as time advances", async () => {
+    await env!.db.delete(schedulerRuns);
+    const id = await startSchedulerRun(
+      env!.db,
+      new Date(NOW.getTime() - 2 * 60_000),
+    );
+    await succeedSchedulerRun(
+      env!.db,
+      id,
+      new Date(NOW.getTime() - 90_000),
+      {},
+    );
+
+    await expect(
+      getSchedulerHealth({
+        db: env!.db,
+        now: NOW,
+        configured: true,
+        processStartedAt: new Date(NOW.getTime() - 60 * 60_000),
+      }),
+    ).resolves.toEqual({ state: "ok", lagSeconds: 90 });
+    await expect(
+      getSchedulerHealth({
+        db: env!.db,
+        now: new Date(NOW.getTime() + 10 * 60_000),
+        configured: true,
+        processStartedAt: new Date(NOW.getTime() - 60 * 60_000),
+      }),
+    ).resolves.toEqual({ state: "lagging", lagSeconds: 690 });
+  });
+
+  itDb("reports a newer failure and recovers after a later success", async () => {
+    await env!.db.delete(schedulerRuns);
+    const success = await startSchedulerRun(
+      env!.db,
+      new Date(NOW.getTime() - 4 * 60_000),
+    );
+    await succeedSchedulerRun(
+      env!.db,
+      success,
+      new Date(NOW.getTime() - 3 * 60_000),
+      {},
+    );
+    const failure = await startSchedulerRun(
+      env!.db,
+      new Date(NOW.getTime() - 2 * 60_000),
+    );
+    await failSchedulerRun(
+      env!.db,
+      failure,
+      new Date(NOW.getTime() - 90_000),
+      "failed",
+    );
+
+    await expect(
+      getSchedulerHealth({
+        db: env!.db,
+        now: NOW,
+        configured: true,
+        processStartedAt: new Date(NOW.getTime() - 60 * 60_000),
+      }),
+    ).resolves.toEqual({ state: "failed", lagSeconds: 180 });
+
+    const recovered = await startSchedulerRun(
+      env!.db,
+      new Date(NOW.getTime() - 60_000),
+    );
+    await succeedSchedulerRun(
+      env!.db,
+      recovered,
+      new Date(NOW.getTime() - 30_000),
+      {},
+    );
+    await expect(
+      getSchedulerHealth({
+        db: env!.db,
+        now: NOW,
+        configured: true,
+        processStartedAt: new Date(NOW.getTime() - 60 * 60_000),
+      }),
+    ).resolves.toEqual({ state: "ok", lagSeconds: 30 });
   });
 });

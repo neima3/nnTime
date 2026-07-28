@@ -1,5 +1,5 @@
 import "server-only";
-import { and, inArray, lt } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, lt } from "drizzle-orm";
 import type { Db } from "../dal";
 import * as schema from "../db/schema";
 
@@ -77,4 +77,69 @@ export async function pruneSchedulerRuns(
     )
     .returning({ id: schema.schedulerRuns.id });
   return removed.length;
+}
+
+export type SchedulerHealth =
+  | { state: "unconfigured"; lagSeconds: null }
+  | { state: "warming"; lagSeconds: null }
+  | { state: "ok"; lagSeconds: number }
+  | { state: "lagging"; lagSeconds: number | null }
+  | { state: "failed"; lagSeconds: number | null };
+
+export async function getSchedulerHealth(input: {
+  db: Db;
+  now: Date;
+  configured: boolean;
+  processStartedAt: Date;
+  maxLagMs?: number;
+}): Promise<SchedulerHealth> {
+  if (!input.configured) {
+    return { state: "unconfigured", lagSeconds: null };
+  }
+
+  const maxLagMs = input.maxLagMs ?? 5 * 60_000;
+  const [completedRows, successRows] = await Promise.all([
+    input.db
+      .select()
+      .from(schema.schedulerRuns)
+      .where(isNotNull(schema.schedulerRuns.finishedAt))
+      .orderBy(desc(schema.schedulerRuns.finishedAt))
+      .limit(1),
+    input.db
+      .select()
+      .from(schema.schedulerRuns)
+      .where(eq(schema.schedulerRuns.state, "succeeded"))
+      .orderBy(desc(schema.schedulerRuns.finishedAt))
+      .limit(1),
+  ]);
+  const latestCompleted = completedRows[0];
+  const latestSuccess = successRows[0];
+
+  if (!latestCompleted) {
+    if (input.now.getTime() - input.processStartedAt.getTime() <= maxLagMs) {
+      return { state: "warming", lagSeconds: null };
+    }
+    return { state: "lagging", lagSeconds: null };
+  }
+
+  const lagSeconds = latestSuccess?.finishedAt
+    ? Math.max(
+        0,
+        Math.floor(
+          (input.now.getTime() - latestSuccess.finishedAt.getTime()) / 1_000,
+        ),
+      )
+    : null;
+  if (
+    latestCompleted.state === "failed" &&
+    (!latestSuccess?.finishedAt ||
+      latestCompleted.finishedAt!.getTime() >
+        latestSuccess.finishedAt.getTime())
+  ) {
+    return { state: "failed", lagSeconds };
+  }
+  if (lagSeconds === null || lagSeconds * 1_000 > maxLagMs) {
+    return { state: "lagging", lagSeconds };
+  }
+  return { state: "ok", lagSeconds };
 }
