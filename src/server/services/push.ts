@@ -10,10 +10,7 @@ import webpush from "web-push";
 import type { Db } from "../dal";
 import dbDefault from "../db";
 import * as schema from "../db/schema";
-import { getOrCreateSettings } from "../dal";
-import { instantToWallFields } from "../temporal/zone";
-import { isQuietAt, startNudgesEnabled } from "@/lib/quiet-hours";
-import { and, eq, isNull, gte, lte, sql } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 let configured = false;
 
@@ -111,88 +108,4 @@ export async function sendToUser(
     pruned,
     retryableFailures,
   };
-}
-
-/**
- * Deliver due "start" nudges (H1). Finds notification jobs whose fire time is
- * within [now-2m, now+2m], sends a push for each (respecting the user's quiet
- * hours), and marks them sent in-place so a later tick won't repeat. Called by
- * jobs/tick — pair with a cron hitting that endpoint every minute or two.
- */
-export async function deliverDueNudges(
-  opts: { db?: Db; now?: Date } = {},
-): Promise<{ delivered: number; suppressed: number; considered: number }> {
-  if (!pushConfigured()) return { delivered: 0, suppressed: 0, considered: 0 };
-  const db = opts.db ?? dbDefault;
-  const now = opts.now ?? new Date();
-  const from = new Date(now.getTime() - 2 * 60 * 1000);
-  const to = new Date(now.getTime() + 2 * 60 * 1000);
-
-  const due = await db
-    .select()
-    .from(schema.plannerEvents)
-    .where(
-      and(
-        eq(schema.plannerEvents.entityType, "notification"),
-        gte(schema.plannerEvents.occurredAt, from),
-        lte(schema.plannerEvents.occurredAt, to),
-        sql`${schema.plannerEvents.payload}->>'type' = 'start'`,
-        sql`(${schema.plannerEvents.payload}->>'sent') IS DISTINCT FROM 'true'`,
-      ),
-    )
-    .limit(200);
-
-  let delivered = 0;
-  let suppressed = 0;
-
-  for (const job of due) {
-    // Look up the activity for friendly copy.
-    const [series] = await db
-      .select()
-      .from(schema.activitySeries)
-      .where(eq(schema.activitySeries.id, job.entityId))
-      .limit(1);
-    if (!series || series.deletedAt) {
-      await markSent(db, job.id);
-      continue;
-    }
-
-    // Per-type toggle + quiet hours (per user timezone).
-    const settings = await getOrCreateSettings(job.userId);
-    if (!startNudgesEnabled(settings.notificationPrefs)) {
-      suppressed++;
-      await markSent(db, job.id);
-      continue;
-    }
-    const hour = instantToWallFields(job.occurredAt, settings.timezone).hour;
-    if (isQuietAt(settings.notificationPrefs, hour)) {
-      suppressed++;
-      await markSent(db, job.id);
-      continue;
-    }
-
-    const { sent } = await sendToUser(
-      job.userId,
-      {
-        title: `${series.emoji ?? "⏰"} ${series.title}`,
-        body: "Starting now — no rush, just a nudge.",
-        tag: `start-${series.id}`,
-        url: "/app/today",
-      },
-      { db },
-    );
-    if (sent > 0) delivered++;
-    await markSent(db, job.id);
-  }
-
-  return { delivered, suppressed, considered: due.length };
-}
-
-async function markSent(db: Db, jobId: string) {
-  await db
-    .update(schema.plannerEvents)
-    .set({
-      payload: sql`jsonb_set(${schema.plannerEvents.payload}, '{sent}', '"true"'::jsonb)`,
-    })
-    .where(eq(schema.plannerEvents.id, jobId));
 }
