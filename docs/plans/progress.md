@@ -36,6 +36,13 @@ write-only boundary:
   and signed. The signed app contains both Health purpose strings plus the
   `com.apple.developer.healthkit` entitlement, installed on the connected
   physical iPhone as Kairo 1.0.0, and launched successfully.
+- **Production verified.** Main commit
+  `1308fcd8278f6cfa5bbdbbcd18ea3cf768a5da59` deployed through Coolify as
+  `jzfgfms0bkc7emdy0t4g32v9` and reached `finished`. The app reports
+  `running:healthy`; `/api/health` returned `ok` for migrations, database, AI,
+  and scheduler. Desktop `/` at 1440×1000 and mobile `/app/today` at 390×844
+  rendered without browser console or page errors. CSP, HSTS, COOP, CORP,
+  Permissions-Policy, Referrer-Policy, nosniff, and frame denial were present.
 
 **Still requires phone interaction:** accept or deny the two Health permission
 sheets, complete a focus session and confirm its mindful sample in Health,
@@ -43,9 +50,8 @@ enable sleep-aware wind-down against real sleep history, and observe the local
 notification. Installation and launch do not prove those user-controlled
 flows.
 
-**Next:** release the exact Round 13 SHA through Coolify, verify live health
-and browser smoke, then complete the four physical HealthKit interaction
-checks above before promoting K04 beyond partial.
+**Next:** complete the four physical HealthKit interaction checks above before
+promoting K04 beyond partial.
 
 ## 2026-07-28 — Round 12: full-surface quality sweep (first since Round 6) (Fable)
 

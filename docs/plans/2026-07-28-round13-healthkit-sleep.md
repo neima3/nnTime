@@ -471,7 +471,7 @@ git add docs/plans/2026-07-28-round13-healthkit-sleep.md \
 git commit -m "docs(R13): record sleep wind-down verification"
 ```
 
-- [ ] **Step 7: Integrate and release.**
+- [x] **Step 7: Integrate and release.**
 
 Fast-forward `main`, push, wait for the exact SHA's Coolify deployment to reach
 `finished`, then verify `running:healthy`, `/api/health`, security headers, and
