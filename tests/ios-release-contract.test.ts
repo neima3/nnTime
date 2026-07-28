@@ -10,6 +10,7 @@ import { resolve } from "node:path";
 const validContract = {
   appBundleId: "me.neima.kairo",
   widgetBundleId: "me.neima.kairo.widgets",
+  targetDeviceFamily: "1",
   marketingVersion: "1.0.0",
   buildNumber: "731",
   appGroups: ["group.me.neima.kairo"],
@@ -54,6 +55,15 @@ describe("iOS release contract", () => {
         "Info.plist must embed KairoBuildDate from $(KAIRO_BUILD_DATE)",
       ]),
     );
+  });
+
+  it("rejects an accidental iPad release surface", () => {
+    expect(
+      validateReleaseContract({
+        ...validContract,
+        targetDeviceFamily: "1,2",
+      }),
+    ).toContain("Kairo release target must be iPhone-only");
   });
 
   it("rejects missing HealthKit and App Group declarations", () => {

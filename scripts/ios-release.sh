@@ -100,7 +100,8 @@ assert_equal() {
 }
 
 plist_value() {
-  plutil -extract "$2" raw -o - "$1"
+  local key_path="${2//./\\.}"
+  plutil -extract "$key_path" raw -o - "$1"
 }
 
 export_options_xml() {
@@ -224,7 +225,7 @@ inspect_archive() {
     "$(plist_value "$entitlements" com.apple.developer.healthkit)" \
     "true" \
     "HealthKit entitlement"
-  if ! plutil -extract com.apple.security.application-groups json -o - "$entitlements" |
+  if ! plutil -extract 'com\.apple\.security\.application-groups' json -o - "$entitlements" |
     grep -Fq '"group.me.neima.kairo"'; then
     echo "Signed app is missing group.me.neima.kairo." >&2
     exit 66

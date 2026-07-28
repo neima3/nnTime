@@ -82,6 +82,9 @@ export function validateReleaseContract(contract) {
   if (contract.widgetBundleId !== "me.neima.kairo.widgets") {
     failures.push("Widget bundle ID must be me.neima.kairo.widgets");
   }
+  if (String(contract.targetDeviceFamily) !== "1") {
+    failures.push("Kairo release target must be iPhone-only");
+  }
   if (!contract.marketingVersion?.trim()) {
     failures.push("Marketing version must be set");
   }
@@ -181,6 +184,7 @@ export function readRepositoryReleaseContract(
   return {
     appBundleId: appSettings.PRODUCT_BUNDLE_IDENTIFIER,
     widgetBundleId: widgetSettings.PRODUCT_BUNDLE_IDENTIFIER,
+    targetDeviceFamily: String(appSettings.TARGETED_DEVICE_FAMILY ?? ""),
     marketingVersion: String(baseSettings.MARKETING_VERSION ?? ""),
     buildNumber: String(
       buildNumber ??
