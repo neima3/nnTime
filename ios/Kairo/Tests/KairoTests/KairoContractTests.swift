@@ -291,6 +291,90 @@ import Foundation
         #expect(nullResult.body.value == nil)
     }
 
+    @Test func generatedPatchRequestsPreserveOmittedNullAndValue() throws {
+        let activityOmitted = Components.Schemas.ActivitySeriesUpdateRequest()
+        let activityNull = Components.Schemas.ActivitySeriesUpdateRequest(
+            rrule: .null
+        )
+        let activityValue = Components.Schemas.ActivitySeriesUpdateRequest(
+            rrule: .value("FREQ=DAILY")
+        )
+        try assertTriStateEncoding(
+            omitted: activityOmitted,
+            null: activityNull,
+            value: activityValue,
+            field: "rrule",
+            expectedValue: "FREQ=DAILY",
+            omittedNeighbor: "title"
+        )
+        let _: Operations.updateActivitySeries.Input.Body = .json(activityNull)
+
+        let occurrenceOmitted =
+            Components.Schemas.ActivityOccurrencePatchRequest()
+        let occurrenceNull = Components.Schemas.ActivityOccurrencePatchRequest(
+            title: .null
+        )
+        let occurrenceValue =
+            Components.Schemas.ActivityOccurrencePatchRequest(
+                title: .value("Override")
+            )
+        try assertTriStateEncoding(
+            omitted: occurrenceOmitted,
+            null: occurrenceNull,
+            value: occurrenceValue,
+            field: "title",
+            expectedValue: "Override",
+            omittedNeighbor: "status"
+        )
+        let _: Operations.overrideActivityOccurrence.Input.Body =
+            .json(occurrenceNull)
+
+        let taskOmitted = Components.Schemas.TaskUpdateRequest()
+        let taskNull = Components.Schemas.TaskUpdateRequest(notes: .null)
+        let taskValue = Components.Schemas.TaskUpdateRequest(
+            notes: .value("Remember this")
+        )
+        try assertTriStateEncoding(
+            omitted: taskOmitted,
+            null: taskNull,
+            value: taskValue,
+            field: "notes",
+            expectedValue: "Remember this",
+            omittedNeighbor: "title"
+        )
+        let _: Operations.updateTask.Input.Body = .json(taskNull)
+
+        let tagOmitted = Components.Schemas.TagUpdateRequest()
+        let tagNull = Components.Schemas.TagUpdateRequest(color: .null)
+        let tagValue = Components.Schemas.TagUpdateRequest(
+            color: .value("iris")
+        )
+        try assertTriStateEncoding(
+            omitted: tagOmitted,
+            null: tagNull,
+            value: tagValue,
+            field: "color",
+            expectedValue: "iris",
+            omittedNeighbor: "name"
+        )
+        let _: Operations.updateTag.Input.Body = .json(tagNull)
+
+        let routineOmitted = Components.Schemas.RoutineUpdateRequest()
+        let routineNull = Components.Schemas.RoutineUpdateRequest(notes: .null)
+        let routineValue = Components.Schemas.RoutineUpdateRequest(
+            notes: .value("Keep this")
+        )
+        try assertTriStateEncoding(
+            omitted: routineOmitted,
+            null: routineNull,
+            value: routineValue,
+            field: "notes",
+            expectedValue: "Keep this",
+            omittedNeighbor: "title"
+        )
+        let _: Operations.updateRoutine.Input.Body = .json(routineNull)
+    }
+
     @Test func generatedRoutineListItemPreservesNestedReadModel() throws {
         let item = try decodeFixture(
             Components.Schemas.RoutineListItem.self,
@@ -325,6 +409,47 @@ import Foundation
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return try decoder.decode(type, from: Data(json.utf8))
+    }
+
+    private func assertTriStateEncoding<T: Codable>(
+        omitted: T,
+        null: T,
+        value: T,
+        field: String,
+        expectedValue: String,
+        omittedNeighbor: String
+    ) throws {
+        let omittedObject = try encodeObject(omitted)
+        let nullObject = try encodeObject(null)
+        let valueObject = try encodeObject(value)
+
+        #expect(omittedObject[field] == nil)
+        #expect(omittedObject[omittedNeighbor] == nil)
+        #expect(nullObject[field] is NSNull)
+        #expect(nullObject[omittedNeighbor] == nil)
+        #expect(valueObject[field] as? String == expectedValue)
+        #expect(valueObject[omittedNeighbor] == nil)
+
+        let decoder = JSONDecoder()
+        let roundTrippedOmitted = try decoder.decode(
+            T.self,
+            from: JSONEncoder().encode(omitted)
+        )
+        let roundTrippedNull = try decoder.decode(
+            T.self,
+            from: JSONEncoder().encode(null)
+        )
+        #expect(try encodeObject(roundTrippedOmitted)[field] == nil)
+        #expect(try encodeObject(roundTrippedNull)[field] is NSNull)
+    }
+
+    private func encodeObject<T: Encodable>(
+        _ value: T
+    ) throws -> [String: Any] {
+        let data = try JSONEncoder().encode(value)
+        return try #require(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
     }
 
     private func assertEnergyLevel(

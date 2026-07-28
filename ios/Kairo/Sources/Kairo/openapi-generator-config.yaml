@@ -5,3 +5,8 @@ accessModifier: public
 typeOverrides:
   schemas:
     NullableEnergyLevel: Components.Schemas.EnergyLevel
+    ActivitySeriesUpdateRequest: KairoActivitySeriesUpdateRequest
+    ActivityOccurrencePatchRequest: KairoActivityOccurrencePatchRequest
+    TaskUpdateRequest: KairoTaskUpdateRequest
+    TagUpdateRequest: KairoTagUpdateRequest
+    RoutineUpdateRequest: KairoRoutineUpdateRequest
