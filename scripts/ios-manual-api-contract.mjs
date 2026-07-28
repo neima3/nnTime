@@ -284,8 +284,17 @@ function escapedPattern(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function isURLSessionType(type) {
-  return /^(?:Foundation\.)?URLSession[!?]?$/.test(type.trim());
+function normalizedTypeName(type) {
+  return type.replace(/\s/g, "").replace(/[!?]+$/, "");
+}
+
+function isURLSessionType(type, aliases) {
+  const normalized = normalizedTypeName(type);
+  return (
+    normalized === "URLSession" ||
+    normalized === "Foundation.URLSession" ||
+    aliases.has(normalized)
+  );
 }
 
 function isSessionLikeIdentifier(identifier) {
@@ -319,17 +328,44 @@ function urlSessionProvenance(source) {
   const sessionIdentifiers = new Set();
   const factoryNames = new Set();
   const bindings = [];
+  const aliasDefinitions = new Map();
+  const urlSessionAliases = new Set();
 
   for (const match of masked.matchAll(
-    /\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*URLSession\b/g,
+    /\btypealias\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*((?:Foundation\s*\.\s*)?[A-Za-z_][A-Za-z0-9_]*[!?]?)/g,
   )) {
-    sessionIdentifiers.add(match[1]);
+    aliasDefinitions.set(match[1], normalizedTypeName(match[2]));
+  }
+  let aliasesChanged = true;
+  while (aliasesChanged) {
+    aliasesChanged = false;
+    for (const [name, target] of aliasDefinitions) {
+      if (
+        !urlSessionAliases.has(name) &&
+        (target === "URLSession" ||
+          target === "Foundation.URLSession" ||
+          urlSessionAliases.has(target))
+      ) {
+        urlSessionAliases.add(name);
+        aliasesChanged = true;
+      }
+    }
   }
 
   for (const match of masked.matchAll(
-    /\bfunc\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*<[^>{}]*>)?\s*\([^)]*\)\s*(?:async\s*)?(?:throws\s*)?->\s*(?:Foundation\.)?URLSession\b/g,
+    /\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*((?:Foundation\s*\.\s*)?[A-Za-z_][A-Za-z0-9_]*[!?]?)/g,
   )) {
-    factoryNames.add(match[1]);
+    if (isURLSessionType(match[2], urlSessionAliases)) {
+      sessionIdentifiers.add(match[1]);
+    }
+  }
+
+  for (const match of masked.matchAll(
+    /\bfunc\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*<[^>{}]*>)?\s*\([^)]*\)\s*(?:async\s*)?(?:throws\s*)?->\s*((?:Foundation\s*\.\s*)?[A-Za-z_][A-Za-z0-9_]*[!?]?)/g,
+  )) {
+    if (isURLSessionType(match[2], urlSessionAliases)) {
+      factoryNames.add(match[1]);
+    }
   }
 
   for (const match of masked.matchAll(
@@ -343,12 +379,15 @@ function urlSessionProvenance(source) {
   }
 
   for (const binding of bindings) {
-    if (binding.type && isURLSessionType(binding.type)) {
+    if (
+      binding.type &&
+      isURLSessionType(binding.type, urlSessionAliases)
+    ) {
       sessionIdentifiers.add(binding.name);
       continue;
     }
     if (
-      /^URLSession\s*(?:\.\s*shared\b|\()/.test(
+      /^(?:Foundation\s*\.\s*)?URLSession\s*(?:\.\s*shared\b|\()/.test(
         binding.initializer,
       )
     ) {
@@ -446,6 +485,7 @@ function authRequestContract(source, endpointContract) {
   if (!range) return { valid: false, range: null };
 
   const functionSource = masked.slice(range.start, range.end);
+  const originalFunctionSource = source.slice(range.start, range.end);
   const hasClosedSignature =
     /\bprivate\s+func\s+authRequest(?:\s*<[^>{}]*>)?\s*\(\s*_\s+endpoint\s*:\s*AuthEndpoint(?:\s*,|\s*\))/s.test(
       functionSource,
@@ -470,12 +510,62 @@ function authRequestContract(source, endpointContract) {
   const requestMatches = [
     ...functionSource.matchAll(/\bURLRequest\s*\(/g),
   ];
+  const safeRequestBindings = [
+    ...functionSource.matchAll(
+      /\bvar\s+request\s*=\s*URLRequest\s*\(\s*url\s*:\s*url\s*\)/g,
+    ),
+  ];
+  const requestDeclarations = [
+    ...functionSource.matchAll(/\b(?:let|var)\s+request\b/g),
+  ];
+  const requestAssignments = [
+    ...functionSource.matchAll(/(?<![.\w])request\s*=(?!=)/g),
+  ];
+  const requestMemberMatches = [
+    ...functionSource.matchAll(
+      /\brequest\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)/g,
+    ),
+  ];
+  const allowedRequestMember = (match) => {
+    const operation = originalFunctionSource.slice(match.index);
+    if (match[1] === "httpMethod") {
+      return /^request\s*\.\s*httpMethod\s*=\s*"POST"[ \t]*(?:\r?\n|$)/.test(
+        operation,
+      );
+    }
+    if (match[1] === "httpBody") {
+      return /^request\s*\.\s*httpBody\s*=\s*try\s+JSONEncoder\s*\(\s*\)\s*\.\s*encode\s*\(\s*body\s*\)[ \t]*(?:\r?\n|$)/.test(
+        operation,
+      );
+    }
+    if (match[1] === "setValue") {
+      return /^request\s*\.\s*setValue\s*\(\s*"application\/json"\s*,\s*forHTTPHeaderField\s*:\s*"Content-Type"\s*\)[ \t]*(?:\r?\n|$)/s.test(
+        operation,
+      );
+    }
+    return false;
+  };
+  const requestMembers = requestMemberMatches.map((match) => match[1]);
+  const hasFixedRequestSetup =
+    safeRequestBindings.length === 1 &&
+    requestDeclarations.length === 1 &&
+    requestAssignments.length === 1 &&
+    requestMembers.length === 3 &&
+    requestMembers.filter((member) => member === "httpMethod")
+      .length === 1 &&
+    requestMembers.filter((member) => member === "httpBody").length ===
+      1 &&
+    requestMembers.filter((member) => member === "setValue").length ===
+      1 &&
+    requestMemberMatches.every(allowedRequestMember) &&
+    !/\brequest\s*\.\s*url\b/.test(functionSource) &&
+    !/&\s*request\b/.test(functionSource);
   const sessionMatches = urlSessionAnalysis(source).calls.filter(
     (call) => isInside(call.index, range),
   );
   const hasClosedTransport =
     requestMatches.length === 1 &&
-    /\bURLRequest\s*\(\s*url\s*:\s*url\s*\)/.test(functionSource) &&
+    hasFixedRequestSetup &&
     sessionMatches.length === 1 &&
     sessionMatches[0].member === "data" &&
     /\bauthSession\s*\.\s*data\s*\(\s*for\s*:\s*request\s*\)/.test(
@@ -499,34 +589,34 @@ function authRequestContract(source, endpointContract) {
 function manualTransportOutsideRange(source, allowedRange) {
   const masked = maskCommentsAndStrings(source);
   const sessionAnalysis = urlSessionAnalysis(source);
-  const requestPatterns = [
-    /\bURLRequest\s*\(/g,
-    /\bfunc\s+request(?:\s*<[^>{}]*>)?\s*\(/g,
-    /(?<![.\w])request\s*\(/g,
-  ];
-
-  let request = false;
-  for (const pattern of requestPatterns) {
-    for (const match of masked.matchAll(pattern)) {
-      if (!isInside(match.index, allowedRange)) request = true;
+  const requestOffenses = [];
+  for (const match of masked.matchAll(/\bURLRequest\s*\(/g)) {
+    if (!isInside(match.index, allowedRange)) {
+      requestOffenses.push({ index: match.index, symbol: "URLRequest" });
     }
   }
 
-  let session = false;
+  const sessionOffenses = [];
   for (const call of sessionAnalysis.calls) {
     if (
       !BENIGN_URL_SESSION_MEMBERS.has(call.member) &&
       !isInside(call.index, allowedRange)
     ) {
-      session = true;
+      sessionOffenses.push(call);
     }
   }
 
   return {
     ambiguousSession: sessionAnalysis.ambiguousBindings.length > 0,
-    request,
-    session,
+    request: requestOffenses.length > 0,
+    requestOffenses,
+    session: sessionOffenses.length > 0,
+    sessionOffenses,
   };
+}
+
+function sourceLine(source, index) {
+  return source.slice(0, index).split("\n").length;
 }
 
 function documentedOperationIDs(spec) {
@@ -581,11 +671,21 @@ export function validateGeneratedClientAdoption({ sources, spec, project }) {
       failures.push(
         `${path} contains manual URLRequest transport outside KairoAPI.authRequest`,
       );
+      for (const offense of manualTransport.requestOffenses) {
+        failures.push(
+          `${path}:${sourceLine(file.source, offense.index)} contains manual URLRequest transport via ${offense.symbol} outside KairoAPI.authRequest`,
+        );
+      }
     }
     if (manualTransport.session) {
       failures.push(
         `${path} contains manual URLSession transport outside KairoAPI.authRequest`,
       );
+      for (const offense of manualTransport.sessionOffenses) {
+        failures.push(
+          `${path}:${sourceLine(file.source, offense.index)} contains manual URLSession transport via URLSession.${offense.member} outside KairoAPI.authRequest`,
+        );
+      }
     }
     if (manualTransport.ambiguousSession) {
       failures.push(

@@ -88,12 +88,19 @@ function facadeSource(
 
       private func authRequest<T>(
         _ endpoint: AuthEndpoint,
+        body: [String: String],
         as type: T.Type
       ) async throws {
         let url = endpoint.pathComponents.reduce(baseURL) {
           $0.appending(path: $1)
         }
-        let request = URLRequest(url: url)
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(
+          "application/json",
+          forHTTPHeaderField: "Content-Type"
+        )
+        request.httpBody = try JSONEncoder().encode(body)
         _ = try await authSession.data(for: request)
       }
 
@@ -166,6 +173,13 @@ describe("generated Swift client adoption gate", () => {
     expect(result.failures).toContain(
       "ios/App/Features/Search/SearchView.swift contains manual URLRequest transport outside KairoAPI.authRequest",
     );
+    expect(
+      result.failures.some((failure) =>
+        /^ios\/App\/Features\/Search\/SearchView\.swift:\d+ .*URLRequest/.test(
+          failure,
+        ),
+      ),
+    ).toBe(true);
   });
 
   it.each([
@@ -195,6 +209,18 @@ describe("generated Swift client adoption gate", () => {
     expect(result.failures).toContain(
       "ios/App/Features/Search/SearchView.swift contains manual URLSession transport outside KairoAPI.authRequest",
     );
+    const member = /shared\.([A-Za-z_][A-Za-z0-9_]*)/.exec(
+      primitive,
+    )?.[1];
+    expect(
+      result.failures.some(
+        (failure) =>
+          failure.includes(
+            "ios/App/Features/Search/SearchView.swift:1",
+          ) &&
+          failure.includes(`URLSession.${member}`),
+      ),
+    ).toBe(true);
   });
 
   it("does not confuse ActivityKit request calls with manual network transport", () => {
@@ -208,6 +234,31 @@ describe("generated Swift client adoption gate", () => {
           path: "ios/App/Features/Focus/FocusView.swift",
           source:
             "liveActivity = try ActivityKit.Activity<FocusAttributes>.request(attributes: attributes)",
+        },
+      ]).failures,
+    ).toEqual([]);
+  });
+
+  it("allows pure domain request declarations and calls", () => {
+    expect(
+      validate([
+        {
+          path: "ios/App/API/KairoAPI.swift",
+          source: facadeSource(),
+        },
+        {
+          path: "ios/App/Domain/ApprovalQueue.swift",
+          source: `
+            struct ApprovalQueue {
+              func request(_ identifier: String) -> Bool {
+                !identifier.isEmpty
+              }
+
+              func approve(_ identifier: String) -> Bool {
+                request(identifier)
+              }
+            }
+          `,
         },
       ]).failures,
     ).toEqual([]);
@@ -251,6 +302,41 @@ describe("generated Swift client adoption gate", () => {
 
     expect(result.failures).toContain(
       "ios/App/Services/AliasedTransport.swift contains manual URLSession transport outside KairoAPI.authRequest",
+    );
+  });
+
+  it.each([
+    [
+      "Foundation-qualified inferred receiver",
+      `
+        let client = Foundation.URLSession.shared
+        _ = client.data(from: plannerURL)
+      `,
+    ],
+    [
+      "same-file qualified optional typealias chain",
+      `
+        typealias HTTPTransport = Foundation.URLSession
+        typealias OptionalHTTPTransport = HTTPTransport?
+        func run(_ client: OptionalHTTPTransport) {
+          _ = client?.dataTask(with: plannerRequest)
+        }
+      `,
+    ],
+  ])("rejects %s", (_label, source) => {
+    const result = validate([
+      {
+        path: "ios/App/API/KairoAPI.swift",
+        source: facadeSource(),
+      },
+      {
+        path: "ios/App/Services/TypealiasedTransport.swift",
+        source,
+      },
+    ]);
+
+    expect(result.failures).toContain(
+      "ios/App/Services/TypealiasedTransport.swift contains manual URLSession transport outside KairoAPI.authRequest",
     );
   });
 
@@ -510,6 +596,38 @@ describe("generated Swift client adoption gate", () => {
       {
         path: "ios/App/API/KairoAPI.swift",
         source: dynamicAuthRequest,
+      },
+    ]);
+
+    expect(result.failures).toContain(
+      "KairoAPI manual auth transport must use a closed AuthEndpoint-based authRequest boundary",
+    );
+  });
+
+  it.each([
+    ["request URL reassignment", "request.url = configuredPlannerURL"],
+    ["request reassignment", "request = configuredPlannerRequest"],
+    [
+      "request URL member mutation",
+      'request.url?.append(path: "api")',
+    ],
+    ["request URL inout mutation", "retarget(&request.url)"],
+    ["request inout mutation", "retarget(&request)"],
+    ["request method reassignment", 'request.httpMethod = "GET"'],
+    [
+      "request body member mutation",
+      "request.httpBody?.append(contentsOf: plannerPayload)",
+    ],
+  ])("rejects auth %s", (_label, mutation) => {
+    const mutatedRequest = facadeSource().replace(
+      "_ = try await authSession.data(for: request)",
+      `${mutation}
+        _ = try await authSession.data(for: request)`,
+    );
+    const result = validate([
+      {
+        path: "ios/App/API/KairoAPI.swift",
+        source: mutatedRequest,
       },
     ]);
 
