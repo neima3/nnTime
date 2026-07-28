@@ -10,7 +10,8 @@ readiness goal.
 Kairo's roadmap marks iOS release preflight, TestFlight, privacy labels, and
 launch complete, but the production app target does not yet support that claim:
 
-- `ios/App` has no `PrivacyInfo.xcprivacy`;
+- `ios/App` and the widget extension had no executable-scoped
+  `PrivacyInfo.xcprivacy`;
 - the only preflight is a value-object inside the older Swift contract package,
   with the wrong default bundle identifier and hard-coded capability booleans;
 - the real app has no archive/export/upload automation;
@@ -43,6 +44,7 @@ The release preflight reads repository files and the built archive:
 - `ios/App/Info.plist`
 - `ios/App/Kairo.entitlements`
 - `ios/App/PrivacyInfo.xcprivacy`
+- `ios/Widget/PrivacyInfo.xcprivacy`
 - the generated archive's app and widget bundles
 - git HEAD, branch, cleanliness, and upstream relationship
 
@@ -97,13 +99,19 @@ variables may be added later without changing the archive contract.
   - `CA92.1` for app-only preferences;
   - `1C8F.1` for preferences shared with the Kairo widget through the App Group.
 
+`ios/Widget/PrivacyInfo.xcprivacy` independently declares `1C8F.1` because the
+extension executable reads the shared App Group cache. It declares no
+collection and no tracking; the containing app's manifest is not a substitute
+for the extension's declaration.
+
 Health data is intentionally absent from collected-data declarations. Kairo
 reads Sleep Analysis and writes mindful minutes only on-device after explicit
 permission; raw samples, source metadata, and derived schedules are not sent to
 Kairo's servers.
 
-The archive gate verifies the manifest exists at the app-bundle root and that
-its declaration remains consistent with the source contract.
+The artifact gate verifies the app and widget manifests exist at their
+respective executable roots and that both declarations remain consistent with
+the source contract.
 
 ### Public policy
 
@@ -151,12 +159,13 @@ behavior.
 ## Verification
 
 - TDD for release-contract validation and privacy-policy content.
-- `plutil -lint` on the privacy manifest and generated export options.
+- `plutil -lint` on both privacy manifests and generated export options.
 - full web lint, typecheck, 547+ tests, and production build.
 - full native unit/UI suite and Main Thread Checker scan.
 - signed physical-device build remains green.
-- signed archive inspection: bundle IDs, versions, provenance, entitlements,
-  privacy manifest location, widget embedding, and signature verification.
+- signed archive and IPA inspection: bundle IDs, versions, provenance,
+  entitlements, app/widget privacy manifest locations, widget embedding, and
+  signature verification.
 - App Store IPA export and, where credentials allow, Apple validation/upload.
 - real-browser desktop and 390px mobile QA of `/privacy`, including keyboard,
   heading, link, contrast, console, and screenshot evidence.

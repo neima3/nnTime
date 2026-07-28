@@ -79,7 +79,7 @@ run_logged() {
     return
   fi
   set -o pipefail
-  "$@" 2>&1 | tee "$log_file"
+  "$@" 2>&1 | node scripts/ios-release-redact.mjs | tee "$log_file"
 }
 
 require_tool() {
@@ -163,7 +163,8 @@ preflight() {
   require_tool xcodebuild
   require_tool codesign
 
-  if [[ "${KAIRO_ALLOW_DIRTY:-0}" != "1" && -n "$(git status --porcelain)" ]]; then
+  if [[ -n "$(git status --porcelain)" ]] &&
+    [[ "$DRY_RUN" != "1" || "${KAIRO_ALLOW_DIRTY:-0}" != "1" ]]; then
     echo "Release checkout must be clean. Commit or set KAIRO_ALLOW_DIRTY=1 for a non-release dry run." >&2
     exit 67
   fi
@@ -191,6 +192,7 @@ preflight() {
 }
 
 inspect_archive() {
+  local expected_build_date="${1:-}"
   if [[ "$DRY_RUN" == "1" ]]; then
     echo "Inspect archive: $ARCHIVE_PATH"
     return
@@ -198,40 +200,56 @@ inspect_archive() {
 
   local app="$ARCHIVE_PATH/Products/Applications/Kairo.app"
   local widget="$app/PlugIns/KairoWidget.appex"
-  local info="$app/Info.plist"
-  local widget_info="$widget/Info.plist"
-  local entitlements="$ARTIFACT_ROOT/Kairo.entitlements.plist"
 
   [[ -d "$app" ]] || { echo "Archive does not contain Kairo.app." >&2; exit 66; }
   [[ -d "$widget" ]] || { echo "Archive does not contain KairoWidget.appex." >&2; exit 66; }
-  [[ -f "$app/PrivacyInfo.xcprivacy" ]] || {
-    echo "Archive app root is missing PrivacyInfo.xcprivacy." >&2
-    exit 66
-  }
-
-  assert_equal "$(plist_value "$info" CFBundleIdentifier)" "me.neima.kairo" "App bundle ID"
-  assert_equal "$(plist_value "$widget_info" CFBundleIdentifier)" "me.neima.kairo.widgets" "Widget bundle ID"
-  assert_equal "$(plist_value "$info" CFBundleVersion)" "$BUILD_NUMBER" "Build number"
-  assert_equal "$(plist_value "$info" KairoGitCommit)" "$GIT_SHA" "Git provenance"
-  [[ -n "$(plist_value "$info" KairoBuildDate)" ]] || {
-    echo "Archive is missing KairoBuildDate provenance." >&2
-    exit 66
-  }
 
   codesign --verify --deep --strict --verbose=2 "$app"
-  codesign --display --entitlements :- "$app" > "$entitlements" 2>/dev/null
-  plutil -lint "$entitlements"
-  assert_equal \
-    "$(plist_value "$entitlements" com.apple.developer.healthkit)" \
-    "true" \
-    "HealthKit entitlement"
-  if ! plutil -extract 'com\.apple\.security\.application-groups' json -o - "$entitlements" |
-    grep -Fq '"group.me.neima.kairo"'; then
-    echo "Signed app is missing group.me.neima.kairo." >&2
-    exit 66
+  codesign --verify --strict --verbose=2 "$widget"
+  local contract_command=(
+    node scripts/ios-release-contract.mjs
+      --archive "$ARCHIVE_PATH"
+      --expected-build-number "$BUILD_NUMBER"
+      --expected-git-sha "$GIT_SHA"
+  )
+  if [[ -n "$expected_build_date" ]]; then
+    contract_command+=(--expected-build-date "$expected_build_date")
   fi
+  "${contract_command[@]}"
 
   echo "Verified archive: $ARCHIVE_PATH"
+}
+
+inspect_ipa() {
+  local ipa="$1"
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "Inspect exported IPA: $EXPORT_PATH/Kairo.ipa"
+    return
+  fi
+
+  (
+    local inspection_root
+    inspection_root="$(mktemp -d "${TMPDIR:-/tmp}/kairo-ipa-inspect.XXXXXX")"
+    trap 'find "$inspection_root" -depth -delete' EXIT
+    ditto -x -k "$ipa" "$inspection_root"
+
+    local app
+    app="$(find "$inspection_root/Payload" -maxdepth 1 -name '*.app' -type d -print -quit)"
+    [[ -n "$app" ]] || {
+      echo "Exported IPA does not contain an application bundle." >&2
+      exit 66
+    }
+
+    codesign --verify --deep --strict --verbose=2 "$app"
+    node scripts/ios-release-contract.mjs \
+      --app "$app" \
+      --expected-build-number "$BUILD_NUMBER" \
+      --expected-git-sha "$GIT_SHA" \
+      --distribution \
+      --expected-team-id "$TEAM_ID"
+  )
+
+  echo "Verified exported IPA: $ipa"
 }
 
 archive() {
@@ -257,7 +275,7 @@ archive() {
       KAIRO_BUILD_DATE="$BUILD_DATE"
   )
   run_logged "$LOG_DIR/archive.log" "${archive_command[@]}"
-  inspect_archive
+  inspect_archive "$BUILD_DATE"
 }
 
 export_or_upload() {
@@ -287,7 +305,10 @@ export_or_upload() {
     local ipa
     ipa="$(find "$EXPORT_PATH" -maxdepth 1 -name '*.ipa' -type f -print -quit)"
     [[ -n "$ipa" ]] || { echo "Export completed without an IPA." >&2; exit 66; }
+    inspect_ipa "$ipa"
     echo "Exported IPA: $ipa"
+  elif [[ "$DRY_RUN" == "1" && "$destination" == "export" ]]; then
+    inspect_ipa "$EXPORT_PATH/Kairo.ipa"
   elif [[ "$destination" == "upload" ]]; then
     echo "Upload command completed. Confirm processing in App Store Connect before claiming TestFlight availability."
   fi

@@ -56,9 +56,11 @@ pnpm ios:release upload
 The driver writes only to git-ignored `artifacts/ios-release/`, preserves Xcode
 logs, and refuses a dirty release checkout. It derives a positive build number
 from `KAIRO_BUILD_NUMBER` or the git commit count and embeds both the exact git
-SHA and UTC build date. The archive gate verifies the app and widget identities,
-signature, HealthKit/App Group entitlements, root privacy manifest, and
-provenance before export or upload.
+SHA and UTC build date. The archive gate verifies the app and widget
+identities, versions, signatures, HealthKit/App Group entitlements, each
+executable's privacy manifest, and provenance before export or upload.
+`export` also unpacks and validates the distribution-signed IPA. Xcode output
+is scrubbed of optional API-key values before it is written to release logs.
 
 `export` uses App Store Connect distribution signing but does not upload.
 `upload` is the Apple-side mutation and requires an existing verified archive.

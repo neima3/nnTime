@@ -14,6 +14,24 @@ release SHA; and upload to TestFlight only if Apple accepts and processes it.
 `docs/DEPLOYMENT.md`, and Apple's current privacy-manifest and Xcode
 distribution documentation.
 
+## Execution status
+
+- [x] Task 1 — repository-backed release contract
+- [x] Task 2 — accurate privacy manifest and native policy model
+- [x] Task 3 — public privacy policy and links
+- [x] Task 4 — deterministic archive, export, and upload driver
+- [x] Task 5 — release artifact verification
+- [x] Task 6 — browser and design-quality verification
+- [x] Task 7 — truthful handoff prepared; integration, deployment, and Apple
+      state are verified after this immutable source commit and reported as
+      post-commit evidence
+
+Release evidence is split deliberately: repository checks and the signed
+artifact pipeline can be recorded here, while the exact deployed SHA, Apple
+upload acceptance, and TestFlight processing necessarily occur after the
+source commit exists. Those post-commit states must be reported from their
+live systems and never backfilled by inference.
+
 ## Task 1 — Repository-backed release contract
 
 **Files**
@@ -46,6 +64,7 @@ distribution documentation.
 **Files**
 
 - Create: `ios/App/PrivacyInfo.xcprivacy`
+- Create: `ios/Widget/PrivacyInfo.xcprivacy`
 - Modify: `ios/App/Info.plist`
 - Modify: `ios/project.yml`
 - Modify: `ios/Kairo/Sources/Kairo/ReleasePreflight.swift`
@@ -61,9 +80,9 @@ distribution documentation.
    Apple, and remote-push gates and require the actual app's privacy, App
    Group, HealthKit, and Health-purpose-string gates.
 3. Run both focused suites and record RED.
-4. Add the root privacy manifest and provenance placeholders, wire build
-   settings into the real target, and correct the old Swift policy model and
-   bundle identifier.
+4. Add executable-scoped app and widget privacy manifests plus provenance
+   placeholders, wire build settings into the real targets, and correct the
+   old Swift policy model and bundle identifier.
 5. Add `@MainActor` isolation to the pre-existing view tests so Swift 6 release
    validation is warning-clean.
 6. Run `plutil -lint`, the focused Vitest suite, and the Swift package suite to
@@ -156,7 +175,7 @@ distribution documentation.
    - app/extension bundle IDs, version, and build;
    - git SHA and build timestamp;
    - embedded widget;
-   - root privacy manifest;
+   - app and widget privacy manifests;
    - App Group and HealthKit entitlements;
    - signing identity and `codesign --verify`;
    - exported IPA contents.
@@ -224,8 +243,8 @@ distribution documentation.
 - The final deployed SHA passes all web/native gates.
 - `/privacy` is live, accurate, responsive, keyboard-usable, and linked from
   web and iOS.
-- The shipped app bundle contains the approved root privacy manifest and
-  verifiable git/build provenance.
+- The shipped app and widget executables contain their approved privacy
+  manifests, and the app contains verifiable git/build provenance.
 - A signed `.xcarchive` and App Store Connect `.ipa` pass local inspection.
 - “TestFlight uploaded” appears only with Apple's accepted upload evidence;
   “available in TestFlight” appears only after processing completes.

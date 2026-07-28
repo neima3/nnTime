@@ -1,5 +1,72 @@
 # Progress log
 
+## 2026-07-28 — Round 14: verifiable distribution and public privacy (Codex)
+
+Roadmap:
+`docs/plans/2026-07-28-round14-testflight-release.md`. Closed the repository
+and artifact gaps between a simulator-ready native app and a release that can
+be evaluated truthfully:
+
+- **Repository-backed release contract.** `pnpm ios:release:preflight` now
+  validates the real XcodeGen target rather than a parallel model: exact app
+  and widget IDs, iPhone-only device family, semantic version/build,
+  HealthKit and App Group entitlements, both Health purpose strings, both
+  executable-scoped privacy manifests, and build provenance.
+- **Accurate privacy declarations.** The app `PrivacyInfo.xcprivacy` declares
+  tracking off, the account/planner/product-interaction data Kairo actually
+  sends, and the approved app-only/App Group UserDefaults reasons. The widget
+  has its own no-collection/no-tracking manifest with the App Group
+  UserDefaults reason it independently requires. Raw Apple Health data is
+  intentionally absent because it remains on-device.
+- **Public policy and entry points.** `/privacy` explains account/planner
+  storage, optional providers, Apple Health's local-only boundary,
+  export/deletion, retention, security, and contact in plain language. It is
+  linked from the landing footer and native Settings.
+- **Deterministic distribution driver.** `pnpm ios:release` now owns
+  preflight, signed archive, App Store Connect IPA export, and upload modes.
+  It requires a clean checkout for every real mode, derives a positive build
+  number, embeds the exact Git SHA/UTC build date, verifies app and widget
+  signatures, versions, entitlements, and manifests in both archive and IPA,
+  and scrubs optional API-key values before writing Xcode logs.
+- **Native proof.** Swift package validation passed **40 tests / 8 suites**;
+  the app-hosted gate passed **56 tests** with no Main Thread Checker
+  diagnostic; the definitive serial XCUITest flight passed **17/17**. A
+  Live Activity tab-selection race was reproduced, fixed with an observable
+  selection gate and one bounded retry, and reverified in the focused and full
+  suites.
+- **Distribution-pipeline proof and adversarial review.** An initial signed
+  archive and App Store Connect-exported IPA proved distribution signing,
+  identifiers, provenance, HealthKit/App Group entitlements,
+  `beta-reports-active`, `get-task-allow = false`, and strict code-sign
+  verification. Independent review then found that the widget executable
+  lacked its own required-reason manifest and that the first inspector did not
+  enforce both bundles deeply enough. The repository and artifact contracts
+  now require the widget manifest, matching app/widget versions and builds,
+  both signed entitlement sets, exact provenance, and IPA inspection; the
+  strengthened validator correctly rejects the superseded artifact. The final
+  artifact must be rebuilt from this immutable handoff commit.
+- **Web and design proof.** Lint, typecheck, build, and **47 files / 566
+  tests** passed. `/privacy` was exercised in a real production browser at
+  1440×1000 and 390×844 in light and dark schemes. It has one H1, ten ordered
+  H2s, no horizontal overflow, visible keyboard focus, working section
+  navigation and landing entry link, and no console or failed-network errors.
+  Screenshots were visually inspected and remain git-ignored.
+- **Parity unchanged.** Release truth and privacy disclosure do not inflate
+  feature parity: web remains **89.74%** and iOS/combined **87.08%**.
+- **Roadmap semantics corrected.** Checked 7F/8D boxes now describe the
+  repository capability/historical gate only. They no longer imply that any
+  particular build was uploaded, processed, reviewed, or launched.
+
+**Post-commit evidence boundary:** the exact final archive/IPA SHA, Apple
+upload acceptance and processing state, Coolify deployment record, live
+health, and live-browser proof are collected after this source commit exists
+and reported directly from those systems. “Uploaded” and “available in
+TestFlight” remain separate claims.
+
+**Still user-controlled:** accepting or denying the physical Apple Health
+permission sheets and confirming real mindful-minute/sleep behavior in the
+Health app. Release automation cannot substitute for those interactions.
+
 ## 2026-07-28 — Round 13: private sleep-aware wind-down (Codex)
 
 Roadmap: `docs/plans/2026-07-28-round13-healthkit-sleep.md`. Completed K04's

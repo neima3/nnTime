@@ -82,12 +82,14 @@ design work BEFORE the consuming subphase starts.
   - [x] 7C Data/sync (shared revision/cursor protocol, offline, logout purge)
   - [x] 7D Planner UI (Today/editor/Anytime → Week/Routines; VoiceOver/Dynamic Type)
   - [x] 7E Focus + local notifications (background-safe reconstruction)
-  - [x] 7F Release preflight + TestFlight
+  - [x] 7F Repository release preflight + signed archive/export capability
+        (TestFlight status is release-specific evidence, not implied here)
 - [x] Phase 8 — iOS surfaces + launch → **85% iOS PARITY GATE**
   - [x] 8A Interactive widgets + Live Activity/Dynamic Island
   - [x] 8B Google sign-in (web+iOS), Apple Reminders import decision executed
   - [x] 8C Ongoing hardening: repeated restore drill, E2E suite in CI, monitoring
-  - [x] 8D App Store privacy labels, review prep, launch
+  - [x] 8D Privacy/review-prep contract + scripted parity gate
+        (App Store upload, processing, and launch are tracked per release)
 
 ---
 
@@ -333,9 +335,11 @@ via the same API), personalization incl. high-contrast — token fidelity
 reviewed by Fable/Opus; VoiceOver, Dynamic Type, reduced motion;
 physical-device recordings. **7E Focus + notifications:** elapsed-time
 reconstruction (no indefinite background), local notifications scheduled from
-cached day, timer Live-Activity-ready. **7F Release preflight:** certificates,
-bundle IDs, entitlements, privacy manifest, App Store Connect access verified
-as a gate BEFORE build work claims done; CI archive; TestFlight.
+cached day, timer Live-Activity-ready. **7F Repository release preflight:**
+certificates, bundle IDs, entitlements, privacy manifest, provenance, signed
+archive, and App Store Connect export are verified gates before distribution.
+Apple upload acceptance and TestFlight processing are external, per-release
+states and require their own evidence; this phase checkbox never implies them.
 
 ## Phase 8 — iOS surfaces + hardening + launch → 85% iOS PARITY GATE
 8A **interactive** widgets (complete-from-widget), timeline + next-up widgets,
@@ -344,8 +348,10 @@ parity row, scores 0 if deferred). 8B Google sign-in on web+iOS; execute the
 Apple Reminders import decision recorded in 0.5 checklist (ship or justified
 exclusion); **Apple Health sync (HealthKit: write focus/mindful minutes,
 read sleep schedule to inform wind-down suggestions; explicit user opt-in)**. 8C ongoing hardening: repeated restore drill, Playwright E2E in CI,
-uptime monitoring, dependency audit. 8D App Store privacy labels + review prep;
-final scripted parity audit for iOS ≥85%.
+uptime monitoring, dependency audit. 8D privacy declarations, public policy,
+review-prep contract, and final scripted parity audit for iOS ≥85%. App Store
+upload, processing, review, and launch remain per-release states and are never
+inferred from this historical phase checkbox.
 
 ---
 

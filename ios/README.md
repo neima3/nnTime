@@ -136,7 +136,8 @@ The release gate requires:
 - an App Store Connect app record for `me.neima.kairo`.
 
 The archive embeds the exact git SHA and UTC build date, then verifies bundle
-IDs, build number, widget embedding, signature, HealthKit/App Group
-entitlements, and the root `PrivacyInfo.xcprivacy`. Upload success means Apple
-accepted the upload command; it is not described as available in TestFlight
-until App Store Connect finishes processing it.
+IDs, versions, widget embedding, signatures, HealthKit/App Group entitlements,
+and both executable-scoped `PrivacyInfo.xcprivacy` files. Export also validates
+the distribution-signed IPA. Upload success means Apple accepted the upload
+command; it is not described as available in TestFlight until App Store
+Connect finishes processing it.
