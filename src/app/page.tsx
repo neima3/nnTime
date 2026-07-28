@@ -511,7 +511,15 @@ export default function LandingPage() {
       <footer className="border-t border-border bg-surface">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-8 text-sm text-ink-soft">
           <p className="font-semibold">Kairo — a nnTime project</p>
-          <p>Made with care for ADHD brains. No shame mechanics, ever.</p>
+          <div className="flex flex-wrap items-center gap-4">
+            <p>Made with care for ADHD brains. No shame mechanics, ever.</p>
+            <Link
+              href="/privacy"
+              className="inline-flex min-h-11 items-center rounded-xl px-3 font-semibold transition-colors hover:bg-surface-sunken hover:text-ink"
+            >
+              Privacy
+            </Link>
+          </div>
         </div>
       </footer>
     </div>

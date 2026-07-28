@@ -222,6 +222,9 @@ struct SettingsView: View {
                         VStack(spacing: 0) {
                             linkRow("Export or delete on the web", "square.and.arrow.up",
                                     url: "https://time.neima.me/app/settings")
+                            divider
+                            linkRow("Privacy policy", "hand.raised",
+                                    url: "https://time.neima.me/privacy")
                         }
                     }
 
