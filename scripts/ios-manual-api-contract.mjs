@@ -271,8 +271,61 @@ function authEndpointContract(source) {
   return { valid: true, range: enumRange };
 }
 
-const URL_SESSION_PRIMITIVE =
-  /\.\s*(?:data|dataTask|upload|uploadTask|download|downloadTask|bytes|webSocketTask|streamTask)\s*\(\s*(?:for|from|with|withResumeData|withHostName|withNetService)\s*:/g;
+const BENIGN_URL_SESSION_MEMBERS = new Set([
+  "finishTasksAndInvalidate",
+  "flush",
+  "getAllTasks",
+  "getTasksWithCompletionHandler",
+  "invalidateAndCancel",
+  "reset",
+]);
+
+function escapedPattern(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function urlSessionMemberCalls(source) {
+  const masked = maskCommentsAndStrings(source);
+  const sessionIdentifiers = new Set();
+
+  for (const match of masked.matchAll(
+    /\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*URLSession\b/g,
+  )) {
+    sessionIdentifiers.add(match[1]);
+  }
+  for (const match of masked.matchAll(
+    /\b(?:let|var)\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*URLSession\s*(?:\.\s*shared\b|\()/g,
+  )) {
+    sessionIdentifiers.add(match[1]);
+  }
+
+  const calls = [];
+  const directPatterns = [
+    /\bURLSession\s*\.\s*shared\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(/g,
+    /\bURLSession\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(/g,
+  ];
+  for (const pattern of directPatterns) {
+    for (const match of masked.matchAll(pattern)) {
+      calls.push({ index: match.index, member: match[1] });
+    }
+  }
+
+  for (const identifier of sessionIdentifiers) {
+    const pattern = new RegExp(
+      `\\b${escapedPattern(identifier)}\\s*\\.\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*\\(`,
+      "g",
+    );
+    for (const match of masked.matchAll(pattern)) {
+      calls.push({ index: match.index, member: match[1] });
+    }
+  }
+
+  return [
+    ...new Map(
+      calls.map((call) => [`${call.index}:${call.member}`, call]),
+    ).values(),
+  ];
+}
 
 function authRequestContract(source, endpointContract) {
   if (!endpointContract.valid) return { valid: false, range: null };
@@ -289,31 +342,47 @@ function authRequestContract(source, endpointContract) {
     /\bprivate\s+func\s+authRequest(?:\s*<[^>{}]*>)?\s*\(\s*_\s+endpoint\s*:\s*AuthEndpoint(?:\s*,|\s*\))/s.test(
       functionSource,
     );
-  const buildsFromEndpoint =
-    /\bendpoint\s*\.\s*pathComponents\s*\.\s*reduce\s*\(\s*baseURL\s*\)/.test(
-      functionSource,
-    ) &&
-    /\$0\s*\.\s*appending\s*\(\s*path\s*:\s*\$1\s*\)/.test(
-      functionSource,
-    );
+  const safeURLBindings = [
+    ...functionSource.matchAll(
+      /\blet\s+url\s*=\s*endpoint\s*\.\s*pathComponents\s*\.\s*reduce\s*\(\s*baseURL\s*\)\s*\{\s*\$0\s*\.\s*appending\s*\(\s*path\s*:\s*\$1\s*\)\s*\}/g,
+    ),
+  ];
+  const urlDeclarations = [
+    ...functionSource.matchAll(/\b(?:let|var)\s+url\b/g),
+  ];
+  const urlAssignments = [
+    ...functionSource.matchAll(/(?<![.\w])url\s*=(?!=)/g),
+  ];
+  const hasClosedURLBinding =
+    safeURLBindings.length === 1 &&
+    urlDeclarations.length === 1 &&
+    urlAssignments.length === 1 &&
+    !/(?<![.\w])url\s*\./.test(functionSource) &&
+    !/&\s*url\b/.test(functionSource);
   const requestMatches = [
     ...functionSource.matchAll(/\bURLRequest\s*\(/g),
   ];
-  const sessionMatches = [
-    ...functionSource.matchAll(URL_SESSION_PRIMITIVE),
-  ];
+  const sessionMatches = urlSessionMemberCalls(source).filter((call) =>
+    isInside(call.index, range),
+  );
   const hasClosedTransport =
     requestMatches.length === 1 &&
     /\bURLRequest\s*\(\s*url\s*:\s*url\s*\)/.test(functionSource) &&
     sessionMatches.length === 1 &&
+    sessionMatches[0].member === "data" &&
     /\bauthSession\s*\.\s*data\s*\(\s*for\s*:\s*request\s*\)/.test(
       functionSource,
     );
 
   return {
-    valid: hasClosedSignature && buildsFromEndpoint && hasClosedTransport,
+    valid:
+      hasClosedSignature &&
+      hasClosedURLBinding &&
+      hasClosedTransport,
     range:
-      hasClosedSignature && buildsFromEndpoint && hasClosedTransport
+      hasClosedSignature &&
+      hasClosedURLBinding &&
+      hasClosedTransport
         ? range
         : null,
   };
@@ -335,8 +404,11 @@ function manualTransportOutsideRange(source, allowedRange) {
   }
 
   let session = false;
-  for (const match of masked.matchAll(URL_SESSION_PRIMITIVE)) {
-    if (!isInside(match.index, allowedRange)) {
+  for (const call of urlSessionMemberCalls(source)) {
+    if (
+      !BENIGN_URL_SESSION_MEMBERS.has(call.member) &&
+      !isInside(call.index, allowedRange)
+    ) {
       session = true;
     }
   }

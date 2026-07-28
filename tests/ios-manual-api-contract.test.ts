@@ -176,6 +176,10 @@ describe("generated Swift client adoption gate", () => {
     "URLSession.shared.downloadTask(with: plannerRequest)",
     "URLSession.shared.bytes(from: plannerURL)",
     "URLSession.shared.webSocketTask(with: plannerURL)",
+    "URLSession.shared.dataTaskPublisher(for: plannerRequest)",
+    "URLSession.shared.uploadTask(withStreamedRequest: plannerRequest)",
+    "URLSession.shared.download(resumeFrom: resumeData)",
+    "URLSession.shared.requestProducer(for: plannerRequest)",
   ])("rejects manual URLSession primitive %s", (primitive) => {
     const result = validate([
       {
@@ -204,6 +208,25 @@ describe("generated Swift client adoption gate", () => {
           path: "ios/App/Features/Focus/FocusView.swift",
           source:
             "liveActivity = try ActivityKit.Activity<FocusAttributes>.request(attributes: attributes)",
+        },
+      ]).failures,
+    ).toEqual([]);
+  });
+
+  it("allows benign URLSession construction and lifecycle controls", () => {
+    expect(
+      validate([
+        {
+          path: "ios/App/API/KairoAPI.swift",
+          source: facadeSource(),
+        },
+        {
+          path: "ios/App/Services/SessionOwner.swift",
+          source: `
+            let session = URLSession(configuration: .ephemeral)
+            session.finishTasksAndInvalidate()
+            session.invalidateAndCancel()
+          `,
         },
       ]).failures,
     ).toEqual([]);
@@ -305,6 +328,64 @@ describe("generated Swift client adoption gate", () => {
       {
         path: "ios/App/API/KairoAPI.swift",
         source: dynamicAuthRequest,
+      },
+    ]);
+
+    expect(result.failures).toContain(
+      "KairoAPI manual auth transport must use a closed AuthEndpoint-based authRequest boundary",
+    );
+  });
+
+  it("rejects a discarded safe reduction followed by a dynamic url binding", () => {
+    const disconnectedURL = facadeSource().replace(
+      "let url = endpoint.pathComponents.reduce(baseURL) {\n          $0.appending(path: $1)\n        }",
+      `
+        _ = endpoint.pathComponents.reduce(baseURL) {
+          $0.appending(path: $1)
+        }
+        let url = configuredPlannerURL
+      `,
+    );
+    const result = validate([
+      {
+        path: "ios/App/API/KairoAPI.swift",
+        source: disconnectedURL,
+      },
+    ]);
+
+    expect(result.failures).toContain(
+      "KairoAPI manual auth transport must use a closed AuthEndpoint-based authRequest boundary",
+    );
+  });
+
+  it.each([
+    [
+      "reassigned",
+      `
+        var url = endpoint.pathComponents.reduce(baseURL) {
+          $0.appending(path: $1)
+        }
+        url = configuredPlannerURL
+      `,
+    ],
+    [
+      "mutated",
+      `
+        var url = endpoint.pathComponents.reduce(baseURL) {
+          $0.appending(path: $1)
+        }
+        url.append(path: "api")
+      `,
+    ],
+  ])("rejects a %s auth url binding", (_label, urlBinding) => {
+    const mutatedURL = facadeSource().replace(
+      "let url = endpoint.pathComponents.reduce(baseURL) {\n          $0.appending(path: $1)\n        }",
+      urlBinding,
+    );
+    const result = validate([
+      {
+        path: "ios/App/API/KairoAPI.swift",
+        source: mutatedURL,
       },
     ]);
 
