@@ -2,6 +2,23 @@ import OpenAPIRuntime
 import OpenAPIURLSession
 import Foundation
 
+private struct RFC3339DateTranscoder: DateTranscoder {
+    private let fractional: ISO8601DateTranscoder =
+        .iso8601WithFractionalSeconds
+    private let wholeSeconds: ISO8601DateTranscoder = .iso8601
+
+    func encode(_ date: Date) throws -> String {
+        try wholeSeconds.encode(date)
+    }
+
+    func decode(_ dateString: String) throws -> Date {
+        if let date = try? fractional.decode(dateString) {
+            return date
+        }
+        return try wholeSeconds.decode(dateString)
+    }
+}
+
 public struct KairoClient: Sendable {
     public static let productionServerURL = URL(
         string: "https://time.neima.me/api/v1"
@@ -32,6 +49,9 @@ public struct KairoClient: Sendable {
         serverURL = baseURL
         self.client = Client(
             serverURL: baseURL,
+            configuration: .init(
+                dateTranscoder: RFC3339DateTranscoder()
+            ),
             transport: transport,
             middlewares: middlewares
         )

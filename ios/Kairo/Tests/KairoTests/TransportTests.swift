@@ -24,6 +24,27 @@ import Testing
         #expect(session.configuration.timeoutIntervalForRequest == 20)
     }
 
+    @Test(
+        "Generated responses decode RFC 3339 timestamps",
+        arguments: [
+            "2026-07-28T16:02:47Z",
+            "2026-07-28T16:02:47.872Z",
+        ]
+    )
+    func generatedResponsesDecodeRFC3339Timestamps(
+        timestamp: String
+    ) async throws {
+        let kairo = KairoClient(
+            baseURL: URL(string: "http://127.0.0.1:3456/api/v1")!,
+            transport: SettingsTransport(timestamp: timestamp)
+        )
+
+        let output = try await kairo.client.getUserSettings()
+        let settings = try output.ok.body.json
+
+        #expect(settings.createdAt == settings.updatedAt)
+    }
+
     @Test func timezoneMiddlewareInjectsHeaderWithoutClobberingExplicitValue() async throws {
         let name = try #require(HTTPField.Name("x-timezone"))
         let middleware = TimezoneMiddleware(timezoneIdentifier: "America/New_York")
@@ -250,6 +271,43 @@ private struct RecordingTransport: ClientTransport {
                 headerFields: [.contentType: "application/json"]
             ),
             HTTPBody(payload)
+        )
+    }
+}
+
+private struct SettingsTransport: ClientTransport {
+    let timestamp: String
+
+    func send(
+        _ request: HTTPRequest,
+        body: HTTPBody?,
+        baseURL: URL,
+        operationID: String
+    ) async throws -> (HTTPResponse, HTTPBody?) {
+        #expect(operationID == "getUserSettings")
+        return (
+            HTTPResponse(
+                status: .ok,
+                headerFields: [.contentType: "application/json"]
+            ),
+            HTTPBody(
+                """
+                {
+                  "userId":"user-1",
+                  "timezone":"America/New_York",
+                  "locale":"en",
+                  "weekStart":0,
+                  "hourCycle":"h12",
+                  "theme":"system",
+                  "reducedStimulation":false,
+                  "notificationPrefs":{},
+                  "schemaVersion":1,
+                  "revision":1,
+                  "createdAt":"\(timestamp)",
+                  "updatedAt":"\(timestamp)"
+                }
+                """
+            )
         )
     }
 }

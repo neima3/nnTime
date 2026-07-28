@@ -13,7 +13,9 @@ final class KairoAPITransportTests: XCTestCase {
             baseURL: URL(string: "http://127.0.0.1:3456")!,
             plannerTransport: PlannerMockTransport(
                 recorder: recorder,
-                responder: Self.successResponse
+                responder: { operation in
+                    Self.successResponse(operation)
+                }
             ),
             timezoneIdentifierProvider: { "America/Chicago" },
             idempotencyKeyProvider: { keys.next() }
@@ -274,6 +276,36 @@ final class KairoAPITransportTests: XCTestCase {
             try focusUpdate.jsonBody()["state"] as? String,
             "paused"
         )
+    }
+
+    func testSettingsDecodesRFC3339TimestampsWithAndWithoutFractions() async throws {
+        for timestamp in [
+            "2026-07-28T16:02:47Z",
+            "2026-07-28T16:02:47.872Z",
+        ] {
+            let api = KairoAPI(
+                baseURL: URL(string: "http://127.0.0.1:3456")!,
+                plannerTransport: PlannerMockTransport(
+                    recorder: PlannerRequestRecorder()
+                ) { operation in
+                    XCTAssertEqual(operation, "getUserSettings")
+                    return .init(
+                        status: .ok,
+                        body: Self.settingsJSON(
+                            revision: 7,
+                            timestamp: timestamp
+                        )
+                    )
+                },
+                timezoneIdentifierProvider: { "UTC" },
+                idempotencyKeyProvider: {
+                    "019fa64f-32f2-7001-8296-34373d7c90a0"
+                }
+            )
+
+            let settings = try await api.settings()
+            XCTAssertEqual(settings.revision, 7)
+        }
     }
 
     func testDocumentedErrorsPreserveMessageConflictDetailsAndStatus() async throws {
@@ -603,7 +635,10 @@ final class KairoAPITransportTests: XCTestCase {
         }
     }
 
-    private static func settingsJSON(revision: Int) -> String {
+    private static func settingsJSON(
+        revision: Int,
+        timestamp: String = "2026-07-28T12:00:00Z"
+    ) -> String {
         """
         {
           "userId":"user-1","timezone":"America/Chicago","locale":"en-US",
@@ -611,8 +646,8 @@ final class KairoAPITransportTests: XCTestCase {
           "reducedStimulation":false,
           "notificationPrefs":{"reminders":true},
           "schemaVersion":1,"revision":\(revision),
-          "createdAt":"2026-07-28T12:00:00Z",
-          "updatedAt":"2026-07-28T12:00:00Z"
+          "createdAt":"\(timestamp)",
+          "updatedAt":"\(timestamp)"
         }
         """
     }
