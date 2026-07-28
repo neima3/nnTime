@@ -50,4 +50,4 @@ package link does not change runtime API behavior by itself.
 - `Sources/Kairo/ReleasePreflight.swift` — Pre-flight checklist gate
 - `Sources/Kairo/iOSSurfaces.swift` — Widgets, Live Activity, HealthKit, privacy labels
 
-40 tests across 8 suites. swift build + swift test pass.
+44 tests across 8 suites. swift build + swift test pass.
