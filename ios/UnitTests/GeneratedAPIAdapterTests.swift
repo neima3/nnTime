@@ -550,6 +550,197 @@ final class GeneratedAPIAdapterTests: XCTestCase {
         )
     }
 
+    func testEveryOutputAdapterWiresEveryDocumentedErrorExactly() throws {
+        let envelope = try errorEnvelope(
+            code: "test_error",
+            message: "Preserve this exact envelope.",
+            retryable: true,
+            details: [
+                "current": [
+                    "revision": 12,
+                    "values": ["one", NSNull()] as [Any],
+                ] as [String: Any],
+            ]
+        )
+        let error = ServerErrorData(
+            code: "test_error",
+            message: "Preserve this exact envelope.",
+            retryable: true,
+            details: .object([
+                "current": .object([
+                    "revision": .integer(12),
+                    "values": .array([.string("one"), .null]),
+                ]),
+            ])
+        )
+
+        assertAdapterError(
+            .http(
+                operation: "getDay",
+                statusCode: 400,
+                error: error
+            )
+        ) {
+            try GeneratedAPIAdapters.day(
+                .badRequest(.init(body: .json(envelope)))
+            )
+        }
+        assertAdapterError(
+            .unauthorized(
+                operation: "getDay",
+                statusCode: 401,
+                error: error
+            )
+        ) {
+            try GeneratedAPIAdapters.day(
+                .unauthorized(.init(body: .json(envelope)))
+            )
+        }
+        assertAdapterError(
+            .unauthorized(
+                operation: "getUserSettings",
+                statusCode: 401,
+                error: error
+            )
+        ) {
+            try GeneratedAPIAdapters.settings(
+                .unauthorized(.init(body: .json(envelope)))
+            )
+        }
+        assertAdapterError(
+            .http(
+                operation: "createActivitySeries",
+                statusCode: 400,
+                error: error
+            )
+        ) {
+            try GeneratedAPIAdapters.activity(
+                .badRequest(.init(body: .json(envelope)))
+            )
+        }
+        assertAdapterError(
+            .unauthorized(
+                operation: "createActivitySeries",
+                statusCode: 401,
+                error: error
+            )
+        ) {
+            try GeneratedAPIAdapters.activity(
+                .unauthorized(.init(body: .json(envelope)))
+            )
+        }
+        assertAdapterError(
+            .conflict(
+                operation: "createActivitySeries",
+                statusCode: 409,
+                error: error
+            )
+        ) {
+            try GeneratedAPIAdapters.activity(
+                .conflict(.init(body: .json(envelope)))
+            )
+        }
+        assertAdapterError(
+            .http(
+                operation: "createTask",
+                statusCode: 400,
+                error: error
+            )
+        ) {
+            try GeneratedAPIAdapters.task(
+                .badRequest(.init(body: .json(envelope)))
+            )
+        }
+        assertAdapterError(
+            .unauthorized(
+                operation: "createTask",
+                statusCode: 401,
+                error: error
+            )
+        ) {
+            try GeneratedAPIAdapters.task(
+                .unauthorized(.init(body: .json(envelope)))
+            )
+        }
+        assertAdapterError(
+            .conflict(
+                operation: "createTask",
+                statusCode: 409,
+                error: error
+            )
+        ) {
+            try GeneratedAPIAdapters.task(
+                .conflict(.init(body: .json(envelope)))
+            )
+        }
+        assertAdapterError(
+            .http(
+                operation: "search",
+                statusCode: 400,
+                error: error
+            )
+        ) {
+            try GeneratedAPIAdapters.search(
+                .badRequest(.init(body: .json(envelope)))
+            )
+        }
+        assertAdapterError(
+            .unauthorized(
+                operation: "search",
+                statusCode: 401,
+                error: error
+            )
+        ) {
+            try GeneratedAPIAdapters.search(
+                .unauthorized(.init(body: .json(envelope)))
+            )
+        }
+        assertAdapterError(
+            .http(
+                operation: "getStats",
+                statusCode: 400,
+                error: error
+            )
+        ) {
+            try GeneratedAPIAdapters.stats(
+                .badRequest(.init(body: .json(envelope)))
+            )
+        }
+        assertAdapterError(
+            .unauthorized(
+                operation: "getStats",
+                statusCode: 401,
+                error: error
+            )
+        ) {
+            try GeneratedAPIAdapters.stats(
+                .unauthorized(.init(body: .json(envelope)))
+            )
+        }
+        assertAdapterError(
+            .unauthorized(
+                operation: "listRoutines",
+                statusCode: 401,
+                error: error
+            )
+        ) {
+            try GeneratedAPIAdapters.routines(
+                .unauthorized(.init(body: .json(envelope)))
+            )
+        }
+        assertAdapterError(
+            .unauthorized(
+                operation: "getActiveFocusSession",
+                statusCode: 401,
+                error: error
+            )
+        ) {
+            try GeneratedAPIAdapters.focus(
+                .unauthorized(.init(body: .json(envelope)))
+            )
+        }
+    }
+
     func testMalformedDocumentedErrorDetailsFailAtTheirExactPath() throws {
         var envelope = try errorEnvelope(
             code: "conflict",
@@ -790,6 +981,73 @@ final class GeneratedAPIAdapterTests: XCTestCase {
         }
     }
 
+    func testEveryWeekStartAndFocusEnumCaseMapsExactly() throws {
+        let weekStarts: [(WeekStart, Int32)] = [
+            (.sunday, 0),
+            (.monday, 1),
+            (.tuesday, 2),
+            (.wednesday, 3),
+            (.thursday, 4),
+            (.friday, 5),
+            (.saturday, 6),
+        ]
+        XCTAssertEqual(weekStarts.count, WeekStart.allCases.count)
+        for (input, expected) in weekStarts {
+            XCTAssertEqual(
+                try GeneratedAPIAdapters.settingsUpdate(
+                    .init(weekStart: input)
+                ).weekStart,
+                expected
+            )
+        }
+
+        let transitions: [
+            (FocusTransitionState, Components.Schemas.FocusState)
+        ] = [
+            (.running, .running),
+            (.paused, .paused),
+            (.completed, .completed),
+            (.skipped, .skipped),
+            (.cancelled, .cancelled),
+        ]
+        XCTAssertEqual(
+            transitions.count,
+            FocusTransitionState.allCases.count
+        )
+        for (input, expected) in transitions {
+            guard case let .case1(payload) =
+                try GeneratedAPIAdapters.focusCommand(.transition(input))
+            else {
+                return XCTFail("Expected transition payload for \(input)")
+            }
+            XCTAssertEqual(payload.state, expected)
+        }
+
+        let extensions: [
+            (
+                FocusExtensionMinutes,
+                Components.Schemas.FocusSessionPatchRequest
+                    .Case2Payload.addMinutesPayload
+            )
+        ] = [
+            (.one, ._1),
+            (.five, ._5),
+            (.ten, ._10),
+        ]
+        XCTAssertEqual(
+            extensions.count,
+            FocusExtensionMinutes.allCases.count
+        )
+        for (input, expected) in extensions {
+            guard case let .case2(payload) =
+                try GeneratedAPIAdapters.focusCommand(.extend(input))
+            else {
+                return XCTFail("Expected extension payload for \(input)")
+            }
+            XCTAssertEqual(payload.addMinutes, expected)
+        }
+    }
+
     private func decode<T: Decodable>(
         _ type: T.Type,
         _ json: String
@@ -854,6 +1112,26 @@ final class GeneratedAPIAdapterTests: XCTestCase {
                 retryable: retryable
             )
         )
+    }
+
+    private func assertAdapterError<T>(
+        _ expected: GeneratedAPIAdapterError,
+        file: StaticString = #filePath,
+        line: UInt = #line,
+        operation: () throws -> T
+    ) {
+        XCTAssertThrowsError(
+            try operation(),
+            file: file,
+            line: line
+        ) { error in
+            XCTAssertEqual(
+                error as? GeneratedAPIAdapterError,
+                expected,
+                file: file,
+                line: line
+            )
+        }
     }
 
     private func assertSendable<T: Sendable>(_ value: T) {
