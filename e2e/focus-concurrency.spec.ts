@@ -8,7 +8,14 @@
 import { test, expect } from "@playwright/test";
 import { gotoHydrated } from "./helpers";
 
-test.use({ locale: "en-US", timezoneId: "America/New_York" });
+// Production registers the PWA worker; Playwright cannot route requests that a
+// service worker handles. This spec intentionally injects transport failures,
+// so keep its isolated context on the network path under test.
+test.use({
+  locale: "en-US",
+  timezoneId: "America/New_York",
+  serviceWorkers: "block",
+});
 
 test.afterEach(async ({ page }) => {
   // A failed assertion must not leave the shared E2E account with an active
