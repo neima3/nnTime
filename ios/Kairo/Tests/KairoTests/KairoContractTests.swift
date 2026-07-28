@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import OpenAPIRuntime
 @testable import KairoAPIClient
 
 @Suite struct KairoContractTests {
@@ -375,6 +376,239 @@ import Foundation
         let _: Operations.updateRoutine.Input.Body = .json(routineNull)
     }
 
+    @Test func customPatchOverridesRoundTripEveryWireKey() throws {
+        let firstDate = Date(timeIntervalSince1970: 1_722_340_800)
+        let secondDate = Date(timeIntervalSince1970: 1_722_344_400)
+        let thirdDate = Date(timeIntervalSince1970: 1_722_348_000)
+        let objectValue: [String: (any Sendable)?] = [
+            "label": "Prepare",
+            "done": true,
+        ]
+        let object = try OpenAPIObjectContainer(
+            unvalidatedValue: objectValue
+        )
+
+        let activityKeys = contractKeys(
+            "KairoActivitySeriesUpdateRequest",
+            [
+                "editScope",
+                "occurrenceKey",
+                "tz",
+                "dtstartLocal",
+                "rrule",
+                "exdate",
+                "rdate",
+                "title",
+                "emoji",
+                "categoryId",
+                "durationMin",
+                "checklistTemplate",
+                "energy",
+                "priority",
+                "tags",
+                "notes",
+                "source",
+                "sourceRef",
+                "status",
+                "startAt",
+                "completedAt",
+                "checklistOverride",
+            ]
+        )
+        try assertOmittedRoundTrip(
+            Components.Schemas.ActivitySeriesUpdateRequest()
+        )
+        try assertCompleteWireRoundTrip(
+            Components.Schemas.ActivitySeriesUpdateRequest(
+                editScope: .this_and_future,
+                occurrenceKey: firstDate,
+                tz: "America/New_York",
+                dtstartLocal: secondDate,
+                rrule: .value("FREQ=WEEKLY;BYDAY=MO"),
+                exdate: .value(["2026-07-29"]),
+                rdate: .value([thirdDate]),
+                title: "Morning plan",
+                emoji: .value("🌅"),
+                categoryId: .value(
+                    "0198f834-c9ab-7e12-b1cf-1faebad8f4fd"
+                ),
+                durationMin: 45,
+                checklistTemplate: [object],
+                energy: .value(.high),
+                priority: .high,
+                tags: .value([
+                    "0198f834-c9ab-7e12-b1cf-1faebad8f4fe"
+                ]),
+                notes: .value("Bring water"),
+                source: .calendar,
+                sourceRef: .value("calendar-event-1"),
+                status: .completed,
+                startAt: thirdDate,
+                completedAt: .value(thirdDate),
+                checklistOverride: .value([
+                    .init(label: "Prepare", done: true)
+                ])
+            ),
+            keys: activityKeys
+        )
+        try assertExplicitNullRoundTrip(
+            Components.Schemas.ActivitySeriesUpdateRequest(
+                rrule: .null,
+                exdate: .null,
+                rdate: .null,
+                emoji: .null,
+                categoryId: .null,
+                energy: .null,
+                tags: .null,
+                notes: .null,
+                sourceRef: .null,
+                completedAt: .null,
+                checklistOverride: .null
+            ),
+            keys: [
+                "rrule",
+                "exdate",
+                "rdate",
+                "emoji",
+                "categoryId",
+                "energy",
+                "tags",
+                "notes",
+                "sourceRef",
+                "completedAt",
+                "checklistOverride",
+            ]
+        )
+
+        let occurrenceKeys = contractKeys(
+            "KairoActivityOccurrencePatchRequest",
+            [
+                "title",
+                "startAt",
+                "durationMin",
+                "status",
+                "checklistOverride",
+                "energy",
+                "completedAt",
+            ]
+        )
+        try assertOmittedRoundTrip(
+            Components.Schemas.ActivityOccurrencePatchRequest()
+        )
+        try assertCompleteWireRoundTrip(
+            Components.Schemas.ActivityOccurrencePatchRequest(
+                title: .value("One-off title"),
+                startAt: .value(firstDate),
+                durationMin: .value(30),
+                status: .skipped,
+                checklistOverride: .value(object),
+                energy: .value(.medium),
+                completedAt: .value(secondDate)
+            ),
+            keys: occurrenceKeys
+        )
+        try assertExplicitNullRoundTrip(
+            Components.Schemas.ActivityOccurrencePatchRequest(
+                title: .null,
+                startAt: .null,
+                durationMin: .null,
+                checklistOverride: .null,
+                energy: .null,
+                completedAt: .null
+            ),
+            keys: [
+                "title",
+                "startAt",
+                "durationMin",
+                "checklistOverride",
+                "energy",
+                "completedAt",
+            ]
+        )
+
+        let taskKeys = contractKeys(
+            "KairoTaskUpdateRequest",
+            [
+                "bucket",
+                "title",
+                "emoji",
+                "categoryId",
+                "date",
+                "priority",
+                "energy",
+                "notes",
+            ]
+        )
+        try assertOmittedRoundTrip(Components.Schemas.TaskUpdateRequest())
+        try assertCompleteWireRoundTrip(
+            Components.Schemas.TaskUpdateRequest(
+                bucket: .anytime,
+                title: "Capture",
+                emoji: .value("📝"),
+                categoryId: .value(
+                    "0198f834-c9ab-7e12-b1cf-1faebad8f4fc"
+                ),
+                date: .value("2026-07-29"),
+                priority: .low,
+                energy: .value(.low),
+                notes: .value("Exact note")
+            ),
+            keys: taskKeys
+        )
+        try assertExplicitNullRoundTrip(
+            Components.Schemas.TaskUpdateRequest(
+                emoji: .null,
+                categoryId: .null,
+                date: .null,
+                energy: .null,
+                notes: .null
+            ),
+            keys: ["emoji", "categoryId", "date", "energy", "notes"]
+        )
+
+        let tagKeys = contractKeys(
+            "KairoTagUpdateRequest",
+            ["name", "color"]
+        )
+        try assertOmittedRoundTrip(Components.Schemas.TagUpdateRequest())
+        try assertCompleteWireRoundTrip(
+            Components.Schemas.TagUpdateRequest(
+                name: "Planning",
+                color: .value("iris")
+            ),
+            keys: tagKeys
+        )
+        try assertExplicitNullRoundTrip(
+            Components.Schemas.TagUpdateRequest(color: .null),
+            keys: ["color"]
+        )
+
+        let routineKeys = contractKeys(
+            "KairoRoutineUpdateRequest",
+            ["title", "emoji", "categoryId", "notes"]
+        )
+        try assertOmittedRoundTrip(Components.Schemas.RoutineUpdateRequest())
+        try assertCompleteWireRoundTrip(
+            Components.Schemas.RoutineUpdateRequest(
+                title: "Morning reset",
+                emoji: .value("☀️"),
+                categoryId: .value(
+                    "0198f834-c9ab-7e12-b1cf-1faebad8f4fb"
+                ),
+                notes: .value("Exact routine note")
+            ),
+            keys: routineKeys
+        )
+        try assertExplicitNullRoundTrip(
+            Components.Schemas.RoutineUpdateRequest(
+                emoji: .null,
+                categoryId: .null,
+                notes: .null
+            ),
+            keys: ["emoji", "categoryId", "notes"]
+        )
+    }
+
     @Test func generatedRoutineListItemPreservesNestedReadModel() throws {
         let item = try decodeFixture(
             Components.Schemas.RoutineListItem.self,
@@ -466,10 +700,53 @@ import Foundation
         #expect(try encodeObject(roundTrippedNull)[field] is NSNull)
     }
 
+    private func contractKeys(
+        _ typeName: String,
+        _ keys: [String]
+    ) -> Set<String> {
+        _ = typeName
+        return Set(keys)
+    }
+
+    private func assertOmittedRoundTrip<T: Codable & Equatable>(
+        _ value: T
+    ) throws {
+        #expect(try encodeObject(value).isEmpty)
+        #expect(try roundTrip(value) == value)
+    }
+
+    private func assertCompleteWireRoundTrip<T: Codable & Equatable>(
+        _ value: T,
+        keys: Set<String>
+    ) throws {
+        #expect(Set(try encodeObject(value).keys) == keys)
+        #expect(try roundTrip(value) == value)
+    }
+
+    private func assertExplicitNullRoundTrip<T: Codable & Equatable>(
+        _ value: T,
+        keys: Set<String>
+    ) throws {
+        let object = try encodeObject(value)
+        #expect(Set(object.keys) == keys)
+        #expect(object.values.allSatisfy { $0 is NSNull })
+        #expect(try roundTrip(value) == value)
+    }
+
+    private func roundTrip<T: Codable>(_ value: T) throws -> T {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(T.self, from: encoder.encode(value))
+    }
+
     private func encodeObject<T: Encodable>(
         _ value: T
     ) throws -> [String: Any] {
-        let data = try JSONEncoder().encode(value)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(value)
         return try #require(
             JSONSerialization.jsonObject(with: data) as? [String: Any]
         )

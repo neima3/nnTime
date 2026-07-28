@@ -8,6 +8,7 @@ import * as routineSchemas from "./routine";
 import { validateSwiftPatchOverrides } from "./swift-patch-contract";
 
 interface JsonSchema {
+  "<<"?: JsonSchema;
   $ref?: string;
   additionalProperties?: boolean | JsonSchema;
   anyOf?: JsonSchema[];
@@ -72,6 +73,10 @@ const generatorConfig = parseYaml(
 ) as GeneratorConfig;
 const swiftPatchSource = readFileSync(
   resolve("ios/Kairo/Sources/Kairo/PatchRequests.swift"),
+  "utf8",
+);
+const swiftContractTestSource = readFileSync(
+  resolve("ios/Kairo/Tests/KairoTests/KairoContractTests.swift"),
   "utf8",
 );
 
@@ -190,7 +195,8 @@ function dereference(
   allComponents: Record<string, JsonSchema>,
 ): JsonSchema {
   const name = refName(schema);
-  return name ? (allComponents[name] ?? schema) : schema;
+  const resolved = name ? (allComponents[name] ?? schema) : schema;
+  return resolved["<<"] ? { ...resolved["<<"], ...resolved } : resolved;
 }
 
 function sortedValues(values: unknown[]): unknown[] {
@@ -353,26 +359,30 @@ function semanticContract(
   const explicitMaximum = maximumCandidates.length
     ? Math.min(...maximumCandidates)
     : undefined;
-  const int32Minimum =
-    kind === "integer" && resolved.format === "int32"
-      ? -2_147_483_648
+  const integerMinimum =
+    kind === "integer" && !values?.length
+      ? resolved.format === "int32"
+        ? -2_147_483_648
+        : -Number.MAX_SAFE_INTEGER
       : undefined;
-  const int32Maximum =
-    kind === "integer" && resolved.format === "int32"
-      ? 2_147_483_647
+  const integerMaximum =
+    kind === "integer" && !values?.length
+      ? resolved.format === "int32"
+        ? 2_147_483_647
+        : Number.MAX_SAFE_INTEGER
       : undefined;
   const minimum =
     explicitMinimum === undefined
-      ? int32Minimum
-      : int32Minimum === undefined
+      ? integerMinimum
+      : integerMinimum === undefined
         ? explicitMinimum
-        : Math.max(explicitMinimum, int32Minimum);
+        : Math.max(explicitMinimum, integerMinimum);
   const maximum =
     explicitMaximum === undefined
-      ? int32Maximum
-      : int32Maximum === undefined
+      ? integerMaximum
+      : integerMaximum === undefined
         ? explicitMaximum
-        : Math.min(explicitMaximum, int32Maximum);
+        : Math.min(explicitMaximum, integerMaximum);
   const format = resolved.format === "int32" ? undefined : resolved.format;
   return {
     ...common,
@@ -464,26 +474,51 @@ function requestIntegerInventory(
   );
 }
 
-function containsInt32(
-  schema: JsonSchema,
+function responseIntegerInventoryIssues(
   allComponents: Record<string, JsonSchema>,
-  seen = new Set<string>(),
-): boolean {
-  if (schema.format === "int32") return true;
-  const name = refName(schema);
-  if (name && !seen.has(name) && allComponents[name]) {
-    return containsInt32(
-      allComponents[name],
-      allComponents,
-      new Set(seen).add(name),
+): string[] {
+  const issues: string[] = [];
+  for (const [componentName, validator] of Object.entries(
+    schemaIndex.responseSchemaRegistry,
+  )) {
+    const component = allComponents[componentName];
+    if (!component) {
+      issues.push(componentName);
+      continue;
+    }
+    const zodJson = z.toJSONSchema(validator, {
+      target: "draft-2020-12",
+      reused: "inline",
+    }) as JsonSchema;
+    const openApiInventory = semanticIntegerInventory(
+      semanticContract(component, allComponents) as SemanticNode,
+      componentName,
     );
+    const zodInventory = semanticIntegerInventory(
+      semanticContract(zodJson, {}) as SemanticNode,
+      componentName,
+    );
+    if (JSON.stringify(openApiInventory) !== JSON.stringify(zodInventory)) {
+      issues.push(
+        `${componentName}: OpenAPI ${JSON.stringify(openApiInventory)} != Zod ${JSON.stringify(zodInventory)}`,
+      );
+    }
   }
-  return [
-    ...(schema.anyOf ?? []),
-    ...(schema.oneOf ?? []),
-    ...Object.values(schema.properties ?? {}),
-    ...(schema.items ? [schema.items] : []),
-  ].some((child) => containsInt32(child, allComponents, seen));
+  return issues;
+}
+
+function swiftFixtureWireKeyInventory(
+  source: string,
+): Record<string, string[]> {
+  const inventory: Record<string, string[]> = {};
+  for (const match of source.matchAll(
+    /contractKeys\(\s*"([^"]+)",\s*\[([\s\S]*?)\]\s*\)/g,
+  )) {
+    inventory[match[1]!] = [...match[2]!.matchAll(/"([^"]+)"/g)]
+      .map((key) => key[1]!)
+      .sort();
+  }
+  return inventory;
 }
 
 describe("request OpenAPI contract", () => {
@@ -657,6 +692,86 @@ describe("request OpenAPI contract", () => {
     ).toContain(
       "TaskUpdateRequest: cannot source-audit Swift struct ExternalModule.TaskUpdateRequest",
     );
+  });
+
+  it("detects missing and mis-keyed custom Swift codec paths", () => {
+    const mutations = [
+      {
+        name: "missing encode",
+        from: "        try container.encodeIfPresent(name, forKey: .name)\n",
+        to: "",
+      },
+      {
+        name: "mis-keyed encode",
+        from: "        try container.encodePatchField(color, forKey: .color)\n",
+        to: "        try container.encodePatchField(color, forKey: .name)\n",
+      },
+      {
+        name: "duplicate encode",
+        from: "        try container.encodePatchField(color, forKey: .color)\n",
+        to:
+          "        try container.encodePatchField(color, forKey: .color)\n" +
+          "        try container.encodePatchField(color, forKey: .color)\n",
+      },
+      {
+        name: "missing decode",
+        from:
+          "        name = try container.decodeIfPresent(String.self, forKey: .name)\n",
+        to: "",
+      },
+      {
+        name: "mis-keyed decode",
+        from:
+          "        color = try container.decodePatchField(String.self, forKey: .color)\n",
+        to:
+          "        color = try container.decodePatchField(String.self, forKey: .name)\n",
+      },
+      {
+        name: "wrong nullable decode operation",
+        from:
+          "        color = try container.decodePatchField(String.self, forKey: .color)\n",
+        to:
+          "        color = try container.decodeIfPresent(String.self, forKey: .color)\n",
+      },
+      {
+        name: "missing CodingKeys case",
+        from: "        case name\n        case color\n",
+        to: "        case name\n",
+      },
+      {
+        name: "mis-keyed CodingKeys case",
+        from: "        case name\n        case color\n",
+        to: '        case name\n        case color = "name"\n',
+      },
+    ];
+
+    const undetected = mutations.flatMap((mutation) => {
+      const mutatedSource = swiftPatchSource.replace(mutation.from, mutation.to);
+      expect(mutatedSource, mutation.name).not.toBe(swiftPatchSource);
+      return validateSwiftPatchOverrides(
+        components,
+        generatorConfig,
+        mutatedSource,
+        clearablePatchNames,
+      ).length === 0
+        ? [mutation.name]
+        : [];
+    });
+    expect(undetected).toEqual([]);
+  });
+
+  it("keeps exhaustive Swift round-trip fixtures synced to every custom override", () => {
+    const fixtureInventory = swiftFixtureWireKeyInventory(
+      swiftContractTestSource,
+    );
+    const overrides = generatorConfig.typeOverrides?.schemas ?? {};
+    const expected = Object.fromEntries(
+      clearablePatchNames.map((componentName) => [
+        overrides[componentName],
+        Object.keys(components[componentName]?.properties ?? {}).sort(),
+      ]),
+    );
+    expect(fixtureInventory).toEqual(expected);
   });
 
   it("keeps request properties, requiredness, and nullability aligned with zod", () => {
@@ -957,29 +1072,19 @@ describe("request OpenAPI contract", () => {
     }
   });
 
-  it("keeps every int32-bearing registered response integer inventory aligned", () => {
-    for (const [componentName, validator] of Object.entries(
-      schemaIndex.responseSchemaRegistry,
-    )) {
-      const component = components[componentName];
-      if (!component || !containsInt32(component, components)) continue;
-      const zodJson = z.toJSONSchema(validator, {
-        target: "draft-2020-12",
-        reused: "inline",
-      }) as JsonSchema;
-      expect(
-        semanticIntegerInventory(
-          semanticContract(component, components) as SemanticNode,
-          componentName,
-        ),
-        componentName,
-      ).toEqual(
-        semanticIntegerInventory(
-          semanticContract(zodJson, {}) as SemanticNode,
-          componentName,
-        ),
-      );
-    }
+  it("keeps every registered response integer inventory aligned", () => {
+    expect(responseIntegerInventoryIssues(components)).toEqual([]);
+  });
+
+  it("detects a response component whose sole int32 format is deleted", () => {
+    const mutated = structuredClone(components);
+    mutated.Tag!.properties!.revision = structuredClone(mutated.Revision!);
+    delete mutated.Tag!.properties!.revision!.format;
+    expect(
+      responseIntegerInventoryIssues(mutated).some((issue) =>
+        issue.startsWith("Tag:"),
+      ),
+    ).toBe(true);
   });
 
   it("bounds persisted settings schemaVersion to PostgreSQL integer width", () => {

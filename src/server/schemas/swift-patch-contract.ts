@@ -65,8 +65,10 @@ function nonNullSchema(
   return schema;
 }
 
-function structBody(source: string, typeName: string): string | undefined {
-  const declaration = `public struct ${typeName}`;
+function declarationBody(
+  source: string,
+  declaration: string,
+): string | undefined {
   const declarationIndex = source.indexOf(declaration);
   if (declarationIndex === -1) return undefined;
   const openingBrace = source.indexOf("{", declarationIndex);
@@ -79,6 +81,10 @@ function structBody(source: string, typeName: string): string | undefined {
     if (depth === 0) return source.slice(openingBrace + 1, index);
   }
   return undefined;
+}
+
+function structBody(source: string, typeName: string): string | undefined {
+  return declarationBody(source, `public struct ${typeName}`);
 }
 
 function swiftProperties(
@@ -95,6 +101,153 @@ function swiftProperties(
     result[match[1]!] = match[2]!;
   }
   return result;
+}
+
+interface SwiftWireMapping {
+  key: string;
+  operation?: string;
+  property: string;
+}
+
+function swiftCodingKeys(structSource: string): SwiftWireMapping[] | undefined {
+  const body = declarationBody(structSource, "private enum CodingKeys");
+  if (body === undefined) return undefined;
+  const mappings: SwiftWireMapping[] = [];
+  for (const match of body.matchAll(
+    /^\s*case\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*=\s*"([^"]+)")?\s*$/gm,
+  )) {
+    mappings.push({
+      property: match[1]!,
+      key: match[2] ?? match[1]!,
+    });
+  }
+  return mappings;
+}
+
+function swiftDecoderMappings(
+  structSource: string,
+): SwiftWireMapping[] | undefined {
+  const body = declarationBody(structSource, "public init(from decoder");
+  if (body === undefined) return undefined;
+  return [...body.matchAll(
+    /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*try\s+container\.(decodeIfPresent|decodePatchField)\([\s\S]*?forKey:\s*\.([A-Za-z_][A-Za-z0-9_]*)\s*\)\s*$/gm,
+  )].map((match) => ({
+    property: match[1]!,
+    operation: match[2]!,
+    key: match[3]!,
+  }));
+}
+
+function swiftEncoderMappings(
+  structSource: string,
+): SwiftWireMapping[] | undefined {
+  const body = declarationBody(structSource, "public func encode(to encoder");
+  if (body === undefined) return undefined;
+  return [...body.matchAll(
+    /^\s*try\s+container\.(encodeIfPresent|encodePatchField)\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*,[\s\S]*?forKey:\s*\.([A-Za-z_][A-Za-z0-9_]*)\s*\)\s*$/gm,
+  )].map((match) => ({
+    operation: match[1]!,
+    property: match[2]!,
+    key: match[3]!,
+  }));
+}
+
+function validateWireMappings(
+  componentName: string,
+  label: string,
+  expectedProperties: string[],
+  mappings: SwiftWireMapping[] | undefined,
+  issues: string[],
+  expectedOperation?: (propertyName: string) => string,
+): void {
+  if (!mappings) {
+    issues.push(`${componentName}: missing Swift ${label}`);
+    return;
+  }
+
+  const expected = new Set(expectedProperties);
+  for (const propertyName of expectedProperties) {
+    const byProperty = mappings.filter(
+      (mapping) => mapping.property === propertyName,
+    );
+    if (byProperty.length !== 1) {
+      issues.push(
+        `${componentName}.${propertyName}: Swift ${label} occurrences=${byProperty.length}, expected=1`,
+      );
+      continue;
+    }
+    if (byProperty[0]!.key !== propertyName) {
+      issues.push(
+        `${componentName}.${propertyName}: Swift ${label} key=${byProperty[0]!.key}, expected=${propertyName}`,
+      );
+    }
+    const operation = expectedOperation?.(propertyName);
+    if (operation && byProperty[0]!.operation !== operation) {
+      issues.push(
+        `${componentName}.${propertyName}: Swift ${label} operation=${byProperty[0]!.operation}, expected=${operation}`,
+      );
+    }
+  }
+
+  for (const mapping of mappings) {
+    if (!expected.has(mapping.property)) {
+      issues.push(
+        `${componentName}: unexpected Swift ${label} property ${mapping.property}`,
+      );
+    }
+  }
+
+  const keyCounts = new Map<string, number>();
+  for (const mapping of mappings) {
+    keyCounts.set(mapping.key, (keyCounts.get(mapping.key) ?? 0) + 1);
+  }
+  for (const [key, count] of keyCounts) {
+    if (count > 1) {
+      issues.push(
+        `${componentName}: duplicate Swift ${label} key ${key} (${count})`,
+      );
+    }
+  }
+}
+
+function validateCustomCodecShape(
+  componentName: string,
+  schema: ContractSchema,
+  swiftType: string,
+  components: Record<string, ContractSchema>,
+  swiftSource: string,
+  issues: string[],
+): void {
+  const body = structBody(swiftSource, swiftType);
+  if (body === undefined) return;
+  const expectedProperties = Object.keys(schema.properties ?? {}).sort();
+  const usesPatchField = (propertyName: string): boolean =>
+    isNullable(schema.properties?.[propertyName] ?? {}, components);
+  validateWireMappings(
+    componentName,
+    "CodingKeys",
+    expectedProperties,
+    swiftCodingKeys(body),
+    issues,
+  );
+  validateWireMappings(
+    componentName,
+    "decoder mapping",
+    expectedProperties,
+    swiftDecoderMappings(body),
+    issues,
+    (propertyName) =>
+      usesPatchField(propertyName) ? "decodePatchField" : "decodeIfPresent",
+  );
+  validateWireMappings(
+    componentName,
+    "encoder mapping",
+    expectedProperties,
+    swiftEncoderMappings(body),
+    issues,
+    (propertyName) =>
+      usesPatchField(propertyName) ? "encodePatchField" : "encodeIfPresent",
+  );
 }
 
 function normalizeSwiftType(swiftType: string): string {
@@ -314,6 +467,14 @@ export function validateSwiftPatchOverrides(
       swiftSource,
       issues,
       new Set([swiftType]),
+    );
+    validateCustomCodecShape(
+      componentName,
+      component,
+      swiftType,
+      components,
+      swiftSource,
+      issues,
     );
   }
 
