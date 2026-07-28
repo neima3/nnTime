@@ -36,6 +36,14 @@ export interface PushPayload {
   url?: string;
 }
 
+export interface PushDeliveryResult {
+  configured: boolean;
+  subscriptions: number;
+  sent: number;
+  pruned: number;
+  retryableFailures: number;
+}
+
 /**
  * Send a payload to every live subscription for a user. Returns how many were
  * delivered. Prunes subscriptions the push service reports as gone.
@@ -43,10 +51,23 @@ export interface PushPayload {
 export async function sendToUser(
   userId: string,
   payload: PushPayload,
-  opts: { db?: Db } = {},
-): Promise<{ sent: number; pruned: number }> {
-  if (!pushConfigured()) return { sent: 0, pruned: 0 };
+  opts: {
+    db?: Db;
+    sendNotification?: typeof webpush.sendNotification;
+  } = {},
+): Promise<PushDeliveryResult> {
+  if (!pushConfigured()) {
+    return {
+      configured: false,
+      subscriptions: 0,
+      sent: 0,
+      pruned: 0,
+      retryableFailures: 0,
+    };
+  }
   const db = opts.db ?? dbDefault;
+  const sendNotification =
+    opts.sendNotification ?? webpush.sendNotification.bind(webpush);
 
   const subs = await db
     .select()
@@ -60,11 +81,12 @@ export async function sendToUser(
 
   let sent = 0;
   let pruned = 0;
+  let retryableFailures = 0;
   const body = JSON.stringify(payload);
 
   for (const sub of subs) {
     try {
-      await webpush.sendNotification(
+      await sendNotification(
         { endpoint: sub.endpoint, keys: sub.keys as { p256dh: string; auth: string } },
         body,
       );
@@ -77,10 +99,18 @@ export async function sendToUser(
           .set({ deletedAt: new Date() })
           .where(eq(schema.pushSubscriptions.id, sub.id));
         pruned++;
+      } else {
+        retryableFailures++;
       }
     }
   }
-  return { sent, pruned };
+  return {
+    configured: true,
+    subscriptions: subs.length,
+    sent,
+    pruned,
+    retryableFailures,
+  };
 }
 
 /**
