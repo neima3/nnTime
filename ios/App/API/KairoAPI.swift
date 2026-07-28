@@ -580,11 +580,12 @@ actor KairoAPI {
             throw Self.apiError(error)
         } catch let error as APIError {
             throw error
-        } catch let error as DecodingError {
-            throw APIError.decoding(error)
         } catch {
             if Self.isCancellation(error) {
                 throw CancellationError()
+            }
+            if let decodingError = Self.decodingError(error) {
+                throw APIError.decoding(decodingError)
             }
             throw APIError.network(error)
         }
@@ -603,6 +604,18 @@ actor KairoAPI {
             return isCancellation(clientError.underlyingError)
         }
         return false
+    }
+
+    private static func decodingError(
+        _ error: Error
+    ) -> DecodingError? {
+        if let decodingError = error as? DecodingError {
+            return decodingError
+        }
+        if let clientError = error as? ClientError {
+            return decodingError(clientError.underlyingError)
+        }
+        return nil
     }
 
     private static func apiError(

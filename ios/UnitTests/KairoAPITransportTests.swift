@@ -348,6 +348,34 @@ final class KairoAPITransportTests: XCTestCase {
         }
     }
 
+    func testMalformedGeneratedResponseMapsWrappedDecodingErrorToDecoding() async {
+        let api = KairoAPI(
+            baseURL: URL(string: "http://127.0.0.1:3456")!,
+            plannerTransport: PlannerMockTransport(
+                recorder: PlannerRequestRecorder()
+            ) { operation in
+                XCTAssertEqual(operation, "getUserSettings")
+                return .init(
+                    status: .ok,
+                    body: #"{"userId":7}"#
+                )
+            },
+            timezoneIdentifierProvider: { "UTC" },
+            idempotencyKeyProvider: {
+                "019fa64f-32f2-7001-8296-34373d7c90a0"
+            }
+        )
+
+        do {
+            _ = try await api.settings()
+            XCTFail("Expected malformed generated response to fail")
+        } catch let APIError.decoding(error) {
+            XCTAssertTrue(error is DecodingError)
+        } catch {
+            XCTFail("Expected APIError.decoding, got \(error)")
+        }
+    }
+
     func testUUIDv7GeneratorUsesTimestampVersionVariantAndNeverReusesKeys() {
         let first = UUIDv7Generator.generate(
             timestampMilliseconds: 1_753_707_600_000,
