@@ -1,158 +1,411 @@
-/**
- * Notification scheduler — ADR-004 (Phase 3B).
- *
- * Durable job that computes/cancels/dedupes notification jobs (start, halfway,
- * wrap-up, daily Review Today, weekly review) when activities/timers/settings
- * change. Runs as a tick guarded by an advisory lock (like the routine
- * materializer).
- *
- * Binding contract (ADR-004):
- *  - Notification jobs are computed rows: type (start, halfway, wrap-up,
- *    review-today, weekly-review), dedup key (user, entity, type, fire_at).
- *  - Web Push: authenticated user-scoped subscription CRUD, endpoints treated
- *    as secrets, stale (410) subscriptions pruned, quiet hours, per-user
- *    reminder offsets + sound.
- */
 import "server-only";
 import dbDefault from "../db";
 import type { Db } from "../dal";
 import * as schema from "../db/schema";
-import { and, eq, isNull, lte, sql } from "drizzle-orm";
+import {
+  and,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  notInArray,
+  sql,
+} from "drizzle-orm";
+import { expandActivitiesForDay } from "./day";
+import {
+  activityDedupKey,
+  activityFireTimes,
+  buildPushPayload,
+  notificationTypeEnabled,
+  type NotificationPushPayload,
+  type NotificationType,
+} from "./notification-policy";
+import { instantToWallFields, wallClockToInstant } from "../temporal/zone";
 
-export type NotificationType =
-  | "start"
-  | "halfway"
-  | "wrap-up"
-  | "review-today"
-  | "weekly-review";
+const NOTIFICATION_LOCK_KEY = 8_947_232;
+const HOUR_MS = 60 * 60_000;
+const REVIEW_EXPIRY_MS = 4 * HOUR_MS;
 
-interface NotificationJob {
-  type: NotificationType;
+export interface DesiredNotificationJob {
   userId: string;
-  entityId: string;
+  entityType: "activity" | "review";
+  entityId: string | null;
+  occurrenceKey: Date | null;
+  type: NotificationType;
   fireAt: Date;
+  expiresAt: Date;
   dedupKey: string;
+  payload: NotificationPushPayload;
 }
 
-/**
- * Compute notification jobs for upcoming activity occurrences. Called by the
- * scheduler tick. Produces dedup-keyed rows so retries/double-runs cannot
- * duplicate.
- */
-export async function computeNotificationJobs(opts: { db?: Db } = {}): Promise<{
+function parseAdvisoryLock(result: unknown): boolean {
+  const rows: unknown[] = Array.isArray(result)
+    ? result
+    : result &&
+        typeof result === "object" &&
+        "rows" in result &&
+        Array.isArray((result as { rows: unknown[] }).rows)
+      ? (result as { rows: unknown[] }).rows
+      : [];
+  const row = rows[0];
+  if (!row || typeof row !== "object") return false;
+  const value = (row as Record<string, unknown>).got_lock;
+  return (
+    value === true ||
+    value === "t" ||
+    value === "true" ||
+    value === 1 ||
+    value === "1"
+  );
+}
+
+function localDateParts(instant: Date, timezone: string) {
+  const wall = instantToWallFields(instant, timezone);
+  return {
+    year: wall.year,
+    month: wall.month,
+    day: wall.day,
+    dayOfWeek: new Date(
+      Date.UTC(wall.year, wall.month, wall.day),
+    ).getUTCDay(),
+  };
+}
+
+function addLocalDays(
+  parts: { year: number; month: number; day: number },
+  days: number,
+) {
+  const shifted = new Date(
+    Date.UTC(parts.year, parts.month, parts.day + days),
+  );
+  return {
+    year: shifted.getUTCFullYear(),
+    month: shifted.getUTCMonth(),
+    day: shifted.getUTCDate(),
+  };
+}
+
+function localDateKey(parts: { year: number; month: number; day: number }) {
+  return [
+    String(parts.year).padStart(4, "0"),
+    String(parts.month + 1).padStart(2, "0"),
+    String(parts.day).padStart(2, "0"),
+  ].join("-");
+}
+
+function reviewJob(input: {
+  userId: string;
+  type: "review-today" | "weekly-review";
+  fireAt: Date;
+  localDate: string;
+}): DesiredNotificationJob {
+  return {
+    userId: input.userId,
+    entityType: "review",
+    entityId: null,
+    occurrenceKey: null,
+    type: input.type,
+    fireAt: input.fireAt,
+    expiresAt: new Date(input.fireAt.getTime() + REVIEW_EXPIRY_MS),
+    dedupKey: [
+      input.userId,
+      "review",
+      input.type,
+      input.localDate,
+      input.fireAt.toISOString(),
+    ].join(":"),
+    payload: buildPushPayload(input.type, {}),
+  };
+}
+
+function desiredReviewJobs(
+  settings: typeof schema.userSettings.$inferSelect,
+  now: Date,
+  horizon: Date,
+): DesiredNotificationJob[] {
+  const jobs: DesiredNotificationJob[] = [];
+  const today = localDateParts(now, settings.timezone);
+
+  if (
+    notificationTypeEnabled(
+      settings.notificationPrefs,
+      "review-today",
+    )
+  ) {
+    let date = today;
+    let fireAt = wallClockToInstant(
+      date.year,
+      date.month,
+      date.day,
+      20,
+      0,
+      0,
+      settings.timezone,
+    );
+    if (fireAt < now) {
+      date = { ...addLocalDays(today, 1), dayOfWeek: (today.dayOfWeek + 1) % 7 };
+      fireAt = wallClockToInstant(
+        date.year,
+        date.month,
+        date.day,
+        20,
+        0,
+        0,
+        settings.timezone,
+      );
+    }
+    if (fireAt < horizon) {
+      jobs.push(
+        reviewJob({
+          userId: settings.userId,
+          type: "review-today",
+          fireAt,
+          localDate: localDateKey(date),
+        }),
+      );
+    }
+  }
+
+  if (
+    notificationTypeEnabled(
+      settings.notificationPrefs,
+      "weekly-review",
+    )
+  ) {
+    const weekEnd = (settings.weekStart + 6) % 7;
+    let daysUntil = (weekEnd - today.dayOfWeek + 7) % 7;
+    let date = addLocalDays(today, daysUntil);
+    let fireAt = wallClockToInstant(
+      date.year,
+      date.month,
+      date.day,
+      18,
+      0,
+      0,
+      settings.timezone,
+    );
+    if (fireAt < now) {
+      daysUntil += 7;
+      date = addLocalDays(today, daysUntil);
+      fireAt = wallClockToInstant(
+        date.year,
+        date.month,
+        date.day,
+        18,
+        0,
+        0,
+        settings.timezone,
+      );
+    }
+    if (fireAt < horizon) {
+      jobs.push(
+        reviewJob({
+          userId: settings.userId,
+          type: "weekly-review",
+          fireAt,
+          localDate: localDateKey(date),
+        }),
+      );
+    }
+  }
+
+  return jobs;
+}
+
+export async function computeNotificationJobs(
+  opts: { db?: Db; now?: Date; horizonHours?: number } = {},
+): Promise<{
+  desired: number;
   created: number;
-  pruned: number;
+  cancelled: number;
+  lockAcquired: boolean;
 }> {
   const db = opts.db ?? dbDefault;
-  const now = new Date();
-  const horizon = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24h ahead
+  const now = opts.now ?? new Date();
+  const horizon = new Date(
+    now.getTime() + (opts.horizonHours ?? 24) * HOUR_MS,
+  );
 
-  return db.transaction(async (tx) => {
-    // Advisory lock (same key space as routine materializer but different id).
-    const lockResult = await tx.execute<{ got_lock: string }>(
-      sql`SELECT pg_try_advisory_xact_lock(8947232) AS got_lock`,
+  return db.transaction(async (transaction) => {
+    const tx = transaction as unknown as Db;
+    const lockResult = await tx.execute(
+      sql`SELECT pg_try_advisory_xact_lock(${NOTIFICATION_LOCK_KEY}) AS got_lock`,
     );
-    const gotLock = (lockResult as unknown as { got_lock: string }[])[0]?.got_lock === "t";
-    if (!gotLock) return { created: 0, pruned: 0 };
+    if (!parseAdvisoryLock(lockResult)) {
+      return {
+        desired: 0,
+        created: 0,
+        cancelled: 0,
+        lockAcquired: false,
+      };
+    }
 
-    // For 3B: compute start + halfway + wrap-up for activity occurrences in the
-    // next 24h. The full implementation expands series (2A) into occurrences,
-    // then schedules notifications. Here we schedule start + halfway + wrap-up
-    // for each non-deleted series's dtstartLocal within the horizon.
-    const series = await tx
-      .select()
-      .from(schema.activitySeries)
-      .where(
-        and(
-          isNull(schema.activitySeries.deletedAt),
-          lte(schema.activitySeries.dtstartLocal, horizon),
+    const [settingsRows, seriesRows, occurrenceRows] = await Promise.all([
+      tx.select().from(schema.userSettings),
+      tx
+        .select()
+        .from(schema.activitySeries)
+        .where(
+          and(
+            isNull(schema.activitySeries.deletedAt),
+            lte(schema.activitySeries.dtstartLocal, horizon),
+          ),
         ),
-      );
+      tx
+        .select()
+        .from(schema.activityOccurrences)
+        .where(isNull(schema.activityOccurrences.deletedAt)),
+    ]);
+    const prefsByUser = new Map(
+      settingsRows.map((settings) => [
+        settings.userId,
+        settings.notificationPrefs,
+      ]),
+    );
+
+    const activities = expandActivitiesForDay(
+      seriesRows,
+      occurrenceRows,
+      { start: now, end: horizon },
+    );
+    const desired: DesiredNotificationJob[] = [];
+
+    for (const activity of activities) {
+      if (activity.status !== "pending") continue;
+      const prefs = prefsByUser.get(activity.userId);
+      for (const candidate of activityFireTimes(
+        activity.dtstartLocal,
+        activity.durationMin,
+      )) {
+        if (
+          candidate.fireAt < now ||
+          candidate.fireAt >= horizon ||
+          !notificationTypeEnabled(prefs, candidate.type)
+        ) {
+          continue;
+        }
+        desired.push({
+          userId: activity.userId,
+          entityType: "activity",
+          entityId: activity.id,
+          occurrenceKey: activity.occurrenceKey,
+          type: candidate.type,
+          fireAt: candidate.fireAt,
+          expiresAt: candidate.expiresAt,
+          dedupKey: activityDedupKey({
+            userId: activity.userId,
+            seriesId: activity.id,
+            occurrenceKey: activity.occurrenceKey,
+            type: candidate.type,
+            fireAt: candidate.fireAt,
+          }),
+          payload: buildPushPayload(candidate.type, {
+            title: activity.title,
+            emoji: activity.emoji ?? undefined,
+            entityId: activity.id,
+          }),
+        });
+      }
+    }
+
+    for (const settings of settingsRows) {
+      desired.push(...desiredReviewJobs(settings, now, horizon));
+    }
+
+    const desiredKeys = desired.map((job) => job.dedupKey);
+    if (desiredKeys.length > 0) {
+      await tx
+        .update(schema.notificationJobs)
+        .set({
+          state: "pending",
+          nextAttemptAt: sql`${schema.notificationJobs.fireAt}`,
+          lastError: null,
+          claimedAt: null,
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(schema.notificationJobs.state, "cancelled"),
+            inArray(schema.notificationJobs.dedupKey, desiredKeys),
+          ),
+        );
+    }
 
     let created = 0;
-    const jobs: NotificationJob[] = [];
-
-    for (const s of series) {
-      if (s.dtstartLocal <= now) continue; // already past
-      const fireStart = new Date(s.dtstartLocal.getTime());
-      const fireHalfway = new Date(s.dtstartLocal.getTime() + (s.durationMin * 60 * 1000) / 2);
-      const fireWrapUp = new Date(s.dtstartLocal.getTime() + (s.durationMin - 5) * 60 * 1000);
-
-      for (const [type, fireAt] of [
-        ["start", fireStart],
-        ["halfway", fireHalfway],
-        ["wrap-up", fireWrapUp],
-      ] as const) {
-        if (fireAt <= now) continue;
-        jobs.push({
-          type,
-          userId: s.userId,
-          entityId: s.id,
-          fireAt,
-          dedupKey: `${s.userId}:${s.id}:${type}:${fireAt.toISOString()}`,
-        });
-      }
+    if (desired.length > 0) {
+      const inserted = await tx
+        .insert(schema.notificationJobs)
+        .values(
+          desired.map((job) => ({
+            id: crypto.randomUUID(),
+            ...job,
+            nextAttemptAt: job.fireAt,
+          })),
+        )
+        .onConflictDoNothing({ target: schema.notificationJobs.dedupKey })
+        .returning({ id: schema.notificationJobs.id });
+      created = inserted.length;
     }
 
-    // Insert notification jobs into the change_log-like structure (or a
-    // dedicated notifications table — for now we store them as planner_events
-    // with a special payload). A dedicated notifications table lands with the
-    // full Web Push integration.
-    for (const job of jobs) {
-      try {
-        await tx.insert(schema.plannerEvents).values({
-          id: crypto.randomUUID(),
-          userId: job.userId,
-          entityType: "notification",
-          entityId: job.entityId,
-          eventType: "carryover", // placeholder; real notification table in full 3B
-          payload: { type: job.type, fireAt: job.fireAt.toISOString(), dedupKey: job.dedupKey },
-          occurredAt: job.fireAt,
-          tz: "UTC",
-        });
-        created++;
-      } catch {
-        // dedup constraint or similar — skip.
-      }
-    }
+    const cancellable = and(
+      inArray(schema.notificationJobs.state, ["pending", "retry"]),
+      gte(schema.notificationJobs.fireAt, now),
+      lt(schema.notificationJobs.fireAt, horizon),
+    );
+    const cancelledRows = await tx
+      .update(schema.notificationJobs)
+      .set({
+        state: "cancelled",
+        lastError: "no-longer-desired",
+        claimedAt: null,
+        updatedAt: now,
+      })
+      .where(
+        desiredKeys.length > 0
+          ? and(
+              cancellable,
+              notInArray(schema.notificationJobs.dedupKey, desiredKeys),
+            )
+          : cancellable,
+      )
+      .returning({ id: schema.notificationJobs.id });
 
-    // Prune stale push subscriptions (410 Gone). In full 3B this checks the
-    // actual Web Push endpoint status; here we prune subscriptions older than
-    // 90 days that haven't been used.
-    return { created, pruned: 0 };
+    return {
+      desired: desired.length,
+      created,
+      cancelled: cancelledRows.length,
+      lockAcquired: true,
+    };
   });
 }
 
-/**
- * Register a Web Push subscription (SEC-08: endpoint is a secret). The endpoint
- * is stored hashed for dedup but the full endpoint is kept for sending.
- */
 export async function registerPushSubscription(
   userId: string,
   input: { endpoint: string; keys: Record<string, string> },
   opts: { db?: Db } = {},
 ) {
   const db = opts.db ?? dbDefault;
-  const id = crypto.randomUUID();
-  const [sub] = await db
+  const [subscription] = await db
     .insert(schema.pushSubscriptions)
     .values({
-      id,
+      id: crypto.randomUUID(),
       userId,
       endpoint: input.endpoint,
       keys: input.keys,
     })
     .onConflictDoUpdate({
-      target: [schema.pushSubscriptions.userId, schema.pushSubscriptions.endpoint],
-      set: { keys: input.keys, updatedAt: new Date() },
+      target: [
+        schema.pushSubscriptions.userId,
+        schema.pushSubscriptions.endpoint,
+      ],
+      set: { keys: input.keys, updatedAt: new Date(), deletedAt: null },
     })
     .returning();
-  return sub;
+  return subscription;
 }
 
-/**
- * Remove a push subscription (logout / unsubscribe). SEC-08: tombstone.
- */
 export async function unregisterPushSubscription(
   userId: string,
   endpoint: string,

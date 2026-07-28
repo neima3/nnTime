@@ -49,7 +49,9 @@ export async function POST(request: Request) {
   try {
     const materialize = await materializeRoutines();
 
-    let notifications: { created: number; pruned: number } | null = null;
+    let notifications: Awaited<
+      ReturnType<typeof computeNotificationJobs>
+    > | null = null;
     let notificationsError: string | null = null;
     try {
       notifications = await computeNotificationJobs();
