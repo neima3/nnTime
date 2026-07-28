@@ -67,11 +67,23 @@ with no operation inventory, and CI did not compile generated Swift.
   were visually inspected under `browser-qa/round15-api-contract/` and remain
   git-ignored.
 
-**Post-commit evidence boundary:** independent review disposition, GitHub
-Actions, the exact Coolify deployment/source SHA, live health dependencies,
-authenticated stats API, headers, and final post-deploy browser evidence are
-collected after the immutable source commit exists. Production mood POST
-remains forbidden.
+**External release proof:**
+- GitHub Actions run `30339293080` passed all three jobs on source SHA
+  `93cf1a6b697531fb2a650f9268a85cd95355df6a`: Postgres-backed Linux
+  build/test, 7-test Playwright E2E, and macOS native/release contract.
+- Coolify deployment `cs7e8owoym1l4etxynpokros` finished for that exact SHA
+  and the Kairo app reported `running:healthy`.
+- Live `/api/health` returned `status: ok` with migrations, database, AI, and
+  scheduler all `ok`. The root returned 200 with CSP, HSTS, frame denial,
+  nosniff, referrer, permissions, and cross-origin isolation headers.
+- In the authenticated production browser, read-only
+  `GET /api/v1/stats?days=14` and `GET /api/v1/focus-sessions` both returned
+  200 with `private, no-store`; stats decoded all expected keys and the focus
+  snapshot decoded without assuming UUID-formatted Better Auth IDs.
+- The live stats surface was visually inspected at 1440×1000 and 390×844 with
+  no console errors, page errors, captured 4xx/5xx requests, or layout defects.
+  Final screenshots remain git-ignored under
+  `browser-qa/round15-api-contract/`. Production mood POST was never called.
 
 ## 2026-07-28 — Round 14: verifiable distribution and public privacy (Codex)
 

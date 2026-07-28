@@ -20,8 +20,7 @@ contract drift fails before release.
 - [x] Task 4 — shipping manual-client operation inventory
 - [x] Task 5 — generated Swift client CI gate
 - [x] Task 6 — full local/native/browser verification
-- [ ] Task 7 — review, handoff, integration, deployment, and live proof
-      (independent review and external ship evidence in progress)
+- [x] Task 7 — review, handoff, integration, deployment, and live proof
 
 ## Task 1 — Canonical-to-Swift spec synchronization
 
