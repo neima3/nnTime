@@ -57,6 +57,7 @@ describe("sendReplaySafeCreate", () => {
         headers: expect.objectContaining({
           "Content-Type": "application/json",
           "Idempotency-Key": "logical-key-1",
+          "X-Kairo-Queue-Owner": "user-1",
         }),
       }),
     );
@@ -88,10 +89,23 @@ describe("sendReplaySafeCreate", () => {
           return response(status);
         },
       );
-      const enqueue = vi.fn(async (userId: string, mutation: QueuedMutationInput) => {
-        queued.push({ userId, mutation });
-        return { ...mutation, userId, createdAt: "now", attempts: 0, status: "pending" as const };
-      });
+      const enqueue = vi.fn(
+        async (
+          userId: string,
+          mutation: QueuedMutationInput,
+          _options?: { deferFlushMs?: number },
+        ) => {
+          void _options;
+          queued.push({ userId, mutation });
+          return {
+            ...mutation,
+            userId,
+            createdAt: "now",
+            attempts: 0,
+            status: "pending" as const,
+          };
+        },
+      );
       const { sender } = harness({ fetch, enqueue });
 
       const result = await sender.sendReplaySafeCreate({
@@ -103,6 +117,7 @@ describe("sendReplaySafeCreate", () => {
       const onlineHeaders = fetch.mock.calls[0]![1]!.headers as Record<string, string>;
       expect(onlineHeaders["Idempotency-Key"]).toBe("logical-key-1");
       expect(queued[0]!.mutation.idempotencyKey).toBe("logical-key-1");
+      expect(enqueue.mock.calls[0]![2]).toEqual({ deferFlushMs: 1000 });
     },
   );
 

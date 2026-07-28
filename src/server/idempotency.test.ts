@@ -37,6 +37,40 @@ afterAll(async () => {
 });
 
 describe("withIdempotency concurrency", () => {
+  it("does not cache a transient conflict that a fresh revision can resolve", async () => {
+    if (!dbAvailable || !env) return;
+    const key = crypto.randomUUID();
+    let executions = 0;
+    const execute = async () => {
+      executions += 1;
+      return executions === 1
+        ? Response.json({ error: { code: "conflict" } }, { status: 409 })
+        : Response.json({ revision: 8 }, { status: 200 });
+    };
+
+    const conflict = await withIdempotency(
+      userId,
+      key,
+      "PATCH",
+      "/api/v1/activities/activity-1",
+      execute,
+      { db: env.db as Db },
+    );
+    const retried = await withIdempotency(
+      userId,
+      key,
+      "PATCH",
+      "/api/v1/activities/activity-1",
+      execute,
+      { db: env.db as Db },
+    );
+
+    expect(conflict.status).toBe(409);
+    expect(retried.status).toBe(200);
+    expect(retried.headers.get("idempotent-replay")).toBeNull();
+    expect(executions).toBe(2);
+  });
+
   it("replays an empty 204 response without repeating the delete", async () => {
     if (!dbAvailable || !env) return;
     const key = crypto.randomUUID();

@@ -83,8 +83,9 @@ async function extractStorableBody(response: Response): Promise<unknown> {
  *
  * - No key → execute as-is.
  * - Known unexpired key → replay stored status + body (`idempotent-replay: true`).
- * - Unknown key → serialize by user/key, execute once, then store any status
- *   below 500 for 48h. Waiters re-read and replay the stored response.
+ * - Unknown key → serialize by user/key, execute once, then store stable
+ *   responses below 500 for 48h. A conflict is not stable: clients may re-read
+ *   a fresh revision and retry the same logical mutation.
  */
 export async function withIdempotency(
   userId: string,
@@ -127,8 +128,9 @@ export async function withIdempotency(
 
     const response = await execute(lockedDb);
 
-    // Don't cache server failures — client may retry after fix.
-    if (response.status >= 500) return response;
+    // Don't cache server failures or optimistic-concurrency conflicts — the
+    // client may retry the same logical mutation after a fresh revision read.
+    if (response.status >= 500 || response.status === 409) return response;
 
     const body = await extractStorableBody(response);
     const expiresAt = new Date(Date.now() + TTL_MS);

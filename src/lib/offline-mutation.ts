@@ -3,9 +3,11 @@
 import {
   enqueueMutation,
   resolveQueueUser,
+  type EnqueueMutationOptions,
   type QueuedMutation,
   type QueuedMutationInput,
 } from "./offline-queue";
+import { QUEUE_OWNER_HEADER } from "./queue-ownership";
 
 export type ReplaySafeCreatePath =
   | "/api/v1/tasks"
@@ -30,6 +32,7 @@ export interface OfflineMutationDependencies {
   enqueue: (
     userId: string,
     mutation: QueuedMutationInput,
+    options?: EnqueueMutationOptions,
   ) => Promise<QueuedMutation | null>;
   resolveUser: () => string | null;
   isOnline: () => boolean;
@@ -84,32 +87,39 @@ export function createOfflineMutationSender(
   dependencies: OfflineMutationDependencies,
 ) {
   async function queue(
+    userId: string | null,
     mutation: QueuedMutationInput,
+    options?: EnqueueMutationOptions,
   ): Promise<OfflineDelivery> {
-    const userId = dependencies.resolveUser();
     if (!userId) return { state: "unavailable" };
-    const saved = await dependencies.enqueue(userId, mutation);
+    const saved = await dependencies.enqueue(userId, mutation, options);
     return saved ? { state: "queued" } : { state: "unavailable" };
   }
 
   async function deliver(
     mutation: QueuedMutationInput,
     onlineHeaders: Record<string, string>,
+    userId: string | null,
   ): Promise<OfflineDelivery> {
-    if (!dependencies.isOnline()) return queue(mutation);
+    if (!dependencies.isOnline()) return queue(userId, mutation);
 
     try {
       const response = await dependencies.fetch(mutation.path, {
         method: mutation.method,
-        headers: onlineHeaders,
+        headers: {
+          ...onlineHeaders,
+          ...(userId ? { [QUEUE_OWNER_HEADER]: userId } : {}),
+        },
         body: mutation.body === undefined
           ? undefined
           : JSON.stringify(mutation.body),
       });
-      if (isRetryableResponse(response)) return queue(mutation);
+      if (isRetryableResponse(response)) {
+        return queue(userId, mutation, { deferFlushMs: 1000 });
+      }
       return { state: "server", response };
     } catch {
-      return queue(mutation);
+      return queue(userId, mutation, { deferFlushMs: 1000 });
     }
   }
 
@@ -120,6 +130,7 @@ export function createOfflineMutationSender(
     }): Promise<OfflineDelivery> {
       assertReplaySafeCreatePath(input.path);
       const idempotencyKey = dependencies.uuid();
+      const userId = dependencies.resolveUser();
       return deliver(
         {
           method: "POST",
@@ -131,6 +142,7 @@ export function createOfflineMutationSender(
           "Content-Type": "application/json",
           "Idempotency-Key": idempotencyKey,
         },
+        userId,
       );
     },
 
@@ -141,6 +153,7 @@ export function createOfflineMutationSender(
     }): Promise<OfflineDelivery> {
       assertRebasedStatusInput(input.path, input.body);
       const idempotencyKey = dependencies.uuid();
+      const userId = dependencies.resolveUser();
       return deliver(
         {
           method: "PATCH",
@@ -154,6 +167,7 @@ export function createOfflineMutationSender(
           "Idempotency-Key": idempotencyKey,
           "If-Match": String(input.onlineRevision),
         },
+        userId,
       );
     },
   };

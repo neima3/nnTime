@@ -67,7 +67,7 @@ export function OfflineIndicator({ userId }: { userId: string | null }) {
   return (
     <div
       role={terminal > 0 ? "alert" : "status"}
-      className="fixed bottom-20 left-1/2 z-30 w-[min(92vw,34rem)] -translate-x-1/2 rounded-2xl border border-border bg-surface-raised px-4 py-3 shadow-float md:bottom-4"
+      className="fixed bottom-52 left-1/2 z-30 w-[min(92vw,34rem)] -translate-x-1/2 rounded-2xl border border-border bg-surface-raised px-4 py-3 shadow-float md:bottom-24"
     >
       <div className="flex items-start gap-2.5 text-[13px] font-semibold">
         {terminal > 0 ? (
@@ -104,7 +104,7 @@ export function OfflineIndicator({ userId }: { userId: string | null }) {
             onClick={() => {
               void dismissTerminalMutations(userId);
             }}
-            className="grid size-7 shrink-0 place-items-center rounded-lg text-ink-faint transition-colors hover:bg-surface-sunken hover:text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+            className="-my-2 -mr-2 grid size-11 shrink-0 place-items-center rounded-xl text-ink-faint transition-colors hover:bg-surface-sunken hover:text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none md:-my-1.5 md:-mr-1.5 md:size-10"
           >
             <X size={15} />
           </button>

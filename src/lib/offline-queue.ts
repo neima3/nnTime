@@ -1,5 +1,7 @@
 "use client";
 
+import { QUEUE_OWNER_HEADER } from "./queue-ownership";
+
 /**
  * Offline mutation queue — ADR-002 (Phase 6B).
  *
@@ -103,6 +105,10 @@ export type QueuedMutationInput = Omit<
   "id" | "userId" | "createdAt" | "attempts" | "status"
 >;
 
+export type EnqueueMutationOptions = {
+  deferFlushMs?: number;
+};
+
 /**
  * Enqueue a mutation. If online, it's flushed immediately. If offline, it
  * stays in the queue until reconnect.
@@ -110,12 +116,13 @@ export type QueuedMutationInput = Omit<
 export async function enqueueMutation(
   userId: string,
   mutation: QueuedMutationInput,
+  options: EnqueueMutationOptions = {},
 ): Promise<QueuedMutation | null> {
   const entry: QueuedMutation = {
     ...mutation,
     userId,
     createdAt: new Date().toISOString(),
-    attempts: 0,
+    attempts: options.deferFlushMs ? 1 : 0,
     status: "pending",
   };
 
@@ -136,7 +143,11 @@ export async function enqueueMutation(
 
   // If online, flush immediately.
   if (navigator.onLine) {
-    flushQueue(userId);
+    if (options.deferFlushMs) {
+      setTimeout(() => void flushQueue(userId), options.deferFlushMs);
+    } else {
+      void flushQueue(userId);
+    }
   }
 
   return entry;
@@ -212,11 +223,14 @@ export async function executeMutation(
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       "Idempotency-Key": mut.idempotencyKey,
+      [QUEUE_OWNER_HEADER]: mut.userId,
     };
 
     // Rebase-on-replay: re-read the resource for a fresh If-Match revision.
     if (mut.rebasePath) {
-      const readRes = await fetch(mut.rebasePath);
+      const readRes = await fetch(mut.rebasePath, {
+        headers: { [QUEUE_OWNER_HEADER]: mut.userId },
+      });
       if (readRes.status === 404 || readRes.status === 410) {
         return {
           success: false,

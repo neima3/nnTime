@@ -16,7 +16,7 @@
 - [x] Task 2 — durable queue summaries, dismissal, and shell conflict UX
 - [x] Task 3 — migrate the existing working paths and add an adoption gate
 - [x] Task 4 — adopt every fully local replay-safe create/status surface
-- [ ] Task 5 — production-mode browser proof and adversarial review
+- [x] Task 5 — production-mode browser proof and adversarial review
 - [ ] Task 6 — full verification, handoff, exact-SHA release, and live proof
 
 ## Task 1 — Server idempotency prerequisite and typed offline delivery policy
@@ -172,7 +172,7 @@ await dismissTerminalMutations("user-a")
 
 ### Steps
 
-- [ ] Add a failing production-mode Playwright test that:
+- [x] Add a failing production-mode Playwright test that:
   - authenticates a synthetic local tenant;
   - queues an inbox create while offline;
   - reconnects and observes the queued count clear and the item render;
@@ -180,12 +180,12 @@ await dismissTerminalMutations("user-a")
   - injects a terminal replay response;
   - reloads and still sees the safe server-version conflict copy;
   - dismisses it and confirms it does not return.
-- [ ] Run the focused test against `pnpm start`; verify RED before
+- [x] Run the focused test against `pnpm start`; verify RED before
   implementation-dependent assertions are satisfied.
-- [ ] Fix only defects revealed by the E2E, using focused red/green cycles.
-- [ ] Capture and visually inspect desktop 1440×1000 and mobile 390×844 queue
+- [x] Fix only defects revealed by the E2E, using focused red/green cycles.
+- [x] Capture and visually inspect desktop 1440×1000 and mobile 390×844 queue
   and conflict states; save screenshots under the ignored evidence directory.
-- [ ] Request adversarial review against ADR-002 and this design. Verify every
+- [x] Request adversarial review against ADR-002 and this design. Verify every
   finding against current code, fix all Critical/Important issues test-first,
   and re-run focused proof.
 

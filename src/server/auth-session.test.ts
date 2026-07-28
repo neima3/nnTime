@@ -1,23 +1,69 @@
-/**
- * Auth session tests — verifies getSession returns null gracefully
- * when no session cookie is present, and when DB is unavailable.
- */
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-describe("auth session resilience", () => {
-  it("getSession returns null when headers are empty (no cookie)", async () => {
-    // This test verifies the graceful fallback behavior — getSession catches
-    // errors and returns null instead of throwing.
-    // We can't fully test this without mocking next/headers, but the
-    // important contract is: no crash on missing session.
-    expect(true).toBe(true); // contract documented
-  });
+const mocks = vi.hoisted(() => ({
+  getSession: vi.fn(),
+  headers: vi.fn(),
+  ensureMigrated: vi.fn(),
+}));
+
+vi.mock("next/headers", () => ({ headers: mocks.headers }));
+vi.mock("./auth", () => ({
+  auth: { api: { getSession: mocks.getSession } },
+}));
+vi.mock("./db/migrate-on-startup", () => ({
+  ensureMigrated: mocks.ensureMigrated,
+}));
+
+import { getSession, requireSession } from "./auth-session";
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.headers.mockResolvedValue(new Headers());
+  mocks.getSession.mockResolvedValue(null);
+  mocks.ensureMigrated.mockResolvedValue(undefined);
 });
 
-describe("auth config validation", () => {
-  it("BETTER_AUTH_SECRET is documented in .env.local", () => {
-    // Contract: the auth secret must be set for sessions to work.
-    // Verified live: sessions persist across requests on time.neima.me.
-    expect(true).toBe(true);
+describe("auth session boundary", () => {
+  it("returns null when no session cookie is present", async () => {
+    await expect(getSession()).resolves.toBeNull();
+  });
+
+  it("returns the authenticated session", async () => {
+    mocks.getSession.mockResolvedValue({
+      user: { id: "user-a" },
+      session: { id: "session-a" },
+    });
+
+    await expect(getSession()).resolves.toEqual({
+      userId: "user-a",
+      sessionId: "session-a",
+    });
+  });
+
+  it("rejects a queued mutation owned by another account", async () => {
+    mocks.headers.mockResolvedValue(
+      new Headers({ "X-Kairo-Queue-Owner": "user-a" }),
+    );
+    mocks.getSession.mockResolvedValue({
+      user: { id: "user-b" },
+      session: { id: "session-b" },
+    });
+
+    await expect(requireSession()).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("allows the matching queue owner", async () => {
+    mocks.headers.mockResolvedValue(
+      new Headers({ "X-Kairo-Queue-Owner": "user-a" }),
+    );
+    mocks.getSession.mockResolvedValue({
+      user: { id: "user-a" },
+      session: { id: "session-a" },
+    });
+
+    await expect(requireSession()).resolves.toEqual({
+      userId: "user-a",
+      sessionId: "session-a",
+    });
   });
 });

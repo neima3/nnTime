@@ -9,6 +9,10 @@ import "server-only";
 import { headers } from "next/headers";
 import { auth } from "./auth";
 import { ensureMigrated } from "./db/migrate-on-startup";
+import {
+  assertQueueOwner,
+  QUEUE_OWNER_HEADER,
+} from "@/lib/queue-ownership";
 
 export interface AuthSession {
   userId: string;
@@ -23,12 +27,18 @@ export interface AuthSession {
 export async function getSession(): Promise<AuthSession | null> {
   try {
     await ensureMigrated(); // guarantee tables exist before querying
+    const requestHeaders = await headers();
     const session = await auth.api.getSession({
-      headers: await headers(),
+      headers: requestHeaders,
     });
     if (!session?.user?.id) return null;
+    assertQueueOwner(
+      session.user.id,
+      requestHeaders.get(QUEUE_OWNER_HEADER),
+    );
     return { userId: session.user.id, sessionId: session.session.id };
-  } catch {
+  } catch (error) {
+    if (error instanceof Response) throw error;
     // DB not connected (no DATABASE_URL in prod yet) or auth not configured.
     return null;
   }

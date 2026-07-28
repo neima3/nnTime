@@ -51,6 +51,8 @@ beforeEach(() => {
 
 afterEach(() => {
   delete (globalThis as { localStorage?: Storage }).localStorage;
+  vi.useRealTimers();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -122,7 +124,7 @@ describe("executeMutation rebase-on-replay", () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
       calls.push({ url, init });
-      if (!init) return jsonResponse(200, { id: "act-1", revision: 7 });
+      if (!init?.method) return jsonResponse(200, { id: "act-1", revision: 7 });
       return jsonResponse(200, { id: "act-1", revision: 8 });
     });
 
@@ -130,10 +132,13 @@ describe("executeMutation rebase-on-replay", () => {
     expect(result).toEqual({ success: true, terminal: false });
     expect(calls).toHaveLength(2);
     // First call is the bare re-read, second the PATCH with the fresh revision.
-    expect(calls[0].init).toBeUndefined();
+    expect(calls[0].init?.headers).toMatchObject({
+      "X-Kairo-Queue-Owner": "user-1",
+    });
     const headers = calls[1].init?.headers as Record<string, string>;
     expect(headers["If-Match"]).toBe("7");
     expect(headers["Idempotency-Key"]).toBe("key-1");
+    expect(headers["X-Kairo-Queue-Owner"]).toBe("user-1");
     expect(calls[1].init?.method).toBe("PATCH");
   });
 
@@ -275,3 +280,53 @@ describe("durable queue summary and terminal acknowledgment", () => {
     });
   });
 });
+
+describe("retry scheduling", () => {
+  it("defers the first replay after an online retryable failure", async () => {
+    vi.stubGlobal("indexedDB", new IDBFactory());
+    vi.stubGlobal("navigator", { onLine: true });
+    vi.stubGlobal("window", { dispatchEvent: vi.fn() });
+    vi.stubGlobal(
+      "CustomEvent",
+      class<T> {
+        constructor(
+          public type: string,
+          public init?: CustomEventInit<T>,
+        ) {}
+      },
+    );
+    const fetch = vi.fn(async (url: string) => {
+      if (url === "/api/auth/get-session") {
+        return responseWithJson(200, { user: { id: "user-a" } });
+      }
+      return responseWithJson(201, { id: "task-1" });
+    });
+    vi.stubGlobal("fetch", fetch);
+    const setTimeout = vi
+      .spyOn(globalThis, "setTimeout")
+      .mockImplementation(
+        (() => 1) as unknown as typeof globalThis.setTimeout,
+      );
+
+    await enqueueMutation(
+      "user-a",
+      {
+        method: "POST",
+        path: "/api/v1/tasks",
+        body: { bucket: "inbox", title: "Retry later" },
+        idempotencyKey: "key-retry",
+      },
+      { deferFlushMs: 1000 },
+    );
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(setTimeout).toHaveBeenCalledWith(expect.any(Function), 1000);
+  });
+});
+
+function responseWithJson(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
