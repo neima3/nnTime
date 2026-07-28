@@ -21,7 +21,7 @@ vi.mock("@/server/dal", () => ({
   createRoutineSchedule: mocks.createRoutineSchedule,
 }));
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 describe("POST /api/v1/routines", () => {
   beforeEach(() => {
@@ -73,5 +73,33 @@ describe("POST /api/v1/routines", () => {
       },
     });
     expect(mocks.createRoutineSchedule).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/v1/routines", () => {
+  it("returns computed totals above Int32 without truncation", async () => {
+    vi.clearAllMocks();
+    mocks.requireSession.mockResolvedValue({ userId: "user-1" });
+    mocks.listRoutines.mockResolvedValue([
+      {
+        id: "01980000-7000-8000-8000-000000000001",
+        userId: "user-1",
+        title: "Large aggregate",
+      },
+    ]);
+    mocks.listRoutineSteps.mockResolvedValue([
+      { durationMin: 2_147_483_647 },
+      { durationMin: 1 },
+    ]);
+    mocks.listRoutineSchedules.mockResolvedValue([]);
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.items[0]).toMatchObject({
+      stepCount: 2,
+      totalMin: 2_147_483_648,
+    });
   });
 });

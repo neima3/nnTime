@@ -1875,8 +1875,14 @@ components:
         schedules:
           type: array
           items: { $ref: '#/components/schemas/RoutineSchedule' }
-        stepCount: { type: integer, format: int32, minimum: 0 }
-        totalMin: { type: integer, format: int32 }
+        stepCount:
+          type: integer
+          minimum: 0
+          maximum: 4294967295
+        totalMin:
+          type: integer
+          minimum: -9007199254740991
+          maximum: 9007199254740991
 
     # ---- Focus sessions (ADR-004) -----------------------------------------
     FocusSession: &focusSessionSchema

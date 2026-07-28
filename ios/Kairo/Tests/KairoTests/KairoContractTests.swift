@@ -400,6 +400,29 @@ import Foundation
         #expect(item.schedules.isEmpty)
         #expect(item.stepCount == 0)
         #expect(item.totalMin == -5)
+
+        let largeAggregate = try decodeFixture(
+            Components.Schemas.RoutineListItem.self,
+            """
+            {
+              "id":"0198f834-c9ab-7e12-b1cf-1faebad8f4fd",
+              "userId":"0198f834-c9ab-7e12-b1cf-1faebad8f4fe",
+              "title":"Large aggregate",
+              "emoji":null,
+              "categoryId":null,
+              "notes":null,
+              "revision":1,
+              "createdAt":"2026-07-28T12:00:00Z",
+              "updatedAt":"2026-07-28T12:00:00Z",
+              "steps":[],
+              "schedules":[],
+              "stepCount":2147483648,
+              "totalMin":2147483648
+            }
+            """
+        )
+        #expect(largeAggregate.stepCount == 2_147_483_648)
+        #expect(largeAggregate.totalMin == 2_147_483_648)
     }
 
     private func decodeFixture<T: Decodable>(

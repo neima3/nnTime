@@ -335,14 +335,24 @@ function semanticContract(
     };
   }
 
-  const explicitMinimum =
-    kind === "integer" && resolved.exclusiveMinimum !== undefined
-      ? Math.floor(resolved.exclusiveMinimum) + 1
-      : resolved.minimum;
-  const explicitMaximum =
-    kind === "integer" && resolved.exclusiveMaximum !== undefined
-      ? Math.ceil(resolved.exclusiveMaximum) - 1
-      : resolved.maximum;
+  const minimumCandidates = [
+    resolved.minimum,
+    ...(kind === "integer" && resolved.exclusiveMinimum !== undefined
+      ? [Math.floor(resolved.exclusiveMinimum) + 1]
+      : []),
+  ].filter((value): value is number => value !== undefined);
+  const maximumCandidates = [
+    resolved.maximum,
+    ...(kind === "integer" && resolved.exclusiveMaximum !== undefined
+      ? [Math.ceil(resolved.exclusiveMaximum) - 1]
+      : []),
+  ].filter((value): value is number => value !== undefined);
+  const explicitMinimum = minimumCandidates.length
+    ? Math.max(...minimumCandidates)
+    : undefined;
+  const explicitMaximum = maximumCandidates.length
+    ? Math.min(...maximumCandidates)
+    : undefined;
   const int32Minimum =
     kind === "integer" && resolved.format === "int32"
       ? -2_147_483_648
@@ -522,6 +532,12 @@ describe("request OpenAPI contract", () => {
           copy.ActivitySeriesUpdateRequest!.properties!.rrule = {
             type: "string",
           };
+        },
+      },
+      {
+        name: "required-set optionality",
+        mutate: (copy) => {
+          copy.TaskUpdateRequest!.required = ["title"];
         },
       },
     ];
@@ -838,7 +854,7 @@ describe("request OpenAPI contract", () => {
     }
   });
 
-  it("keeps routine totals truthful for existing negative-duration data", () => {
+  it("keeps routine computed aggregates truthful beyond Int32", () => {
     const baseRoutine = {
       id: "0198f834-c9ab-7e12-b1cf-1faebad8f4fd",
       userId: "0198f834-c9ab-7e12-b1cf-1faebad8f4fe",
@@ -857,12 +873,77 @@ describe("request OpenAPI contract", () => {
 
     expect(routineSchemas.routineListItemResponse.safeParse(baseRoutine).success)
       .toBe(true);
+    const largeAggregate = {
+      ...baseRoutine,
+      stepCount: 2_147_483_648,
+      totalMin: 2_147_483_648,
+    };
+    expect(
+      routineSchemas.routineListItemResponse.safeParse(largeAggregate).success,
+    ).toBe(true);
+    const zodJson = z.toJSONSchema(
+      routineSchemas.routineListItemResponse,
+    ) as JsonSchema;
+    expect(
+      semanticContract(components.RoutineListItem ?? {}, components),
+    ).toEqual(semanticContract(zodJson, {}));
     expect(components.RoutineListItem?.properties?.totalMin).not.toHaveProperty(
-      "minimum",
+      "format",
     );
+    expect(components.RoutineListItem?.properties?.totalMin).toMatchObject({
+      minimum: -Number.MAX_SAFE_INTEGER,
+      maximum: Number.MAX_SAFE_INTEGER,
+    });
     expect(components.RoutineListItem?.properties?.stepCount).toMatchObject({
       minimum: 0,
+      maximum: 4_294_967_295,
     });
+  });
+
+  it("intersects simultaneous inclusive, exclusive, and int32 bounds", () => {
+    const lowerCombined = semanticContract(
+      {
+        type: "integer",
+        format: "int32",
+        minimum: 12,
+        exclusiveMinimum: 10,
+      },
+      {},
+    );
+    expect(lowerCombined).toEqual(
+      semanticContract(
+        { type: "integer", format: "int32", minimum: 12 },
+        {},
+      ),
+    );
+    expect(lowerCombined).not.toEqual(
+      semanticContract(
+        { type: "integer", format: "int32", minimum: 11 },
+        {},
+      ),
+    );
+
+    const upperCombined = semanticContract(
+      {
+        type: "integer",
+        format: "int32",
+        maximum: 8,
+        exclusiveMaximum: 10,
+      },
+      {},
+    );
+    expect(upperCombined).toEqual(
+      semanticContract(
+        { type: "integer", format: "int32", maximum: 8 },
+        {},
+      ),
+    );
+    expect(upperCombined).not.toEqual(
+      semanticContract(
+        { type: "integer", format: "int32", maximum: 9 },
+        {},
+      ),
+    );
   });
 
   it("keeps arbitrary batch JSON and route-level shapes truthful", () => {
