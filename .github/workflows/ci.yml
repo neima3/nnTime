@@ -74,8 +74,8 @@ jobs:
       - name: Build
         run: pnpm build
 
-  # ADR-002 — compile the generated Swift client from the exact canonical API
-  # contract and guard the shipping app's manual calls against that contract.
+  # ADR-002 — generate the Swift client from the exact canonical API contract,
+  # enforce shipping-app adoption, then test both package and real app targets.
   native-contract:
     runs-on: macos-latest
 
@@ -94,10 +94,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check canonical and shipping-client contracts
+      - name: Check canonical contract and generated-client adoption
         run: |
           pnpm api:check-ios
-          pnpm api:check-ios-client
+          pnpm api:check-ios-adoption
 
       - name: Install Apple release tooling
         run: brew install xcodegen
@@ -107,8 +107,47 @@ jobs:
           pnpm exec vitest run
           tests/ios-release-contract.test.ts tests/ios-release-script.test.ts
 
-      - name: Build and test generated Swift client
-        run: swift test --package-path ios/Kairo --only-use-versions-from-resolved-file
+      - name: Clean and test generated Swift client
+        run: |
+          swift package clean --package-path ios/Kairo
+          swift test --package-path ios/Kairo --only-use-versions-from-resolved-file
+
+      - name: Prepare shipping Xcode project
+        run: ./scripts/ios-prepare-project.sh
+
+      - name: Select available iPhone simulator
+        shell: bash
+        run: |
+          SIMULATOR_INFO="$(
+            xcrun simctl list devices available -j |
+              python3 -c 'import json,sys
+          data=json.load(sys.stdin)
+          for devices in data.get("devices", {}).values():
+              for device in devices:
+                  if device.get("name", "").startswith("iPhone"):
+                      print("{}|{}".format(device["udid"], device["state"]))
+                      raise SystemExit
+          raise SystemExit("No available iPhone simulator")'
+          )"
+          IFS='|' read -r SIMULATOR_ID SIMULATOR_STATE <<< "$SIMULATOR_INFO"
+          if [ "$SIMULATOR_STATE" != "Booted" ]; then
+            xcrun simctl boot "$SIMULATOR_ID"
+          fi
+          xcrun simctl bootstatus "$SIMULATOR_ID" -b
+          echo "KAIRO_SIMULATOR_ID=$SIMULATOR_ID" >> "$GITHUB_ENV"
+
+      - name: Test shipping application
+        run: ./scripts/ios-main-thread-gate.sh
+
+      - name: Build unsigned shipping application
+        run: |
+          ./scripts/ios-xcodebuild.sh \
+            -project ios/Kairo.xcodeproj \
+            -scheme Kairo \
+            -destination "platform=iOS Simulator,id=$KAIRO_SIMULATOR_ID" \
+            -derivedDataPath "$RUNNER_TEMP/kairo-app-build" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
 
   # T15 — real-browser core-loop suite (sign-up, plan/complete, capture,
   # clock format incl. SSR payload, offline replay). The app self-migrates on

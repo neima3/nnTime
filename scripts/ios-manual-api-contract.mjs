@@ -1,171 +1,306 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { resolve } from "node:path";
+import { relative, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 
-const API_PREFIX = "/api/v1";
-const METHODS = new Set(["get", "post", "patch", "delete", "put"]);
+const FACADE_PATH = "ios/App/API/KairoAPI.swift";
 
-function normalizePath(path) {
-  return path
-    .replace(API_PREFIX, "")
-    .replace(/\\\([^)]*\)/g, "{}")
-    .replace(/\{[^}]+\}/g, "{}");
+export const REQUIRED_GENERATED_OPERATIONS = Object.freeze([
+  "getUserSettings",
+  "updateUserSettings",
+  "listCategories",
+  "getDay",
+  "createActivitySeries",
+  "updateActivitySeries",
+  "deleteActivitySeries",
+  "listTasks",
+  "createTask",
+  "deleteTask",
+  "search",
+  "getStats",
+  "createMoodCheckin",
+  "listRoutines",
+  "getActiveFocusSession",
+  "startFocusSession",
+  "updateFocusSession",
+]);
+
+function normalizedPath(path) {
+  return path.replaceAll("\\", "/");
 }
 
-function firstRequestArguments(source, openParenIndex) {
-  const args = [];
-  let start = openParenIndex + 1;
-  let parens = 0;
-  let brackets = 0;
-  let braces = 0;
-  let inString = false;
-  let escaped = false;
-
-  for (let index = start; index < source.length; index += 1) {
-    const char = source[index];
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (char === "\\") {
-        escaped = true;
-      } else if (char === '"') {
-        inString = false;
-      }
-      continue;
-    }
-    if (char === '"') {
-      inString = true;
-    } else if (char === "(") {
-      parens += 1;
-    } else if (char === "[") {
-      brackets += 1;
-    } else if (char === "{") {
-      braces += 1;
-    } else if (char === ")") {
-      if (parens === 0 && brackets === 0 && braces === 0) {
-        args.push(source.slice(start, index).trim());
-        return args;
-      }
-      parens -= 1;
-    } else if (char === "]") {
-      brackets -= 1;
-    } else if (char === "}") {
-      braces -= 1;
-    } else if (
-      char === "," &&
-      parens === 0 &&
-      brackets === 0 &&
-      braces === 0
-    ) {
-      args.push(source.slice(start, index).trim());
-      if (args.length === 2) return args;
-      start = index + 1;
-    }
-  }
-  return null;
-}
-
-function literalString(value) {
-  const match = value?.match(/^"((?:\\.|[^"])*)"$/s);
-  return match?.[1];
-}
-
-export function extractManualApiInventory(source) {
-  const operations = [];
-  const paths = [];
-  const staticFailures = [];
-  const seenPaths = new Set();
-
-  const requestPattern = /\brequest\s*\(/g;
-  for (const match of source.matchAll(requestPattern)) {
-    const prefix = source.slice(Math.max(0, match.index - 24), match.index);
-    if (/\bfunc\s*$/.test(prefix)) continue;
-    const line = source.slice(0, match.index).split("\n").length;
-    const openParenIndex = match.index + match[0].lastIndexOf("(");
-    const args = firstRequestArguments(source, openParenIndex);
-    if (!args || args.length < 2) {
-      staticFailures.push(
-        `request call at line ${line} could not be statically parsed`,
-      );
-      continue;
-    }
-    const method = literalString(args[0]);
-    const path = literalString(args[1]);
-    if (!method) {
-      staticFailures.push(
-        `request call at line ${line} must use a literal HTTP method`,
-      );
-    }
-    if (!path) {
-      staticFailures.push(
-        `request call at line ${line} must use a literal path`,
-      );
-    }
-    if (!method || !path || !path.startsWith(API_PREFIX)) continue;
-    operations.push({
-      method,
-      path: normalizePath(path),
+function walkSwiftFiles(directory) {
+  return readdirSync(directory, { withFileTypes: true })
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .flatMap((entry) => {
+      const path = resolve(directory, entry.name);
+      if (entry.isDirectory()) return walkSwiftFiles(path);
+      return entry.isFile() && entry.name.endsWith(".swift") ? [path] : [];
     });
-  }
-
-  const pathPattern = /"(\/api\/v1\/[^"]+)"/g;
-  for (const match of source.matchAll(pathPattern)) {
-    const path = normalizePath(match[1]);
-    if (seenPaths.has(path)) continue;
-    seenPaths.add(path);
-    paths.push(path);
-  }
-
-  return { operations, paths, staticFailures };
 }
 
-export function validateManualApiContract(source, spec) {
-  const inventory = extractManualApiInventory(source);
-  const documented = new Map();
-  for (const [path, item] of Object.entries(spec.paths ?? {})) {
-    documented.set(normalizePath(path), item);
-  }
+export function collectShippingSwiftSources(appRoot) {
+  const repositoryRoot = resolve(appRoot, "..", "..");
+  return walkSwiftFiles(appRoot).map((path) => ({
+    path: normalizedPath(relative(repositoryRoot, path)),
+    source: readFileSync(path, "utf8"),
+  }));
+}
 
-  const failures = [...inventory.staticFailures];
-  for (const path of inventory.paths) {
-    if (!documented.has(path)) {
-      failures.push(`${path} is not documented in api/openapi.yaml`);
+export function extractGeneratedOperationInventory(source) {
+  const code = maskCommentsAndStrings(source);
+  const operationIDs = [];
+  const seen = new Set();
+  for (const match of code.matchAll(
+    /\bplanner\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(/g,
+  )) {
+    const operationID = match[1];
+    if (seen.has(operationID)) continue;
+    seen.add(operationID);
+    operationIDs.push(operationID);
+  }
+  return operationIDs;
+}
+
+function maskCommentsAndStrings(source) {
+  let result = "";
+  let state = "code";
+  let blockDepth = 0;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    const next = source[index + 1];
+
+    if (state === "lineComment") {
+      if (char === "\n") {
+        state = "code";
+        result += "\n";
+      } else {
+        result += " ";
+      }
+      continue;
+    }
+
+    if (state === "blockComment") {
+      if (char === "/" && next === "*") {
+        blockDepth += 1;
+        result += "  ";
+        index += 1;
+      } else if (char === "*" && next === "/") {
+        blockDepth -= 1;
+        result += "  ";
+        index += 1;
+        if (blockDepth === 0) state = "code";
+      } else {
+        result += char === "\n" ? "\n" : " ";
+      }
+      continue;
+    }
+
+    if (state === "string") {
+      if (char === "\\") {
+        result += " ";
+        if (next !== undefined) {
+          result += next === "\n" ? "\n" : " ";
+          index += 1;
+        }
+      } else if (char === '"') {
+        state = "code";
+        result += " ";
+      } else {
+        result += char === "\n" ? "\n" : " ";
+      }
+      continue;
+    }
+
+    if (char === "/" && next === "/") {
+      state = "lineComment";
+      result += "  ";
+      index += 1;
+    } else if (char === "/" && next === "*") {
+      state = "blockComment";
+      blockDepth = 1;
+      result += "  ";
+      index += 1;
+    } else if (char === '"') {
+      state = "string";
+      result += " ";
+    } else {
+      result += char;
     }
   }
-  for (const { method, path } of inventory.operations) {
-    const item = documented.get(path);
-    const operation = item?.[method.toLowerCase()];
-    if (!operation || !METHODS.has(method.toLowerCase())) {
+
+  return result;
+}
+
+function matchingBrace(source, openingIndex) {
+  let depth = 0;
+  for (let index = openingIndex; index < source.length; index += 1) {
+    if (source[index] === "{") depth += 1;
+    if (source[index] !== "}") continue;
+    depth -= 1;
+    if (depth === 0) return index;
+  }
+  return -1;
+}
+
+function authRequestRange(maskedSource) {
+  const declaration =
+    /\bfunc\s+authRequest(?:\s*<[^>{}]*>)?\s*\(/g.exec(maskedSource);
+  if (!declaration) return null;
+  const openingIndex = maskedSource.indexOf("{", declaration.index);
+  if (openingIndex < 0) return null;
+  const closingIndex = matchingBrace(maskedSource, openingIndex);
+  if (closingIndex < 0) return null;
+  return { start: declaration.index, end: closingIndex + 1 };
+}
+
+function isInside(index, range) {
+  return range !== null && index >= range.start && index < range.end;
+}
+
+function containsManualTransportOutsideAuth(source, allowAuthRequest) {
+  const masked = maskCommentsAndStrings(source);
+  const allowedRange = allowAuthRequest ? authRequestRange(masked) : null;
+  const patterns = [
+    /\bURLRequest\s*\(/g,
+    /\.\s*data\s*\(\s*for\s*:/g,
+    /\bfunc\s+request(?:\s*<[^>{}]*>)?\s*\(/g,
+    /(?<![.\w])request\s*\(/g,
+  ];
+
+  for (const pattern of patterns) {
+    for (const match of masked.matchAll(pattern)) {
+      if (!isInside(match.index, allowedRange)) return true;
+    }
+  }
+  return false;
+}
+
+function documentedOperationIDs(spec) {
+  const ids = new Set();
+  for (const pathItem of Object.values(spec?.paths ?? {})) {
+    for (const operation of Object.values(pathItem ?? {})) {
+      if (
+        operation &&
+        typeof operation === "object" &&
+        typeof operation.operationId === "string"
+      ) {
+        ids.add(operation.operationId);
+      }
+    }
+  }
+  return ids;
+}
+
+function appLinksGeneratedPackage(project) {
+  const packagePath = project?.packages?.KairoAPIClient?.path;
+  const dependencies = project?.targets?.Kairo?.dependencies;
+  if (packagePath !== "Kairo" || !Array.isArray(dependencies)) return false;
+  return dependencies.some(
+    (dependency) =>
+      dependency?.package === "KairoAPIClient" &&
+      dependency?.product === "KairoAPIClient",
+  );
+}
+
+export function validateGeneratedClientAdoption({ sources, spec, project }) {
+  const failures = [];
+  const facade = sources.find(
+    ({ path }) => normalizedPath(path).endsWith(FACADE_PATH),
+  );
+
+  for (const file of sources) {
+    const path = normalizedPath(file.path);
+    if (file.source.includes("/api/v1")) {
+      failures.push(`${path} contains a handwritten /api/v1 path`);
+    }
+    if (
+      containsManualTransportOutsideAuth(
+        file.source,
+        path.endsWith(FACADE_PATH),
+      )
+    ) {
       failures.push(
-        `${method} ${path} is not documented in api/openapi.yaml`,
+        `${path} contains manual URLRequest transport outside KairoAPI.authRequest`,
+      );
+    }
+    if (
+      !path.endsWith(FACADE_PATH) &&
+      extractGeneratedOperationInventory(file.source).length > 0
+    ) {
+      failures.push(
+        `${path} invokes generated planner operations outside KairoAPI.swift`,
       );
     }
   }
-  return [...new Set(failures)];
+
+  if (!facade) {
+    failures.push("ios/App/API/KairoAPI.swift is missing");
+  } else if (!/^\s*import\s+KairoAPIClient\s*$/m.test(facade.source)) {
+    failures.push("KairoAPI.swift must import KairoAPIClient");
+  }
+
+  const operationIDs = facade
+    ? extractGeneratedOperationInventory(facade.source)
+    : [];
+  const operationSet = new Set(operationIDs);
+  for (const operationID of REQUIRED_GENERATED_OPERATIONS) {
+    if (!operationSet.has(operationID)) {
+      failures.push(
+        `KairoAPI generated-operation inventory is missing ${operationID}`,
+      );
+    }
+  }
+
+  const documented = documentedOperationIDs(spec);
+  for (const operationID of operationIDs) {
+    if (!documented.has(operationID)) {
+      failures.push(
+        `KairoAPI generated operation ${operationID} is absent from api/openapi.yaml`,
+      );
+    }
+  }
+
+  if (!appLinksGeneratedPackage(project)) {
+    failures.push(
+      "ios/project.yml must link the KairoAPIClient product to the Kairo app target",
+    );
+  }
+
+  return {
+    failures: [...new Set(failures)],
+    operationIDs,
+  };
 }
 
 function main() {
   const root = resolve(import.meta.dirname, "..");
-  const source = readFileSync(
-    resolve(root, "ios/App/API/KairoAPI.swift"),
-    "utf8",
-  );
+  const sources = collectShippingSwiftSources(resolve(root, "ios/App"));
   const spec = parseYaml(
     readFileSync(resolve(root, "api/openapi.yaml"), "utf8"),
   );
-  const inventory = extractManualApiInventory(source);
-  const failures = validateManualApiContract(source, spec);
-  if (failures.length > 0) {
-    throw new Error(failures.join("\n"));
+  const project = parseYaml(
+    readFileSync(resolve(root, "ios/project.yml"), "utf8"),
+  );
+  const result = validateGeneratedClientAdoption({
+    sources,
+    spec,
+    project,
+  });
+  if (result.failures.length > 0) {
+    throw new Error(result.failures.join("\n"));
   }
   console.log(
-    `Shipping iOS client contract is valid: ${inventory.operations.length} calls across ${inventory.paths.length} path shapes`,
+    `Generated iOS client adoption is valid: ${result.operationIDs.length} operations across ${sources.length} shipping App Swift files`,
   );
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+if (
+  process.argv[1] &&
+  fileURLToPath(import.meta.url) === resolve(process.argv[1])
+) {
   try {
     main();
   } catch (error) {
