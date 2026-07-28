@@ -201,15 +201,15 @@ await dismissTerminalMutations("user-a")
 
 ### Steps
 
-- [ ] Run:
+- [x] Run:
   `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
-- [ ] Run:
+- [x] Run:
   `pnpm api:check-ios && pnpm api:check-ios-adoption &&
   node scripts/parity.mjs`.
-- [ ] Run production-mode Playwright, Swift package tests, app-hosted native
+- [x] Run production-mode Playwright, Swift package tests, app-hosted native
   tests, unsigned simulator build, and the serial native UI suite because the
   repository release gate covers both clients.
-- [ ] Record exact counts, screenshots, review disposition, parity, and the
+- [x] Record exact counts, screenshots, review disposition, parity, and the
   remaining external authenticated-production-read limitation.
 - [ ] Commit the immutable handoff, integrate without discarding unrelated
   work, push `main`, and wait for all exact-SHA GitHub Actions jobs.

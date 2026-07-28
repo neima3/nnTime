@@ -1,5 +1,69 @@
 # Progress log
 
+## 2026-07-28 — Round 17: offline mutation integrity (Codex)
+
+Roadmap:
+`docs/plans/2026-07-28-round17-offline-integrity.md`. Closed the gap between
+ADR-002's narrow delayed-mutation contract and the web app's previously ad hoc
+offline adoption.
+
+- **One executable safety boundary.** `sendReplaySafeCreate` accepts only
+  tasks, activities, routines, and mood; `sendRebasedStatusChange` accepts only
+  status-only activity patches. The same UUID is used for the immediate request
+  and any replay. General edits, deletes, checklist changes, focus transitions,
+  imports, and compound promotions remain direct and online-only.
+- **Every eligible local surface is covered.** Quick Capture (plain and
+  confirmed proposals), Activity Editor create, Inbox capture, mood, routines,
+  Peak Focus, Today completion, and Review complete/skip use the typed boundary.
+  Inputs clear only after a server save or durable IndexedDB write; failed local
+  persistence keeps the user's work visible and says it was not saved.
+- **Durable, honest conflicts.** Queue summaries separate pending and terminal
+  rows per user. The shell refreshes on queue drain, preserves a generic
+  server-version conflict across reload, and deletes only that user's terminal
+  rows after acknowledgment. Production-mode browser QA found the mobile
+  dismiss control hidden under the capture controls and the toast overlapping
+  queue status; both notification layers now remain legible and operable with
+  a 44 px mobile dismiss target.
+- **Replay identity and retry correctness.** Initial and replayed queued
+  requests carry an owner binding that `requireSession` compares with the live
+  authenticated user, preventing a stale queue or account switch from writing
+  into another account. Retryable online failures defer the first replay
+  instead of issuing a back-to-back request. Optimistic-concurrency 409s are no
+  longer cached for 48 hours, so the same logical key can re-read a fresh
+  revision and succeed.
+- **Independent adversarial review.** The first review found the cross-account
+  owner gap, immediate retry, and cached-409 poison described above. Each was
+  reproduced with a failing test and fixed at the boundary. Re-review accepted
+  all three fixes and reported no remaining Critical or Important findings.
+- **Full web proof.** ESLint, TypeScript, production build, and **74 files /
+  781 Vitest tests** passed. OpenAPI sync passed; generated iOS-client adoption
+  remains **17 operations / 30 shipping Swift files**. The full
+  production-mode Playwright suite passed **12/12**, including offline inbox
+  replay, fresh-revision completion convergence, conflict reload/dismissal,
+  focus concurrency, and the core loop.
+- **Visual proof.** Desktop 1440×1000 and mobile 390×844 queue and conflict
+  states were captured and inspected under
+  `browser-qa/round17-offline-integrity/`. The persistent status, transient
+  toast, both mobile capture controls, tab bar, and dismiss action no longer
+  collide.
+- **Native release proof.** Swift package validation passed **57 tests / 9
+  suites**. The release contract and XcodeGen preparation passed with no
+  package-lock diff. The app-hosted gate passed **77/77** with zero Main Thread
+  Checker findings; a fresh unsigned simulator build succeeded. The definitive
+  no-proxy serial iPhone 17 Pro flight passed **17/17** with zero failures and
+  zero Main Thread Checker findings.
+- **Parity remains honest.** This is integrity hardening, not new feature
+  credit: web remains **89.74%** and iOS/combined remains **87.08%**, both above
+  the 85% gates. `docs/plans/parity-checklist.md` is intentionally unchanged.
+- **Data safety.** All browser and native mutation proof used synthetic local
+  tenants or mock native data. No production planner, mood, or PHI-like data
+  was created or changed.
+
+The remaining release work is exact-SHA GitHub Actions, Coolify, and read-only
+live verification. The production Chrome profile was signed out in Round 16;
+unless that external state changes, authenticated planner reads remain
+explicitly unclaimed while 401 authorization-boundary proof remains valid.
+
 ## 2026-07-28 — Round 16: generated client in the shipping native app (Codex)
 
 Roadmap:

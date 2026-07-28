@@ -360,7 +360,17 @@ requests carry shared cookies, planning timezone, idempotency keys, and
 conditional revisions, while CI fails on contract drift, handwritten planner
 transport, dirty generation, package regressions, or a shipping app build/test
 failure. The canonical day/mutation/routine shapes and fractional RFC3339
-transport behavior are executable cross-platform contracts. 8D privacy declarations, public policy,
+transport behavior are executable cross-platform contracts. **Round 17
+hardening (2026-07-28):** every web mutation that ADR-002 permits offline now
+uses one typed allowlist and durable delivery boundary; general edits, deletes,
+checklists, focus transitions, imports, and compound promotions remain
+online-only. Replay-safe creates share one logical idempotency key across the
+initial attempt and replay; status-only activity changes re-read the current
+revision before retry. Queue rows and requests are bound to one account,
+retryable failures honor backoff, conflicts survive reload with an explicit
+server-version outcome, and queue drain refreshes rendered server truth.
+Production-mode browser coverage exercises offline create, status convergence,
+conflict acknowledgment, and responsive notification-layer layout. 8D privacy declarations, public policy,
 review-prep contract, and final scripted parity audit for iOS ≥85%. App Store
 upload, processing, review, and launch remain per-release states and are never
 inferred from this historical phase checkbox.
