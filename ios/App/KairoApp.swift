@@ -3,6 +3,7 @@ import UIKit
 
 @main
 struct KairoApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var appState = AppState()
 
     init() {
@@ -17,6 +18,13 @@ struct KairoApp: App {
                 .environment(appState)
                 .tint(.kIris)
                 .preferredColorScheme(appState.colorScheme)
+                .onChange(of: scenePhase) { _, phase in
+                    guard phase == .active,
+                          KairoPrefs.sleepWindDownEnabled else { return }
+                    Task {
+                        _ = await HealthKitManager.shared.refreshSleepWindDown()
+                    }
+                }
         }
     }
 }

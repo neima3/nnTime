@@ -47,8 +47,16 @@ final class HealthKitManager {
         setEnabled: { KairoPrefs.healthSyncEnabled = $0 },
         isSleepWindDownEnabled: { KairoPrefs.sleepWindDownEnabled },
         setSleepWindDownEnabled: { KairoPrefs.sleepWindDownEnabled = $0 },
-        scheduleSleepWindDown: { _, _, _ in .notificationsOff },
-        cancelSleepWindDown: {}
+        scheduleSleepWindDown: { schedule, now, calendar in
+            await NotificationManager.scheduleSleepWindDown(
+                schedule: schedule,
+                now: now,
+                calendar: calendar
+            )
+        },
+        cancelSleepWindDown: {
+            NotificationManager.cancelSleepWindDown()
+        }
     )
 
     private let client: HealthKitClient

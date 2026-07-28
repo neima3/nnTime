@@ -8,6 +8,7 @@ import UserNotifications
 
 enum NotificationManager {
     private static let center = UNUserNotificationCenter.current()
+    static let sleepWindDownIdentifier = "kairo-sleep-wind-down"
 
     /// Ask once. Returns whether we're authorized after the prompt.
     @discardableResult
@@ -28,7 +29,12 @@ enum NotificationManager {
     /// Only future starts are scheduled; past blocks are skipped. Safe to call
     /// on every day-load — it fully reconciles.
     static func reschedule(blocks: [DayBlock], zone: TimeZone) async {
-        center.removeAllPendingNotificationRequests()
+        let pending = await center.pendingNotificationRequests()
+        center.removePendingNotificationRequests(
+            withIdentifiers: activityRequestIdentifiers(
+                from: pending.map(\.identifier)
+            )
+        )
         guard KairoPrefs.remindersEnabled else { return }
         guard await authorizationStatus() == .authorized else { return }
 
@@ -72,7 +78,97 @@ enum NotificationManager {
     }
 
     static func cancelAll() {
-        center.removeAllPendingNotificationRequests()
+        Task { await cancelActivityReminders() }
+    }
+
+    static func cancelActivityReminders() async {
+        let pending = await center.pendingNotificationRequests()
+        center.removePendingNotificationRequests(
+            withIdentifiers: activityRequestIdentifiers(
+                from: pending.map(\.identifier)
+            )
+        )
+    }
+
+    static func cancelSleepWindDown() {
+        center.removePendingNotificationRequests(
+            withIdentifiers: [sleepWindDownIdentifier]
+        )
+    }
+
+    static func scheduleSleepWindDown(
+        schedule: SleepSchedule,
+        now: Date,
+        calendar: Calendar
+    ) async -> SleepWindDownScheduleResult {
+        cancelSleepWindDown()
+        guard let fireDate = SleepScheduleInference.nextWindDownDate(
+            for: schedule,
+            after: now,
+            calendar: calendar
+        ) else {
+            return .failed
+        }
+
+        let fireHour = calendar.component(.hour, from: fireDate)
+        let decision = windDownScheduleDecision(
+            authorizationStatus: await authorizationStatus(),
+            isQuietHour: KairoPrefs.inQuietHours(fireHour)
+        )
+        guard decision == .scheduled else { return decision }
+
+        do {
+            try await center.add(sleepWindDownRequest(
+                at: fireDate,
+                calendar: calendar
+            ))
+            return .scheduled
+        } catch {
+            return .failed
+        }
+    }
+
+    static func activityRequestIdentifiers(from identifiers: [String]) -> [String] {
+        identifiers.filter {
+            $0.hasPrefix("start-") || $0.hasPrefix("cushion-")
+        }
+    }
+
+    static func windDownScheduleDecision(
+        authorizationStatus: UNAuthorizationStatus,
+        isQuietHour: Bool
+    ) -> SleepWindDownScheduleResult {
+        switch authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            return isQuietHour ? .quietHours : .scheduled
+        case .notDetermined, .denied:
+            return .notificationsOff
+        @unknown default:
+            return .notificationsOff
+        }
+    }
+
+    static func sleepWindDownRequest(
+        at date: Date,
+        calendar: Calendar
+    ) -> UNNotificationRequest {
+        let content = UNMutableNotificationContent()
+        content.title = "🌙 A softer landing?"
+        content.body = "Your usual sleep time is getting close. Wind down now, or ignore this and keep your evening."
+        content.sound = .default
+        let components = calendar.dateComponents(
+            [.year, .month, .day, .hour, .minute],
+            from: date
+        )
+        let trigger = UNCalendarNotificationTrigger(
+            dateMatching: components,
+            repeats: false
+        )
+        return UNNotificationRequest(
+            identifier: sleepWindDownIdentifier,
+            content: content,
+            trigger: trigger
+        )
     }
 
     // MARK: Internals
