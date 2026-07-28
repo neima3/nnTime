@@ -87,6 +87,13 @@ enum KairoPrefs {
         set { store.set(newValue, forKey: "kairo-health-sync") }
     }
 
+    /// Explicit, device-local permission to read recent sleep times and turn
+    /// the on-device pattern into one local wind-down suggestion.
+    static var sleepWindDownEnabled: Bool {
+        get { store.bool(forKey: "kairo-sleep-wind-down") }
+        set { store.set(newValue, forKey: "kairo-sleep-wind-down") }
+    }
+
     /// Local reminders for upcoming activities (T2). Defaults on once the user
     /// grants permission; the toggle lives in Settings.
     static var remindersEnabled: Bool {
