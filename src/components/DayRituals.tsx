@@ -37,11 +37,16 @@ export function DayRituals({
   zone,
   date,
   activityCount,
+  allDone = false,
   unfinished,
 }: {
   zone: string;
   date: string;
   activityCount: number;
+  /** Everything planned today is complete — the moment is rest, not more
+   *  planning, so the morning setup card yields to the celebration banner
+   *  (found by the R12 sweep: both showing at once was contradictory). */
+  allDone?: boolean;
   /** Today's not-done activities (for carry-forward). */
   unfinished: UnfinishedItem[];
 }) {
@@ -177,7 +182,7 @@ export function DayRituals({
     setBusy(false);
   };
 
-  if (morningWindow && activityCount < 2 && dismissed !== "morning") {
+  if (morningWindow && activityCount < 2 && !allDone && dismissed !== "morning") {
     return (
       <div className="mb-5 rounded-3xl border border-cat-butter-ink/20 bg-cat-butter/40 p-4">
         <div className="flex items-start justify-between gap-3">

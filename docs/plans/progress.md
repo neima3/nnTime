@@ -1,5 +1,39 @@
 # Progress log
 
+## 2026-07-28 — Round 12: full-surface quality sweep (first since Round 6) (Fable)
+
+Roadmap: `docs/plans/2026-07-27-round12-quality-sweep.md`. 39 captures
+(13 app routes × desktop-light/dark/mobile) with per-route console + failed-
+request logging on a seeded believable day, then a Fable design review of
+every screen. Evidence in `browser-qa/r12/`.
+
+**Two real defects found and fixed:**
+1. **"Sign in" on a failed session probe.** The sweep's burst tripped
+   better-auth's own limiter, and every 429'd get-session made UserMenu
+   claim the user was signed out — while online, so the R8 offline guard
+   didn't cover it. Principle now enforced completely: a session probe that
+   ERRORED (offline, 429, 5xx) is never evidence of signed-out; only a
+   definitive empty answer is. useSession's `error` field drives the
+   placeholder.
+2. **Contradictory banner stack on Today.** A one-item all-done day in the
+   morning window showed "Day done — go be free" AND "Set up your day — a
+   blank page" simultaneously (each condition individually correct; both at
+   once is exactly the noise Kairo exists to prevent). Design call: a
+   one-thing day done is EARNED celebration for this audience, so the setup
+   card yields to all-done (new `allDone` prop). Verified both directions:
+   all-done morning → celebration only; pending day → neither (count ≥2
+   suppresses the card as before).
+
+**Artifacts, recorded not "fixed":** the 429 bursts themselves are
+better-auth's limiter working under 39 fresh-context loads in ~3 min — not
+user-reachable; month-view dots on future days are E2E residue on the
+shared account. Everything else across all 39 captures held: dark tokens,
+mobile stacking, the new companion chip and charged-hours card, planner,
+templates, routines, play, review, settings.
+
+Gates: 547 unit + 7/7 E2E + build green.
+
+
 ## 2026-07-27 — Round 12: iOS main-actor release hardening (Codex)
 
 Roadmap: `docs/plans/2026-07-27-round12-main-actor.md`. Closed the native

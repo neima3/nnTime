@@ -405,6 +405,7 @@ export default async function TodayPage({
               zone={zone}
               date={date}
               activityCount={activities.length}
+              allDone={activities.length > 0 && activities.every((a) => a.done)}
               unfinished={activities
                 .filter((a) => !a.done)
                 .map((a) => ({

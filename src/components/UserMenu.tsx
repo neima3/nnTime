@@ -23,17 +23,17 @@ function subscribeOnline(onChange: () => void): () => void {
  */
 export function UserMenu() {
   const router = useRouter();
-  const { data, isPending } = useSession();
+  const { data, isPending, error } = useSession();
   const online = useSyncExternalStore(
     subscribeOnline,
     () => navigator.onLine,
     () => true,
   );
 
-  // Offline, the session fetch can fail or never resolve — that is not
-  // evidence the user signed out, and "Sign in" is a dead end without a
-  // network anyway. Hold the neutral placeholder instead.
-  if (isPending || (!data?.user && !online)) {
+  // A session probe that failed — offline, rate-limited (429), or a server
+  // hiccup — is not evidence the user signed out. Only a definitive empty
+  // answer means that. Hold the neutral placeholder for every failure shape.
+  if (isPending || (!data?.user && (!online || error != null))) {
     return <div className="h-11 animate-pulse rounded-xl bg-surface-sunken" aria-hidden />;
   }
 
