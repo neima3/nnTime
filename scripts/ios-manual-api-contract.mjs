@@ -415,7 +415,7 @@ function urlSessionAnalysis(source) {
 
   for (const identifier of sessionIdentifiers) {
     const pattern = new RegExp(
-      `\\b${escapedPattern(identifier)}\\s*\\.\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*\\(`,
+      `\\b${escapedPattern(identifier)}\\s*[?!]?\\s*\\.\\s*([A-Za-z_][A-Za-z0-9_]*)\\s*\\(`,
       "g",
     );
     for (const match of masked.matchAll(pattern)) {

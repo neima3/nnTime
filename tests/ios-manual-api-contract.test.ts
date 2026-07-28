@@ -321,6 +321,41 @@ describe("generated Swift client adoption gate", () => {
     );
   });
 
+  it.each([
+    [
+      "optional",
+      "client: URLSession?",
+      "client?.data(from: plannerURL)",
+    ],
+    [
+      "implicitly unwrapped optional",
+      "client: URLSession!",
+      "client!.dataTask(with: plannerRequest)",
+    ],
+  ])(
+    "rejects calls through an explicitly typed %s URLSession receiver",
+    (_label, declaration, call) => {
+      const result = validate([
+        {
+          path: "ios/App/API/KairoAPI.swift",
+          source: facadeSource(),
+        },
+        {
+          path: "ios/App/Services/OptionalTransport.swift",
+          source: `
+            func run(${declaration}) {
+              _ = ${call}
+            }
+          `,
+        },
+      ]);
+
+      expect(result.failures).toContain(
+        "ios/App/Services/OptionalTransport.swift contains manual URLSession transport outside KairoAPI.authRequest",
+      );
+    },
+  );
+
   it("allows an explicitly non-network session-like local type", () => {
     expect(
       validate([
