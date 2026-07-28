@@ -149,6 +149,26 @@ URL (`curl -sSI https://time.neima.me | grep -i 'content-security\|x-frame\|nosn
 Headers may also be set at the Coolify proxy layer; the app-level ones are the
 source of truth.
 
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains` (added
+  2026-07-27; no `preload` on purpose — that's a hard-to-undo commitment).
+  Browsers only honor HSTS over TLS, so it's inert on local http dev.
+
+## Container health + monitoring (8C, 2026-07-27)
+
+- The **Dockerfile carries a `HEALTHCHECK`** hitting `/api/health` every 30 s
+  (node global fetch — the runtime image has no curl). `/api/health` 503s
+  only on the hard dependencies (DB unreachable / migrations failed); AI and
+  scheduler are explicitly optional there, so the check cannot flap on soft
+  failures. After a deploy the app should read `running:healthy` in Coolify —
+  if it reads `running:unknown`, the image predates this section.
+- The **Coolify-side healthcheck toggle** (app → Health Checks → path
+  `/api/health`, port 3000) is complementary and needs the UI or a
+  write-scoped token: the CLI/API token in `.env.local` is **read-only**
+  (GETs work; PATCH `/api/v1/applications/{uuid}` returns Unauthenticated).
+  Same limitation applies to verifying scheduled DB backups by API — confirm
+  those in the UI (database resource → Backups: daily schedule + retention
+  per the section above).
+
 ## Scheduled push cron (H1 → I3, live 2026-07-24)
 
 Scheduled reminders need something to call `POST /api/v1/jobs/tick`. That is now

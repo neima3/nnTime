@@ -25,5 +25,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/drizzle ./drizzle
 USER nextjs
 EXPOSE 3000
+# Container-level health (8C): /api/health returns 503 only on the hard
+# dependencies (DB unreachable / migrations failed) — AI and scheduler are
+# explicitly optional there, so this can't flap on soft failures. node:24
+# has global fetch; the runtime image ships no curl.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD node -e "fetch('http://localhost:3000/api/health').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))"
 # Migrations run automatically on first DB import (ensureMigrated in db/index.ts).
 CMD ["node", "server.js"]

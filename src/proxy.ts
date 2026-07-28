@@ -31,6 +31,10 @@ const SECURITY_HEADERS: Record<string, string> = {
   ].join(", "),
   "cross-origin-opener-policy": "same-origin",
   "cross-origin-resource-policy": "same-origin",
+  // Browsers only honor HSTS over TLS, so this is inert on local http dev.
+  // Scoped to this host (+its nonexistent subdomains); no preload — that's a
+  // hard-to-undo commitment we don't need.
+  "strict-transport-security": "max-age=31536000; includeSubDomains",
 };
 
 const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
