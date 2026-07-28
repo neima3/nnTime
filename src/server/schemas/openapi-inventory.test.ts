@@ -16,8 +16,10 @@ const API_ROOT = resolve(ROOT, "src/app/api/v1");
 const API_PREFIX = "/api/v1";
 
 interface OpenApiSpec {
-  paths?: Record<string, unknown>;
+  paths?: Record<string, Record<string, unknown>>;
 }
+
+const HTTP_METHODS = new Set(["get", "post", "put", "patch", "delete"]);
 
 /**
  * Handlers that intentionally have no OpenAPI entry (private / internal /
@@ -27,9 +29,7 @@ interface OpenApiSpec {
 const HANDLERS_WITHOUT_OPENAPI = [
   "/api/v1/ai/*",
   "/api/v1/calendar/ics",
-  "/api/v1/mood",
   "/api/v1/privacy/*",
-  "/api/v1/stats",
   "/api/v1/tasks/import",
   "/api/v1/jobs/tick",
   // Web Push (F1) — private product endpoints, not in the published contract.
@@ -68,6 +68,20 @@ function loadSpecPaths(): Set<string> {
   );
 }
 
+function loadSpecOperations(): Set<string> {
+  const text = readFileSync(SPEC_PATH, "utf8");
+  const spec = parseYaml(text) as OpenApiSpec;
+  const found = new Set<string>();
+  for (const [path, item] of Object.entries(spec.paths ?? {})) {
+    const withSlash = path.startsWith("/") ? path : `/${path}`;
+    for (const method of Object.keys(item)) {
+      if (!HTTP_METHODS.has(method.toLowerCase())) continue;
+      found.add(`${method.toUpperCase()} ${API_PREFIX}${withSlash}`);
+    }
+  }
+  return found;
+}
+
 /** Walk src/app/api/v1 for route.ts files → OpenAPI-style path patterns. */
 function scanHandlers(): Set<string> {
   const found = new Set<string>();
@@ -99,6 +113,41 @@ function scanHandlers(): Set<string> {
   return found;
 }
 
+function scanHandlerOperations(): Set<string> {
+  const found = new Set<string>();
+
+  function walk(dir: string) {
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      if (statSync(full).isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (entry !== "route.ts") continue;
+      const rel = relative(API_ROOT, dir);
+      const path =
+        !rel || rel === "."
+          ? API_PREFIX
+          : `${API_PREFIX}/${rel
+              .split(/[/\\]/)
+              .map((segment) => {
+                const match = segment.match(/^\[(.+)\]$/);
+                return match ? `{${match[1]}}` : segment;
+              })
+              .join("/")}`;
+      const source = readFileSync(full, "utf8");
+      const exportPattern =
+        /export\s+(?:async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE)\b|export\s+const\s+(GET|POST|PUT|PATCH|DELETE)\b/g;
+      for (const match of source.matchAll(exportPattern)) {
+        found.add(`${match[1] ?? match[2]} ${path}`);
+      }
+    }
+  }
+
+  walk(API_ROOT);
+  return found;
+}
+
 function isAllowlisted(path: string, list: readonly string[]): boolean {
   for (const entry of list) {
     if (entry.endsWith("/*")) {
@@ -114,6 +163,8 @@ function isAllowlisted(path: string, list: readonly string[]): boolean {
 describe("OpenAPI ↔ handler inventory", () => {
   const openapiPaths = loadSpecPaths();
   const handlerPaths = scanHandlers();
+  const openapiOperations = loadSpecOperations();
+  const handlerOperations = scanHandlerOperations();
 
   it("parses at least one OpenAPI path and one handler", () => {
     expect(openapiPaths.size).toBeGreaterThan(0);
@@ -141,6 +192,34 @@ describe("OpenAPI ↔ handler inventory", () => {
     expect(
       missing,
       `Handlers without OpenAPI (add to openapi.yaml or HANDLERS_WITHOUT_OPENAPI):\n${missing.join("\n")}`,
+    ).toEqual([]);
+  });
+
+  it("every non-allowlisted OpenAPI operation has a matching handler export", () => {
+    const missing = [...openapiOperations].filter((operation) => {
+      const path = operation.slice(operation.indexOf(" ") + 1);
+      return (
+        !isAllowlisted(path, OPENAPI_WITHOUT_HANDLERS) &&
+        !handlerOperations.has(operation)
+      );
+    });
+    expect(
+      missing,
+      `OpenAPI operations without handler exports:\n${missing.join("\n")}`,
+    ).toEqual([]);
+  });
+
+  it("every non-allowlisted handler export is documented as an operation", () => {
+    const missing = [...handlerOperations].filter((operation) => {
+      const path = operation.slice(operation.indexOf(" ") + 1);
+      return (
+        !isAllowlisted(path, HANDLERS_WITHOUT_OPENAPI) &&
+        !openapiOperations.has(operation)
+      );
+    });
+    expect(
+      missing,
+      `Handler exports without OpenAPI operations:\n${missing.join("\n")}`,
     ).toEqual([]);
   });
 

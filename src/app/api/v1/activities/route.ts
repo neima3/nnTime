@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     });
     if (!rl.allowed) return rateLimitedResponse(rl);
     const key = request.headers.get("idempotency-key");
-    return withIdempotency(userId, key, "POST", "/api/v1/activities", async () => {
+    return withIdempotency(userId, key, "POST", "/api/v1/activities", async (db) => {
       const body = await parseBody(request, activitySeriesCreate);
       if (body instanceof Response) return body;
       const series = await createActivitySeries(userId, {
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
         notes: body.notes,
         source: body.source,
         checklistTemplate: body.checklistTemplate,
-      });
+      }, { db });
       return Response.json(series, { status: 201 });
     });
   });

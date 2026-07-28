@@ -1,5 +1,69 @@
 # Progress log
 
+## 2026-07-28 — Round 15: executable native API contract (Codex)
+
+Roadmap:
+`docs/plans/2026-07-28-round15-api-contract.md`. Closed a production-risk gap
+hidden behind the historical 7A checkbox: the repository had two independently
+editable OpenAPI documents, the shipping iOS app still used a manual client
+with no operation inventory, and CI did not compile generated Swift.
+
+- **One authored contract.** `api/openapi.yaml` is canonical.
+  `pnpm api:sync-ios` atomically regenerates the Swift package input and
+  `pnpm api:check-ios` proves byte equality without writing. Drift fails with
+  an actionable repair command.
+- **Runtime and documented shapes agree.** Shared Zod contracts now validate
+  stats queries/responses, mood requests/responses, and focus start/update
+  snapshots. Fractional, non-numeric, zero, negative, and over-90 `days`
+  values return the standard 400 envelope instead of reaching date math.
+  The focus contract now documents its collection GET and the real
+  `{session, remainingSec}` start/update response.
+- **Generated-client compatibility is executable.** Apple’s generator exposed
+  that a nullable `oneOf` silently dropped `FocusSnapshot.session`; a
+  compile-time Swift test reproduced the defect before the schema was corrected
+  with a generator-compatible nullable object shape. The package then passed
+  **41 tests / 8 suites**.
+- **The shipping manual client cannot silently add endpoints.**
+  `pnpm api:check-ios-client` validates **19 calls across 12 path shapes**,
+  including Swift interpolation normalization, against canonical OpenAPI.
+  This deliberately covers operation drift while the app remains manual; full
+  request/response type migration to generated client calls is the remaining
+  boundary.
+- **CI now enforces the native contract.** A dedicated `macos-latest`
+  `native-contract` job checks both OpenAPI copies, checks shipping manual
+  operations, and runs the generated Swift package tests independently of the
+  Linux web jobs.
+- **Idempotent native retries are concurrency-safe.** Mood, task, and activity
+  mutations now execute on the same advisory-locked transaction that persists
+  the replay record. A real PostgreSQL test saturates a `max:2` pool with
+  concurrent task/activity mutations and proves they complete without
+  requiring another connection; a same-key overlap creates one mood event and
+  returns one original plus one replayed response.
+- **Adversarial review closed concrete regressions.** Independent review found
+  and drove fixes for Date-shaped focus rows failing response validation,
+  fail-open manual-client scanning, incomplete method/path inventory,
+  duplicate stats query handling, and both same-key and bounded-pool
+  idempotency races. The final re-review reported no remaining Critical or
+  Important findings.
+- **Full local proof.** Lint, typecheck, build, and **59 files / 629 tests**
+  passed; both contract checks passed; parity intentionally remains web
+  **89.74%** and iOS/combined **87.08%**. The app-hosted native gate passed
+  **56 tests** with no Main Thread Checker diagnostic. The definitive serial
+  XCUITest flight passed **17/17** in 493.8 seconds.
+- **Browser and data-safety proof.** The live stats surface rendered cleanly at
+  1440×1000 and 390×844 with no failed requests, console errors, or page
+  errors; production remained read-only. Against the local `kairo_dev`
+  synthetic tenant, a fractional stats query returned 400, an invalid mood
+  enum returned 400, and a valid mood returned `201 {"ok":true}`. Screenshots
+  were visually inspected under `browser-qa/round15-api-contract/` and remain
+  git-ignored.
+
+**Post-commit evidence boundary:** independent review disposition, GitHub
+Actions, the exact Coolify deployment/source SHA, live health dependencies,
+authenticated stats API, headers, and final post-deploy browser evidence are
+collected after the immutable source commit exists. Production mood POST
+remains forbidden.
+
 ## 2026-07-28 — Round 14: verifiable distribution and public privacy (Codex)
 
 Roadmap:

@@ -12,14 +12,10 @@ import {
   type FocusState,
 } from "@/server/services/focus";
 import { appendPlannerEvent } from "@/server/dal";
-import { z } from "zod";
-
-const createBody = z.object({
-  targetDurationMin: z.number().int().positive().max(24 * 60),
-  activityOccurrenceId: z.string().uuid().optional(),
-  title: z.string().optional(),
-  emoji: z.string().optional(),
-});
+import {
+  focusSessionCreateRequest,
+  focusSnapshotResponse,
+} from "@/server/schemas/focus-session";
 
 export async function GET() {
   return handleErrors(async () => {
@@ -27,7 +23,7 @@ export async function GET() {
     const session = await getActiveSession(userId);
     if (!session) {
       return Response.json(
-        { session: null },
+        focusSnapshotResponse.parse({ session: null }),
         { headers: { "cache-control": "private, no-store" } },
       );
     }
@@ -39,7 +35,7 @@ export async function GET() {
       currentIntervalStartedAt: session.currentIntervalStartedAt,
     });
     return Response.json(
-      { session, remainingSec },
+      focusSnapshotResponse.parse({ session, remainingSec }),
       { headers: { "cache-control": "private, no-store" } },
     );
   });
@@ -48,7 +44,7 @@ export async function GET() {
 export async function POST(request: Request) {
   return handleErrors(async () => {
     const { userId } = await requireSession();
-    const body = await parseBody(request, createBody);
+    const body = await parseBody(request, focusSessionCreateRequest);
     if (body instanceof Response) return body;
     const session = await startFocusSession(userId, {
       targetDurationMin: body.targetDurationMin,
@@ -70,6 +66,12 @@ export async function POST(request: Request) {
       accumulatedPauseSec: session.accumulatedPauseSec,
       currentIntervalStartedAt: session.currentIntervalStartedAt,
     });
-    return Response.json({ session, remainingSec }, { status: 201 });
+    return Response.json(
+      focusSnapshotResponse.parse({ session, remainingSec }),
+      {
+        status: 201,
+        headers: { "cache-control": "private, no-store" },
+      },
+    );
   });
 }

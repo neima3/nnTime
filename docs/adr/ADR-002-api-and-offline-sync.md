@@ -7,6 +7,13 @@ Status: **Accepted** (2026-07-12). Binding on web AND iOS clients.
   zod validators are checked against it in CI; Swift client generated from it
   (toolchain pinned in Phase 7A; not the deprecated swift5 generator).
   CI fails on drift between spec, zod, and handlers.
+- The Swift package's target-local
+  `ios/Kairo/Sources/Kairo/openapi.yaml` is generated input, synchronized
+  byte-for-byte from `api/openapi.yaml` with `pnpm api:sync-ios`; it is never
+  authored independently. CI runs `pnpm api:check-ios`, inventories every
+  shipping `KairoAPI.swift` `/api/v1` call with
+  `pnpm api:check-ios-client`, then compiles and tests the generated package on
+  macOS.
 - Formats: instants RFC 3339 UTC (`date-time`), day values `date`, enums
   closed, IDs UUIDv7. Standard error envelope
   `{error: {code, message, details?, retryable: bool}}`. Cursor pagination

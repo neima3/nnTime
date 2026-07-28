@@ -18,6 +18,7 @@ import {
 } from "@/server/schemas/activity-series";
 import { editSeriesOccurrence } from "@/server/services/recurrence";
 import { withIdempotency } from "@/server/idempotency";
+import type { Db } from "@/server/dal";
 
 export async function GET(
   _request: Request,
@@ -54,8 +55,8 @@ export async function PATCH(
     // Offline replays (ADR-002): a queued status change whose response was
     // lost must not double-apply on retry — replay the stored result instead.
     const idemKey = request.headers.get("idempotency-key");
-    return withIdempotency(userId, idemKey, "PATCH", `/api/v1/activities/${id}`, () =>
-      applyPatch(userId, id, ifMatch, body),
+    return withIdempotency(userId, idemKey, "PATCH", `/api/v1/activities/${id}`, (db) =>
+      applyPatch(userId, id, ifMatch, body, db),
     );
   });
 }
@@ -65,6 +66,7 @@ async function applyPatch(
   id: string,
   ifMatch: string,
   body: ActivitySeriesUpdate,
+  db: Db,
 ): Promise<Response> {
   const {
     editScope,
@@ -76,7 +78,7 @@ async function applyPatch(
   } = body;
 
   const scope = editScope ?? "all";
-  const series = await getActivitySeries(userId, id);
+  const series = await getActivitySeries(userId, id, { db });
   const occurrenceKey = occurrenceKeyRaw
     ? new Date(occurrenceKeyRaw)
     : series.dtstartLocal;
@@ -102,6 +104,7 @@ async function applyPatch(
     scope,
     patch,
     Number(ifMatch),
+    { db },
   );
 
   // History for stats/streaks (ADR-001 planner_events).
@@ -111,26 +114,26 @@ async function applyPatch(
       entityId: id,
       eventType: "complete",
       payload: { occurrenceKey: occurrenceKey.toISOString() },
-    }).catch(() => {});
+    }, { db }).catch(() => {});
   } else if (status === "skipped") {
     await appendPlannerEvent(userId, {
       entityType: "activity_series",
       entityId: id,
       eventType: "skip",
       payload: { occurrenceKey: occurrenceKey.toISOString() },
-    }).catch(() => {});
+    }, { db }).catch(() => {});
   } else if (status === "pending" && completedAt === null) {
     await appendPlannerEvent(userId, {
       entityType: "activity_series",
       entityId: id,
       eventType: "uncomplete",
       payload: {},
-    }).catch(() => {});
+    }, { db }).catch(() => {});
   }
 
   // For this_and_future the "current" series may be the truncated original;
   // clients re-fetch the day. For all/this return the still-current master.
-  const updated = await getActivitySeries(userId, id);
+  const updated = await getActivitySeries(userId, id, { db });
   return Response.json(updated, {
     headers: {
       "cache-control": "private, no-store",

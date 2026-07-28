@@ -1,0 +1,168 @@
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { and, eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import {
+  createEphemeralDb,
+  insertUser,
+  rethrowIfMigrationFailure,
+  type EphemeralDb,
+} from "./db/test-db";
+import * as schema from "./db/schema";
+import { withIdempotency } from "./idempotency";
+import {
+  createActivitySeries,
+  createTask,
+  type Db,
+} from "./dal";
+
+let env: EphemeralDb | null = null;
+let dbAvailable = false;
+let userId: string;
+
+beforeAll(async () => {
+  try {
+    env = await createEphemeralDb();
+    dbAvailable = true;
+    userId = crypto.randomUUID();
+    await insertUser(env.db, userId, "idempotency-concurrency@test.com");
+  } catch (error) {
+    rethrowIfMigrationFailure(error);
+    dbAvailable = false;
+  }
+}, 60000);
+
+afterAll(async () => {
+  if (env) await env.teardown();
+});
+
+describe("withIdempotency concurrency", () => {
+  it("allows only one same-key mood side effect", async () => {
+    if (!dbAvailable || !env) return;
+    const key = crypto.randomUUID();
+    let executions = 0;
+    let releaseFirst!: () => void;
+    let markFirstStarted!: () => void;
+    const firstStarted = new Promise<void>((resolve) => {
+      markFirstStarted = resolve;
+    });
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+
+    const execute = async (executionDb: Db) => {
+      executions += 1;
+      if (executions === 1) {
+        markFirstStarted();
+        await firstGate;
+      }
+      await executionDb.insert(schema.plannerEvents).values({
+        id: crypto.randomUUID(),
+        userId,
+        entityType: "user",
+        entityId: crypto.randomUUID(),
+        eventType: "mood_checkin",
+        payload: { mood: "good" },
+        occurredAt: new Date(),
+        tz: "America/New_York",
+      });
+      return Response.json({ ok: true }, { status: 201 });
+    };
+
+    const first = withIdempotency(
+      userId,
+      key,
+      "POST",
+      "/api/v1/mood",
+      execute,
+      { db: env.db as Db },
+    );
+    await firstStarted;
+    const second = withIdempotency(
+      userId,
+      key,
+      "POST",
+      "/api/v1/mood",
+      execute,
+      { db: env.db as Db },
+    );
+    releaseFirst();
+    const responses = await Promise.all([first, second]);
+
+    const events = await env.db
+      .select()
+      .from(schema.plannerEvents)
+      .where(
+        and(
+          eq(schema.plannerEvents.userId, userId),
+          eq(schema.plannerEvents.eventType, "mood_checkin"),
+        ),
+      );
+    expect(executions).toBe(1);
+    expect(events).toHaveLength(1);
+    expect(responses.map((response) => response.status)).toEqual([201, 201]);
+    expect(
+      responses.filter(
+        (response) => response.headers.get("idempotent-replay") === "true",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("keeps task and activity mutations on the locked connection under pool saturation", async () => {
+    if (!dbAvailable || !env) return;
+    const client = postgres(env.url, { max: 2 });
+    const boundedDb = drizzle(client, { schema });
+    const timeout = new Promise<never>((_, reject) => {
+      setTimeout(
+        () => reject(new Error("idempotent mutations exhausted the bounded pool")),
+        3000,
+      );
+    });
+
+    try {
+      const taskMutation = withIdempotency(
+        userId,
+        crypto.randomUUID(),
+        "POST",
+        "/api/v1/tasks",
+        async (executionDb) => {
+          const task = await createTask(
+            userId,
+            { bucket: "inbox", title: "Pool-safe task" },
+            { db: executionDb },
+          );
+          return Response.json(task, { status: 201 });
+        },
+        { db: boundedDb as Db },
+      );
+      const activityMutation = withIdempotency(
+        userId,
+        crypto.randomUUID(),
+        "POST",
+        "/api/v1/activities",
+        async (executionDb) => {
+          const activity = await createActivitySeries(
+            userId,
+            {
+              tz: "America/New_York",
+              dtstartLocal: new Date("2026-07-28T09:00:00.000Z"),
+              title: "Pool-safe activity",
+              durationMin: 30,
+            },
+            { db: executionDb },
+          );
+          return Response.json(activity, { status: 201 });
+        },
+        { db: boundedDb as Db },
+      );
+
+      const responses = await Promise.race([
+        Promise.all([taskMutation, activityMutation]),
+        timeout,
+      ]);
+      expect(responses.map((response) => response.status)).toEqual([201, 201]);
+    } finally {
+      await client.end({ timeout: 1 });
+    }
+  });
+});

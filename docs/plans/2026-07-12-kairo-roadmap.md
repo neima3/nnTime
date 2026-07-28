@@ -348,7 +348,12 @@ parity row, scores 0 if deferred). 8B Google sign-in on web+iOS; execute the
 Apple Reminders import decision recorded in 0.5 checklist (ship or justified
 exclusion); **Apple Health sync (HealthKit: write focus/mindful minutes,
 read sleep schedule to inform wind-down suggestions; explicit user opt-in)**. 8C ongoing hardening: repeated restore drill, Playwright E2E in CI,
-uptime monitoring, dependency audit. 8D privacy declarations, public policy,
+uptime monitoring, dependency audit. **Round 15 hardening (2026-07-28):**
+`api/openapi.yaml` is now the only authored API document; its Swift package
+copy is byte-for-byte checked, every shipping manual Swift operation is
+checked against documented method/path pairs, generated Swift compiles and
+tests in a dedicated macOS CI job, and stats/mood/focus snapshot drift found by
+the new gates is corrected. 8D privacy declarations, public policy,
 review-prep contract, and final scripted parity audit for iOS ≥85%. App Store
 upload, processing, review, and launch remain per-release states and are never
 inferred from this historical phase checkbox.

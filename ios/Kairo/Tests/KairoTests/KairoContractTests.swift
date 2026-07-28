@@ -12,4 +12,8 @@ import Foundation
     @Test func generatedClientTypeExists() {
         let _ = Client.self
     }
+    @Test func generatedFocusSnapshotIncludesSession() {
+        let snapshot = Components.Schemas.FocusSnapshot(remainingSec: nil)
+        let _ = snapshot.session
+    }
 }

@@ -69,6 +69,34 @@ jobs:
       - name: Build
         run: pnpm build
 
+  # ADR-002 — compile the generated Swift client from the exact canonical API
+  # contract and guard the shipping app's manual calls against that contract.
+  native-contract:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check canonical and shipping-client contracts
+        run: |
+          pnpm api:check-ios
+          pnpm api:check-ios-client
+
+      - name: Build and test generated Swift client
+        run: swift test --package-path ios/Kairo
+
   # T15 — real-browser core-loop suite (sign-up, plan/complete, capture,
   # clock format incl. SSR payload, offline replay). The app self-migrates on
   # startup, so the job only provides a DB and a throwaway auth secret.

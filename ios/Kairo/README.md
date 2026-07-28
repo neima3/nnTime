@@ -3,15 +3,27 @@
 ## Build & Test
 
 ```bash
+# From the repository root, after editing api/openapi.yaml:
+pnpm api:sync-ios
+pnpm api:check-ios
+pnpm api:check-ios-client
+
 # Build the Swift Package (includes OpenAPI client generation)
-swift build
+swift build --package-path ios/Kairo
 
 # Run tests
-swift test
+swift test --package-path ios/Kairo
 
 # Open in Xcode (opens Package.swift — Xcode resolves SPM deps automatically)
-open Package.swift
+open ios/Kairo/Package.swift
 ```
+
+`api/openapi.yaml` is the only authored REST contract.
+`Sources/Kairo/openapi.yaml` is a committed, byte-identical generated copy
+because Swift OpenAPI Generator requires the document inside its target. Never
+edit the package copy directly. GitHub Actions checks both copies, validates
+the shipping app's manual `/api/v1` calls against the canonical operations,
+and compiles this generated client on macOS.
 
 ## Archive for TestFlight
 

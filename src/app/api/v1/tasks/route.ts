@@ -33,14 +33,14 @@ export async function POST(request: Request) {
     });
     if (!rl.allowed) return rateLimitedResponse(rl);
     const key = request.headers.get("idempotency-key");
-    return withIdempotency(userId, key, "POST", "/api/v1/tasks", async () => {
+    return withIdempotency(userId, key, "POST", "/api/v1/tasks", async (db) => {
       const body = await parseBody(request, taskCreate);
       if (body instanceof Response) return body;
       // zod dateStr is a string; the DAL expects a Date for the `date` column.
       const task = await createTask(userId, {
         ...body,
         ...(body.date ? { date: new Date(body.date) } : { date: null }),
-      });
+      }, { db });
       return Response.json(task, { status: 201 });
     });
   });

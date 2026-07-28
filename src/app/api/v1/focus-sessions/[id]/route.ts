@@ -11,18 +11,10 @@ import {
   type FocusState,
 } from "@/server/services/focus";
 import { NotFoundError, appendPlannerEvent } from "@/server/dal";
-import { z } from "zod";
-
-const patchBody = z.discriminatedUnion("action", [
-  z.object({
-    action: z.literal("transition"),
-    state: z.enum(["running", "paused", "completed", "skipped", "cancelled"]),
-  }),
-  z.object({
-    action: z.literal("extend"),
-    addMinutes: z.union([z.literal(1), z.literal(5), z.literal(10)]),
-  }),
-]);
+import {
+  focusSessionPatchRequest,
+  focusSnapshotResponse,
+} from "@/server/schemas/focus-session";
 
 export async function PATCH(
   request: Request,
@@ -31,7 +23,7 @@ export async function PATCH(
   return handleErrors(async () => {
     const { userId } = await requireSession();
     const { id } = await params;
-    const body = await parseBody(request, patchBody);
+    const body = await parseBody(request, focusSessionPatchRequest);
     if (body instanceof Response) return body;
 
     try {
@@ -80,7 +72,7 @@ export async function PATCH(
         currentIntervalStartedAt: session.currentIntervalStartedAt,
       });
       return Response.json(
-        { session, remainingSec },
+        focusSnapshotResponse.parse({ session, remainingSec }),
         { headers: { "cache-control": "private, no-store" } },
       );
     } catch (e) {

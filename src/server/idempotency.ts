@@ -5,8 +5,9 @@
  * 48h and replays it on retry so offline/reconnect clients don't double-create.
  */
 import "server-only";
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
 import db, { schema } from "@/server/db";
+import type { Db } from "@/server/dal";
 
 const TTL_MS = 48 * 60 * 60 * 1000;
 
@@ -23,9 +24,10 @@ function replayResponse(status: number, body: unknown): Response {
 async function lookup(
   userId: string,
   key: string,
+  database: Db = db,
 ): Promise<{ responseStatus: number; responseBody: unknown } | null> {
   const now = new Date();
-  const rows = await db
+  const rows = await database
     .select({
       responseStatus: schema.idempotencyKeys.responseStatus,
       responseBody: schema.idempotencyKeys.responseBody,
@@ -71,33 +73,40 @@ async function extractStorableBody(response: Response): Promise<unknown> {
  *
  * - No key → execute as-is.
  * - Known unexpired key → replay stored status + body (`idempotent-replay: true`).
- * - Unknown key → execute; on status < 500, store for 48h. Concurrent first
- *   writers race on the composite PK; losers re-read and replay the winner.
+ * - Unknown key → serialize by user/key, execute once, then store any status
+ *   below 500 for 48h. Waiters re-read and replay the stored response.
  */
 export async function withIdempotency(
   userId: string,
   key: string | null | undefined,
   method: string,
   path: string,
-  execute: () => Promise<Response>,
+  execute: (database: Db) => Promise<Response>,
+  opts: { db?: Db } = {},
 ): Promise<Response> {
-  if (!key) return execute();
+  const database = opts.db ?? (db as Db);
+  if (!key) return execute(database);
 
-  const existing = await lookup(userId, key);
-  if (existing) {
-    return replayResponse(existing.responseStatus, existing.responseBody);
-  }
+  const lockKey = `${userId}:${key}`;
+  return database.transaction(async (transaction) => {
+    const lockedDb = transaction as unknown as Db;
+    await lockedDb.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
+    );
 
-  const response = await execute();
+    const existing = await lookup(userId, key, lockedDb);
+    if (existing) {
+      return replayResponse(existing.responseStatus, existing.responseBody);
+    }
 
-  // Don't cache server failures — client may retry after fix.
-  if (response.status >= 500) return response;
+    const response = await execute(lockedDb);
 
-  const body = await extractStorableBody(response);
-  const expiresAt = new Date(Date.now() + TTL_MS);
+    // Don't cache server failures — client may retry after fix.
+    if (response.status >= 500) return response;
 
-  try {
-    const inserted = await db
+    const body = await extractStorableBody(response);
+    const expiresAt = new Date(Date.now() + TTL_MS);
+    await lockedDb
       .insert(schema.idempotencyKeys)
       .values({
         userId,
@@ -108,40 +117,18 @@ export async function withIdempotency(
         responseBody: body,
         expiresAt,
       })
-      .onConflictDoNothing()
-      .returning({ key: schema.idempotencyKeys.key });
-
-    // Lost the race, or an expired row still holds the PK.
-    if (inserted.length === 0) {
-      const winner = await lookup(userId, key);
-      if (winner) {
-        return replayResponse(winner.responseStatus, winner.responseBody);
-      }
-      // Expired key occupying PK — overwrite so the new response is stored.
-      await db
-        .update(schema.idempotencyKeys)
-        .set({
+      .onConflictDoUpdate({
+        target: [schema.idempotencyKeys.userId, schema.idempotencyKeys.key],
+        set: {
           requestMethod: method,
           requestPath: path,
           responseStatus: response.status,
           responseBody: body,
           expiresAt,
           createdAt: new Date(),
-        })
-        .where(
-          and(
-            eq(schema.idempotencyKeys.userId, userId),
-            eq(schema.idempotencyKeys.key, key),
-          ),
-        );
-    }
-  } catch {
-    // PK conflict or other insert error → re-read and replay if present.
-    const winner = await lookup(userId, key);
-    if (winner) {
-      return replayResponse(winner.responseStatus, winner.responseBody);
-    }
-  }
+        },
+      });
 
-  return response;
+    return response;
+  });
 }

@@ -26,6 +26,7 @@ export * from "./batch";
 export * from "./change";
 export * from "./day";
 export * from "./search";
+export * from "./stats";
 
 // Re-import the schema objects (named exports from above) to build the registry.
 import { errorEnvelope } from "./envelope";
@@ -40,13 +41,23 @@ import {
   routineStepResponse,
   routineScheduleResponse,
 } from "./routine";
-import { focusSessionResponse } from "./focus-session";
+import {
+  focusSessionCreateRequest,
+  focusSessionPatchRequest,
+  focusSessionResponse,
+  focusSnapshotResponse,
+} from "./focus-session";
 import { plannerEventResponse } from "./planner-event";
 import { userSettingsResponse } from "./user-settings";
 import { batchRequest, batchResponse } from "./batch";
 import { changeLogEntry, changesResponse } from "./change";
 import { dayResponse } from "./day";
 import { searchHit, searchResponse } from "./search";
+import {
+  moodCheckinRequest,
+  moodCheckinResponse,
+  statsResponse,
+} from "./stats";
 
 /**
  * Registry of response/component schemas keyed by the OpenAPI component name.
@@ -65,6 +76,9 @@ export const responseSchemaRegistry = {
   RoutineStep: routineStepResponse,
   RoutineSchedule: routineScheduleResponse,
   FocusSession: focusSessionResponse,
+  FocusSessionCreateRequest: focusSessionCreateRequest,
+  FocusSessionPatchRequest: focusSessionPatchRequest,
+  FocusSnapshot: focusSnapshotResponse,
   PlannerEvent: plannerEventResponse,
   UserSettings: userSettingsResponse,
   BatchRequest: batchRequest,
@@ -74,6 +88,9 @@ export const responseSchemaRegistry = {
   DayResponse: dayResponse,
   SearchHit: searchHit,
   SearchResponse: searchResponse,
+  StatsResponse: statsResponse,
+  MoodCheckinRequest: moodCheckinRequest,
+  MoodCheckinResponse: moodCheckinResponse,
 } as const;
 
 /** Type alias for the component-name keys, for consumers/tests. */
