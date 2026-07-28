@@ -1,16 +1,14 @@
-/**
- * POST /api/v1/jobs/tick — ADR-004 scheduler tick endpoint.
- *
- * Coolify cron (or external scheduler) hits this authenticated route once per
- * minute. Runs the routine materializer and optional notification tick under
- * their own advisory locks.
- *
- * Auth: Authorization: Bearer ${CRON_SECRET} OR x-cron-secret: ${CRON_SECRET}
- */
-import { materializeRoutines } from "@/server/services/routine-materializer";
-import { computeNotificationJobs } from "@/server/services/notifications";
-import { deliverDueNotificationJobs } from "@/server/services/notification-delivery";
+import db from "@/server/db";
 import { logger } from "@/server/log";
+import { deliverDueNotificationJobs } from "@/server/services/notification-delivery";
+import { computeNotificationJobs } from "@/server/services/notifications";
+import { materializeRoutines } from "@/server/services/routine-materializer";
+import {
+  failSchedulerRun,
+  pruneSchedulerRuns,
+  startSchedulerRun,
+  succeedSchedulerRun,
+} from "@/server/services/scheduler-runs";
 
 export const dynamic = "force-dynamic";
 
@@ -32,9 +30,7 @@ function authorizeCron(request: Request): Response | null {
     return null;
   }
 
-  if (bearer === secret || xCron === secret) {
-    return null;
-  }
+  if (bearer === secret || xCron === secret) return null;
 
   return Response.json(
     { error: "unauthorized" },
@@ -46,50 +42,42 @@ export async function POST(request: Request) {
   const denied = authorizeCron(request);
   if (denied) return denied;
 
+  const startedAt = new Date();
+  let runId: string | null = null;
   try {
+    runId = await startSchedulerRun(db, startedAt);
     const materialize = await materializeRoutines();
+    const notifications = await computeNotificationJobs();
+    const delivery = await deliverDueNotificationJobs();
+    const summary = { materialize, notifications, delivery };
+    const finishedAt = new Date();
 
-    let notifications: Awaited<
-      ReturnType<typeof computeNotificationJobs>
-    > | null = null;
-    let notificationsError: string | null = null;
-    try {
-      notifications = await computeNotificationJobs();
-    } catch (e) {
-      notificationsError = e instanceof Error ? e.message : String(e);
-      logger.warn("jobs/tick notification tick failed", {
-        error: notificationsError,
-      });
-    }
-
-    let delivery: Awaited<
-      ReturnType<typeof deliverDueNotificationJobs>
-    > | null = null;
-    try {
-      delivery = await deliverDueNotificationJobs();
-    } catch (e) {
-      logger.warn("jobs/tick push delivery failed", {
-        error: e instanceof Error ? e.message : String(e),
-      });
-    }
+    await succeedSchedulerRun(db, runId, finishedAt, summary);
+    await pruneSchedulerRuns(db, finishedAt);
 
     return Response.json(
       {
         ok: true,
-        timestamp: new Date().toISOString(),
-        materialize,
-        notifications,
-        notificationsError,
-        delivery,
+        timestamp: finishedAt.toISOString(),
+        ...summary,
       },
       { headers: { "cache-control": "no-store" } },
     );
-  } catch (e) {
-    const message = e instanceof Error ? e.message : String(e);
-    logger.error("jobs/tick failed", { error: message });
+  } catch (error) {
+    if (runId) {
+      try {
+        await failSchedulerRun(db, runId, new Date(), error);
+      } catch {
+        logger.error("jobs/tick could not record failed scheduler run");
+      }
+    }
+    logger.error("jobs/tick failed");
     return Response.json(
-      { ok: false, error: message },
-      { status: 500, headers: { "cache-control": "no-store" } },
+      { ok: false, error: "scheduler tick failed" },
+      {
+        status: 500,
+        headers: { "cache-control": "no-store" },
+      },
     );
   }
 }
