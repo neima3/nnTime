@@ -83,7 +83,9 @@ describe("scheduler run ledger", () => {
     const sensitive =
       `push failed\nhttps://push.invalid/secret ` +
       `Authorization: Bearer cron-top-secret ` +
-      `api_key=provider-key user@example.com ${"x".repeat(900)}`;
+      `api_key=provider-key user@example.com ` +
+      `postgresql://kairo:prod-db-password@db:5432/kairo ` +
+      `{"token":"provider-secret"} ${"x".repeat(900)}`;
     await failSchedulerRun(env!.db, id, new Date(NOW.getTime() + 500), sensitive);
     const [run] = await env!.db
       .select()
@@ -96,6 +98,8 @@ describe("scheduler run ledger", () => {
     expect(run.lastError).not.toContain("push.invalid");
     expect(run.lastError).not.toContain("cron-top-secret");
     expect(run.lastError).not.toContain("provider-key");
+    expect(run.lastError).not.toContain("prod-db-password");
+    expect(run.lastError).not.toContain("provider-secret");
     expect(run.lastError).not.toContain("user@example.com");
     expect(run.summary).toEqual({});
   });

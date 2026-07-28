@@ -155,6 +155,31 @@ describe.sequential("sendToUser", () => {
     });
   });
 
+  itDb("bounds provider requests and sends subscriptions concurrently", async () => {
+    const userId = await seedSubscriptions(2);
+    const releases: Array<() => void> = [];
+    webPushMocks.sendNotification.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releases.push(() => resolve({ statusCode: 201 }));
+        }),
+    );
+
+    const delivery = sendToUser(userId, PAYLOAD, {
+      db: env!.db,
+      sendNotification: webPushMocks.sendNotification,
+    });
+    await vi.waitFor(() => {
+      expect(webPushMocks.sendNotification).toHaveBeenCalledTimes(2);
+    });
+    for (const release of releases) release();
+
+    await expect(delivery).resolves.toMatchObject({ sent: 2 });
+    for (const call of webPushMocks.sendNotification.mock.calls) {
+      expect(call[2]).toMatchObject({ timeout: 30_000 });
+    }
+  });
+
   itDb("reports an empty live subscription set honestly", async () => {
     const userId = await seedSubscriptions(0);
     await expect(sendToUser(userId, PAYLOAD, { db: env!.db })).resolves.toEqual({

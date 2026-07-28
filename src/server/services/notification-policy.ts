@@ -16,6 +16,7 @@ export interface NotificationPushPayload {
   body: string;
   tag: string;
   url: string;
+  silent?: boolean;
 }
 
 const MINUTE_MS = 60_000;
@@ -110,6 +111,10 @@ export function hideActivityTitlesOnLockScreen(prefs: unknown): boolean {
   return prefsRecord(prefs).hideActivityTitlesOnLockScreen === true;
 }
 
+export function notificationSoundEnabled(prefs: unknown): boolean {
+  return prefsRecord(prefs).soundEnabled !== false;
+}
+
 export function retryDelayMs(attempt: number): number {
   const normalized = Math.max(1, Math.floor(attempt));
   return [1, 5, 15, 30][Math.min(normalized - 1, 3)] * MINUTE_MS;
@@ -139,11 +144,16 @@ export function buildPushPayload(
     emoji?: string;
     entityId?: string;
     hideActivityTitle?: boolean;
+    soundEnabled?: boolean;
   },
 ): NotificationPushPayload {
   const title = input.title?.trim() || "Next activity";
   const entityId = input.entityId?.trim() || "activity";
   const hidden = input.hideActivityTitle === true;
+  const sound =
+    input.soundEnabled === undefined
+      ? {}
+      : { silent: input.soundEnabled === false };
 
   switch (type) {
     case "start":
@@ -154,6 +164,7 @@ export function buildPushPayload(
         body: "Starting now — no rush, just a nudge.",
         tag: `start-${entityId}`,
         url: "/app/today",
+        ...sound,
       };
     case "halfway":
       return {
@@ -161,6 +172,7 @@ export function buildPushPayload(
         body: "A gentle check-in — keep going or adjust the plan.",
         tag: `halfway-${entityId}`,
         url: "/app/today",
+        ...sound,
       };
     case "wrap-up":
       return {
@@ -168,6 +180,7 @@ export function buildPushPayload(
         body: "About five minutes left — finish softly or extend.",
         tag: `wrap-up-${entityId}`,
         url: "/app/focus",
+        ...sound,
       };
     case "review-today":
       return {
@@ -175,6 +188,7 @@ export function buildPushPayload(
         body: "A quiet moment to close the loop on your day.",
         tag: "review-today",
         url: "/app/review",
+        ...sound,
       };
     case "weekly-review":
       return {
@@ -182,6 +196,7 @@ export function buildPushPayload(
         body: "Notice what worked and shape a gentler week ahead.",
         tag: "weekly-review",
         url: "/app/week",
+        ...sound,
       };
   }
 }

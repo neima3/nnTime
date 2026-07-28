@@ -195,6 +195,62 @@ function ReminderTimingRows({
   ));
 }
 
+function NotificationTypeRows({
+  prefs,
+  onChange,
+}: {
+  prefs: Record<string, unknown>;
+  onChange: (nextPrefs: Record<string, unknown>) => void;
+}) {
+  const rows = [
+    {
+      label: "Start-of-block reminders",
+      hint: "A gentle nudge when a scheduled activity begins",
+      key: "startNudges",
+    },
+    {
+      label: "Halfway check-ins",
+      hint: "A soft moment to keep going or adjust the plan",
+      key: "halfwayNudges",
+    },
+    {
+      label: "Wrap-up reminders",
+      hint: "A heads-up near the planned end of longer activities",
+      key: "wrapUpNudges",
+    },
+    {
+      label: "Daily review reminder",
+      hint: "A quiet evening prompt to close the loop on today",
+      key: "reviewTodayNudges",
+    },
+    {
+      label: "Weekly review reminder",
+      hint: "A week-ending prompt to notice patterns and plan gently",
+      key: "weeklyReviewNudges",
+    },
+  ] as const;
+
+  return rows.map((row) => (
+    <Row
+      key={row.key}
+      label={row.label}
+      hint={row.hint}
+      right={
+        <Toggle
+          label={row.label}
+          on={prefs[row.key] !== false}
+          onChange={(value) =>
+            onChange({
+              ...prefs,
+              [row.key]: value,
+            })
+          }
+        />
+      }
+    />
+  ));
+}
+
 /**
  * Quiet hours (H7) — a nightly window where reminders hold off. Persisted in
  * notificationPrefs.quietHours, which is the same blob the server push delivery
@@ -670,28 +726,34 @@ export function SettingsClient() {
             />
           }
         />
-        <Row
-          label="Start-of-block reminders"
-          hint="The push nudge when a scheduled activity begins — off silences just these, other nudges stay"
-          right={
-            <Toggle
-              label="Start-of-block reminders"
-              on={settings.notificationPrefs.startNudges !== false}
-              onChange={(v) =>
-                void patch({
-                  notificationPrefs: {
-                    ...settings.notificationPrefs,
-                    startNudges: v,
-                  },
-                })
-              }
-            />
+        <NotificationTypeRows
+          prefs={settings.notificationPrefs}
+          onChange={(nextPrefs) =>
+            void patch({ notificationPrefs: nextPrefs })
           }
         />
         <ReminderTimingRows
           prefs={settings.notificationPrefs}
           onChange={(nextPrefs) =>
             void patch({ notificationPrefs: nextPrefs })
+          }
+        />
+        <Row
+          label="Notification sounds"
+          hint="Let your device play its normal alert sound with Kairo pushes"
+          right={
+            <Toggle
+              label="Notification sounds"
+              on={settings.notificationPrefs.soundEnabled !== false}
+              onChange={(value) =>
+                void patch({
+                  notificationPrefs: {
+                    ...settings.notificationPrefs,
+                    soundEnabled: value,
+                  },
+                })
+              }
+            />
           }
         />
         <Row

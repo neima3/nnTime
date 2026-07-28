@@ -44,13 +44,19 @@ describe("durable notification regression contract", () => {
     }
   });
 
-  it("keeps reminder timing and lock-screen privacy user-configurable", () => {
+  it("keeps notification types, timing, privacy, and sound user-configurable", () => {
     const settings = source("src/components/SettingsClient.tsx");
     for (const key of [
+      "startNudges",
+      "halfwayNudges",
+      "wrapUpNudges",
+      "reviewTodayNudges",
+      "weeklyReviewNudges",
       "startOffsetMin",
       "halfwayOffsetMin",
       "wrapUpOffsetMin",
       "hideActivityTitlesOnLockScreen",
+      "soundEnabled",
     ]) {
       expect(settings).toContain(key);
     }
@@ -58,6 +64,7 @@ describe("durable notification regression contract", () => {
     expect(settings).toContain("Start reminder timing");
     expect(settings).toContain("Halfway reminder timing");
     expect(settings).toContain("Wrap-up reminder timing");
+    expect(settings).toContain("Notification sounds");
   });
 
   it("adds infrastructure without rewriting production planner history", () => {

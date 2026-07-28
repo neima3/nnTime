@@ -31,6 +31,7 @@ export interface PushPayload {
   body: string;
   tag?: string;
   url?: string;
+  silent?: boolean;
 }
 
 export interface PushDeliveryResult {
@@ -81,11 +82,12 @@ export async function sendToUser(
   let retryableFailures = 0;
   const body = JSON.stringify(payload);
 
-  for (const sub of subs) {
+  await Promise.all(subs.map(async (sub) => {
     try {
       await sendNotification(
         { endpoint: sub.endpoint, keys: sub.keys as { p256dh: string; auth: string } },
         body,
+        { timeout: 30_000 },
       );
       sent++;
     } catch (err) {
@@ -100,7 +102,7 @@ export async function sendToUser(
         retryableFailures++;
       }
     }
-  }
+  }));
   return {
     configured: true,
     subscriptions: subs.length,

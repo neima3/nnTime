@@ -87,9 +87,13 @@ async function seedJob(
   const type = input.type ?? "start";
   const isReview = type === "review-today" || type === "weekly-review";
   const defaultFireAt =
-    activityFireTimes(OCCURRENCE, 30).find(
-      (candidate) => candidate.type === type,
-    )?.fireAt ?? new Date(NOW.getTime() - 60_000);
+    type === "review-today"
+      ? new Date("2026-07-28T20:00:00.000Z")
+      : type === "weekly-review"
+        ? new Date("2026-07-25T18:00:00.000Z")
+        : activityFireTimes(OCCURRENCE, 30).find(
+            (candidate) => candidate.type === type,
+          )!.fireAt;
   const seriesId =
     input.entityId ?? (isReview ? null : await seedSeries(userId));
   const id = input.id ?? uuidv7();
@@ -214,6 +218,55 @@ describe("deliverDueNotificationJobs", () => {
     expect(await getJob(jobId)).toMatchObject({
       state: "sent",
       deliveredAt: reclaimedAt,
+      claimToken: null,
+    });
+  });
+
+  itDb("renews the lease while the provider send is in flight", async () => {
+    const userId = await seedUser();
+    const jobId = await seedJob(userId);
+    let currentTime = NOW;
+    let sendEnteredResolve!: () => void;
+    let releaseSendResolve!: () => void;
+    const sendEntered = new Promise<void>((resolve) => {
+      sendEnteredResolve = resolve;
+    });
+    const releaseSend = new Promise<void>((resolve) => {
+      releaseSendResolve = resolve;
+    });
+    const firstSend = vi.fn(async () => {
+      sendEnteredResolve();
+      await releaseSend;
+      return SUCCESS;
+    });
+    const secondSend = vi.fn().mockResolvedValue(SUCCESS);
+
+    const firstWorker = deliverDueNotificationJobs({
+      db: env!.db,
+      now: NOW,
+      clock: () => currentTime,
+      claimHeartbeatMs: 5,
+      send: firstSend,
+    });
+    await sendEntered;
+    currentTime = new Date(NOW.getTime() + 6 * 60_000);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+
+    const secondResult = await deliverDueNotificationJobs({
+      db: env!.db,
+      now: currentTime,
+      send: secondSend,
+    });
+    releaseSendResolve();
+    const firstResult = await firstWorker;
+
+    expect(secondResult.considered).toBe(0);
+    expect(secondSend).not.toHaveBeenCalled();
+    expect(firstResult.delivered).toBe(1);
+    expect(firstSend).toHaveBeenCalledTimes(1);
+    expect(await getJob(jobId)).toMatchObject({
+      state: "sent",
+      deliveredAt: currentTime,
       claimToken: null,
     });
   });
@@ -452,6 +505,48 @@ describe("deliverDueNotificationJobs", () => {
     expect(send).toHaveBeenCalledTimes(1);
     expect(send.mock.calls[0]?.[1]).toMatchObject({
       title: "Activity starting",
+    });
+  });
+
+  itDb("suppresses obsolete review retries after planning settings change", async () => {
+    const dailyUser = await seedUser();
+    const weeklyUser = await seedUser();
+    const dailyId = await seedJob(dailyUser, {
+      type: "review-today",
+      fireAt: new Date("2026-07-28T20:00:00.000Z"),
+      nextAttemptAt: new Date("2026-07-28T22:59:00.000Z"),
+    });
+    const weeklyId = await seedJob(weeklyUser, {
+      type: "weekly-review",
+      fireAt: new Date("2026-07-25T18:00:00.000Z"),
+      nextAttemptAt: new Date("2026-07-28T22:59:00.000Z"),
+    });
+    await env!.db
+      .update(userSettings)
+      .set({ timezone: "America/New_York" })
+      .where(eq(userSettings.userId, dailyUser));
+    await env!.db
+      .update(userSettings)
+      .set({ weekStart: 1 })
+      .where(eq(userSettings.userId, weeklyUser));
+    const send = vi.fn().mockResolvedValue(SUCCESS);
+
+    const result = await deliverDueNotificationJobs({
+      db: env!.db,
+      now: NOW,
+      limit: 20,
+      send,
+    });
+
+    expect(result).toMatchObject({ delivered: 0, suppressed: 2 });
+    expect(send).not.toHaveBeenCalled();
+    await expect(getJob(dailyId)).resolves.toMatchObject({
+      state: "suppressed",
+      lastError: "schedule-changed",
+    });
+    await expect(getJob(weeklyId)).resolves.toMatchObject({
+      state: "suppressed",
+      lastError: "schedule-changed",
     });
   });
 

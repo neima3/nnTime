@@ -4,6 +4,7 @@ import {
   activityFireTimes,
   buildPushPayload,
   hideActivityTitlesOnLockScreen,
+  notificationSoundEnabled,
   notificationTypeEnabled,
   retryDelayMs,
 } from "./notification-policy";
@@ -172,6 +173,20 @@ describe("buildPushPayload", () => {
     });
     expect(payload).toEqual(expected);
     expect(JSON.stringify(payload)).not.toContain("private note");
+  });
+
+  it("maps the per-user sound preference to the Web Notification silent flag", () => {
+    expect(notificationSoundEnabled(undefined)).toBe(true);
+    expect(notificationSoundEnabled({ soundEnabled: true })).toBe(true);
+    expect(notificationSoundEnabled({ soundEnabled: false })).toBe(false);
+    expect(notificationSoundEnabled({ soundEnabled: "false" })).toBe(true);
+
+    expect(
+      buildPushPayload("review-today", { soundEnabled: false }),
+    ).toMatchObject({ silent: true });
+    expect(
+      buildPushPayload("review-today", { soundEnabled: true }),
+    ).toMatchObject({ silent: false });
   });
 
   it("can hide activity names and emoji from lock-screen copy", () => {

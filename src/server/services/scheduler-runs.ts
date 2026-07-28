@@ -14,7 +14,15 @@ import * as schema from "../db/schema";
 function sanitizeSchedulerError(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error);
   return raw
-    .replace(/https?:\/\/\S+/gi, "[redacted]")
+    .replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, "[redacted-url]")
+    .replace(
+      /"(authorization|api[_-]?key|token|secret|password|passwd)"\s*:\s*"[^"]*"/gi,
+      '"$1":"[redacted]"',
+    )
+    .replace(
+      /'(authorization|api[_-]?key|token|secret|password|passwd)'\s*:\s*'[^']*'/gi,
+      "'$1':'[redacted]'",
+    )
     .replace(
       /\b(authorization)\b\s*[:=]\s*(?:bearer\s+)?[^\s,;]+/gi,
       "$1=[redacted]",

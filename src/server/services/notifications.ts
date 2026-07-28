@@ -20,6 +20,7 @@ import {
   activityFireTimes,
   buildPushPayload,
   hideActivityTitlesOnLockScreen,
+  notificationSoundEnabled,
   notificationTypeEnabled,
   type NotificationPushPayload,
   type NotificationType,
@@ -102,6 +103,7 @@ function reviewJob(input: {
   type: "review-today" | "weekly-review";
   fireAt: Date;
   localDate: string;
+  soundEnabled: boolean;
 }): DesiredNotificationJob {
   return {
     userId: input.userId,
@@ -118,7 +120,9 @@ function reviewJob(input: {
       input.localDate,
       input.fireAt.toISOString(),
     ].join(":"),
-    payload: buildPushPayload(input.type, {}),
+    payload: buildPushPayload(input.type, {
+      soundEnabled: input.soundEnabled,
+    }),
   };
 }
 
@@ -165,6 +169,9 @@ function desiredReviewJobs(
           type: "review-today",
           fireAt,
           localDate: localDateKey(date),
+          soundEnabled: notificationSoundEnabled(
+            settings.notificationPrefs,
+          ),
         }),
       );
     }
@@ -208,6 +215,9 @@ function desiredReviewJobs(
           type: "weekly-review",
           fireAt,
           localDate: localDateKey(date),
+          soundEnabled: notificationSoundEnabled(
+            settings.notificationPrefs,
+          ),
         }),
       );
     }
@@ -369,6 +379,7 @@ export async function computeNotificationJobs(
             entityId: activity.id,
             hideActivityTitle:
               hideActivityTitlesOnLockScreen(prefs),
+            soundEnabled: notificationSoundEnabled(prefs),
           }),
         });
       }

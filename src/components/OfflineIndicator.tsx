@@ -19,9 +19,22 @@ import {
 
 export function OfflineIndicator({ userId }: { userId: string | null }) {
   const router = useRouter();
-  const [online, setOnline] = useState(true);
+  const [online, setOnline] = useState(() =>
+    typeof navigator === "undefined" ? true : navigator.onLine,
+  );
   const [pending, setPending] = useState(0);
   const [terminal, setTerminal] = useState(0);
+
+  useEffect(() => {
+    const syncConnectivity = () => setOnline(navigator.onLine);
+    syncConnectivity();
+    window.addEventListener("online", syncConnectivity);
+    window.addEventListener("offline", syncConnectivity);
+    return () => {
+      window.removeEventListener("online", syncConnectivity);
+      window.removeEventListener("offline", syncConnectivity);
+    };
+  }, []);
 
   useEffect(() => {
     if (!userId) return;
@@ -31,7 +44,6 @@ export function OfflineIndicator({ userId }: { userId: string | null }) {
     const cleanup = initOfflineQueue(userId);
 
     const updateStatus = async () => {
-      setOnline(navigator.onLine);
       const summary = await getQueueSummary(userId);
       setPending(summary.pending);
       setTerminal(summary.terminal);
@@ -43,8 +55,6 @@ export function OfflineIndicator({ userId }: { userId: string | null }) {
     };
 
     void updateStatus();
-    window.addEventListener("online", onQueueChanged);
-    window.addEventListener("offline", onQueueChanged);
     window.addEventListener("kairo:queue-changed", onQueueChanged);
     window.addEventListener("kairo:queue-drained", onQueueDrained);
     window.addEventListener("kairo:conflict", onQueueChanged);
@@ -53,8 +63,6 @@ export function OfflineIndicator({ userId }: { userId: string | null }) {
 
     return () => {
       cleanup();
-      window.removeEventListener("online", onQueueChanged);
-      window.removeEventListener("offline", onQueueChanged);
       window.removeEventListener("kairo:queue-changed", onQueueChanged);
       window.removeEventListener("kairo:queue-drained", onQueueDrained);
       window.removeEventListener("kairo:conflict", onQueueChanged);

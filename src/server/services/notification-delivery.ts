@@ -10,12 +10,14 @@ import {
   activityFireTimes,
   buildPushPayload,
   hideActivityTitlesOnLockScreen,
+  notificationSoundEnabled,
   notificationTypeEnabled,
   retryDelayMs,
 } from "./notification-policy";
 import { sendToUser } from "./push";
 
 const CLAIM_LEASE_MS = 5 * 60_000;
+const CLAIM_HEARTBEAT_MS = 60_000;
 const MAX_ATTEMPTS = 5;
 
 interface ClaimedJob {
@@ -154,6 +156,67 @@ async function renewClaim(
   });
 }
 
+function reviewScheduleStillMatches(
+  job: ClaimedJob,
+  timezone: string,
+  weekStart: number,
+): boolean {
+  const wall = instantToWallFields(job.fireAt, timezone);
+  if (
+    job.type === "review-today"
+  ) {
+    return wall.hour === 20 && wall.minute === 0;
+  }
+  if (job.type !== "weekly-review") return false;
+  const localDayOfWeek = new Date(
+    Date.UTC(wall.year, wall.month, wall.day),
+  ).getUTCDay();
+  return (
+    wall.hour === 18 &&
+    wall.minute === 0 &&
+    localDayOfWeek === (weekStart + 6) % 7
+  );
+}
+
+async function sendWithClaimHeartbeat(
+  db: Db,
+  job: ClaimedJob,
+  send: typeof sendToUser,
+  payload: Parameters<typeof sendToUser>[1],
+  clock: () => Date,
+  intervalMs: number,
+) {
+  let claimHeld = true;
+  let renewalInFlight = false;
+  let latestRenewal: Promise<void> = Promise.resolve();
+  const heartbeat = setInterval(() => {
+    if (renewalInFlight || !claimHeld) return;
+    renewalInFlight = true;
+    latestRenewal = renewClaim(db, job, clock())
+      .then((renewed) => {
+        claimHeld = claimHeld && renewed;
+      })
+      .catch(() => {
+        claimHeld = false;
+      })
+      .finally(() => {
+        renewalInFlight = false;
+      });
+  }, intervalMs);
+  heartbeat.unref?.();
+
+  try {
+    const outcome = await send(job.userId, payload, { db });
+    clearInterval(heartbeat);
+    await latestRenewal;
+    return { outcome, claimHeld };
+  } catch (error) {
+    clearInterval(heartbeat);
+    await latestRenewal;
+    throw error;
+  }
+}
+
 export async function deliverDueNotificationJobs(
   opts: {
     db?: Db;
@@ -162,6 +225,7 @@ export async function deliverDueNotificationJobs(
     send?: typeof sendToUser;
     clock?: () => Date;
     beforeSend?: () => Promise<void>;
+    claimHeartbeatMs?: number;
   } = {},
 ): Promise<{
   considered: number;
@@ -169,9 +233,9 @@ export async function deliverDueNotificationJobs(
   suppressed: number;
   retried: number;
   expired: number;
-    pruned: number;
-    retryableFailures: number;
-  }> {
+  pruned: number;
+  retryableFailures: number;
+}> {
   const db = opts.db ?? dbDefault;
   const now = opts.now ?? new Date();
   const clock =
@@ -317,9 +381,30 @@ export async function deliverDueNotificationJobs(
         entityId: series.id,
         hideActivityTitle:
           hideActivityTitlesOnLockScreen(prefs),
+        soundEnabled: notificationSoundEnabled(prefs),
       });
     } else {
-      payload = buildPushPayload(job.type, {});
+      if (
+        !reviewScheduleStillMatches(
+          job,
+          timezone,
+          settings?.weekStart ?? 0,
+        )
+      ) {
+        if (await transitionJob(db, job, {
+          state: "suppressed",
+          lastError: "schedule-changed",
+          claimedAt: null,
+          claimToken: null,
+          updatedAt: decisionAt,
+        })) {
+          summary.suppressed++;
+        }
+        continue;
+      }
+      payload = buildPushPayload(job.type, {
+        soundEnabled: notificationSoundEnabled(prefs),
+      });
     }
 
     await opts.beforeSend?.();
@@ -352,7 +437,15 @@ export async function deliverDueNotificationJobs(
     }
 
     const attempt = job.attempts + 1;
-    const outcome = await send(job.userId, payload, { db });
+    const { outcome, claimHeld } = await sendWithClaimHeartbeat(
+      db,
+      job,
+      send,
+      payload,
+      clock,
+      Math.max(5, opts.claimHeartbeatMs ?? CLAIM_HEARTBEAT_MS),
+    );
+    if (!claimHeld) continue;
     const completedAt = clock();
     summary.pruned += outcome.pruned;
     summary.retryableFailures += outcome.retryableFailures;

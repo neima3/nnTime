@@ -81,8 +81,9 @@ test("an offline inbox capture replays once and appears after reconnect", async 
 test("an offline completion queues, replays on reconnect, and sticks", async ({
   page,
   context,
-}) => {
-  await createActivity(page, dayUrl(3), "Offline E2E block");
+}, testInfo) => {
+  const title = `Offline E2E block ${Date.now()}`;
+  await createActivity(page, dayUrl(3 + testInfo.retry), title);
 
   // Let the post-save router.refresh finish before pulling the plug — going
   // offline mid-RSC-fetch fails the refresh instead of testing the queue.
@@ -95,11 +96,11 @@ test("an offline completion queues, replays on reconnect, and sticks", async ({
   // A failed session fetch while offline must not masquerade as signed-out.
   await expect(page.getByRole("link", { name: "Sign in" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Complete Offline E2E block" }).click();
+  await page.getByRole("button", { name: `Complete ${title}` }).click();
 
   // Optimistic overlay + honest offline copy.
   await expect(
-    page.getByRole("button", { name: "Mark Offline E2E block not done" }),
+    page.getByRole("button", { name: `Mark ${title} not done` }),
   ).toBeVisible();
   await expect(page.getByText("saved on this device", { exact: false })).toBeVisible();
 
@@ -153,7 +154,7 @@ test("an offline completion queues, replays on reconnect, and sticks", async ({
   await page.reload();
   await page.waitForSelector('html[data-hydrated="true"]');
   await expect(
-    page.getByRole("button", { name: "Mark Offline E2E block not done" }),
+    page.getByRole("button", { name: `Mark ${title} not done` }),
   ).toBeVisible();
   await expect(page.getByText("all 1 done")).toBeVisible();
 });

@@ -18,6 +18,14 @@ describe("OfflineIndicator recovery contract", () => {
     expect(source).toContain("router.refresh()");
   });
 
+  it("tracks connectivity even before a queue owner resolves", () => {
+    expect(source).toContain("navigator.onLine");
+    expect(source).toContain('window.addEventListener("offline", syncConnectivity)');
+    expect(source.indexOf('window.addEventListener("offline", syncConnectivity)')).toBeLessThan(
+      source.indexOf("if (!userId) return;"),
+    );
+  });
+
   it("reports the terminal outcome without exposing mutation contents", () => {
     expect(source).toContain(
       "A saved offline change couldn’t sync. Kairo kept the server version.",
