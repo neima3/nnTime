@@ -139,17 +139,6 @@ import Foundation
                 == ["low", "medium", "high"]
         )
 
-        let batchResult = try decodeFixture(
-            Components.Schemas.BatchResult.self,
-            #"{"status":204,"body":null}"#
-        )
-        #expect(batchResult.body == nil)
-        let batchOperation = try decodeFixture(
-            Components.Schemas.BatchOperation.self,
-            #"{"method":"POST","path":"/api/v1/tasks","body":{"title":"Capture"}}"#
-        )
-        #expect(batchOperation.body != nil)
-
         let search = try decodeFixture(
             Components.Schemas.SearchResponse.self,
             """
@@ -228,9 +217,78 @@ import Foundation
         #expect(updateSettings.timezone == "America/New_York")
 
         let createRoutine = Components.Schemas.RoutineCreateRequest(
-            title: "Morning reset"
+            title: "Morning reset",
+            steps: [
+                .init(title: "Stretch", durationMin: 5),
+                .init(title: "Plan", durationMin: 10),
+            ],
+            schedule: .init(
+                tz: "America/New_York",
+                rrule: "FREQ=DAILY",
+                paused: false
+            )
         )
         #expect(createRoutine.title == "Morning reset")
+        #expect(createRoutine.steps?.count == 2)
+        #expect(createRoutine.schedule?.tz == "America/New_York")
+
+        let createFocus = Components.Schemas.FocusSessionCreateRequest(
+            targetDurationMin: 25,
+            title: "Deep work",
+            emoji: "🎯"
+        )
+        #expect(createFocus.targetDurationMin == 25)
+
+        let transitionFocus = Components.Schemas.FocusSessionPatchRequest.case1(
+            .init(action: .transition, state: .paused)
+        )
+        let extendFocus = Components.Schemas.FocusSessionPatchRequest.case2(
+            .init(action: .extend, addMinutes: ._5)
+        )
+        if case let .case1(payload) = transitionFocus {
+            #expect(payload.state == .paused)
+        } else {
+            Issue.record("Expected transition focus payload")
+        }
+        if case let .case2(payload) = extendFocus {
+            #expect(payload.addMinutes == ._5)
+        } else {
+            Issue.record("Expected extend focus payload")
+        }
+    }
+
+    @Test func generatedBatchBodiesPreserveArbitraryJSON() throws {
+        let scalarOperation = Components.Schemas.BatchOperation(
+            method: .POST,
+            path: "/api/v1/tasks",
+            body: try .init(unvalidatedValue: "capture")
+        )
+        #expect(scalarOperation.body?.value as? String == "capture")
+
+        let arrayOperation = try decodeFixture(
+            Components.Schemas.BatchOperation.self,
+            #"{"method":"PATCH","path":"/api/v1/tasks/id","body":[1,"two",true]}"#
+        )
+        let array = arrayOperation.body?.value as? [(any Sendable)?]
+        #expect(array?.count == 3)
+        #expect(array?[0] as? Int == 1)
+        #expect(array?[1] as? String == "two")
+        #expect(array?[2] as? Bool == true)
+
+        let object: [String: (any Sendable)?] = ["ok": true, "count": 2]
+        let objectResult = Components.Schemas.BatchResult(
+            status: 200,
+            body: try .init(unvalidatedValue: object)
+        )
+        let decodedObject = objectResult.body.value as? [String: (any Sendable)?]
+        #expect(decodedObject?["ok"] as? Bool == true)
+        #expect(decodedObject?["count"] as? Int == 2)
+
+        let nullResult = try decodeFixture(
+            Components.Schemas.BatchResult.self,
+            #"{"status":204,"body":null}"#
+        )
+        #expect(nullResult.body.value == nil)
     }
 
     @Test func generatedRoutineListItemPreservesNestedReadModel() throws {
@@ -250,14 +308,14 @@ import Foundation
               "steps":[],
               "schedules":[],
               "stepCount":0,
-              "totalMin":0
+              "totalMin":-5
             }
             """
         )
         #expect(item.steps.isEmpty)
         #expect(item.schedules.isEmpty)
         #expect(item.stepCount == 0)
-        #expect(item.totalMin == 0)
+        #expect(item.totalMin == -5)
     }
 
     private func decodeFixture<T: Decodable>(

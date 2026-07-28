@@ -315,13 +315,72 @@ describe("request OpenAPI contract", () => {
     );
   });
 
-  it("keeps the route-level batch cap and emitted result body truthful", () => {
+  it("keeps nested routine response requiredness and nullability aligned with zod", () => {
+    const responsePairs = [
+      ["RoutineStep", routineSchemas.routineStepResponse],
+      ["RoutineSchedule", routineSchemas.routineScheduleResponse],
+    ] as const;
+
+    for (const [componentName, validator] of responsePairs) {
+      const zodJson = z.toJSONSchema(validator, {
+        target: "draft-2020-12",
+        reused: "inline",
+      }) as JsonSchema;
+      expect(
+        objectContract(components[componentName] ?? {}, components),
+        componentName,
+      ).toEqual(objectContract(zodJson, {}));
+    }
+  });
+
+  it("keeps routine totals truthful for existing negative-duration data", () => {
+    const baseRoutine = {
+      id: "0198f834-c9ab-7e12-b1cf-1faebad8f4fd",
+      userId: "0198f834-c9ab-7e12-b1cf-1faebad8f4fe",
+      title: "Legacy routine",
+      emoji: null,
+      categoryId: null,
+      notes: null,
+      revision: 1,
+      createdAt: "2026-07-28T12:00:00Z",
+      updatedAt: "2026-07-28T12:00:00Z",
+      steps: [],
+      schedules: [],
+      stepCount: 0,
+      totalMin: -5,
+    };
+
+    expect(routineSchemas.routineListItemResponse.safeParse(baseRoutine).success)
+      .toBe(true);
+    expect(components.RoutineListItem?.properties?.totalMin).not.toHaveProperty(
+      "minimum",
+    );
+    expect(components.RoutineListItem?.properties?.stepCount).toMatchObject({
+      minimum: 0,
+    });
+  });
+
+  it("keeps arbitrary batch JSON and route-level shapes truthful", () => {
+    expect(Object.keys(components.BatchOperation?.properties ?? {}).sort())
+      .toEqual(["body", "idempotencyKey", "method", "path"]);
+    expect([...(components.BatchOperation?.required ?? [])].sort()).toEqual([
+      "method",
+      "path",
+    ]);
+    expect(components.BatchOperation?.properties?.body).toEqual({});
+
     expect(components.BatchRequest?.properties?.operations?.maxItems).toBe(50);
     expect(components.BatchRequest?.properties?.operations).not.toHaveProperty(
       "minItems",
     );
-    expect(components.BatchResult?.required).toEqual(
-      expect.arrayContaining(["status", "body"]),
-    );
+    expect(Object.keys(components.BatchResult?.properties ?? {}).sort()).toEqual([
+      "body",
+      "status",
+    ]);
+    expect([...(components.BatchResult?.required ?? [])].sort()).toEqual([
+      "body",
+      "status",
+    ]);
+    expect(components.BatchResult?.properties?.body).toEqual({});
   });
 });

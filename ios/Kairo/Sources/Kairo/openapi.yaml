@@ -1721,7 +1721,7 @@ components:
     RoutineStep:
       type: object
       description: Mirrors the `routine_steps` table.
-      required: [id, userId, routineId, title, sortOrder, revision, createdAt, updatedAt]
+      required: [id, userId, routineId, title, durationMin, sortOrder, revision, createdAt, updatedAt]
       properties:
         id: { type: string, format: uuid }
         userId: { type: string, format: uuid }
@@ -1741,7 +1741,7 @@ components:
         materializes occurrences 48h ahead, deduped on
         `(routine_schedule_id, occurrence_key)` (ADR-004). Mirrors the
         `routine_schedules` table.
-      required: [id, userId, routineId, tz, paused, revision, createdAt, updatedAt]
+      required: [id, userId, routineId, tz, rrule, paused, nextRunAt, revision, createdAt, updatedAt]
       properties:
         id: { type: string, format: uuid }
         userId: { type: string, format: uuid }
@@ -1875,7 +1875,7 @@ components:
           type: array
           items: { $ref: '#/components/schemas/RoutineSchedule' }
         stepCount: { type: integer, format: int32, minimum: 0 }
-        totalMin: { type: integer, format: int32, minimum: 0 }
+        totalMin: { type: integer, format: int32 }
 
     # ---- Focus sessions (ADR-004) -----------------------------------------
     FocusSession: &focusSessionSchema
@@ -2010,9 +2010,7 @@ components:
           type: string
           description: Allowlisted path beginning with `/api/v1/`.
           example: /api/v1/tasks
-        body:
-          type: object
-          additionalProperties: true
+        body: {}
 
     BatchRequest:
       type: object
@@ -2032,10 +2030,7 @@ components:
         status:
           type: integer
           description: HTTP status that the inner operation produced.
-        body:
-          type: [object, 'null']
-          additionalProperties: true
-        error: { $ref: '#/components/schemas/Error' }
+        body: {}
 
     BatchResponse:
       type: object

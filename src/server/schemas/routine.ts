@@ -132,7 +132,7 @@ export const routineDetailResponse = routineResponse.extend({
 /** GET /api/v1/routines list item, including UI summary counts. */
 export const routineListItemResponse = routineDetailResponse.extend({
   stepCount: z.number().int().nonnegative(),
-  totalMin: z.number().int().nonnegative(),
+  totalMin: z.number().int(),
 });
 
 export type RoutineResponse = z.infer<typeof routineResponse>;
