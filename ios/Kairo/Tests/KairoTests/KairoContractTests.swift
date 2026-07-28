@@ -49,6 +49,7 @@ import Foundation
             }
             """
         )
+        assertEnergyLevel(activity.energy)
         #expect(activity.energy == nil)
         #expect(activity.status == .pending)
 
@@ -81,14 +82,15 @@ import Foundation
               "bucket":"inbox",
               "title":"Capture",
               "priority":"none",
-              "energy":null,
+              "energy":"low",
               "revision":1,
               "createdAt":"2026-07-28T12:00:00Z",
               "updatedAt":"2026-07-28T12:00:00Z"
             }
             """
         )
-        #expect(task.energy == nil)
+        assertEnergyLevel(task.energy)
+        #expect(task.energy == .low)
 
         let series = try decodeFixture(
             Components.Schemas.ActivitySeries.self,
@@ -100,7 +102,8 @@ import Foundation
               "dtstartLocal":"2026-07-28T13:00:00Z",
               "title":"Morning plan",
               "durationMin":30,
-              "energy":null,
+              "checklistTemplate":[],
+              "energy":"medium",
               "priority":"none",
               "source":"manual",
               "revision":1,
@@ -109,7 +112,9 @@ import Foundation
             }
             """
         )
-        #expect(series.energy == nil)
+        assertChecklistTemplate(series.checklistTemplate)
+        assertEnergyLevel(series.energy)
+        #expect(series.energy == .medium)
 
         let occurrence = try decodeFixture(
             Components.Schemas.ActivityOccurrence.self,
@@ -120,14 +125,19 @@ import Foundation
               "seriesId":"0198f834-c9ab-7e12-b1cf-1faebad8f4fc",
               "occurrenceKey":"2026-07-28T13:00:00Z",
               "status":"pending",
-              "energy":null,
+              "energy":"high",
               "revision":1,
               "createdAt":"2026-07-28T12:00:00Z",
               "updatedAt":"2026-07-28T12:00:00Z"
             }
             """
         )
-        #expect(occurrence.energy == nil)
+        assertEnergyLevel(occurrence.energy)
+        #expect(occurrence.energy == .high)
+        #expect(
+            Components.Schemas.EnergyLevel.allCases.map(\.rawValue)
+                == ["low", "medium", "high"]
+        )
 
         let batchResult = try decodeFixture(
             Components.Schemas.BatchResult.self,
@@ -174,7 +184,7 @@ import Foundation
 
         let mood = try decodeFixture(
             Components.Schemas.MoodCheckinRequest.self,
-            #"{"mood":"good","note":null}"#
+            #"{"mood":"good"}"#
         )
         #expect(mood.mood == .good)
         let response = try decodeFixture(
@@ -192,4 +202,12 @@ import Foundation
         decoder.dateDecodingStrategy = .iso8601
         return try decoder.decode(type, from: Data(json.utf8))
     }
+
+    private func assertEnergyLevel(
+        _ energy: Components.Schemas.EnergyLevel?
+    ) {}
+
+    private func assertChecklistTemplate(
+        _ checklist: Components.Schemas.ActivitySeries.checklistTemplatePayload
+    ) {}
 }

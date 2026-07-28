@@ -54,6 +54,7 @@ describe("ADR-002: OpenAPI ↔ zod parity (CI drift gate)", () => {
     "ThemeMode",
     "TaskBucket",
     "EnergyLevel",
+    "NullableEnergyLevel",
     "Priority",
     "OccurrenceStatus",
     "ChecklistParent",
