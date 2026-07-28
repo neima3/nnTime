@@ -12,6 +12,7 @@ import {
   focusStateEnum,
   instant,
   managedRowFields,
+  pgInteger,
   uuid,
 } from "./common";
 
@@ -31,8 +32,8 @@ export const focusSessionResponse = z.object({
   activityOccurrenceId: uuid.nullable(),
   state: focusStateEnum,
   startedAt: databaseInstant,
-  targetDurationMin: z.number().int(),
-  accumulatedPauseSec: z.number().int(),
+  targetDurationMin: pgInteger,
+  accumulatedPauseSec: pgInteger,
   /** When the current running/paused interval began; null when idle. */
   currentIntervalStartedAt: databaseInstant.nullable(),
   /** Free-text reason captured on completion (e.g. "finished", "interrupted"). */
@@ -42,7 +43,7 @@ export const focusSessionResponse = z.object({
 /** POST /api/v1/focus-sessions body. Server time owns `startedAt`. */
 export const focusSessionCreateRequest = z.object({
   activityOccurrenceId: uuid.optional(),
-  targetDurationMin: z.number().int().positive().max(24 * 60),
+  targetDurationMin: pgInteger.min(1).max(24 * 60),
   title: z.string().optional(),
   emoji: z.string().optional(),
 });

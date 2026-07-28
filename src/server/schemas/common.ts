@@ -44,11 +44,17 @@ export const dateStr = z.iso.date();
  */
 export const ianaTimezone = z.string().min(1);
 
+/** PostgreSQL `integer` / Swift `Int32` wire range. */
+export const pgInteger = z.int32();
+
+/** PostgreSQL `smallint` range, represented as Swift `Int32` on the wire. */
+export const pgSmallint = z.int32().min(-32_768).max(32_767);
+
 /**
  * Monotonic per-row revision used for optimistic concurrency (If-Match / 409,
  * ADR-002). Defaults to 1 on insert and is bumped inside each write tx.
  */
-export const revision = z.number().int().min(1);
+export const revision = pgInteger.min(1);
 
 /**
  * Free-form JSON object for `jsonb` columns that carry presentation extras
@@ -126,7 +132,7 @@ export const editScopeEnum = z.enum(["this", "this_and_future", "all"]);
  * Day-of-week start: 0=Sun … 6=Sat (smallint column). Not a string enum in the
  * DB; modeled as an integer range here.
  */
-export const weekStartEnum = z.number().int().min(0).max(6);
+export const weekStartEnum = pgSmallint.min(0).max(6);
 
 /* -------------------------------------------------------------------------- */
 /* Shared field groups                                                        */

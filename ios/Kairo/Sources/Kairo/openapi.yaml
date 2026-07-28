@@ -1288,7 +1288,7 @@ components:
           type: string
           description: Immutable semantic key (e.g. `peach`).
         label: { type: string }
-        sortOrder: { type: integer, format: int32 }
+        sortOrder: { type: integer, format: int32, minimum: -32768, maximum: 32767 }
         revision: { $ref: '#/components/schemas/Revision' }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
@@ -1360,7 +1360,7 @@ components:
       description: Editable category fields. The semantic `key` is immutable.
       properties:
         label: { type: string }
-        sortOrder: { type: integer, format: int32 }
+        sortOrder: { type: integer, format: int32, minimum: -32768, maximum: 32767 }
 
     TagCreateRequest:
       type: object
@@ -1678,7 +1678,7 @@ components:
         parentType: { $ref: '#/components/schemas/ChecklistParent' }
         parentId: { type: string, format: uuid }
         label: { type: string }
-        sortOrder: { type: integer, format: int32 }
+        sortOrder: { type: integer, format: int32, minimum: -32768, maximum: 32767 }
         done: { type: boolean }
         revision: { $ref: '#/components/schemas/Revision' }
         createdAt: { type: string, format: date-time }
@@ -1692,14 +1692,14 @@ components:
         parentType: { $ref: '#/components/schemas/ChecklistParent' }
         parentId: { type: string, format: uuid }
         label: { type: string }
-        sortOrder: { type: integer, format: int32 }
+        sortOrder: { type: integer, format: int32, minimum: -32768, maximum: 32767 }
         done: { type: boolean }
 
     ChecklistItemUpdateRequest:
       type: object
       properties:
         label: { type: string }
-        sortOrder: { type: integer, format: int32 }
+        sortOrder: { type: integer, format: int32, minimum: -32768, maximum: 32767 }
         done: { type: boolean }
 
     # ---- Routines ----------------------------------------------------------
@@ -1729,7 +1729,7 @@ components:
         routineId: { type: string, format: uuid }
         title: { type: string }
         durationMin: { type: [integer, 'null'], format: int32 }
-        sortOrder: { type: integer, format: int32 }
+        sortOrder: { type: integer, format: int32, minimum: -32768, maximum: 32767 }
         revision: { $ref: '#/components/schemas/Revision' }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
@@ -1798,7 +1798,7 @@ components:
       properties:
         title: { type: string }
         durationMin: { type: [integer, 'null'], format: int32 }
-        sortOrder: { type: integer, format: int32 }
+        sortOrder: { type: integer, format: int32, minimum: -32768, maximum: 32767 }
 
     RoutineScheduleCreateRequest:
       type: object

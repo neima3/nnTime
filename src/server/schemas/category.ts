@@ -9,6 +9,7 @@
 import { z } from "zod";
 import {
   managedRowFields,
+  pgSmallint,
   softDeletableFields,
   uuid,
 } from "./common";
@@ -24,7 +25,7 @@ export const categoryResponse = z.object({
   key: z.string(),
   /** User-editable display label. */
   label: z.string(),
-  sortOrder: z.number().int(),
+  sortOrder: pgSmallint,
 });
 
 /**
@@ -33,7 +34,7 @@ export const categoryResponse = z.object({
  */
 export const categoryUpdate = z.object({
   label: z.string().optional(),
-  sortOrder: z.number().int().optional(),
+  sortOrder: pgSmallint.optional(),
 });
 
 export type CategoryResponse = z.infer<typeof categoryResponse>;

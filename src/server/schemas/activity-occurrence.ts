@@ -14,6 +14,7 @@ import {
   jsonObject,
   managedRowFields,
   occurrenceStatusEnum,
+  pgInteger,
   softDeletableFields,
   uuid,
 } from "./common";
@@ -29,7 +30,7 @@ export const activityOccurrenceResponse = z.object({
   // override columns — null = inherit from series template
   title: z.string().nullable(),
   startAt: instant.nullable(),
-  durationMin: z.number().int().nullable(),
+  durationMin: pgInteger.nullable(),
   status: occurrenceStatusEnum,
   /** Per-occurrence checklist overrides (jsonb). */
   checklistOverride: jsonObject.nullable(),
@@ -44,7 +45,7 @@ export const activityOccurrenceResponse = z.object({
 export const activityOccurrencePatch = z.object({
   title: z.string().nullable().optional(),
   startAt: instant.nullable().optional(),
-  durationMin: z.number().int().nullable().optional(),
+  durationMin: pgInteger.nullable().optional(),
   status: occurrenceStatusEnum.optional(),
   checklistOverride: jsonObject.nullable().optional(),
   energy: energyLevelEnum.nullable().optional(),

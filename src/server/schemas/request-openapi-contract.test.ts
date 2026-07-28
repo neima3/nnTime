@@ -5,6 +5,7 @@ import { parse as parseYaml } from "yaml";
 import { z } from "zod";
 import * as schemaIndex from "./index";
 import * as routineSchemas from "./routine";
+import { validateSwiftPatchOverrides } from "./swift-patch-contract";
 
 interface JsonSchema {
   $ref?: string;
@@ -69,6 +70,10 @@ const generatorConfig = parseYaml(
     "utf8",
   ),
 ) as GeneratorConfig;
+const swiftPatchSource = readFileSync(
+  resolve("ios/Kairo/Sources/Kairo/PatchRequests.swift"),
+  "utf8",
+);
 
 const expectedRequestOperations = {
   createActivitySeries: "ActivitySeriesCreateRequest",
@@ -189,9 +194,12 @@ function dereference(
 }
 
 function sortedValues(values: unknown[]): unknown[] {
-  return [...values].sort((left, right) =>
-    JSON.stringify(left).localeCompare(JSON.stringify(right)),
-  );
+  return [...values].sort((left, right) => {
+    if (typeof left === "number" && typeof right === "number") {
+      return left - right;
+    }
+    return JSON.stringify(left).localeCompare(JSON.stringify(right));
+  });
 }
 
 function literalValues(
@@ -327,20 +335,34 @@ function semanticContract(
     };
   }
 
-  const defaultIntegerMinimum = -Number.MAX_SAFE_INTEGER;
-  const defaultIntegerMaximum = Number.MAX_SAFE_INTEGER;
-  const minimum =
+  const explicitMinimum =
     kind === "integer" && resolved.exclusiveMinimum !== undefined
       ? Math.floor(resolved.exclusiveMinimum) + 1
-      : kind === "integer" && resolved.minimum === defaultIntegerMinimum
-        ? undefined
-        : resolved.minimum;
-  const maximum =
+      : resolved.minimum;
+  const explicitMaximum =
     kind === "integer" && resolved.exclusiveMaximum !== undefined
       ? Math.ceil(resolved.exclusiveMaximum) - 1
-      : kind === "integer" && resolved.maximum === defaultIntegerMaximum
-        ? undefined
-        : resolved.maximum;
+      : resolved.maximum;
+  const int32Minimum =
+    kind === "integer" && resolved.format === "int32"
+      ? -2_147_483_648
+      : undefined;
+  const int32Maximum =
+    kind === "integer" && resolved.format === "int32"
+      ? 2_147_483_647
+      : undefined;
+  const minimum =
+    explicitMinimum === undefined
+      ? int32Minimum
+      : int32Minimum === undefined
+        ? explicitMinimum
+        : Math.max(explicitMinimum, int32Minimum);
+  const maximum =
+    explicitMaximum === undefined
+      ? int32Maximum
+      : int32Maximum === undefined
+        ? explicitMaximum
+        : Math.min(explicitMaximum, int32Maximum);
   const format = resolved.format === "int32" ? undefined : resolved.format;
   return {
     ...common,
@@ -364,6 +386,59 @@ function semanticContract(
       ? {}
       : { pattern: resolved.pattern }),
   };
+}
+
+interface SemanticNode {
+  kind?: string | string[];
+  maximum?: number;
+  minimum?: number;
+  properties?: Record<string, SemanticNode>;
+  items?: SemanticNode;
+  union?: SemanticNode[];
+  values?: unknown[];
+}
+
+function requestIntegerInventory(
+  componentNames: string[],
+  allComponents: Record<string, JsonSchema>,
+): Record<
+  string,
+  { minimum?: number; maximum?: number; values?: unknown[] }
+> {
+  const inventory: Record<
+    string,
+    { minimum?: number; maximum?: number; values?: unknown[] }
+  > = {};
+
+  function visit(node: SemanticNode, path: string): void {
+    if (node.kind === "integer") {
+      inventory[path] = {
+        ...(node.minimum === undefined ? {} : { minimum: node.minimum }),
+        ...(node.maximum === undefined ? {} : { maximum: node.maximum }),
+        ...(node.values === undefined ? {} : { values: node.values }),
+      };
+    }
+    for (const [name, property] of Object.entries(node.properties ?? {})) {
+      visit(property, `${path}.${name}`);
+    }
+    if (node.items) visit(node.items, `${path}[]`);
+    for (const [index, branch] of (node.union ?? []).entries()) {
+      const action = branch.properties?.action?.values?.[0];
+      const branchName = typeof action === "string" ? action : String(index);
+      visit(branch, `${path}<${branchName}>`);
+    }
+  }
+
+  for (const componentName of [...componentNames].sort()) {
+    visit(
+      semanticContract(
+        allComponents[componentName] ?? {},
+        allComponents,
+      ) as SemanticNode,
+      componentName,
+    );
+  }
+  return inventory;
 }
 
 describe("request OpenAPI contract", () => {
@@ -408,6 +483,61 @@ describe("request OpenAPI contract", () => {
       clearable.filter((componentName) => !overrides[componentName]),
       "optional+nullable PATCH components without a typed Swift override",
     ).toEqual([]);
+  });
+
+  it("keeps every configured custom Swift override complete and tri-state-correct", () => {
+    expect(
+      validateSwiftPatchOverrides(components, generatorConfig, swiftPatchSource),
+    ).toEqual([]);
+  });
+
+  it("detects Swift override property inventory and nullability drift", () => {
+    const mutations: Array<{
+      name: string;
+      mutate: (copy: Record<string, JsonSchema>) => void;
+    }> = [
+      {
+        name: "added property",
+        mutate: (copy) => {
+          copy.TaskUpdateRequest!.properties!.futureField = { type: "string" };
+        },
+      },
+      {
+        name: "removed property",
+        mutate: (copy) => {
+          delete copy.TagUpdateRequest!.properties!.name;
+        },
+      },
+      {
+        name: "renamed property",
+        mutate: (copy) => {
+          const properties = copy.RoutineUpdateRequest!.properties!;
+          properties.details = properties.notes!;
+          delete properties.notes;
+        },
+      },
+      {
+        name: "nullable classification",
+        mutate: (copy) => {
+          copy.ActivitySeriesUpdateRequest!.properties!.rrule = {
+            type: "string",
+          };
+        },
+      },
+    ];
+
+    for (const mutation of mutations) {
+      const mutated = structuredClone(components);
+      mutation.mutate(mutated);
+      expect(
+        validateSwiftPatchOverrides(
+          mutated,
+          generatorConfig,
+          swiftPatchSource,
+        ),
+        mutation.name,
+      ).not.toEqual([]);
+    }
   });
 
   it("keeps request properties, requiredness, and nullability aligned with zod", () => {
@@ -484,6 +614,169 @@ describe("request OpenAPI contract", () => {
         components.RoutineCreateRequest?.properties?.schedule?.properties ?? {},
       ).sort(),
     ).toEqual(["paused", "rrule", "tz"]);
+  });
+
+  it("enforces exact persisted integer boundaries in every scoped request schema", () => {
+    const uuid = "0198f834-c9ab-7e12-b1cf-1faebad8f4fd";
+    const int32 = {
+      minimum: -2_147_483_648,
+      maximum: 2_147_483_647,
+    };
+    const smallint = { minimum: -32_768, maximum: 32_767 };
+    const boundaryCases: Array<{
+      name: string;
+      validator: z.ZodType;
+      input: (value: number) => unknown;
+      minimum: number;
+      maximum: number;
+    }> = [
+      {
+        name: "activity create duration",
+        validator: schemaIndex.activitySeriesCreate,
+        input: (durationMin) => ({
+          tz: "America/New_York",
+          dtstartLocal: "2026-07-28T12:00:00Z",
+          title: "Plan",
+          durationMin,
+        }),
+        ...int32,
+      },
+      {
+        name: "activity update duration",
+        validator: schemaIndex.activitySeriesUpdate,
+        input: (durationMin) => ({ durationMin }),
+        ...int32,
+      },
+      {
+        name: "occurrence override duration",
+        validator: schemaIndex.activityOccurrencePatch,
+        input: (durationMin) => ({ durationMin }),
+        ...int32,
+      },
+      {
+        name: "routine create step duration",
+        validator: schemaIndex.routineCreate,
+        input: (durationMin) => ({
+          title: "Routine",
+          steps: [{ title: "Step", durationMin }],
+        }),
+        ...int32,
+      },
+      {
+        name: "routine step create duration",
+        validator: schemaIndex.routineStepCreate,
+        input: (durationMin) => ({ title: "Step", durationMin }),
+        ...int32,
+      },
+      {
+        name: "routine step update duration",
+        validator: schemaIndex.routineStepUpdate,
+        input: (durationMin) => ({ durationMin }),
+        ...int32,
+      },
+      {
+        name: "category order",
+        validator: schemaIndex.categoryUpdate,
+        input: (sortOrder) => ({ sortOrder }),
+        ...smallint,
+      },
+      {
+        name: "checklist create order",
+        validator: schemaIndex.checklistItemCreate,
+        input: (sortOrder) => ({
+          parentType: "task",
+          parentId: uuid,
+          label: "Step",
+          sortOrder,
+        }),
+        ...smallint,
+      },
+      {
+        name: "checklist update order",
+        validator: schemaIndex.checklistItemUpdate,
+        input: (sortOrder) => ({ sortOrder }),
+        ...smallint,
+      },
+      {
+        name: "routine step create order",
+        validator: schemaIndex.routineStepCreate,
+        input: (sortOrder) => ({ title: "Step", sortOrder }),
+        ...smallint,
+      },
+      {
+        name: "routine step update order",
+        validator: schemaIndex.routineStepUpdate,
+        input: (sortOrder) => ({ sortOrder }),
+        ...smallint,
+      },
+      {
+        name: "settings week start",
+        validator: schemaIndex.userSettingsUpdate,
+        input: (weekStart) => ({ weekStart }),
+        minimum: 0,
+        maximum: 6,
+      },
+      {
+        name: "focus target duration",
+        validator: schemaIndex.focusSessionCreateRequest,
+        input: (targetDurationMin) => ({ targetDurationMin }),
+        minimum: 1,
+        maximum: 1_440,
+      },
+    ];
+
+    for (const boundary of boundaryCases) {
+      expect(
+        boundary.validator.safeParse(boundary.input(boundary.minimum)).success,
+        `${boundary.name} minimum`,
+      ).toBe(true);
+      expect(
+        boundary.validator.safeParse(boundary.input(boundary.maximum)).success,
+        `${boundary.name} maximum`,
+      ).toBe(true);
+      expect(
+        boundary.validator.safeParse(boundary.input(boundary.minimum - 1))
+          .success,
+        `${boundary.name} below minimum`,
+      ).toBe(false);
+      expect(
+        boundary.validator.safeParse(boundary.input(boundary.maximum + 1))
+          .success,
+        `${boundary.name} above maximum`,
+      ).toBe(false);
+    }
+  });
+
+  it("inventories every documented request integer and its exact wire range", () => {
+    const int32 = {
+      minimum: -2_147_483_648,
+      maximum: 2_147_483_647,
+    };
+    const smallint = { minimum: -32_768, maximum: 32_767 };
+    expect(
+      requestIntegerInventory(Object.keys(requestSchemaRegistry), components),
+    ).toEqual({
+      "ActivityOccurrencePatchRequest.durationMin": int32,
+      "ActivitySeriesCreateRequest.durationMin": int32,
+      "ActivitySeriesUpdateRequest.durationMin": int32,
+      "CategoryUpdateRequest.sortOrder": smallint,
+      "ChecklistItemCreateRequest.sortOrder": smallint,
+      "ChecklistItemUpdateRequest.sortOrder": smallint,
+      "FocusSessionCreateRequest.targetDurationMin": {
+        minimum: 1,
+        maximum: 1_440,
+      },
+      "FocusSessionPatchRequest<extend>.addMinutes": {
+        values: [1, 5, 10],
+      },
+      "RoutineCreateRequest.steps[].durationMin": int32,
+      "RoutineStepCreateRequest.durationMin": int32,
+      "RoutineStepCreateRequest.sortOrder": smallint,
+      "UserSettingsUpdateRequest.weekStart": {
+        minimum: 0,
+        maximum: 6,
+      },
+    });
   });
 
   it("documents the routine list and detail read models emitted by live routes", () => {
@@ -636,6 +929,14 @@ describe("request OpenAPI contract", () => {
         mutate: (copy) => {
           copy.FocusSessionCreateRequest!.properties!.targetDurationMin!
             .maximum = 1439;
+        },
+      },
+      {
+        name: "int32 width",
+        componentName: "ActivitySeriesCreateRequest",
+        mutate: (copy) => {
+          delete copy.ActivitySeriesCreateRequest!.properties!.durationMin!
+            .format;
         },
       },
       {

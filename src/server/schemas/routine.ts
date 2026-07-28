@@ -12,6 +12,8 @@ import {
   ianaTimezone,
   instant,
   managedRowFields,
+  pgInteger,
+  pgSmallint,
   softDeletableFields,
   uuid,
 } from "./common";
@@ -51,22 +53,22 @@ export const routineStepResponse = z.object({
   routineId: uuid,
   title: z.string(),
   /** Optional per-step duration in minutes. */
-  durationMin: z.number().int().nullable(),
-  sortOrder: z.number().int(),
+  durationMin: pgInteger.nullable(),
+  sortOrder: pgSmallint,
 });
 
 /** POST body for a routine step. */
 export const routineStepCreate = z.object({
   title: z.string(),
-  durationMin: z.number().int().nullish(),
-  sortOrder: z.number().int().optional(),
+  durationMin: pgInteger.nullish(),
+  sortOrder: pgSmallint.optional(),
 });
 
 /** PATCH body for a routine step. */
 export const routineStepUpdate = z.object({
   title: z.string().optional(),
-  durationMin: z.number().int().nullable().optional(),
-  sortOrder: z.number().int().optional(),
+  durationMin: pgInteger.nullable().optional(),
+  sortOrder: pgSmallint.optional(),
 });
 
 /* -------------------------------------------------------------------------- */

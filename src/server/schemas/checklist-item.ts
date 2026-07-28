@@ -10,6 +10,7 @@ import { z } from "zod";
 import {
   checklistParentEnum,
   managedRowFields,
+  pgSmallint,
   softDeletableFields,
   uuid,
 } from "./common";
@@ -23,7 +24,7 @@ export const checklistItemResponse = z.object({
   parentType: checklistParentEnum,
   parentId: uuid,
   label: z.string(),
-  sortOrder: z.number().int(),
+  sortOrder: pgSmallint,
   done: z.boolean(),
 });
 
@@ -32,14 +33,14 @@ export const checklistItemCreate = z.object({
   parentType: checklistParentEnum,
   parentId: uuid,
   label: z.string(),
-  sortOrder: z.number().int().optional(),
+  sortOrder: pgSmallint.optional(),
   done: z.boolean().optional(),
 });
 
 /** PATCH /api/v1/checklist-items/{id} body. */
 export const checklistItemUpdate = z.object({
   label: z.string().optional(),
-  sortOrder: z.number().int().optional(),
+  sortOrder: pgSmallint.optional(),
   done: z.boolean().optional(),
 });
 
