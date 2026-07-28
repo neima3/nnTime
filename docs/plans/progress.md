@@ -68,11 +68,30 @@ requests and response decoders.
   revision/idempotency/reconciliation gaps and missing date boundaries. The
   final re-review reported no remaining Important or Minor findings.
 
-**External release proof:** collected only after the immutable source SHA is
-committed and pushed. GitHub Actions, exact-SHA Coolify deployment, live health,
-authenticated read-only APIs, desktop/mobile UI, security headers, console, and
-failed-network state are intentionally not claimed by this pre-release note.
-Production planner and mood mutations remain prohibited.
+**External release proof:** the immutable code SHA
+`f6c93e07d831f1181f0cbdb834f53af3fd715f7f` is pushed to `main`.
+[GitHub Actions run 30381917744](https://github.com/neima3/nnTime/actions/runs/30381917744)
+passed all three required jobs: build/test, production-mode Playwright
+**10/10**, and the clean generated-client/package/app-hosted-test/unsigned-app
+native contract job. Coolify deployment `gbqda9s02f1uijm5twaraoc9` reports
+that exact commit `finished`; app `kairo` is `running:healthy`.
+
+Live read-only verification returned HTTP/2 200 and
+`/api/health` `{status:"ok"}` with migration, database, AI, and scheduler checks
+all `ok`. Enforcing CSP, HSTS, DENY framing, nosniff, referrer, permissions,
+COOP, and CORP headers are present. The deployed Focus chunks contain both
+unique Round 16 recovery markers (`Focus changed elsewhere` and
+`couldn't be loaded`). The real Chrome production page was exercised at
+1440×1000 and 390×844 across Focus, Today, and Stats; the hydrated desktop and
+mobile Focus screens were visually inspected and the browser reported no
+warnings or errors.
+
+The available Chrome profile was signed out. Read-only planner endpoints
+correctly returned 401, but an authenticated settings/categories/day/stats
+read was not claimed: no Kairo login was available in the open session and the
+approved 1Password biometric sign-in timed out. Task 7 therefore remains open
+on that single evidence item. No production planner or mood mutation was
+performed; the complete mutation matrix remains synthetic-local evidence.
 
 ## 2026-07-28 — Round 15: executable native API contract (Codex)
 

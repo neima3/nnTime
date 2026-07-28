@@ -20,6 +20,8 @@
 - [x] Task 5 — replace the manual inventory with adoption and app-build gates
 - [x] Task 6 — full web/native/browser verification and independent review
 - [ ] Task 7 — handoff, integration, CI, exact-SHA deploy, and live proof
+  (release green; authenticated production-read proof requires an existing
+  signed-in session)
 
 ## Task 1 — Correct the day and nullable OpenAPI contracts
 
