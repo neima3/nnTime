@@ -68,7 +68,7 @@ Vitest, web-push, Swift/OpenAPI contract gates, Coolify.
 - Modify: `src/server/db/migrations.test.ts`
 - Modify: `src/server/db/schema-invariants.test.ts`
 
-- [ ] **Step 1: Write the failing migration assertions**
+- [x] **Step 1: Write the failing migration assertions**
 
 Add `notification_jobs` and `scheduler_runs` to the expected table list, add
 the four new enum names to the enum list, and add tests that query
@@ -88,7 +88,7 @@ await expect(
 Add a cascade test that inserts a user, job, and run; deleting the user must
 remove the job while the operational run remains.
 
-- [ ] **Step 2: Run the schema tests to prove RED**
+- [x] **Step 2: Run the schema tests to prove RED**
 
 Run:
 
@@ -98,7 +98,7 @@ pnpm vitest run src/server/db/migrations.test.ts src/server/db/schema-invariants
 
 Expected: failures naming the missing tables/enums/exports.
 
-- [ ] **Step 3: Add the exact Drizzle enums and tables**
+- [x] **Step 3: Add the exact Drizzle enums and tables**
 
 Define:
 
@@ -147,7 +147,7 @@ Define `schedulerRuns` without `user_id`, because it is aggregate operational
 state. Export `DbNotificationJob` and `DbSchedulerRun`. Add only
 `notification_jobs` to `userOwnedTables`.
 
-- [ ] **Step 4: Add the forward SQL migration**
+- [x] **Step 4: Add the forward SQL migration**
 
 Create the matching four enums, two tables, FK, checks, and indexes. Include:
 
@@ -163,12 +163,12 @@ CHECK (
 Use statement breakpoints between independently applied statements. Do not
 update or delete `planner_events`.
 
-- [ ] **Step 5: Run the schema tests to GREEN**
+- [x] **Step 5: Run the schema tests to GREEN**
 
 Run the focused command from Step 2. Expected: all tests pass with a local
 Postgres; migration failures must fail rather than skip.
 
-- [ ] **Step 6: Commit the schema slice**
+- [x] **Step 6: Commit the schema slice**
 
 ```bash
 git add drizzle/0009_durable_notification_jobs.sql src/server/db/schema.ts \
@@ -183,7 +183,7 @@ git commit -m "feat: add durable notification job schema"
 - Create: `src/server/services/notification-policy.ts`
 - Create: `src/server/services/notification-policy.test.ts`
 
-- [ ] **Step 1: Write failing table-driven policy tests**
+- [x] **Step 1: Write failing table-driven policy tests**
 
 Cover explicit-false preference behavior, quiet hours, effective occurrence
 start/duration, short activities, all five payloads, expiry, and retry. The
@@ -199,7 +199,7 @@ expect(retryDelayMs(9)).toBe(1_800_000);
 The 8-minute activity expectation is start + halfway only; wrap-up is omitted
 because five minutes before end is not meaningfully after its start.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 pnpm vitest run src/server/services/notification-policy.test.ts
@@ -207,7 +207,7 @@ pnpm vitest run src/server/services/notification-policy.test.ts
 
 Expected: import failure for the missing policy module.
 
-- [ ] **Step 3: Implement typed pure policy**
+- [x] **Step 3: Implement typed pure policy**
 
 Export:
 
@@ -251,11 +251,11 @@ const PREF_KEY = {
 } as const;
 ```
 
-- [ ] **Step 4: Run GREEN**
+- [x] **Step 4: Run GREEN**
 
 Run the focused command from Step 2. Expected: all policy cases pass.
 
-- [ ] **Step 5: Commit the policy slice**
+- [x] **Step 5: Commit the policy slice**
 
 ```bash
 git add src/server/services/notification-policy.ts \
@@ -272,7 +272,7 @@ git commit -m "feat: define notification delivery policy"
 - Modify: `src/server/services/notification-policy.ts`
 - Modify: `src/server/services/notification-policy.test.ts`
 
-- [ ] **Step 1: Write failing integration fixtures**
+- [x] **Step 1: Write failing integration fixtures**
 
 Use `createEphemeralDb`, `insertUser`, fixed UUIDs, fixed `now`, and settings
 rows. Prove:
@@ -290,7 +290,7 @@ rows. Prove:
 
 Assert database rows and states, not only returned counters.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 pnpm vitest run src/server/services/notifications.integration.test.ts
@@ -299,7 +299,7 @@ pnpm vitest run src/server/services/notifications.integration.test.ts
 Expected: old code writes `planner_events`, lacks deterministic `now`, and
 cannot satisfy any job-table assertion.
 
-- [ ] **Step 3: Add deterministic desired-job builders**
+- [x] **Step 3: Add deterministic desired-job builders**
 
 Extend the policy module with:
 
@@ -327,7 +327,7 @@ export function activityDedupKey(input: {
 
 Use ISO timestamps in UTC. Add focused unit expectations for stable key output.
 
-- [ ] **Step 4: Implement compute/upsert/cancel**
+- [x] **Step 4: Implement compute/upsert/cancel**
 
 Use the signature:
 
@@ -360,7 +360,7 @@ Use one SQL anti-membership update for cancellation; if the desired list is
 empty, cancel all eligible rows in the bounded window. Never catch general
 insert errors as duplicates.
 
-- [ ] **Step 5: Run focused unit and integration GREEN**
+- [x] **Step 5: Run focused unit and integration GREEN**
 
 ```bash
 pnpm vitest run src/server/services/notification-policy.test.ts \
@@ -369,12 +369,12 @@ pnpm vitest run src/server/services/notification-policy.test.ts \
 
 Expected: deterministic passing results including the concurrent double-run.
 
-- [ ] **Step 6: Prove planner history is untouched**
+- [x] **Step 6: Prove planner history is untouched**
 
 Add an assertion that the compute tests leave
 `SELECT count(*) FROM planner_events` at zero. Run the focused suite again.
 
-- [ ] **Step 7: Commit the compute slice**
+- [x] **Step 7: Commit the compute slice**
 
 ```bash
 git add src/server/services/notification-policy.ts \
@@ -391,7 +391,7 @@ git commit -m "feat: compute idempotent notification jobs"
 - Modify: `src/server/services/push.ts`
 - Create: `src/server/services/push.test.ts`
 
-- [ ] **Step 1: Write failing Web Push classification tests**
+- [x] **Step 1: Write failing Web Push classification tests**
 
 Mock `webpush.sendNotification` and a minimal database. Assert:
 
@@ -408,7 +408,7 @@ Cover 201 success, 404/410 tombstone, 429, 500, thrown network errors, no
 subscriptions, and unconfigured VAPID. Verify endpoint values never appear in
 logged or returned errors.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 pnpm vitest run src/server/services/push.test.ts
@@ -416,7 +416,7 @@ pnpm vitest run src/server/services/push.test.ts
 
 Expected: the old `{ sent, pruned }` result cannot report retryable failures.
 
-- [ ] **Step 3: Narrow `push.ts` to transport responsibility**
+- [x] **Step 3: Narrow `push.ts` to transport responsibility**
 
 Export:
 
@@ -443,11 +443,11 @@ Remove `deliverDueNudges` and `markSent`. Treat 404/410 as prune; every other
 failure increments `retryableFailures`. An unconfigured sender returns
 `configured: false` without querying subscriptions.
 
-- [ ] **Step 4: Run GREEN**
+- [x] **Step 4: Run GREEN**
 
 Run the focused command from Step 2. Expected: all outcome cases pass.
 
-- [ ] **Step 5: Commit the transport slice**
+- [x] **Step 5: Commit the transport slice**
 
 ```bash
 git add src/server/services/push.ts src/server/services/push.test.ts
@@ -461,7 +461,7 @@ git commit -m "fix: surface web push delivery outcomes"
 - Create: `src/server/services/notification-delivery.ts`
 - Create: `src/server/services/notification-delivery.integration.test.ts`
 
-- [ ] **Step 1: Write failing state-machine integration tests**
+- [x] **Step 1: Write failing state-machine integration tests**
 
 Seed jobs and subscriptions in ephemeral Postgres. Inject a deterministic
 `sendToUser` function. Cover:
@@ -477,7 +477,7 @@ Seed jobs and subscriptions in ephemeral Postgres. Inject a deterministic
 - all five types reach their expected payload builder;
 - each claimed job exits `processing`.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 pnpm vitest run src/server/services/notification-delivery.integration.test.ts
@@ -485,7 +485,7 @@ pnpm vitest run src/server/services/notification-delivery.integration.test.ts
 
 Expected: module import failure.
 
-- [ ] **Step 3: Implement one-statement atomic claim**
+- [x] **Step 3: Implement one-statement atomic claim**
 
 Use:
 
@@ -516,7 +516,7 @@ const claimed = await db.execute(sql`
 
 Normalize the postgres-js/Drizzle result shape in one tested helper.
 
-- [ ] **Step 4: Implement transitions**
+- [x] **Step 4: Implement transitions**
 
 Export:
 
@@ -541,12 +541,12 @@ codes only (`preference-disabled`, `quiet-hours`, `source-missing`,
 `push-unconfigured`, `no-subscriptions`, `retry-exhausted`) in `last_error`.
 Clear `claimed_at` for every terminal/retry transition.
 
-- [ ] **Step 5: Run GREEN and inspect final rows**
+- [x] **Step 5: Run GREEN and inspect final rows**
 
 Run the focused command from Step 2. Expected: every state-machine test passes
 and no row remains `processing`.
 
-- [ ] **Step 6: Commit the delivery slice**
+- [x] **Step 6: Commit the delivery slice**
 
 ```bash
 git add src/server/services/notification-delivery.ts \
@@ -563,13 +563,13 @@ git commit -m "feat: deliver notification jobs with durable retries"
 - Modify: `src/app/api/v1/jobs/tick/route.ts`
 - Create: `src/app/api/v1/jobs/tick/route.test.ts`
 
-- [ ] **Step 1: Write failing scheduler-run integration tests**
+- [x] **Step 1: Write failing scheduler-run integration tests**
 
 Prove start, success, failure, sanitized error truncation, and deletion of runs
 older than 30 days. Assert a failed run remains queryable and a success records
 the exact aggregate counts passed to it.
 
-- [ ] **Step 2: Implement run helpers**
+- [x] **Step 2: Implement run helpers**
 
 Export:
 
@@ -597,7 +597,7 @@ export async function pruneSchedulerRuns(
 Sanitize errors to one line and 500 characters. Run the integration suite to
 GREEN.
 
-- [ ] **Step 3: Write failing route orchestration tests**
+- [x] **Step 3: Write failing route orchestration tests**
 
 Mock materialization, compute, delivery, and run helpers. Assert:
 
@@ -607,7 +607,7 @@ Mock materialization, compute, delivery, and run helpers. Assert:
 - an error in any stage records a failed run and returns 500 `{ ok: false }`;
 - no nested catch converts scheduler failure to HTTP 200.
 
-- [ ] **Step 4: Run route RED**
+- [x] **Step 4: Run route RED**
 
 ```bash
 pnpm vitest run src/app/api/v1/jobs/tick/route.test.ts
@@ -615,21 +615,21 @@ pnpm vitest run src/app/api/v1/jobs/tick/route.test.ts
 
 Expected: the existing route swallows notification and delivery errors.
 
-- [ ] **Step 5: Rewrite the route around one failure boundary**
+- [x] **Step 5: Rewrite the route around one failure boundary**
 
 Create the run only after cron authorization. Use one injected/default database
 for run helpers. On success, record summary then prune old runs. On any thrown
 stage, record failure and return 500. Do not return stack traces or raw push
 errors.
 
-- [ ] **Step 6: Run scheduler and route GREEN**
+- [x] **Step 6: Run scheduler and route GREEN**
 
 ```bash
 pnpm vitest run src/server/services/scheduler-runs.integration.test.ts \
   src/app/api/v1/jobs/tick/route.test.ts
 ```
 
-- [ ] **Step 7: Commit the scheduler slice**
+- [x] **Step 7: Commit the scheduler slice**
 
 ```bash
 git add src/server/services/scheduler-runs.ts \
@@ -648,7 +648,7 @@ git commit -m "feat: record fail-closed scheduler runs"
 - Modify: `src/app/api/health/route.ts`
 - Create: `src/app/api/health/route.test.ts`
 
-- [ ] **Step 1: Write failing snapshot tests**
+- [x] **Step 1: Write failing snapshot tests**
 
 Use fixed `now` values to prove:
 
@@ -665,13 +665,13 @@ Cases: no secret in development, no run within five-minute process grace,
 recent success, success older than five minutes, latest failure newer than
 success, and later success recovering from failure.
 
-- [ ] **Step 2: Implement `getSchedulerHealth`**
+- [x] **Step 2: Implement `getSchedulerHealth`**
 
 Query only the newest completed run and newest success. Accept `{ db, now,
 configured, processStartedAt, maxLagMs }` so tests do not use wall-clock or
 module-load timing.
 
-- [ ] **Step 3: Write failing health-route tests**
+- [x] **Step 3: Write failing health-route tests**
 
 Mock migrations, DB connectivity, and scheduler health. Assert aggregate
 response:
@@ -692,19 +692,19 @@ response:
 `lagging`/`failed` must return 503; `unconfigured` is allowed only outside
 production; `warming` returns 200 during grace.
 
-- [ ] **Step 4: Implement route health mapping**
+- [x] **Step 4: Implement route health mapping**
 
 Keep existing migration/DB/AI semantics. Add scheduler state and optional lag
 without exposing run summary or errors.
 
-- [ ] **Step 5: Run GREEN**
+- [x] **Step 5: Run GREEN**
 
 ```bash
 pnpm vitest run src/server/services/scheduler-runs.integration.test.ts \
   src/app/api/health/route.test.ts
 ```
 
-- [ ] **Step 6: Commit the health slice**
+- [x] **Step 6: Commit the health slice**
 
 ```bash
 git add src/server/services/scheduler-runs.ts \
@@ -722,7 +722,7 @@ git commit -m "feat: report scheduler lag in health"
 - Create: `src/server/services/notification-regression.test.ts`
 - Verify: `docs/plans/2026-07-28-round18-durable-notifications-prompt.md`
 
-- [ ] **Step 1: Add static regression assertions**
+- [x] **Step 1: Add static regression assertions**
 
 Read scheduler sources as text and require:
 
@@ -732,12 +732,12 @@ Read scheduler sources as text and require:
 - every notification enum value appears in policy payload tests;
 - migration contains no `DELETE`, `TRUNCATE`, or `UPDATE planner_events`.
 
-- [ ] **Step 2: Add runtime history/sync isolation assertion**
+- [x] **Step 2: Add runtime history/sync isolation assertion**
 
 In the compute integration test, create/deliver/cancel jobs and assert
 `planner_events` and `change_log` counts do not change.
 
-- [ ] **Step 3: Run all scheduler-focused suites**
+- [x] **Step 3: Run all scheduler-focused suites**
 
 ```bash
 pnpm vitest run \
@@ -755,13 +755,13 @@ pnpm vitest run \
 
 Expected: all pass with real PostgreSQL integration.
 
-- [ ] **Step 4: Verify the immutable executor prompt**
+- [x] **Step 4: Verify the immutable executor prompt**
 
 Confirm the committed prompt names the AGENTS guide, ADR-004, design, this
 plan, TDD, production backup, no production planner mutation, exact-SHA
 CI/deploy, and read-only live proof.
 
-- [ ] **Step 5: Commit the regression slice**
+- [x] **Step 5: Commit the regression slice**
 
 ```bash
 git add src/server/db/migrations.test.ts \
@@ -781,7 +781,7 @@ git commit -m "test: lock durable notification contract"
 - Modify: `docs/plans/progress.md`
 - Modify: `docs/plans/2026-07-28-round18-durable-notifications.md`
 
-- [ ] **Step 1: Run full web and contract gates**
+- [x] **Step 1: Run full web and contract gates**
 
 ```bash
 pnpm lint &&
@@ -796,7 +796,7 @@ Record exact test counts and parity output. Correct D10/G07 evidence only if
 the implementation proves the stated user-visible behavior; do not change the
 score merely for infrastructure.
 
-- [ ] **Step 2: Run native gates**
+- [x] **Step 2: Run native gates**
 
 ```bash
 swift build --package-path ios/Kairo
@@ -810,7 +810,7 @@ Use the repository's actual script names from `package.json`; if a listed
 alias differs, record the exact equivalent command and result in progress.
 Scan native output for Main Thread Checker diagnostics.
 
-- [ ] **Step 3: Run production-mode synthetic browser QA**
+- [x] **Step 3: Run production-mode synthetic browser QA**
 
 Start the production build with a synthetic local Postgres and local cron
 secret. In a muted real browser at desktop and 390px mobile:
@@ -832,7 +832,7 @@ Use `superpowers:requesting-code-review`, address every verified finding with
 `superpowers:receiving-code-review`, rerun focused and full gates, and record
 the disposition in `docs/plans/progress.md`.
 
-- [ ] **Step 5: Update truthful handoff docs**
+- [x] **Step 5: Update truthful handoff docs**
 
 Add Round 18 hardening to the roadmap, correct notification parity evidence,
 append exact verification and remaining ranked gaps to progress, and check
@@ -850,23 +850,23 @@ every completed task in this plan. The remaining order is:
 Run the full commands from Steps 1–2 again after docs. Confirm `git diff
 --check` and a clean intended diff. Commit the immutable Round 18 handoff.
 
-- [ ] **Step 7: Integrate and push**
+- [ ] **Step 7: Create the predeploy database backup**
+
+Follow `docs/DEPLOYMENT.md` exactly. Store the backup outside the repository,
+verify it is non-empty and readable with `pg_restore --list` or the matching
+format command, and record only path/size/checksum—never credentials or planner
+contents. This must precede the push because production auto-deploy is enabled.
+
+- [ ] **Step 8: Integrate and push**
 
 Use `superpowers:finishing-a-development-branch`. Integrate into `main`
 without discarding unrelated user changes, push `main`, and verify the exact
 remote SHA.
 
-- [ ] **Step 8: Wait for exact-SHA CI**
+- [ ] **Step 9: Wait for exact-SHA CI**
 
 Require every GitHub Actions job for the pushed SHA to pass. A passing earlier
 SHA is not release evidence.
-
-- [ ] **Step 9: Create the predeploy database backup**
-
-Follow `docs/DEPLOYMENT.md` exactly. Store the backup outside the repository,
-verify it is non-empty and readable with `pg_restore --list` or the matching
-format command, and record only path/size/checksum—never credentials or planner
-contents.
 
 - [ ] **Step 10: Deploy and verify exact live SHA**
 

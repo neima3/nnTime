@@ -19,20 +19,20 @@ import {
 
 export function OfflineIndicator({ userId }: { userId: string | null }) {
   const router = useRouter();
-  const [online, setOnline] = useState(() =>
-    typeof navigator === "undefined" ? true : navigator.onLine,
-  );
+  const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(0);
   const [terminal, setTerminal] = useState(0);
 
   useEffect(() => {
     const syncConnectivity = () => setOnline(navigator.onLine);
+    const onOnline = () => setOnline(true);
+    const onOffline = () => setOnline(false);
     syncConnectivity();
-    window.addEventListener("online", syncConnectivity);
-    window.addEventListener("offline", syncConnectivity);
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
     return () => {
-      window.removeEventListener("online", syncConnectivity);
-      window.removeEventListener("offline", syncConnectivity);
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
     };
   }, []);
 

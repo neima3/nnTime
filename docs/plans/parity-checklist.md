@@ -107,9 +107,9 @@ energy-pattern learning, and related rows — see table.
 | F03 | One-way sync only, by design | F | both | 5A | planned | 1 | SHIPPED: calendar import is read-only (source='calendar', read-only locked blocks). Kairo's calendar import is read-only/one-way by the same design choice. |
 | F04 | Per-device import step | F | both | 5A | planned | 1 | Superseded by account-level OAuth sync (server-side, not per-device) — same end-user outcome via a better mechanism. |
 | F05 | Imported events are "locked" | F | both | 2C, 5A | planned | 1 | — |
-| G01 | Per-notification-type toggles | G | both | 3B | planned | 1 | SHIPPED: the durable compute and delivery boundaries independently re-check start, halfway, wrap-up, daily review, and weekly review preferences; an explicit false cancels or suppresses the affected work. |
-| G02 | Custom timing | G | both | 3B | planned | 1 | — |
-| G03 | Custom sounds | G | both | 3B | planned | 1 | — |
+| G01 | Per-notification-type toggles | G | both | 3B | planned | 1 | WEB SHIPPED (Round 18): Settings exposes start, halfway, wrap-up, daily-review, and weekly-review toggles; compute and delivery independently re-check the same explicit-false keys. Native parity is not claimed. |
+| G02 | Custom timing | G | both | 3B | planned | 1 | WEB SHIPPED (Round 18): bounded Settings controls shift start, halfway, and wrap-up reminders; compute and delivery share the same parser. Native custom timing is not claimed. |
+| G03 | Custom sounds | G | both | 3B | planned | 1 | WEB SHIPPED (Round 18): the account sound toggle is re-read at delivery and maps to the Web Notification `silent` option. Custom native sounds are not claimed. |
 | G04 | "Review Today" daily check-in | G | both | 2D, 3B | planned | 1 | SHIPPED (Round 18): one deduplicated daily review job at 20:00 in the account planning zone, preference/quiet-hour checked again at delivery. |
 | G05 | "Review your week" | G | both | 3B | planned | 1 | SHIPPED (Round 18): one deduplicated week-ending review job at 18:00 in the account planning zone and configured week-start convention. |
 | G06 | Gentle/soft notification design | G | both | 3B | planned | 1 | SHIPPED: privacy-minimal, calm copy is generated centrally by `notification-policy.ts`; arbitrary activity notes and push endpoints never enter job payloads. |

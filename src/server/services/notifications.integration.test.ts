@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { v7 as uuidv7 } from "uuid";
 import {
   createEphemeralDb,
@@ -13,9 +13,13 @@ import {
   changeLog,
   notificationJobs,
   plannerEvents,
+  pushSubscriptions,
   userSettings,
 } from "../db/schema";
-import { computeNotificationJobs } from "./notifications";
+import {
+  computeNotificationJobs,
+  registerPushSubscription,
+} from "./notifications";
 
 const NOW = new Date("2026-07-28T12:00:00.000Z");
 const NO_REVIEWS = {
@@ -363,5 +367,36 @@ describe("computeNotificationJobs", () => {
 
     expect(jobs).toHaveLength(3);
     expect(new Set(jobs.map((job) => job.dedupKey)).size).toBe(3);
+  });
+});
+
+describe("push subscription registration", () => {
+  itDb("caps each account at ten live subscriptions", async () => {
+    const userId = await seedUser();
+
+    for (let index = 0; index < 12; index++) {
+      await registerPushSubscription(
+        userId,
+        {
+          endpoint: `https://push.invalid/${index}`,
+          keys: { p256dh: `key-${index}`, auth: `auth-${index}` },
+        },
+        { db: env!.db },
+      );
+    }
+
+    const live = await env!.db
+      .select()
+      .from(pushSubscriptions)
+      .where(
+        and(
+          eq(pushSubscriptions.userId, userId),
+          isNull(pushSubscriptions.deletedAt),
+        ),
+    );
+    expect(live).toHaveLength(10);
+    expect(live.map((subscription) => subscription.endpoint)).toContain(
+      "https://push.invalid/11",
+    );
   });
 });

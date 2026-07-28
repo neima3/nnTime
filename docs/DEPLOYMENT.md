@@ -88,7 +88,7 @@ Phase 1+ requires `DATABASE_URL`, `BETTER_AUTH_SECRET`, etc.
 | `BETTER_AUTH_SECRET` | Session signing |
 | `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL` | Canonical origin |
 | `TRUSTED_ORIGINS` | Optional comma-separated extra Origins allowed for cookie-auth API mutations (always allows `https://time.neima.me` + `http://localhost:3000`) |
-| `CRON_SECRET` | Bearer secret for `POST /api/v1/jobs/tick` (ADR-004 scheduler). Each tick records a scheduler run, materializes routines, computes deduplicated `notification_jobs`, atomically claims due work, and delivers or durably retries Web Push. The Origin/CSRF proxy guard skips this path because it uses bearer, not cookies. **The cron now exists — see below.** |
+| `CRON_SECRET` | Bearer secret for `POST /api/v1/jobs/tick` (ADR-004 scheduler). Each tick records a scheduler run, materializes routines, computes deduplicated `notification_jobs`, atomically claims due work, and delivers or durably retries Web Push. Claims heartbeat during delivery; provider fan-out is capped at four concurrent requests and ten live subscriptions per account. The Origin/CSRF proxy guard skips this path because it uses bearer, not cookies. **The cron now exists — see below.** |
 | `ANTHROPIC_API_KEY` | Optional; AI co-planner (503 if missing on AI routes) |
 
 ## Postgres provisioning (Phase 1A+)

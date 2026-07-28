@@ -13,6 +13,7 @@ import * as schema from "../db/schema";
 import { and, eq, isNull } from "drizzle-orm";
 
 let configured = false;
+const MAX_CONCURRENT_PUSH_REQUESTS = 4;
 
 /** Lazily configure VAPID from env. Returns false if keys are missing. */
 export function pushConfigured(): boolean {
@@ -82,27 +83,40 @@ export async function sendToUser(
   let retryableFailures = 0;
   const body = JSON.stringify(payload);
 
-  await Promise.all(subs.map(async (sub) => {
-    try {
-      await sendNotification(
-        { endpoint: sub.endpoint, keys: sub.keys as { p256dh: string; auth: string } },
-        body,
-        { timeout: 30_000 },
-      );
-      sent++;
-    } catch (err) {
-      const status = (err as { statusCode?: number }).statusCode;
-      if (status === 404 || status === 410) {
-        await db
-          .update(schema.pushSubscriptions)
-          .set({ deletedAt: new Date() })
-          .where(eq(schema.pushSubscriptions.id, sub.id));
-        pruned++;
-      } else {
-        retryableFailures++;
+  let nextSubscription = 0;
+  const workers = Array.from(
+    {
+      length: Math.min(MAX_CONCURRENT_PUSH_REQUESTS, subs.length),
+    },
+    async () => {
+      while (nextSubscription < subs.length) {
+        const sub = subs[nextSubscription++];
+        try {
+          await sendNotification(
+            {
+              endpoint: sub.endpoint,
+              keys: sub.keys as { p256dh: string; auth: string },
+            },
+            body,
+            { timeout: 30_000 },
+          );
+          sent++;
+        } catch (err) {
+          const status = (err as { statusCode?: number }).statusCode;
+          if (status === 404 || status === 410) {
+            await db
+              .update(schema.pushSubscriptions)
+              .set({ deletedAt: new Date() })
+              .where(eq(schema.pushSubscriptions.id, sub.id));
+            pruned++;
+          } else {
+            retryableFailures++;
+          }
+        }
       }
-    }
-  }));
+    },
+  );
+  await Promise.all(workers);
   return {
     configured: true,
     subscriptions: subs.length,

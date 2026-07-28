@@ -1,5 +1,79 @@
 # Progress log
 
+## 2026-07-28 — Round 18: durable notifications and truthful scheduler health (Codex)
+
+Roadmap:
+`docs/plans/2026-07-28-round18-durable-notifications.md`. Replaced the
+production-looking placeholder notification flow that wrote duplicate
+`planner_events` with a durable Postgres scheduler boundary.
+
+- **Dedicated operational state.** Forward-only migration `0009` adds
+  `notification_jobs` and `scheduler_runs`, stable deduplication, due/entity
+  indexes, bounded states, and claim-token ownership without updating or
+  deleting planner history. Notification work remains outside sync, stats, and
+  export.
+- **All five ADR-004 types.** Start, halfway, wrap-up, Review Today, and weekly
+  review jobs are recurrence/override aware. Compute cancels obsolete future
+  work; delivery re-checks preference, quiet hours, current recurrence/source
+  state, planning timezone/week-start, timing offsets, title privacy, and sound.
+- **Bounded, fenced delivery.** One-statement `SKIP LOCKED` claims use a fresh
+  UUID fencing token. The owner renews its five-minute lease immediately before
+  and once per minute during provider delivery. Web Push uses a 30-second socket
+  timeout, four-request concurrency pool, and ten-live-subscription account
+  ceiling. Retryable failures use 1/5/15/30-minute backoff; 404/410 endpoints are
+  tombstoned; expired, suppressed, retry, and sent outcomes remain durable.
+- **User-facing control.** The existing Settings design now exposes all five
+  notification-type toggles, per-activity timing controls, normal-device-sound
+  control, lock-screen title privacy, and quiet hours. The service worker
+  consumes the current sound preference through `NotificationOptions.silent`.
+- **Fail-closed operations.** Every authenticated minute tick records a run and
+  returns 500 when any stage fails. `/api/health` reports warming, current lag,
+  latest failure, and recovery from the ledger. Error storage redacts arbitrary
+  credential URLs, quoted JSON secrets, authorization values, tokens, API keys,
+  passwords, and email addresses.
+- **Independent adversarial review.** Successive reviews found stale-owner
+  fencing, batch-clock, recurrence, privacy, offset, retry-summary, pruning,
+  sanitizer, in-flight lease, review-reschedule, sound/toggle, unbounded fan-out,
+  and offline-hydration gaps. Each verified issue received a failing regression
+  before its fix. The final release review is required to report no remaining
+  Critical or Important findings.
+- **Local release proof.** ESLint, TypeScript, production build, and **82 files /
+  860 Vitest tests** passed after the final bounded-fan-out follow-up. OpenAPI
+  sync and generated iOS adoption passed at **17 operations / 30 shipping Swift
+  files**. The full production-mode Playwright suite passed **12/12** on a fresh
+  migrated PostgreSQL database, including both offline replay flows.
+- **Scheduler state-cycle proof.** Against a synthetic local tenant,
+  unauthenticated tick returned 401; authenticated tick returned 200 with one
+  desired/deduplicated job and healthy scheduler. Temporarily renaming the local
+  synthetic job table forced tick 500 and health 503/`scheduler:failed`;
+  restoring it produced tick 200 and health 200/`scheduler:ok`. Evidence is
+  ignored under `browser-qa/round18-durable-notifications/`.
+- **Responsive browser proof.** The expanded Settings surface persisted a
+  per-type toggle and timing offset across reload, then restored the defaults.
+  Desktop 1440×1000 and mobile 390×844 renders have zero horizontal overflow,
+  zero console warnings/errors, and all fourteen accessible switches. The
+  inspected screenshots are
+  `browser-qa/round18-durable-notifications/settings-desktop.png` and
+  `settings-mobile.png`.
+- **Native regression proof.** Swift build/test passed **57 tests / 9 suites**;
+  release preflight and XcodeGen preparation passed; the app-hosted main-thread
+  gate passed **77/77** with zero Main Thread Checker findings; and the serial
+  no-proxy iPhone 17 Pro flight passed **17/17**. Round 18's later review fixes
+  are web/server/docs-only.
+- **Parity is informational.** The current script still credits `planned` rows,
+  so its web **89.74%** and iOS/combined **87.08%** output is not treated as a
+  truthful release gate. G01–G03 evidence now explicitly distinguishes shipped
+  web behavior from unclaimed native parity.
+- **Data safety.** All mutation, failure, delivery, and browser proof used
+  synthetic local databases/accounts. Production planner, settings,
+  subscriptions, notification rows, and user data have not been read or
+  changed. Production integration remains blocked until a fresh custom-format
+  backup is copied off-host and validated.
+
+**Release state:** predeploy backup, `main` integration, exact-SHA CI, Coolify
+deployment, and read-only live proof remain pending and must be appended here
+before Round 18 is called shipped.
+
 ## 2026-07-28 — Round 17: offline mutation integrity (Codex)
 
 Roadmap:

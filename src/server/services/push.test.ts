@@ -155,13 +155,20 @@ describe.sequential("sendToUser", () => {
     });
   });
 
-  itDb("bounds provider requests and sends subscriptions concurrently", async () => {
-    const userId = await seedSubscriptions(2);
+  itDb("bounds provider requests while sending subscriptions concurrently", async () => {
+    const userId = await seedSubscriptions(9);
     const releases: Array<() => void> = [];
+    let active = 0;
+    let peakActive = 0;
     webPushMocks.sendNotification.mockImplementation(
       () =>
         new Promise((resolve) => {
-          releases.push(() => resolve({ statusCode: 201 }));
+          active++;
+          peakActive = Math.max(peakActive, active);
+          releases.push(() => {
+            active--;
+            resolve({ statusCode: 201 });
+          });
         }),
     );
 
@@ -170,11 +177,20 @@ describe.sequential("sendToUser", () => {
       sendNotification: webPushMocks.sendNotification,
     });
     await vi.waitFor(() => {
-      expect(webPushMocks.sendNotification).toHaveBeenCalledTimes(2);
+      expect(webPushMocks.sendNotification).toHaveBeenCalledTimes(4);
     });
-    for (const release of releases) release();
+    releases.splice(0).forEach((release) => release());
+    await vi.waitFor(() => {
+      expect(webPushMocks.sendNotification).toHaveBeenCalledTimes(8);
+    });
+    releases.splice(0).forEach((release) => release());
+    await vi.waitFor(() => {
+      expect(webPushMocks.sendNotification).toHaveBeenCalledTimes(9);
+    });
+    releases.splice(0).forEach((release) => release());
 
-    await expect(delivery).resolves.toMatchObject({ sent: 2 });
+    await expect(delivery).resolves.toMatchObject({ sent: 9 });
+    expect(peakActive).toBe(4);
     for (const call of webPushMocks.sendNotification.mock.calls) {
       expect(call[2]).toMatchObject({ timeout: 30_000 });
     }

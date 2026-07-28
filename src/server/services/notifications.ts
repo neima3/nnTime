@@ -4,6 +4,7 @@ import type { Db } from "../dal";
 import * as schema from "../db/schema";
 import {
   and,
+  asc,
   eq,
   gte,
   inArray,
@@ -30,6 +31,7 @@ import { instantToWallFields, wallClockToInstant } from "../temporal/zone";
 const NOTIFICATION_LOCK_KEY = 8_947_232;
 const HOUR_MS = 60 * 60_000;
 const REVIEW_EXPIRY_MS = 4 * HOUR_MS;
+const MAX_PUSH_SUBSCRIPTIONS_PER_USER = 10;
 
 export interface DesiredNotificationJob {
   userId: string;
@@ -464,23 +466,60 @@ export async function registerPushSubscription(
   opts: { db?: Db } = {},
 ) {
   const db = opts.db ?? dbDefault;
-  const [subscription] = await db
-    .insert(schema.pushSubscriptions)
-    .values({
-      id: crypto.randomUUID(),
-      userId,
-      endpoint: input.endpoint,
-      keys: input.keys,
-    })
-    .onConflictDoUpdate({
-      target: [
-        schema.pushSubscriptions.userId,
-        schema.pushSubscriptions.endpoint,
-      ],
-      set: { keys: input.keys, updatedAt: new Date(), deletedAt: null },
-    })
-    .returning();
-  return subscription;
+  return db.transaction(async (transaction) => {
+    const tx = transaction as unknown as Db;
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${"push:" + userId}))`,
+    );
+    const now = new Date();
+    const [subscription] = await tx
+      .insert(schema.pushSubscriptions)
+      .values({
+        id: crypto.randomUUID(),
+        userId,
+        endpoint: input.endpoint,
+        keys: input.keys,
+      })
+      .onConflictDoUpdate({
+        target: [
+          schema.pushSubscriptions.userId,
+          schema.pushSubscriptions.endpoint,
+        ],
+        set: { keys: input.keys, updatedAt: now, deletedAt: null },
+      })
+      .returning();
+
+    const live = await tx
+      .select({
+        id: schema.pushSubscriptions.id,
+        createdAt: schema.pushSubscriptions.createdAt,
+      })
+      .from(schema.pushSubscriptions)
+      .where(
+        and(
+          eq(schema.pushSubscriptions.userId, userId),
+          isNull(schema.pushSubscriptions.deletedAt),
+        ),
+      )
+      .orderBy(
+        asc(schema.pushSubscriptions.createdAt),
+        asc(schema.pushSubscriptions.id),
+      );
+    const excess = live.length - MAX_PUSH_SUBSCRIPTIONS_PER_USER;
+    if (excess > 0) {
+      const staleIds = live
+        .filter((candidate) => candidate.id !== subscription.id)
+        .slice(0, excess)
+        .map((candidate) => candidate.id);
+      if (staleIds.length > 0) {
+        await tx
+          .update(schema.pushSubscriptions)
+          .set({ deletedAt: now, updatedAt: now })
+          .where(inArray(schema.pushSubscriptions.id, staleIds));
+      }
+    }
+    return subscription;
+  });
 }
 
 export async function unregisterPushSubscription(

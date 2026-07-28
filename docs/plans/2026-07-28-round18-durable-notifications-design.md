@@ -125,9 +125,11 @@ Default fire times are:
 The current `startNudges: false` preference disables start jobs. New flat
 preferences `halfwayNudges`, `wrapUpNudges`, `reviewTodayNudges`, and
 `weeklyReviewNudges` follow the same explicit-false rule, preserving the
-existing default-on behavior. Quiet hours are checked at delivery so a setting
-change takes effect immediately. The free-form settings JSON remains backward
-compatible; this round does not add a visual settings redesign.
+existing default-on behavior. Settings exposes all five controls, per-activity
+timing offsets, lock-screen title privacy, and a sound preference without
+changing the established visual language. Quiet hours are checked at delivery
+so a setting change takes effect immediately. The free-form settings JSON
+remains backward compatible.
 
 Review jobs are created only for users with settings rows. This prevents a
 background scan from inventing planner state for dormant auth records.
@@ -137,8 +139,8 @@ background scan from inventing planner state for dormant auth records.
 Claiming uses one SQL update over a `FOR UPDATE SKIP LOCKED` selection so two
 workers cannot own the same job. Every ownership change gets a UUID fencing
 token; transitions compare-and-set both state and token, and the owner renews
-the lease immediately before external delivery. A stale `processing` claim
-becomes eligible again after five minutes.
+the lease immediately before and once per minute throughout external delivery.
+A stale `processing` claim becomes eligible again after five minutes.
 
 Each claimed job reaches exactly one transition:
 
@@ -154,6 +156,9 @@ Each claimed job reaches exactly one transition:
 
 Push sending returns structured counts for sent, pruned, and retryable failures.
 HTTP 404/410 subscriptions are tombstoned. Other errors are never swallowed.
+Provider requests have a 30-second socket timeout, a four-request concurrency
+pool, and a ten-live-subscription ceiling per account so one user cannot exhaust
+the scheduler's sockets or memory.
 A successful delivery to any live subscription is sufficient to mark the job
 sent; failures on sibling subscriptions are reported in the run summary.
 
@@ -162,6 +167,8 @@ The job table never stores push endpoints or arbitrary activity notes.
 Account preferences can hide activity names from lock-screen copy and shift
 start, halfway, and wrap-up reminders by bounded per-type minute offsets. The
 same preference parser is used during compute and delivery revalidation.
+The sound preference maps to the Web Notification `silent` option at current
+delivery time rather than trusting stale payload JSON.
 Expiry, quiet-hours, delivery timestamps, and retry backoff use a fresh clock
 reading for each claimed job rather than the batch-start timestamp.
 
@@ -208,6 +215,8 @@ Strict red/green coverage proves:
 - edits, skips, deletes, and preference changes cancel pending jobs;
 - all five notification types produce deterministic keys and fire times;
 - atomic claims prevent double delivery and stale claims recover;
+- claims stay leased throughout in-flight delivery, while provider fan-out and
+  live subscriptions remain bounded;
 - success, no-subscription, quiet-hours, disabled, stale-subscription,
   transient-failure, retry, and expiry transitions;
 - the tick route returns 500 and records failure when any scheduler stage

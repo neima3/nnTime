@@ -31,6 +31,18 @@ async function queueRows(page: import("@playwright/test").Page) {
   });
 }
 
+async function setOffline(
+  page: import("@playwright/test").Page,
+  context: import("@playwright/test").BrowserContext,
+  offline: boolean,
+) {
+  await context.setOffline(offline);
+  await page.evaluate(
+    (eventName) => window.dispatchEvent(new Event(eventName)),
+    offline ? "offline" : "online",
+  );
+}
+
 test("an offline inbox capture replays once and appears after reconnect", async ({
   page,
   context,
@@ -38,9 +50,8 @@ test("an offline inbox capture replays once and appears after reconnect", async 
   const title = `Offline inbox ${Date.now()}`;
   await page.setViewportSize({ width: 1440, height: 1000 });
   await gotoHydrated(page, "/app/today");
-  await page.waitForLoadState("networkidle").catch(() => {});
 
-  await context.setOffline(true);
+  await setOffline(page, context, true);
   await expect(page.getByText("You're offline")).toBeVisible({ timeout: 10_000 });
   await page.keyboard.press("c");
   await page.getByPlaceholder("One thought, then let it go…").fill(title);
@@ -69,7 +80,7 @@ test("an offline inbox capture replays once and appears after reconnect", async 
     fullPage: true,
   });
 
-  await context.setOffline(false);
+  await setOffline(page, context, false);
   await expect.poll(async () => (await queueRows(page)).length, {
     timeout: 15_000,
   }).toBe(0);
@@ -85,11 +96,7 @@ test("an offline completion queues, replays on reconnect, and sticks", async ({
   const title = `Offline E2E block ${Date.now()}`;
   await createActivity(page, dayUrl(3 + testInfo.retry), title);
 
-  // Let the post-save router.refresh finish before pulling the plug — going
-  // offline mid-RSC-fetch fails the refresh instead of testing the queue.
-  await page.waitForLoadState("networkidle").catch(() => {});
-
-  await context.setOffline(true);
+  await setOffline(page, context, true);
   // The indicator reacts to the browser's offline event; give the just-
   // navigated page a moment to have its listeners attached.
   await expect(page.getByText("You're offline")).toBeVisible({ timeout: 10_000 });
@@ -124,7 +131,7 @@ test("an offline completion queues, replays on reconnect, and sticks", async ({
   });
   expect(queued).toEqual([{ method: "PATCH", status: "pending", hasRebase: true }]);
 
-  await context.setOffline(false);
+  await setOffline(page, context, false);
 
   // The queue drains and the page refreshes to server truth.
   await expect

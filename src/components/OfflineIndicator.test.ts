@@ -19,9 +19,9 @@ describe("OfflineIndicator recovery contract", () => {
   });
 
   it("tracks connectivity even before a queue owner resolves", () => {
-    expect(source).toContain("navigator.onLine");
-    expect(source).toContain('window.addEventListener("offline", syncConnectivity)');
-    expect(source.indexOf('window.addEventListener("offline", syncConnectivity)')).toBeLessThan(
+    expect(source).toContain("const [online, setOnline] = useState(true)");
+    expect(source).toContain('window.addEventListener("offline", onOffline)');
+    expect(source.indexOf('window.addEventListener("offline", onOffline)')).toBeLessThan(
       source.indexOf("if (!userId) return;"),
     );
   });
