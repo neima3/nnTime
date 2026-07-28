@@ -17,7 +17,7 @@
 - [x] Task 3 — migrate the existing working paths and add an adoption gate
 - [x] Task 4 — adopt every fully local replay-safe create/status surface
 - [x] Task 5 — production-mode browser proof and adversarial review
-- [ ] Task 6 — full verification, handoff, exact-SHA release, and live proof
+- [x] Task 6 — full verification, handoff, exact-SHA release, and live proof
 
 ## Task 1 — Server idempotency prerequisite and typed offline delivery policy
 
@@ -211,11 +211,11 @@ await dismissTerminalMutations("user-a")
   repository release gate covers both clients.
 - [x] Record exact counts, screenshots, review disposition, parity, and the
   remaining external authenticated-production-read limitation.
-- [ ] Commit the immutable handoff, integrate without discarding unrelated
+- [x] Commit the immutable handoff, integrate without discarding unrelated
   work, push `main`, and wait for all exact-SHA GitHub Actions jobs.
-- [ ] Wait for the exact-SHA Coolify deployment to be `finished` and
+- [x] Wait for the exact-SHA Coolify deployment to be `finished` and
   `running:healthy`.
-- [ ] Verify production read-only: health checks, security headers, unique
+- [x] Verify production read-only: health checks, security headers, unique
   deployed bundle marker, signed-out authorization boundary, desktop/mobile
   UI, and console. Do not mutate production planner or mood data.
 

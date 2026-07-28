@@ -59,10 +59,25 @@ offline adoption.
   tenants or mock native data. No production planner, mood, or PHI-like data
   was created or changed.
 
-The remaining release work is exact-SHA GitHub Actions, Coolify, and read-only
-live verification. The production Chrome profile was signed out in Round 16;
-unless that external state changes, authenticated planner reads remain
-explicitly unclaimed while 401 authorization-boundary proof remains valid.
+- **Exact-SHA release proof.** Source SHA
+  `c0283eaee08503223dc4e21f5b42e80e4a2697ae` passed all three GitHub Actions
+  jobs in run
+  [`30389900489`](https://github.com/neima3/nnTime/actions/runs/30389900489):
+  build/test, production-mode E2E, and native contract. Coolify deployment
+  `k13p2zccvbvrhg2o54rk5gt3` finished for that exact SHA and the `kairo`
+  application reported `running:healthy`.
+- **Read-only production proof.** `GET /api/health` returned `200` with
+  migrations, database, AI, and scheduler all `ok`; the signed-out settings
+  boundary returned the expected `401`. CSP, HSTS, frame denial, MIME sniffing
+  denial, referrer, permissions, opener, and resource policies were present.
+  The live hashed client chunks contained the Round 17 conflict copy. The Today
+  surface rendered without horizontal overflow at 1440×1000 and 390×844, with
+  zero browser-console warnings or errors; screenshots are in the ignored
+  `browser-qa/round17-offline-integrity/` directory.
+
+The production Chrome profile remains signed out, so authenticated planner
+reads are explicitly unclaimed. The release proof was read-only and made no
+production planner or mood changes.
 
 ## 2026-07-28 — Round 16: generated client in the shipping native app (Codex)
 
