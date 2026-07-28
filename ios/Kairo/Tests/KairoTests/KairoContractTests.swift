@@ -144,6 +144,11 @@ import Foundation
             #"{"status":204,"body":null}"#
         )
         #expect(batchResult.body == nil)
+        let batchOperation = try decodeFixture(
+            Components.Schemas.BatchOperation.self,
+            #"{"method":"POST","path":"/api/v1/tasks","body":{"title":"Capture"}}"#
+        )
+        #expect(batchOperation.body != nil)
 
         let search = try decodeFixture(
             Components.Schemas.SearchResponse.self,
@@ -192,6 +197,67 @@ import Foundation
             #"{"ok":true}"#
         )
         #expect(response.ok)
+    }
+
+    @Test func generatedMutationInputsExcludeServerOwnedFields() {
+        let createActivity = Components.Schemas.ActivitySeriesCreateRequest(
+            tz: "America/New_York",
+            dtstartLocal: Date(timeIntervalSince1970: 0),
+            title: "Morning plan",
+            durationMin: 30
+        )
+        #expect(createActivity.title == "Morning plan")
+
+        let updateActivity = Components.Schemas.ActivitySeriesUpdateRequest(
+            title: "Updated plan"
+        )
+        #expect(updateActivity.title == "Updated plan")
+
+        let createTask = Components.Schemas.TaskCreateRequest(
+            bucket: .inbox,
+            title: "Capture"
+        )
+        #expect(createTask.title == "Capture")
+
+        let updateTask = Components.Schemas.TaskUpdateRequest(title: "Clarify")
+        #expect(updateTask.title == "Clarify")
+
+        let updateSettings = Components.Schemas.UserSettingsUpdateRequest(
+            timezone: "America/New_York"
+        )
+        #expect(updateSettings.timezone == "America/New_York")
+
+        let createRoutine = Components.Schemas.RoutineCreateRequest(
+            title: "Morning reset"
+        )
+        #expect(createRoutine.title == "Morning reset")
+    }
+
+    @Test func generatedRoutineListItemPreservesNestedReadModel() throws {
+        let item = try decodeFixture(
+            Components.Schemas.RoutineListItem.self,
+            """
+            {
+              "id":"0198f834-c9ab-7e12-b1cf-1faebad8f4fd",
+              "userId":"0198f834-c9ab-7e12-b1cf-1faebad8f4fe",
+              "title":"Morning reset",
+              "emoji":null,
+              "categoryId":null,
+              "notes":null,
+              "revision":1,
+              "createdAt":"2026-07-28T12:00:00Z",
+              "updatedAt":"2026-07-28T12:00:00Z",
+              "steps":[],
+              "schedules":[],
+              "stepCount":0,
+              "totalMin":0
+            }
+            """
+        )
+        #expect(item.steps.isEmpty)
+        #expect(item.schedules.isEmpty)
+        #expect(item.stepCount == 0)
+        #expect(item.totalMin == 0)
     }
 
     private func decodeFixture<T: Decodable>(

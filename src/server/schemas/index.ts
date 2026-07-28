@@ -5,9 +5,10 @@
  * REST API. These mirror src/server/db/schema.ts and are checked for parity
  * against api/openapi.yaml by the contract-parity test in CI.
  *
- * `responseSchemaRegistry` maps OpenAPI component names → zod schema objects;
- * the parity test walks it. Adding a component to the spec means adding a key
- * here AND a matching schema file. Hand-written, NOT drizzle-zod generated.
+ * The response and request registries map OpenAPI component names → zod schema
+ * objects; the parity test walks both. Adding a component to the spec means
+ * adding a key here AND a matching schema file. Hand-written, NOT
+ * drizzle-zod generated.
  */
 
 export * from "./common";
@@ -30,16 +31,33 @@ export * from "./stats";
 
 // Re-import the schema objects (named exports from above) to build the registry.
 import { errorEnvelope } from "./envelope";
-import { categoryResponse } from "./category";
-import { tagResponse } from "./tag";
-import { taskResponse } from "./task";
-import { activitySeriesResponse } from "./activity-series";
-import { activityOccurrenceResponse } from "./activity-occurrence";
-import { checklistItemResponse } from "./checklist-item";
+import { categoryResponse, categoryUpdate } from "./category";
+import { tagCreate, tagResponse, tagUpdate } from "./tag";
+import { taskCreate, taskResponse, taskUpdate } from "./task";
 import {
+  activitySeriesCreate,
+  activitySeriesResponse,
+  activitySeriesUpdate,
+} from "./activity-series";
+import {
+  activityOccurrencePatch,
+  activityOccurrenceResponse,
+} from "./activity-occurrence";
+import {
+  checklistItemCreate,
+  checklistItemResponse,
+  checklistItemUpdate,
+} from "./checklist-item";
+import {
+  routineCreate,
+  routineDetailResponse,
+  routineListItemResponse,
   routineResponse,
+  routineScheduleCreate,
   routineStepResponse,
+  routineStepCreate,
   routineScheduleResponse,
+  routineUpdate,
 } from "./routine";
 import {
   focusSessionCreateRequest,
@@ -48,8 +66,8 @@ import {
   focusSnapshotResponse,
 } from "./focus-session";
 import { plannerEventResponse } from "./planner-event";
-import { userSettingsResponse } from "./user-settings";
-import { batchRequest, batchResponse } from "./batch";
+import { userSettingsResponse, userSettingsUpdate } from "./user-settings";
+import { batchRequest, batchResponse, batchResult } from "./batch";
 import { changeLogEntry, changesResponse } from "./change";
 import { dayActivityResponse, dayResponse } from "./day";
 import { searchHit, searchResponse } from "./search";
@@ -73,15 +91,15 @@ export const responseSchemaRegistry = {
   ActivityOccurrence: activityOccurrenceResponse,
   ChecklistItem: checklistItemResponse,
   Routine: routineResponse,
+  RoutineDetail: routineDetailResponse,
+  RoutineListItem: routineListItemResponse,
   RoutineStep: routineStepResponse,
   RoutineSchedule: routineScheduleResponse,
   FocusSession: focusSessionResponse,
-  FocusSessionCreateRequest: focusSessionCreateRequest,
-  FocusSessionPatchRequest: focusSessionPatchRequest,
   FocusSnapshot: focusSnapshotResponse,
   PlannerEvent: plannerEventResponse,
   UserSettings: userSettingsResponse,
-  BatchRequest: batchRequest,
+  BatchResult: batchResult,
   BatchResponse: batchResponse,
   ChangeLogEntry: changeLogEntry,
   ChangesResponse: changesResponse,
@@ -90,7 +108,6 @@ export const responseSchemaRegistry = {
   SearchHit: searchHit,
   SearchResponse: searchResponse,
   StatsResponse: statsResponse,
-  MoodCheckinRequest: moodCheckinRequest,
   MoodCheckinResponse: moodCheckinResponse,
 } as const;
 
@@ -98,7 +115,38 @@ export const responseSchemaRegistry = {
 export type ResponseSchemaName = keyof typeof responseSchemaRegistry;
 
 /**
+ * Registry of request-body schemas keyed by their OpenAPI component name.
+ * Request models are intentionally separate from response/database rows so
+ * generated clients never require server-owned fields.
+ */
+export const requestSchemaRegistry = {
+  ActivitySeriesCreateRequest: activitySeriesCreate,
+  ActivitySeriesUpdateRequest: activitySeriesUpdate,
+  ActivityOccurrencePatchRequest: activityOccurrencePatch,
+  TaskCreateRequest: taskCreate,
+  TaskUpdateRequest: taskUpdate,
+  ChecklistItemCreateRequest: checklistItemCreate,
+  ChecklistItemUpdateRequest: checklistItemUpdate,
+  TagCreateRequest: tagCreate,
+  TagUpdateRequest: tagUpdate,
+  RoutineCreateRequest: routineCreate,
+  RoutineUpdateRequest: routineUpdate,
+  RoutineStepCreateRequest: routineStepCreate,
+  RoutineScheduleCreateRequest: routineScheduleCreate,
+  UserSettingsUpdateRequest: userSettingsUpdate,
+  CategoryUpdateRequest: categoryUpdate,
+  FocusSessionCreateRequest: focusSessionCreateRequest,
+  FocusSessionPatchRequest: focusSessionPatchRequest,
+  BatchRequest: batchRequest,
+  MoodCheckinRequest: moodCheckinRequest,
+} as const;
+
+/** Type alias for request component-name keys. */
+export type RequestSchemaName = keyof typeof requestSchemaRegistry;
+
+/**
  * Convenience type: maps each component name to its inferred TS type. Useful
  * for route handlers that want the inferred shape without re-inferring.
  */
 export type ResponseSchemaRegistry = typeof responseSchemaRegistry;
+export type RequestSchemaRegistry = typeof requestSchemaRegistry;

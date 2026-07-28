@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
-import { responseSchemaRegistry } from "./index";
+import { requestSchemaRegistry, responseSchemaRegistry } from "./index";
 
 const SPEC_PATH = resolve(process.cwd(), "api/openapi.yaml");
 
@@ -37,7 +37,10 @@ function getComponentNames(spec: OpenApiSpec): Set<string> {
 describe("ADR-002: OpenAPI ↔ zod parity (CI drift gate)", () => {
   const spec = loadSpec();
   const specNames = getComponentNames(spec);
-  const zodNames = new Set(Object.keys(responseSchemaRegistry));
+  const zodNames = new Set([
+    ...Object.keys(responseSchemaRegistry),
+    ...Object.keys(requestSchemaRegistry),
+  ]);
 
   // OpenAPI legitimately defines MORE named components than the zod registry:
   // enums and primitives (HourCycle, Priority, Revision, …) that OpenAPI needs
@@ -49,7 +52,6 @@ describe("ADR-002: OpenAPI ↔ zod parity (CI drift gate)", () => {
   const OPENAPI_ONLY_ALLOWED = new Set([
     "ErrorEnvelope",
     "BatchOperation",
-    "BatchResult",
     "HourCycle",
     "ThemeMode",
     "TaskBucket",

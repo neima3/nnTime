@@ -31,14 +31,6 @@ export const routineResponse = z.object({
   notes: z.string().nullable(),
 });
 
-/** POST /api/v1/routines body. */
-export const routineCreate = z.object({
-  title: z.string(),
-  emoji: z.string().optional(),
-  categoryId: uuid.optional(),
-  notes: z.string().optional(),
-});
-
 /** PATCH /api/v1/routines/{id} body. */
 export const routineUpdate = z.object({
   title: z.string().optional(),
@@ -65,7 +57,6 @@ export const routineStepResponse = z.object({
 
 /** POST body for a routine step. */
 export const routineStepCreate = z.object({
-  routineId: uuid,
   title: z.string(),
   durationMin: z.number().int().nullish(),
   sortOrder: z.number().int().optional(),
@@ -99,11 +90,9 @@ export const routineScheduleResponse = z.object({
 
 /** POST body for a routine schedule. */
 export const routineScheduleCreate = z.object({
-  routineId: uuid,
   tz: ianaTimezone,
   rrule: z.string().nullable().optional(),
   paused: z.boolean().optional(),
-  nextRunAt: instant.nullish(),
 });
 
 /** PATCH body for a routine schedule. */
@@ -112,6 +101,38 @@ export const routineScheduleUpdate = z.object({
   rrule: z.string().nullable().optional(),
   paused: z.boolean().optional(),
   nextRunAt: instant.nullable().optional(),
+});
+
+/* -------------------------------------------------------------------------- */
+/* Routine API read/write models                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * POST /api/v1/routines body. A routine may be created atomically with its
+ * initial steps and one schedule. Path/server-owned fields are injected by
+ * the route and DAL, never accepted from clients.
+ */
+export const routineCreate = z.object({
+  title: z.string().min(1).max(200),
+  emoji: z.string().optional(),
+  categoryId: uuid.optional(),
+  notes: z.string().optional(),
+  steps: z
+    .array(routineStepCreate.omit({ sortOrder: true }))
+    .optional(),
+  schedule: routineScheduleCreate.optional(),
+});
+
+/** GET /api/v1/routines/{id} response, including its child rows. */
+export const routineDetailResponse = routineResponse.extend({
+  steps: z.array(routineStepResponse),
+  schedules: z.array(routineScheduleResponse),
+});
+
+/** GET /api/v1/routines list item, including UI summary counts. */
+export const routineListItemResponse = routineDetailResponse.extend({
+  stepCount: z.number().int().nonnegative(),
+  totalMin: z.number().int().nonnegative(),
 });
 
 export type RoutineResponse = z.infer<typeof routineResponse>;
@@ -123,3 +144,5 @@ export type RoutineStepUpdate = z.infer<typeof routineStepUpdate>;
 export type RoutineScheduleResponse = z.infer<typeof routineScheduleResponse>;
 export type RoutineScheduleCreate = z.infer<typeof routineScheduleCreate>;
 export type RoutineScheduleUpdate = z.infer<typeof routineScheduleUpdate>;
+export type RoutineDetailResponse = z.infer<typeof routineDetailResponse>;
+export type RoutineListItemResponse = z.infer<typeof routineListItemResponse>;

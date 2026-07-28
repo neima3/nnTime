@@ -10,29 +10,7 @@ import {
   createRoutineSchedule,
 } from "@/server/dal";
 import { handleErrors, parseBody } from "@/server/api-errors";
-import { z } from "zod";
-
-const createBody = z.object({
-  title: z.string().min(1).max(200),
-  emoji: z.string().optional(),
-  categoryId: z.string().uuid().optional(),
-  notes: z.string().optional(),
-  steps: z
-    .array(
-      z.object({
-        title: z.string(),
-        durationMin: z.number().int().nullish(),
-      }),
-    )
-    .optional(),
-  schedule: z
-    .object({
-      tz: z.string().min(1),
-      rrule: z.string().nullable().optional(),
-      paused: z.boolean().optional(),
-    })
-    .optional(),
-});
+import { routineCreate } from "@/server/schemas/routine";
 
 export async function GET() {
   return handleErrors(async () => {
@@ -61,7 +39,7 @@ export async function GET() {
 export async function POST(request: Request) {
   return handleErrors(async () => {
     const { userId } = await requireSession();
-    const body = await parseBody(request, createBody);
+    const body = await parseBody(request, routineCreate);
     if (body instanceof Response) return body;
     const routine = await createRoutine(userId, {
       title: body.title,

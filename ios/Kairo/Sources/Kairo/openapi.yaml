@@ -133,7 +133,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ActivitySeries'
+              $ref: '#/components/schemas/ActivitySeriesCreateRequest'
       responses:
         '201':
           description: Created.
@@ -206,7 +206,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ActivitySeries' }
+            schema: { $ref: '#/components/schemas/ActivitySeriesUpdateRequest' }
       responses:
         '200':
           description: The updated series (and, for future-split, the new series id).
@@ -279,7 +279,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ActivityOccurrence' }
+            schema: { $ref: '#/components/schemas/ActivityOccurrencePatchRequest' }
       responses:
         '200':
           description: The updated occurrence.
@@ -306,7 +306,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/Task' }
+            schema: { $ref: '#/components/schemas/TaskCreateRequest' }
       responses:
         '201':
           description: Created.
@@ -370,7 +370,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/Task' }
+            schema: { $ref: '#/components/schemas/TaskUpdateRequest' }
       responses:
         '200':
           description: Updated.
@@ -413,7 +413,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ActivitySeries' }
+            schema: { $ref: '#/components/schemas/ActivitySeriesCreateRequest' }
       responses:
         '201':
           description: The created series. The source task is now soft-deleted.
@@ -440,7 +440,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ChecklistItem' }
+            schema: { $ref: '#/components/schemas/ChecklistItemCreateRequest' }
       responses:
         '201':
           description: Created.
@@ -465,7 +465,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ChecklistItem' }
+            schema: { $ref: '#/components/schemas/ChecklistItemUpdateRequest' }
       responses:
         '200':
           description: Updated.
@@ -502,7 +502,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/Tag' }
+            schema: { $ref: '#/components/schemas/TagCreateRequest' }
       responses:
         '201':
           description: Created.
@@ -562,7 +562,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/Tag' }
+            schema: { $ref: '#/components/schemas/TagUpdateRequest' }
       responses:
         '200':
           description: Updated.
@@ -599,7 +599,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/Routine' }
+            schema: { $ref: '#/components/schemas/RoutineCreateRequest' }
       responses:
         '201':
           description: Created.
@@ -628,7 +628,7 @@ paths:
                 properties:
                   items:
                     type: array
-                    items: { $ref: '#/components/schemas/Routine' }
+                    items: { $ref: '#/components/schemas/RoutineListItem' }
                   nextCursor: { type: [string, 'null'] }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
@@ -644,7 +644,7 @@ paths:
           description: The routine.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Routine' }
+              schema: { $ref: '#/components/schemas/RoutineDetail' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
@@ -659,7 +659,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/Routine' }
+            schema: { $ref: '#/components/schemas/RoutineUpdateRequest' }
       responses:
         '200':
           description: Updated.
@@ -697,7 +697,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/RoutineStep' }
+            schema: { $ref: '#/components/schemas/RoutineStepCreateRequest' }
       responses:
         '201':
           description: Created.
@@ -726,7 +726,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/RoutineSchedule' }
+            schema: { $ref: '#/components/schemas/RoutineScheduleCreateRequest' }
       responses:
         '201':
           description: Created.
@@ -843,7 +843,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/UserSettings' }
+            schema: { $ref: '#/components/schemas/UserSettingsUpdateRequest' }
       responses:
         '200':
           description: Updated.
@@ -896,7 +896,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/Category' }
+            schema: { $ref: '#/components/schemas/CategoryUpdateRequest' }
       responses:
         '200':
           description: Updated.
@@ -1354,6 +1354,44 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
+    CategoryUpdateRequest:
+      type: object
+      description: Editable category fields. The semantic `key` is immutable.
+      properties:
+        label: { type: string }
+        sortOrder: { type: integer, format: int32 }
+
+    TagCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        color: { type: string }
+
+    TagUpdateRequest:
+      type: object
+      properties:
+        name: { type: string }
+        color: { type: [string, 'null'] }
+
+    UserSettingsUpdateRequest:
+      type: object
+      description: Client-editable settings. Identity, revisions, and timestamps are server-owned.
+      properties:
+        timezone: { type: string, minLength: 1 }
+        locale: { type: string }
+        weekStart:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 6
+        hourCycle: { $ref: '#/components/schemas/HourCycle' }
+        theme: { $ref: '#/components/schemas/ThemeMode' }
+        reducedStimulation: { type: boolean }
+        notificationPrefs:
+          type: object
+          additionalProperties: true
+
     # ---- Tasks (ADR-001) ---------------------------------------------------
     Task:
       type: object
@@ -1384,6 +1422,31 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         deletedAt: { type: [string, 'null'], format: date-time }
+
+    TaskCreateRequest:
+      type: object
+      required: [bucket, title]
+      properties:
+        bucket: { $ref: '#/components/schemas/TaskBucket' }
+        title: { type: string }
+        emoji: { type: string }
+        categoryId: { type: string, format: uuid }
+        date: { type: [string, 'null'], format: date }
+        priority: { $ref: '#/components/schemas/Priority' }
+        energy: { $ref: '#/components/schemas/NullableEnergyLevel' }
+        notes: { type: string }
+
+    TaskUpdateRequest:
+      type: object
+      properties:
+        bucket: { $ref: '#/components/schemas/TaskBucket' }
+        title: { type: string }
+        emoji: { type: [string, 'null'] }
+        categoryId: { type: [string, 'null'], format: uuid }
+        date: { type: [string, 'null'], format: date }
+        priority: { $ref: '#/components/schemas/Priority' }
+        energy: { $ref: '#/components/schemas/NullableEnergyLevel' }
+        notes: { type: [string, 'null'] }
 
     # ---- Activities (ADR-001) ---------------------------------------------
     ActivitySeries:
@@ -1464,6 +1527,78 @@ components:
         updatedAt: { type: string, format: date-time }
         deletedAt: { type: [string, 'null'], format: date-time }
 
+    ActivitySeriesCreateRequest:
+      type: object
+      description: Client-authored activity-series fields.
+      required: [tz, dtstartLocal, title, durationMin]
+      properties:
+        tz: { type: string, minLength: 1 }
+        dtstartLocal: { type: string, format: date-time }
+        rrule: { type: [string, 'null'] }
+        exdate:
+          type: array
+          items: { type: string, format: date }
+        rdate:
+          type: array
+          items: { type: string, format: date-time }
+        title: { type: string }
+        emoji: { type: string }
+        categoryId: { type: string, format: uuid }
+        durationMin: { type: integer, format: int32 }
+        checklistTemplate:
+          type: array
+          items: { type: object, additionalProperties: true }
+        energy: { $ref: '#/components/schemas/NullableEnergyLevel' }
+        priority: { $ref: '#/components/schemas/Priority' }
+        tags:
+          type: array
+          items: { type: string, format: uuid }
+        notes: { type: string }
+        source: { $ref: '#/components/schemas/ActivitySource' }
+        sourceRef: { type: string }
+
+    ActivitySeriesUpdateRequest:
+      type: object
+      description: Editable series/template fields plus ADR-001 occurrence scope.
+      properties:
+        editScope: { $ref: '#/components/schemas/EditScope' }
+        occurrenceKey: { type: string, format: date-time }
+        tz: { type: string, minLength: 1 }
+        dtstartLocal: { type: string, format: date-time }
+        rrule: { type: [string, 'null'] }
+        exdate:
+          type: [array, 'null']
+          items: { type: string, format: date }
+        rdate:
+          type: [array, 'null']
+          items: { type: string, format: date-time }
+        title: { type: string }
+        emoji: { type: [string, 'null'] }
+        categoryId: { type: [string, 'null'], format: uuid }
+        durationMin: { type: integer, format: int32 }
+        checklistTemplate:
+          type: array
+          items: { type: object, additionalProperties: true }
+        energy: { $ref: '#/components/schemas/NullableEnergyLevel' }
+        priority: { $ref: '#/components/schemas/Priority' }
+        tags:
+          type: [array, 'null']
+          items: { type: string, format: uuid }
+        notes: { type: [string, 'null'] }
+        source: { $ref: '#/components/schemas/ActivitySource' }
+        sourceRef: { type: [string, 'null'] }
+        status: { $ref: '#/components/schemas/OccurrenceStatus' }
+        startAt: { type: string, format: date-time }
+        completedAt: { type: [string, 'null'], format: date-time }
+        checklistOverride:
+          type: [array, 'null']
+          items:
+            type: object
+            required: [label]
+            properties:
+              label: { type: string }
+              done: { type: boolean }
+
     ActivityOccurrence:
       type: object
       description: |
@@ -1506,6 +1641,19 @@ components:
         updatedAt: { type: string, format: date-time }
         deletedAt: { type: [string, 'null'], format: date-time }
 
+    ActivityOccurrencePatchRequest:
+      type: object
+      properties:
+        title: { type: [string, 'null'] }
+        startAt: { type: [string, 'null'], format: date-time }
+        durationMin: { type: [integer, 'null'], format: int32 }
+        status: { $ref: '#/components/schemas/OccurrenceStatus' }
+        checklistOverride:
+          type: [object, 'null']
+          additionalProperties: true
+        energy: { $ref: '#/components/schemas/NullableEnergyLevel' }
+        completedAt: { type: [string, 'null'], format: date-time }
+
     # ---- Checklist ---------------------------------------------------------
     ChecklistItem:
       type: object
@@ -1535,6 +1683,23 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         deletedAt: { type: [string, 'null'], format: date-time }
+
+    ChecklistItemCreateRequest:
+      type: object
+      required: [parentType, parentId, label]
+      properties:
+        parentType: { $ref: '#/components/schemas/ChecklistParent' }
+        parentId: { type: string, format: uuid }
+        label: { type: string }
+        sortOrder: { type: integer, format: int32 }
+        done: { type: boolean }
+
+    ChecklistItemUpdateRequest:
+      type: object
+      properties:
+        label: { type: string }
+        sortOrder: { type: integer, format: int32 }
+        done: { type: boolean }
 
     # ---- Routines ----------------------------------------------------------
     Routine:
@@ -1589,6 +1754,128 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
         deletedAt: { type: [string, 'null'], format: date-time }
+
+    RoutineCreateRequest:
+      type: object
+      description: Creates a routine and may atomically create initial steps and one schedule.
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        emoji: { type: string }
+        categoryId: { type: string, format: uuid }
+        notes: { type: string }
+        steps:
+          type: array
+          items:
+            type: object
+            required: [title]
+            properties:
+              title: { type: string }
+              durationMin: { type: [integer, 'null'], format: int32 }
+        schedule:
+          type: object
+          required: [tz]
+          properties:
+            tz: { type: string, minLength: 1 }
+            rrule: { type: [string, 'null'] }
+            paused: { type: boolean }
+
+    RoutineUpdateRequest:
+      type: object
+      properties:
+        title: { type: string }
+        emoji: { type: [string, 'null'] }
+        categoryId: { type: [string, 'null'], format: uuid }
+        notes: { type: [string, 'null'] }
+
+    RoutineStepCreateRequest:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string }
+        durationMin: { type: [integer, 'null'], format: int32 }
+        sortOrder: { type: integer, format: int32 }
+
+    RoutineScheduleCreateRequest:
+      type: object
+      required: [tz]
+      properties:
+        tz: { type: string, minLength: 1 }
+        rrule: { type: [string, 'null'] }
+        paused: { type: boolean }
+
+    RoutineDetail:
+      type: object
+      description: Routine detail read model with its ordered steps and schedules.
+      required:
+        - id
+        - userId
+        - title
+        - emoji
+        - categoryId
+        - notes
+        - revision
+        - createdAt
+        - updatedAt
+        - steps
+        - schedules
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        title: { type: string }
+        emoji: { type: [string, 'null'] }
+        categoryId: { type: [string, 'null'], format: uuid }
+        notes: { type: [string, 'null'] }
+        revision: { $ref: '#/components/schemas/Revision' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        deletedAt: { type: [string, 'null'], format: date-time }
+        steps:
+          type: array
+          items: { $ref: '#/components/schemas/RoutineStep' }
+        schedules:
+          type: array
+          items: { $ref: '#/components/schemas/RoutineSchedule' }
+
+    RoutineListItem:
+      type: object
+      description: Routine list read model with child rows and UI summary counts.
+      required:
+        - id
+        - userId
+        - title
+        - emoji
+        - categoryId
+        - notes
+        - revision
+        - createdAt
+        - updatedAt
+        - steps
+        - schedules
+        - stepCount
+        - totalMin
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        title: { type: string }
+        emoji: { type: [string, 'null'] }
+        categoryId: { type: [string, 'null'], format: uuid }
+        notes: { type: [string, 'null'] }
+        revision: { $ref: '#/components/schemas/Revision' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        deletedAt: { type: [string, 'null'], format: date-time }
+        steps:
+          type: array
+          items: { $ref: '#/components/schemas/RoutineStep' }
+        schedules:
+          type: array
+          items: { $ref: '#/components/schemas/RoutineSchedule' }
+        stepCount: { type: integer, format: int32, minimum: 0 }
+        totalMin: { type: integer, format: int32, minimum: 0 }
 
     # ---- Focus sessions (ADR-004) -----------------------------------------
     FocusSession: &focusSessionSchema
@@ -1710,27 +1997,22 @@ components:
     BatchOperation:
       type: object
       description: A single operation within a `BatchRequest`.
-      required: [requestMethod, requestPath]
+      required: [method, path]
       properties:
         idempotencyKey:
           type: string
-          format: uuid
           description: Per-operation idempotency key (recommended).
-        requestMethod:
+        method:
           type: string
-          enum: [POST, PATCH, DELETE, PUT]
+          enum: [POST, PATCH, DELETE]
           description: HTTP verb of the inner operation.
-        requestPath:
+        path:
           type: string
-          description: Path relative to the server URL (no `/api/v1` prefix).
-          example: /tasks
+          description: Allowlisted path beginning with `/api/v1/`.
+          example: /api/v1/tasks
         body:
-          description: Optional JSON body for the inner operation.
           type: object
           additionalProperties: true
-        ifMatch:
-          type: [string, 'null']
-          description: Optional per-operation `If-Match` revision.
 
     BatchRequest:
       type: object
@@ -1739,20 +2021,18 @@ components:
       properties:
         operations:
           type: array
-          minItems: 1
           maxItems: 50
           items: { $ref: '#/components/schemas/BatchOperation' }
 
     BatchResult:
       type: object
       description: The result of one batch operation, in request order.
-      required: [status]
+      required: [status, body]
       properties:
         status:
           type: integer
           description: HTTP status that the inner operation produced.
         body:
-          description: The inner operation's response body, if any.
           type: [object, 'null']
           additionalProperties: true
         error: { $ref: '#/components/schemas/Error' }
