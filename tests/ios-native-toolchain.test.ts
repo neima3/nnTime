@@ -2,10 +2,13 @@ import { afterEach, describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import {
   chmodSync,
+  lstatSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
@@ -60,15 +63,18 @@ describe("iOS native package toolchain", () => {
     }
   });
 
-  it("replaces generated-project lock drift byte-for-byte", () => {
+  it("atomically replaces generated-project lock drift byte-for-byte", () => {
     const directory = mkdtempSync(join(tmpdir(), "kairo-lock-"));
     tempDirs.push(directory);
+    const externalLockPath = join(directory, "external-lock");
     const generatedLockPath = join(
       directory,
       "Kairo.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
     );
-    mkdirSync(resolve(generatedLockPath, ".."), { recursive: true });
-    writeFileSync(generatedLockPath, '{"pins":[]}\n');
+    const generatedLockDirectory = resolve(generatedLockPath, "..");
+    mkdirSync(generatedLockDirectory, { recursive: true });
+    writeFileSync(externalLockPath, "external sentinel\n");
+    symlinkSync(externalLockPath, generatedLockPath);
 
     expect(
       installPackageLock(authoritativeLockPath, generatedLockPath),
@@ -76,9 +82,65 @@ describe("iOS native package toolchain", () => {
     expect(readFileSync(generatedLockPath)).toEqual(
       readFileSync(authoritativeLockPath),
     );
+    expect(readFileSync(externalLockPath, "utf8")).toBe("external sentinel\n");
+    expect(lstatSync(generatedLockPath).isSymbolicLink()).toBe(false);
+    expect(readdirSync(generatedLockDirectory)).toEqual(["Package.resolved"]);
+  });
+
+  it("does not rewrite an unchanged generated-project lock", () => {
+    const directory = mkdtempSync(join(tmpdir(), "kairo-lock-"));
+    tempDirs.push(directory);
+    const generatedLockPath = join(directory, "Package.resolved");
+    writeFileSync(generatedLockPath, readFileSync(authoritativeLockPath));
+
     expect(
       installPackageLock(authoritativeLockPath, generatedLockPath),
     ).toBe("unchanged");
+    expect(readdirSync(directory)).toEqual(["Package.resolved"]);
+  });
+
+  it("leaves the existing destination untouched when the source lock is invalid", () => {
+    const directory = mkdtempSync(join(tmpdir(), "kairo-lock-"));
+    tempDirs.push(directory);
+    const invalidLockPath = join(directory, "invalid.json");
+    const generatedLockDirectory = join(directory, "generated");
+    const generatedLockPath = join(generatedLockDirectory, "Package.resolved");
+    mkdirSync(generatedLockDirectory);
+    writeFileSync(invalidLockPath, '{"pins":');
+    writeFileSync(generatedLockPath, "existing destination\n");
+
+    expect(() =>
+      installPackageLock(invalidLockPath, generatedLockPath),
+    ).toThrow("is not valid JSON");
+    expect(readFileSync(generatedLockPath, "utf8")).toBe(
+      "existing destination\n",
+    );
+    expect(readdirSync(generatedLockDirectory)).toEqual(["Package.resolved"]);
+  });
+
+  it("cleans up its same-directory temporary file when replacement fails", () => {
+    const directory = mkdtempSync(join(tmpdir(), "kairo-lock-"));
+    tempDirs.push(directory);
+    const generatedLockPath = join(directory, "Package.resolved");
+    mkdirSync(generatedLockPath);
+
+    expect(() =>
+      installPackageLock(authoritativeLockPath, generatedLockPath),
+    ).toThrow();
+    expect(readdirSync(directory)).toEqual(["Package.resolved"]);
+  });
+
+  it("uses a unique same-directory rename instead of writing the destination directly", () => {
+    const source = readFileSync(
+      resolve("scripts/ios-package-lock.mjs"),
+      "utf8",
+    );
+
+    expect(source).toContain("randomUUID");
+    expect(source).toContain("renameSync");
+    expect(source).toContain("unlinkSync");
+    expect(source).toMatch(/join\(\s*dirname\(destinationPath\)/);
+    expect(source).not.toMatch(/writeFileSync\(\s*destinationPath/);
   });
 
   it("injects the locked-plugin policy into every wrapped xcodebuild", () => {
@@ -131,10 +193,12 @@ describe("iOS native package toolchain", () => {
   it("documents deterministic preparation and both noninteractive Xcode flags", () => {
     const readme = readFileSync(resolve("ios/README.md"), "utf8");
     expect(readme).toContain("./scripts/ios-prepare-project.sh");
-    expect(readme.match(/-skipPackagePluginValidation/g)).toHaveLength(2);
+    expect(readme.match(/\.\/scripts\/ios-xcodebuild\.sh/g)).toHaveLength(2);
+    expect(readme).not.toMatch(/^\s*xcodebuild(?:\s|$)/m);
+    expect(readme.match(/-skipPackagePluginValidation/g)).toHaveLength(1);
     expect(
       readme.match(/-onlyUsePackageVersionsFromResolvedFile/g),
-    ).toHaveLength(2);
+    ).toHaveLength(1);
     expect(readme).toContain("security risk");
     expect(readme).toContain("committed");
 
@@ -144,5 +208,11 @@ describe("iOS native package toolchain", () => {
     );
     expect(packageReadme).toContain("Package.resolved");
     expect(packageReadme).toContain("ios-prepare-project.sh");
+    expect(packageReadme).toContain(
+      "swift test --package-path ios/Kairo --only-use-versions-from-resolved-file",
+    );
+    expect(packageReadme).not.toMatch(
+      /^\s*swift test --package-path ios\/Kairo\s*$/m,
+    );
   });
 });

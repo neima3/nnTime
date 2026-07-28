@@ -39,13 +39,20 @@ describe("native API contract CI", () => {
   it("checks both OpenAPI drift surfaces before Swift compilation", () => {
     const steps = workflow.jobs?.["native-contract"]?.steps ?? [];
     const commands = steps.map((step) => step.run ?? "").join("\n");
+    const lockedSwiftTest =
+      "swift test --package-path ios/Kairo --only-use-versions-from-resolved-file";
 
     expect(commands).toContain("pnpm install --frozen-lockfile");
     expect(commands).toContain("pnpm api:check-ios");
     expect(commands).toContain("pnpm api:check-ios-client");
-    expect(commands).toContain("swift test --package-path ios/Kairo");
+    expect(
+      steps.find((step) => step.run?.startsWith("swift test"))?.run,
+    ).toBe(lockedSwiftTest);
+    expect(commands).not.toMatch(
+      /(?:^|\n)\s*swift test --package-path ios\/Kairo\s*(?:\n|$)/,
+    );
     expect(commands.indexOf("pnpm api:check-ios")).toBeLessThan(
-      commands.indexOf("swift test --package-path ios/Kairo"),
+      commands.indexOf(lockedSwiftTest),
     );
   });
 

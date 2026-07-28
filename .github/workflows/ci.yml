@@ -108,7 +108,7 @@ jobs:
           tests/ios-release-contract.test.ts tests/ios-release-script.test.ts
 
       - name: Build and test generated Swift client
-        run: swift test --package-path ios/Kairo
+        run: swift test --package-path ios/Kairo --only-use-versions-from-resolved-file
 
   # T15 — real-browser core-loop suite (sign-up, plan/complete, capture,
   # clock format incl. SSR payload, offline replay). The app self-migrates on

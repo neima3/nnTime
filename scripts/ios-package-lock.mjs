@@ -1,9 +1,14 @@
 import {
+  lstatSync,
   mkdirSync,
   readFileSync,
+  renameSync,
+  statSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { randomUUID } from "node:crypto";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 function validatePackageLock(contents, sourcePath) {
@@ -37,7 +42,10 @@ export function installPackageLock(sourcePath, destinationPath) {
   validatePackageLock(authoritative.toString("utf8"), sourcePath);
 
   try {
-    if (readFileSync(destinationPath).equals(authoritative)) {
+    if (
+      lstatSync(destinationPath).isFile() &&
+      readFileSync(destinationPath).equals(authoritative)
+    ) {
       return "unchanged";
     }
   } catch (error) {
@@ -47,7 +55,31 @@ export function installPackageLock(sourcePath, destinationPath) {
   }
 
   mkdirSync(dirname(destinationPath), { recursive: true });
-  writeFileSync(destinationPath, authoritative);
+  const temporaryPath = join(
+    dirname(destinationPath),
+    `.${basename(destinationPath)}.${process.pid}.${randomUUID()}.tmp`,
+  );
+
+  try {
+    writeFileSync(temporaryPath, authoritative, {
+      flag: "wx",
+      mode: statSync(sourcePath).mode & 0o777,
+    });
+    renameSync(temporaryPath, destinationPath);
+  } catch (error) {
+    try {
+      unlinkSync(temporaryPath);
+    } catch (cleanupError) {
+      if (cleanupError.code !== "ENOENT") {
+        throw new AggregateError(
+          [error, cleanupError],
+          `Failed to install ${destinationPath} and clean up ${temporaryPath}`,
+        );
+      }
+    }
+    throw error;
+  }
+
   return "updated";
 }
 
