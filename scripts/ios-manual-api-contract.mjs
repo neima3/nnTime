@@ -292,6 +292,12 @@ function isSessionLikeIdentifier(identifier) {
   return /session$/i.test(identifier) || /^session/i.test(identifier);
 }
 
+function localAliasIdentifier(initializer) {
+  return /^(?:(?:self|Self)\s*\.\s*)?([A-Za-z_][A-Za-z0-9_]*)$/.exec(
+    initializer,
+  )?.[1];
+}
+
 function isProvenNonNetworkInitializer(initializer) {
   const nominalConstructor =
     /^(?:[A-Za-z_][A-Za-z0-9_]*\s*\.\s*)*([A-Z][A-Za-z0-9_]*)\s*\(/.exec(
@@ -363,10 +369,8 @@ function urlSessionProvenance(source) {
     changed = false;
     for (const binding of bindings) {
       if (sessionIdentifiers.has(binding.name)) continue;
-      const alias = /^([A-Za-z_][A-Za-z0-9_]*)$/.exec(
-        binding.initializer,
-      );
-      if (alias && sessionIdentifiers.has(alias[1])) {
+      const alias = localAliasIdentifier(binding.initializer);
+      if (alias && sessionIdentifiers.has(alias)) {
         sessionIdentifiers.add(binding.name);
         changed = true;
       }
@@ -381,11 +385,9 @@ function urlSessionProvenance(source) {
       if (isProvenNonNetworkInitializer(binding.initializer)) {
         return false;
       }
-      const alias = /^([A-Za-z_][A-Za-z0-9_]*)$/.exec(
-        binding.initializer,
-      );
+      const alias = localAliasIdentifier(binding.initializer);
       const sessionLikeInitializer =
-        (alias && isSessionLikeIdentifier(alias[1])) ||
+        (alias && isSessionLikeIdentifier(alias)) ||
         /\b[A-Za-z_][A-Za-z0-9_]*Session\s*\(/i.test(
           binding.initializer,
         );

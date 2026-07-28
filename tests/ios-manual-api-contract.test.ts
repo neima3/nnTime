@@ -254,6 +254,46 @@ describe("generated Swift client adoption gate", () => {
     );
   });
 
+  it.each([
+    [
+      "instance",
+      "let transportSession: URLSession = .shared",
+      "self.transportSession",
+    ],
+    [
+      "static",
+      "static let staticSession: URLSession = .shared",
+      "Self.staticSession",
+    ],
+  ])(
+    "rejects request calls through a same-file %s URLSession property alias",
+    (_label, property, initializer) => {
+      const result = validate([
+        {
+          path: "ios/App/API/KairoAPI.swift",
+          source: facadeSource(),
+        },
+        {
+          path: "ios/App/Services/QualifiedAliasTransport.swift",
+          source: `
+            final class SessionOwner {
+              ${property}
+
+              func run() {
+                let transport = ${initializer}
+                _ = transport.data(from: plannerURL)
+              }
+            }
+          `,
+        },
+      ]);
+
+      expect(result.failures).toContain(
+        "ios/App/Services/QualifiedAliasTransport.swift contains manual URLSession transport outside KairoAPI.authRequest",
+      );
+    },
+  );
+
   it("rejects request calls through a current-file URLSession factory result", () => {
     const result = validate([
       {
