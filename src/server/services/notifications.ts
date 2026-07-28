@@ -11,6 +11,7 @@ import {
   lt,
   lte,
   notInArray,
+  or,
   sql,
 } from "drizzle-orm";
 import { expandActivitiesForDay } from "./day";
@@ -242,22 +243,41 @@ export async function computeNotificationJobs(
       };
     }
 
-    const [settingsRows, seriesRows, occurrenceRows] = await Promise.all([
+    const [settingsRows, occurrenceRows] = await Promise.all([
       tx.select().from(schema.userSettings),
-      tx
-        .select()
-        .from(schema.activitySeries)
-        .where(
-          and(
-            isNull(schema.activitySeries.deletedAt),
-            lte(schema.activitySeries.dtstartLocal, horizon),
-          ),
-        ),
       tx
         .select()
         .from(schema.activityOccurrences)
         .where(isNull(schema.activityOccurrences.deletedAt)),
     ]);
+    const movedIntoHorizonSeriesIds = [
+      ...new Set(
+        occurrenceRows
+          .filter(
+            (occurrence) =>
+              occurrence.startAt !== null &&
+              occurrence.startAt < horizon,
+          )
+          .map((occurrence) => occurrence.seriesId),
+      ),
+    ];
+    const seriesRows = await tx
+      .select()
+      .from(schema.activitySeries)
+      .where(
+        and(
+          isNull(schema.activitySeries.deletedAt),
+          movedIntoHorizonSeriesIds.length > 0
+            ? or(
+                lte(schema.activitySeries.dtstartLocal, horizon),
+                inArray(
+                  schema.activitySeries.id,
+                  movedIntoHorizonSeriesIds,
+                ),
+              )
+            : lte(schema.activitySeries.dtstartLocal, horizon),
+        ),
+      );
     const prefsByUser = new Map(
       settingsRows.map((settings) => [
         settings.userId,
@@ -270,6 +290,46 @@ export async function computeNotificationJobs(
       occurrenceRows,
       { start: now, end: horizon },
     );
+    const expandedOccurrenceKeys = new Set(
+      activities.map(
+        (activity) =>
+          `${activity.id}|${activity.occurrenceKey.getTime()}`,
+      ),
+    );
+    const seriesById = new Map(
+      seriesRows.map((series) => [series.id, series]),
+    );
+    for (const occurrence of occurrenceRows) {
+      if (
+        occurrence.status !== "pending" ||
+        occurrence.startAt === null ||
+        occurrence.startAt >= horizon
+      ) {
+        continue;
+      }
+      const occurrenceIdentity = `${occurrence.seriesId}|${occurrence.occurrenceKey.getTime()}`;
+      if (expandedOccurrenceKeys.has(occurrenceIdentity)) continue;
+      const series = seriesById.get(occurrence.seriesId);
+      if (!series || series.userId !== occurrence.userId) continue;
+      const durationMin = occurrence.durationMin ?? series.durationMin;
+      if (
+        occurrence.startAt.getTime() + durationMin * 60_000 <=
+        now.getTime()
+      ) {
+        continue;
+      }
+      activities.push({
+        ...series,
+        dtstartLocal: occurrence.startAt,
+        durationMin,
+        title: occurrence.title ?? series.title,
+        energy: occurrence.energy ?? series.energy,
+        checklistTemplate:
+          occurrence.checklistOverride ?? series.checklistTemplate,
+        occurrenceKey: occurrence.occurrenceKey,
+        status: occurrence.status,
+      });
+    }
     const desired: DesiredNotificationJob[] = [];
 
     for (const activity of activities) {

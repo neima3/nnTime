@@ -178,6 +178,43 @@ describe("computeNotificationJobs", () => {
     ).toBe(true);
   });
 
+  itDb("schedules an occurrence moved into the horizon from outside it", async () => {
+    const userId = await seedUser();
+    const occurrenceKey = new Date("2026-07-30T14:00:00.000Z");
+    const seriesId = await seedSeries(userId, {
+      start: occurrenceKey,
+      durationMin: 30,
+    });
+    await env!.db.insert(activityOccurrences).values({
+      id: uuidv7(),
+      userId,
+      seriesId,
+      occurrenceKey,
+      startAt: new Date("2026-07-28T15:00:00.000Z"),
+      durationMin: 20,
+      status: "pending",
+    });
+
+    await computeNotificationJobs({ db: env!.db, now: NOW });
+    const jobs = await env!.db
+      .select()
+      .from(notificationJobs)
+      .where(eq(notificationJobs.userId, userId));
+
+    expect(jobs.map((job) => job.fireAt.toISOString()).sort()).toEqual([
+      "2026-07-28T15:00:00.000Z",
+      "2026-07-28T15:10:00.000Z",
+      "2026-07-28T15:15:00.000Z",
+    ]);
+    expect(
+      jobs.every(
+        (job) =>
+          job.entityId === seriesId &&
+          job.occurrenceKey?.toISOString() === occurrenceKey.toISOString(),
+      ),
+    ).toBe(true);
+  });
+
   itDb("does not schedule completed, skipped, or cancelled occurrences", async () => {
     const userId = await seedUser();
     const statuses = ["completed", "skipped", "cancelled"] as const;
