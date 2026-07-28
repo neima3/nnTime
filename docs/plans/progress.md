@@ -25,6 +25,14 @@ runtime-correctness gap exposed after Round 11:
   succeeded; its stale `var` warning in the widget intent was removed.
 - **Parity unchanged.** This is correctness hardening, not feature inflation:
   web **89.74%**, iOS/combined **87.08%**; both gates pass.
+- **Production verified.** Main commit
+  `64d8db6502b6a8b4308eddd12196e031d61bbca6` deployed through Coolify as
+  `gr9qfn157skskn4i99axp004` and reached `finished`. The live app reports
+  `running:healthy`; `/api/health` returned `ok` for migrations, database, AI,
+  and scheduler. Desktop `/` at 1440×1000 and mobile `/app/today` at 390×844
+  rendered without browser console or page errors. CSP, HSTS, COOP, CORP,
+  Permissions-Policy, Referrer-Policy, nosniff, and frame-denial headers were
+  present.
 - **Host contention handled honestly.** A separate checkout was running
   Xcode against the original simulator. Final evidence used a distinct,
   already-migrated iPhone 17 Pro plus isolated DerivedData rather than treating

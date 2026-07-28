@@ -221,11 +221,11 @@ git add docs/plans/2026-07-27-round12-main-actor-design.md \
 git commit -m "fix(R12): isolate iOS app state on main actor"
 ```
 
-- [ ] **Step 3: Fast-forward `main`, push, and wait for Coolify auto-deploy.**
+- [x] **Step 3: Fast-forward `main`, push, and wait for Coolify auto-deploy.**
 
 Verify the deployment references the exact pushed SHA and reaches `finished`.
 
-- [ ] **Step 4: Verify production.**
+- [x] **Step 4: Verify production.**
 
 Require `/api/health` status `ok`, required security headers, desktop homepage
 and 390×844 `/app/today` browser smoke with screenshots, and no browser console
