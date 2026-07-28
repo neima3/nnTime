@@ -374,16 +374,18 @@ describe("push subscription registration", () => {
   itDb("caps each account at ten live subscriptions", async () => {
     const userId = await seedUser();
 
-    for (let index = 0; index < 12; index++) {
-      await registerPushSubscription(
-        userId,
-        {
-          endpoint: `https://push.invalid/${index}`,
-          keys: { p256dh: `key-${index}`, auth: `auth-${index}` },
-        },
-        { db: env!.db },
-      );
-    }
+    await Promise.all(
+      Array.from({ length: 12 }, (_, index) =>
+        registerPushSubscription(
+          userId,
+          {
+            endpoint: `https://push.invalid/${index}`,
+            keys: { p256dh: `key-${index}`, auth: `auth-${index}` },
+          },
+          { db: env!.db },
+        ),
+      ),
+    );
 
     const live = await env!.db
       .select()
