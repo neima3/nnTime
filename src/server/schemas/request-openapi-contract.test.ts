@@ -408,9 +408,9 @@ interface SemanticNode {
   values?: unknown[];
 }
 
-function requestIntegerInventory(
-  componentNames: string[],
-  allComponents: Record<string, JsonSchema>,
+function semanticIntegerInventory(
+  root: SemanticNode,
+  rootPath: string,
 ): Record<
   string,
   { minimum?: number; maximum?: number; values?: unknown[] }
@@ -439,19 +439,55 @@ function requestIntegerInventory(
     }
   }
 
-  for (const componentName of [...componentNames].sort()) {
-    visit(
-      semanticContract(
-        allComponents[componentName] ?? {},
-        allComponents,
-      ) as SemanticNode,
-      componentName,
-    );
-  }
+  visit(root, rootPath);
   return inventory;
 }
 
+function requestIntegerInventory(
+  componentNames: string[],
+  allComponents: Record<string, JsonSchema>,
+): Record<
+  string,
+  { minimum?: number; maximum?: number; values?: unknown[] }
+> {
+  return Object.assign(
+    {},
+    ...[...componentNames].sort().map((componentName) =>
+      semanticIntegerInventory(
+        semanticContract(
+          allComponents[componentName] ?? {},
+          allComponents,
+        ) as SemanticNode,
+        componentName,
+      ),
+    ),
+  );
+}
+
+function containsInt32(
+  schema: JsonSchema,
+  allComponents: Record<string, JsonSchema>,
+  seen = new Set<string>(),
+): boolean {
+  if (schema.format === "int32") return true;
+  const name = refName(schema);
+  if (name && !seen.has(name) && allComponents[name]) {
+    return containsInt32(
+      allComponents[name],
+      allComponents,
+      new Set(seen).add(name),
+    );
+  }
+  return [
+    ...(schema.anyOf ?? []),
+    ...(schema.oneOf ?? []),
+    ...Object.values(schema.properties ?? {}),
+    ...(schema.items ? [schema.items] : []),
+  ].some((child) => containsInt32(child, allComponents, seen));
+}
+
 describe("request OpenAPI contract", () => {
+  const clearablePatchNames = clearablePatchComponents(spec);
   const requestSchemaRegistry = (
     schemaIndex as typeof schemaIndex & {
       requestSchemaRegistry?: Record<string, z.ZodType>;
@@ -480,8 +516,7 @@ describe("request OpenAPI contract", () => {
   });
 
   it("requires generated type overrides for every clearable PATCH body", () => {
-    const clearable = clearablePatchComponents(spec);
-    expect(clearable).toEqual([
+    expect(clearablePatchNames).toEqual([
       "ActivityOccurrencePatchRequest",
       "ActivitySeriesUpdateRequest",
       "RoutineUpdateRequest",
@@ -490,14 +525,19 @@ describe("request OpenAPI contract", () => {
     ]);
     const overrides = generatorConfig.typeOverrides?.schemas ?? {};
     expect(
-      clearable.filter((componentName) => !overrides[componentName]),
+      clearablePatchNames.filter((componentName) => !overrides[componentName]),
       "optional+nullable PATCH components without a typed Swift override",
     ).toEqual([]);
   });
 
   it("keeps every configured custom Swift override complete and tri-state-correct", () => {
     expect(
-      validateSwiftPatchOverrides(components, generatorConfig, swiftPatchSource),
+      validateSwiftPatchOverrides(
+        components,
+        generatorConfig,
+        swiftPatchSource,
+        clearablePatchNames,
+      ),
     ).toEqual([]);
   });
 
@@ -540,6 +580,49 @@ describe("request OpenAPI contract", () => {
           copy.TaskUpdateRequest!.required = ["title"];
         },
       },
+      {
+        name: "same-name primitive",
+        mutate: (copy) => {
+          copy.TaskUpdateRequest!.properties!.title = { type: "boolean" };
+        },
+      },
+      {
+        name: "representation-changing format",
+        mutate: (copy) => {
+          copy.TaskUpdateRequest!.properties!.date!.format = "date-time";
+        },
+      },
+      {
+        name: "enum ref identity",
+        mutate: (copy) => {
+          copy.TaskUpdateRequest!.properties!.priority = {
+            $ref: "#/components/schemas/EnergyLevel",
+          };
+        },
+      },
+      {
+        name: "array item type",
+        mutate: (copy) => {
+          copy.ActivitySeriesUpdateRequest!.properties!.tags!.items = {
+            type: "boolean",
+          };
+        },
+      },
+      {
+        name: "local helper member type",
+        mutate: (copy) => {
+          copy.ActivitySeriesUpdateRequest!.properties!.checklistOverride!
+            .items!.properties!.done = { type: "string" };
+        },
+      },
+      {
+        name: "free-form object container",
+        mutate: (copy) => {
+          copy.ActivityOccurrencePatchRequest!.properties!.checklistOverride = {
+            type: ["string", "null"],
+          };
+        },
+      },
     ];
 
     for (const mutation of mutations) {
@@ -550,10 +633,30 @@ describe("request OpenAPI contract", () => {
           mutated,
           generatorConfig,
           swiftPatchSource,
+          clearablePatchNames,
         ),
         mutation.name,
       ).not.toEqual([]);
     }
+  });
+
+  it("fails closed when a clearable override has a qualified unauditable type", () => {
+    const mutatedConfig = structuredClone(generatorConfig);
+    mutatedConfig.typeOverrides ??= {};
+    mutatedConfig.typeOverrides.schemas ??= {};
+    mutatedConfig.typeOverrides.schemas.TaskUpdateRequest =
+      "ExternalModule.TaskUpdateRequest";
+
+    expect(
+      validateSwiftPatchOverrides(
+        components,
+        mutatedConfig,
+        swiftPatchSource,
+        clearablePatchNames,
+      ),
+    ).toContain(
+      "TaskUpdateRequest: cannot source-audit Swift struct ExternalModule.TaskUpdateRequest",
+    );
   });
 
   it("keeps request properties, requiredness, and nullability aligned with zod", () => {
@@ -852,6 +955,39 @@ describe("request OpenAPI contract", () => {
         componentName,
       ).toEqual(semanticContract(zodJson, {}));
     }
+  });
+
+  it("keeps every int32-bearing registered response integer inventory aligned", () => {
+    for (const [componentName, validator] of Object.entries(
+      schemaIndex.responseSchemaRegistry,
+    )) {
+      const component = components[componentName];
+      if (!component || !containsInt32(component, components)) continue;
+      const zodJson = z.toJSONSchema(validator, {
+        target: "draft-2020-12",
+        reused: "inline",
+      }) as JsonSchema;
+      expect(
+        semanticIntegerInventory(
+          semanticContract(component, components) as SemanticNode,
+          componentName,
+        ),
+        componentName,
+      ).toEqual(
+        semanticIntegerInventory(
+          semanticContract(zodJson, {}) as SemanticNode,
+          componentName,
+        ),
+      );
+    }
+  });
+
+  it("bounds persisted settings schemaVersion to PostgreSQL integer width", () => {
+    const schemaVersion = schemaIndex.userSettingsResponse.shape.schemaVersion;
+    expect(schemaVersion.safeParse(-2_147_483_648).success).toBe(true);
+    expect(schemaVersion.safeParse(2_147_483_647).success).toBe(true);
+    expect(schemaVersion.safeParse(-2_147_483_649).success).toBe(false);
+    expect(schemaVersion.safeParse(2_147_483_648).success).toBe(false);
   });
 
   it("keeps routine computed aggregates truthful beyond Int32", () => {

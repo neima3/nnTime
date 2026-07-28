@@ -1507,7 +1507,6 @@ components:
         durationMin:
           type: integer
           format: int32
-          minimum: 0
           description: Authoritative duration; end time is derived.
         checklistTemplate:
           type: array
@@ -2299,7 +2298,6 @@ components:
         durationMin:
           type: integer
           format: int32
-          minimum: 0
           description: Authoritative duration; end time is derived.
         checklistTemplate:
           type: array

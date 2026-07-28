@@ -14,6 +14,7 @@ import {
   ianaTimezone,
   instant,
   jsonObject,
+  pgInteger,
   revision,
   themeModeEnum,
   weekStartEnum,
@@ -35,7 +36,7 @@ export const userSettingsResponse = z.object({
   reducedStimulation: z.boolean(),
   /** Presentation-only extras: reminder offsets, sounds, quiet hours (jsonb). */
   notificationPrefs: jsonObject,
-  schemaVersion: z.number().int(),
+  schemaVersion: pgInteger,
   revision,
   createdAt: instant,
   updatedAt: instant,

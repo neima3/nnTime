@@ -1,6 +1,9 @@
 interface ContractSchema {
   $ref?: string;
+  additionalProperties?: boolean | ContractSchema;
   anyOf?: ContractSchema[];
+  format?: string;
+  items?: ContractSchema;
   oneOf?: ContractSchema[];
   properties?: Record<string, ContractSchema>;
   required?: string[];
@@ -40,6 +43,28 @@ function isNullable(
   );
 }
 
+function nonNullSchema(
+  schema: ContractSchema,
+  components: Record<string, ContractSchema>,
+): ContractSchema {
+  if (schema.$ref) return schema;
+  const branches = schema.anyOf ?? schema.oneOf;
+  if (branches) {
+    const nonNull = branches.filter(
+      (branch) => !isNullable(branch, components),
+    );
+    if (nonNull.length === 1) return nonNull[0]!;
+  }
+  if (Array.isArray(schema.type)) {
+    const types = schema.type.filter((type) => type !== "null");
+    return {
+      ...schema,
+      type: types.length === 1 ? types[0] : types,
+    };
+  }
+  return schema;
+}
+
 function structBody(source: string, typeName: string): string | undefined {
   const declaration = `public struct ${typeName}`;
   const declarationIndex = source.indexOf(declaration);
@@ -72,69 +97,224 @@ function swiftProperties(
   return result;
 }
 
-function isOuterOptional(swiftType: string): boolean {
-  return swiftType.endsWith("?");
+function normalizeSwiftType(swiftType: string): string {
+  return swiftType
+    .replaceAll("Swift.String", "String")
+    .replaceAll("Swift.Bool", "Bool")
+    .replaceAll("Swift.Int32", "Int32")
+    .replaceAll("Swift.Int", "Int")
+    .replaceAll("Foundation.Date", "Date")
+    .replaceAll(
+      "OpenAPIRuntime.OpenAPIObjectContainer",
+      "OpenAPIObjectContainer",
+    )
+    .trim();
 }
 
-function isPatchField(swiftType: string): boolean {
-  const withoutOuterOptional = swiftType.endsWith("?")
-    ? swiftType.slice(0, -1)
-    : swiftType;
-  return withoutOuterOptional.startsWith("PatchField<");
+function withoutOuterOptional(swiftType: string): string {
+  return swiftType.endsWith("?") ? swiftType.slice(0, -1) : swiftType;
+}
+
+function patchFieldInner(swiftType: string): string | undefined {
+  if (!swiftType.startsWith("PatchField<") || !swiftType.endsWith(">")) {
+    return undefined;
+  }
+  return swiftType.slice("PatchField<".length, -1);
+}
+
+function arrayInner(swiftType: string): string | undefined {
+  if (!swiftType.startsWith("[") || !swiftType.endsWith("]")) return undefined;
+  return swiftType.slice(1, -1);
+}
+
+function expectedPrimitiveType(schema: ContractSchema): string | undefined {
+  if (schema.type === "string") {
+    return schema.format === "date-time" ? "Date" : "String";
+  }
+  if (schema.type === "boolean") return "Bool";
+  if (schema.type === "integer") {
+    return schema.format === "int32" ? "Int32" : "Int";
+  }
+  if (schema.type === "number") return "Double";
+  return undefined;
+}
+
+function validateStructShape(
+  componentName: string,
+  schema: ContractSchema,
+  swiftType: string,
+  components: Record<string, ContractSchema>,
+  overrides: Record<string, string>,
+  swiftSource: string,
+  issues: string[],
+  activeLocalTypes: Set<string>,
+): void {
+  const actualProperties = swiftProperties(swiftSource, swiftType);
+  if (!actualProperties) {
+    issues.push(`${componentName}: cannot source-audit Swift struct ${swiftType}`);
+    return;
+  }
+
+  const expectedProperties = schema.properties ?? {};
+  const expectedNames = Object.keys(expectedProperties).sort();
+  const actualNames = Object.keys(actualProperties).sort();
+  const missing = expectedNames.filter((name) => !actualProperties[name]);
+  const extra = actualNames.filter((name) => !expectedProperties[name]);
+  if (missing.length) {
+    issues.push(`${componentName}: missing Swift properties ${missing.join(", ")}`);
+  }
+  if (extra.length) {
+    issues.push(`${componentName}: extra Swift properties ${extra.join(", ")}`);
+  }
+
+  const required = new Set(schema.required ?? []);
+  for (const propertyName of expectedNames) {
+    const propertySchema = expectedProperties[propertyName]!;
+    const rawSwiftType = actualProperties[propertyName];
+    if (!rawSwiftType) continue;
+    const propertyPath = `${componentName}.${propertyName}`;
+    const normalized = normalizeSwiftType(rawSwiftType);
+    const expectedOptional = !required.has(propertyName);
+    const actualOptional = normalized.endsWith("?");
+    if (actualOptional !== expectedOptional) {
+      issues.push(
+        `${propertyPath}: Swift optional=${actualOptional}, OpenAPI optional=${expectedOptional}`,
+      );
+    }
+
+    const expectedNullable = isNullable(propertySchema, components);
+    const optionalInner = withoutOuterOptional(normalized);
+    const patchInner = patchFieldInner(optionalInner);
+    const actualNullable = patchInner !== undefined;
+    if (actualNullable !== expectedNullable) {
+      issues.push(
+        `${propertyPath}: Swift tri-state=${actualNullable}, OpenAPI nullable=${expectedNullable}`,
+      );
+      continue;
+    }
+
+    validateWireType(
+      propertyPath,
+      nonNullSchema(propertySchema, components),
+      patchInner ?? optionalInner,
+      components,
+      overrides,
+      swiftSource,
+      issues,
+      activeLocalTypes,
+    );
+  }
+}
+
+function validateWireType(
+  path: string,
+  schema: ContractSchema,
+  swiftType: string,
+  components: Record<string, ContractSchema>,
+  overrides: Record<string, string>,
+  swiftSource: string,
+  issues: string[],
+  activeLocalTypes: Set<string>,
+): void {
+  const normalized = normalizeSwiftType(swiftType);
+  const referencedName = refName(schema);
+  if (referencedName) {
+    const expected =
+      overrides[referencedName] ?? `Components.Schemas.${referencedName}`;
+    if (normalized !== expected) {
+      issues.push(`${path}: Swift type ${normalized}, OpenAPI ref ${expected}`);
+    }
+    return;
+  }
+
+  const primitive = expectedPrimitiveType(schema);
+  if (primitive) {
+    if (normalized !== primitive) {
+      issues.push(`${path}: Swift type ${normalized}, OpenAPI type ${primitive}`);
+    }
+    return;
+  }
+
+  if (schema.type === "array") {
+    const inner = arrayInner(normalized);
+    if (!inner) {
+      issues.push(`${path}: Swift type ${normalized}, OpenAPI type array`);
+      return;
+    }
+    validateWireType(
+      `${path}[]`,
+      schema.items ?? {},
+      inner,
+      components,
+      overrides,
+      swiftSource,
+      issues,
+      activeLocalTypes,
+    );
+    return;
+  }
+
+  if (schema.type === "object" && schema.properties) {
+    if (activeLocalTypes.has(normalized)) return;
+    validateStructShape(
+      path,
+      schema,
+      normalized,
+      components,
+      overrides,
+      swiftSource,
+      issues,
+      new Set(activeLocalTypes).add(normalized),
+    );
+    return;
+  }
+
+  if (
+    schema.type === "object" &&
+    (schema.additionalProperties === true ||
+      typeof schema.additionalProperties === "object")
+  ) {
+    if (normalized !== "OpenAPIObjectContainer") {
+      issues.push(
+        `${path}: Swift type ${normalized}, OpenAPI type OpenAPIObjectContainer`,
+      );
+    }
+    return;
+  }
+
+  issues.push(`${path}: unsupported OpenAPI wire shape for Swift ${normalized}`);
 }
 
 export function validateSwiftPatchOverrides(
   components: Record<string, ContractSchema>,
   config: SwiftGeneratorConfig,
   swiftSource: string,
+  clearableComponentNames: string[],
 ): string[] {
   const issues: string[] = [];
-  const overrides = Object.entries(config.typeOverrides?.schemas ?? {}).filter(
-    ([componentName, swiftType]) =>
-      Boolean(components[componentName]?.properties) && !swiftType.includes("."),
-  );
+  const overrides = config.typeOverrides?.schemas ?? {};
 
-  for (const [componentName, swiftType] of overrides) {
-    const component = components[componentName]!;
-    const expectedProperties = component.properties ?? {};
-    const actualProperties = swiftProperties(swiftSource, swiftType);
-    if (!actualProperties) {
-      issues.push(`${componentName}: missing public struct ${swiftType}`);
+  for (const componentName of [...clearableComponentNames].sort()) {
+    const component = components[componentName];
+    const swiftType = overrides[componentName];
+    if (!component) {
+      issues.push(`${componentName}: missing OpenAPI component`);
       continue;
     }
-
-    const expectedNames = Object.keys(expectedProperties).sort();
-    const actualNames = Object.keys(actualProperties).sort();
-    const missing = expectedNames.filter((name) => !actualProperties[name]);
-    const extra = actualNames.filter((name) => !expectedProperties[name]);
-    if (missing.length) {
-      issues.push(`${componentName}: missing Swift properties ${missing.join(", ")}`);
+    if (!swiftType) {
+      issues.push(`${componentName}: missing configured Swift override`);
+      continue;
     }
-    if (extra.length) {
-      issues.push(`${componentName}: extra Swift properties ${extra.join(", ")}`);
-    }
-
-    const required = new Set(component.required ?? []);
-    for (const propertyName of expectedNames) {
-      const propertySchema = expectedProperties[propertyName]!;
-      const swiftPropertyType = actualProperties[propertyName];
-      if (!swiftPropertyType) continue;
-
-      const expectedOptional = !required.has(propertyName);
-      const expectedNullable = isNullable(propertySchema, components);
-      const actualOptional = isOuterOptional(swiftPropertyType);
-      const actualNullable = isPatchField(swiftPropertyType);
-      if (actualOptional !== expectedOptional) {
-        issues.push(
-          `${componentName}.${propertyName}: Swift optional=${actualOptional}, OpenAPI optional=${expectedOptional}`,
-        );
-      }
-      if (actualNullable !== expectedNullable) {
-        issues.push(
-          `${componentName}.${propertyName}: Swift tri-state=${actualNullable}, OpenAPI nullable=${expectedNullable}`,
-        );
-      }
-    }
+    validateStructShape(
+      componentName,
+      component,
+      swiftType,
+      components,
+      overrides,
+      swiftSource,
+      issues,
+      new Set([swiftType]),
+    );
   }
 
   return issues;
