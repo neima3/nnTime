@@ -19,9 +19,28 @@ final class KairoLiveActivityTest: XCTestCase {
         }
         XCTAssertTrue(app.buttons["New activity"].waitForExistence(timeout: 20))
 
-        app.tabBars.buttons["Focus"].tap()
-        let start = app.buttons["Start focus"]
-        XCTAssertTrue(start.waitForExistence(timeout: 8))
+        let focusTab = app.tabBars.buttons["Focus"]
+        XCTAssertTrue(focusTab.waitForExistence(timeout: 8))
+        focusTab.tap()
+        if !focusTab.waitForSelected(timeout: 3) {
+            focusTab.tap()
+        }
+        XCTAssertTrue(focusTab.waitForSelected(timeout: 5), "Focus tab should be selected")
+
+        // A previously interrupted run may leave the synthetic QA account in
+        // an active session. Finish it through the product before this test
+        // starts the session whose Live Activity it owns.
+        let leftover = app.buttons["Complete session"].firstMatch
+        if leftover.waitForExistence(timeout: 3) {
+            leftover.tap()
+            let doneForNow = app.buttons["Done for now"].firstMatch
+            if doneForNow.waitForExistence(timeout: 8) {
+                doneForNow.tap()
+            }
+        }
+
+        let start = app.buttons["Start focus"].firstMatch
+        XCTAssertTrue(start.waitForExistence(timeout: 10))
         start.tap()
         sleep(2)
 
@@ -43,5 +62,13 @@ final class KairoLiveActivityTest: XCTestCase {
         XCTAssertTrue(app.buttons["Take a 5-min break"].waitForExistence(timeout: 10)
                       || app.buttons["Done for now"].waitForExistence(timeout: 4),
                       "session should complete")
+    }
+}
+
+private extension XCUIElement {
+    func waitForSelected(timeout: TimeInterval) -> Bool {
+        let predicate = NSPredicate(format: "isSelected == true")
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: self)
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 }
