@@ -17,26 +17,33 @@ Mono bundled — SIL OFL, licenses alongside the TTFs in `App/Fonts/`).
 ## Build & run
 ```bash
 brew install xcodegen   # once
-cd ios
-xcodegen generate
-xcodebuild -project Kairo.xcodeproj -scheme Kairo \
+./scripts/ios-prepare-project.sh
+xcodebuild -project ios/Kairo.xcodeproj -scheme Kairo \
   -destination 'platform=iOS Simulator,name=iPhone 17' \
-  -skipPackagePluginValidation build
+  -skipPackagePluginValidation \
+  -onlyUsePackageVersionsFromResolvedFile \
+  build
 ```
 
 XcodeGen links the local `KairoAPIClient` package product only to the `Kairo`
 application target. The widget remains independent of the network package.
-Regenerating the project resolves the package from `ios/Kairo`; no generated
-`.xcodeproj` files are committed. The command-line build explicitly permits
-the `OpenAPIGenerator` build-tool plugin declared in `Kairo/Package.swift`;
-interactive Xcode builds can approve that Apple package plugin in the UI
-instead.
+The preparation script regenerates the project and installs the committed
+`ios/Kairo/Package.resolved` graph into the generated workspace; no generated
+`.xcodeproj` files are committed. Xcode describes the plugin-validation bypass
+used above as a security risk. Kairo accepts that bypass only for
+noninteractive commands because the resolved graph commits every package to an
+exact revision and the locked-version option refuses dependency drift.
+Interactive Xcode builds should continue to review and approve the Apple
+package plugin in the Xcode UI instead of bypassing that prompt.
 Point at a local API with the `KAIRO_BASE_URL` env var in the scheme.
 
 ## Tests
 ```bash
-xcodebuild -project Kairo.xcodeproj -scheme Kairo \
-  -destination 'platform=iOS Simulator,name=iPhone 17' test
+xcodebuild -project ios/Kairo.xcodeproj -scheme Kairo \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -skipPackagePluginValidation \
+  -onlyUsePackageVersionsFromResolvedFile \
+  test
 ```
 `KairoFlowUITests` signs in, creates an activity, completes it, and visits
 every tab — end-to-end against production. `KairoScreenshotTour` captures

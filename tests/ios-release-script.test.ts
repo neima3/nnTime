@@ -26,12 +26,16 @@ describe("iOS release driver", () => {
     const output = run("archive");
 
     expect(output).toContain("Build number: 314");
-    expect(output).toContain("xcodebuild archive");
+    expect(output).toContain(
+      "ios-xcodebuild.sh -skipPackagePluginValidation -onlyUsePackageVersionsFromResolvedFile archive",
+    );
     expect(output).toContain("generic/platform=iOS");
     expect(output).toContain("KAIRO_BUILD_NUMBER=314");
     expect(output).toContain("KAIRO_GIT_SHA=");
     expect(output).toContain("KAIRO_BUILD_DATE=");
     expect(output).toContain("Kairo.xcarchive");
+    expect(output).toContain("-skipPackagePluginValidation");
+    expect(output).toContain("-onlyUsePackageVersionsFromResolvedFile");
   });
 
   it("keeps export and upload destinations explicit", () => {
@@ -44,6 +48,10 @@ describe("iOS release driver", () => {
     expect(uploadOutput).toContain("<string>app-store-connect</string>");
     expect(exportOutput).toContain("<key>manageAppVersionAndBuildNumber</key>");
     expect(exportOutput).toContain("<false/>");
+    expect(exportOutput).toContain("-skipPackagePluginValidation");
+    expect(exportOutput).toContain("-onlyUsePackageVersionsFromResolvedFile");
+    expect(uploadOutput).toContain("-skipPackagePluginValidation");
+    expect(uploadOutput).toContain("-onlyUsePackageVersionsFromResolvedFile");
   });
 
   it("does not echo App Store Connect credential values", () => {

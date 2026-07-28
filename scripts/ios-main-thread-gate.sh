@@ -28,11 +28,11 @@ LOG_FILE="$(mktemp -t kairo-main-thread-gate).log"
 DERIVED_DATA_PATH="$(mktemp -d -t kairo-main-thread-derived)"
 trap 'rm -f "$LOG_FILE"; rm -rf "$DERIVED_DATA_PATH"' EXIT
 
-xcodegen generate --spec ios/project.yml
+./scripts/ios-prepare-project.sh
 
 set +e
 set -o pipefail
-xcodebuild test \
+./scripts/ios-xcodebuild.sh test \
   -project ios/Kairo.xcodeproj \
   -scheme Kairo \
   -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \

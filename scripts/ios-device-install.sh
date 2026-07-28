@@ -106,12 +106,12 @@ echo "→ device: $NAME ($UDID)"
 # ---- Build + install -------------------------------------------------------
 
 echo "→ regenerating the Xcode project"
-(cd "$IOS_DIR" && xcodegen generate >/dev/null)
+./scripts/ios-prepare-project.sh >/dev/null
 
 DERIVED="$(mktemp -d -t kairo-device-build)"
 echo "→ building for the device (this registers the app + widget bundle IDs and"
 echo "  the App Group with your team on first run)"
-xcodebuild \
+./scripts/ios-xcodebuild.sh \
   -project "$IOS_DIR/Kairo.xcodeproj" \
   -scheme Kairo \
   -configuration Release \

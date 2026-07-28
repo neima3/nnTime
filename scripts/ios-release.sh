@@ -4,6 +4,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
+PREPARE_PROJECT="$REPO_ROOT/scripts/ios-prepare-project.sh"
+XCODEBUILD="$REPO_ROOT/scripts/ios-xcodebuild.sh"
 
 MODE="${1:-}"
 case "$MODE" in
@@ -55,6 +57,16 @@ redacted_arg() {
 }
 
 print_command() {
+  if [[ "${1:-}" == "$XCODEBUILD" ]]; then
+    redacted_arg "$1"
+    printf ' '
+    redacted_arg "-skipPackagePluginValidation"
+    printf ' '
+    redacted_arg "-onlyUsePackageVersionsFromResolvedFile"
+    printf ' '
+    shift
+  fi
+
   local argument
   for argument in "$@"; do
     redacted_arg "$argument"
@@ -179,8 +191,8 @@ preflight() {
   echo "Artifact root: $ARTIFACT_ROOT"
 
   KAIRO_BUILD_NUMBER="$BUILD_NUMBER" node scripts/ios-release-contract.mjs
-  run xcodegen generate --spec ios/project.yml
-  run xcodebuild \
+  run "$PREPARE_PROJECT"
+  run "$XCODEBUILD" \
     -project ios/Kairo.xcodeproj \
     -scheme Kairo \
     -configuration Release \
@@ -257,7 +269,7 @@ archive() {
   run mkdir -p "$LOG_DIR" "$DERIVED_DATA_PATH"
   authentication_args
   local archive_command=(
-    xcodebuild archive \
+    "$XCODEBUILD" archive \
       -project ios/Kairo.xcodeproj \
       -scheme Kairo \
       -configuration Release \
@@ -290,7 +302,7 @@ export_or_upload() {
   write_export_options "$destination"
   authentication_args
   local export_command=(
-    xcodebuild -exportArchive \
+    "$XCODEBUILD" -exportArchive \
       -archivePath "$ARCHIVE_PATH" \
       -exportPath "$EXPORT_PATH" \
       -exportOptionsPlist "$EXPORT_OPTIONS_PATH" \

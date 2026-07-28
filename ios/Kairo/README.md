@@ -14,10 +14,10 @@ pnpm api:check-ios
 pnpm api:check-ios-client
 
 # Build the Swift Package (includes OpenAPI client generation)
-swift build --package-path ios/Kairo
+swift build --package-path ios/Kairo --only-use-versions-from-resolved-file
 
 # Run tests
-swift test --package-path ios/Kairo
+swift test --package-path ios/Kairo --only-use-versions-from-resolved-file
 
 # Inspect the package in Xcode (Xcode resolves SPM dependencies automatically)
 open ios/Kairo/Package.swift
@@ -29,15 +29,17 @@ because Swift OpenAPI Generator requires the document inside its target. Never
 edit the package copy directly. GitHub Actions checks both copies, validates
 the shipping app's manual `/api/v1` calls against the canonical operations,
 and compiles this generated client on macOS. Swift package tests use
-`@testable import KairoAPIClient`.
+`@testable import KairoAPIClient`. `Package.resolved` is the authoritative,
+committed dependency graph for both SwiftPM and generated Xcode projects.
 
 ## Shipping app integration
 
 `ios/project.yml` declares this directory as a local package and links the
 `KairoAPIClient` product only to the shipping `Kairo` application target. Run
-`xcodegen generate` from `ios/` after project changes. The widget does not link
-the package. The shipping app's transport adoption is tracked separately; this
-package link does not change runtime API behavior by itself.
+`./scripts/ios-prepare-project.sh` from the repository root after project
+changes so XcodeGen also receives the authoritative lock. The widget does not
+link the package. The shipping app's transport adoption is tracked separately;
+this package link does not change runtime API behavior by itself.
 
 ## Architecture
 
