@@ -14,6 +14,8 @@ vi.mock("@/server/auth-session", () => ({
 }));
 
 vi.mock("@/server/dal", () => ({
+  ConflictError: class ConflictError extends Error {},
+  NotFoundError: class NotFoundError extends Error {},
   listRoutines: mocks.listRoutines,
   createRoutine: mocks.createRoutine,
   listRoutineSteps: mocks.listRoutineSteps,
@@ -101,5 +103,41 @@ describe("GET /api/v1/routines", () => {
       stepCount: 2,
       totalMin: 2_147_483_648,
     });
+  });
+
+  it("returns a structured error instead of an unsafe total", async () => {
+    vi.clearAllMocks();
+    mocks.requireSession.mockResolvedValue({ userId: "user-1" });
+    mocks.listRoutines.mockResolvedValue([
+      {
+        id: "01980000-7000-8000-8000-000000000001",
+        userId: "user-1",
+        title: "Unsafe aggregate",
+      },
+    ]);
+    mocks.listRoutineSteps.mockResolvedValue([
+      { durationMin: Number.MAX_SAFE_INTEGER },
+      { durationMin: 1 },
+    ]);
+    mocks.listRoutineSchedules.mockResolvedValue([]);
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(body).toEqual({
+      error: {
+        code: "internal",
+        message: "An unexpected error occurred",
+        retryable: false,
+      },
+    });
+    expect(body).not.toHaveProperty("items");
+    expect(consoleError).toHaveBeenCalledOnce();
+    consoleError.mockRestore();
   });
 });

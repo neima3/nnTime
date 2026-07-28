@@ -9,6 +9,7 @@ import {
   listRoutineSchedules,
 } from "@/server/dal";
 import { handleErrors, parseBody } from "@/server/api-errors";
+import { sumRoutineDurationMinutes } from "@/server/routine-duration";
 import { routineCreate } from "@/server/schemas/routine";
 
 export async function GET() {
@@ -24,7 +25,7 @@ export async function GET() {
           steps,
           schedules,
           stepCount: steps.length,
-          totalMin: steps.reduce((s, x) => s + (x.durationMin ?? 0), 0),
+          totalMin: sumRoutineDurationMinutes(steps),
         };
       }),
     );
