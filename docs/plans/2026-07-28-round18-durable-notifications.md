@@ -826,7 +826,7 @@ secret. In a muted real browser at desktop and 390px mobile:
 
 Keep all captures git-ignored.
 
-- [ ] **Step 4: Run adversarial code review**
+- [x] **Step 4: Run adversarial code review**
 
 Use `superpowers:requesting-code-review`, address every verified finding with
 `superpowers:receiving-code-review`, rerun focused and full gates, and record
@@ -845,7 +845,7 @@ every completed task in this plan. The remaining order is:
 5. migration-runner transaction/lock hardening;
 6. calendar subscription reconciliation.
 
-- [ ] **Step 6: Run final precommit verification and commit**
+- [x] **Step 6: Run final precommit verification and commit**
 
 Run the full commands from Steps 1–2 again after docs. Confirm `git diff
 --check` and a clean intended diff. Commit the immutable Round 18 handoff.
