@@ -9,8 +9,10 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Check, SkipForward } from "lucide-react";
 import { catClasses, type CategoryId } from "@/lib/mock";
 import { localMinutesToInstant } from "@/lib/adapters";
+import { sendRebasedStatusChange } from "@/lib/offline-mutation";
 import { celebrate } from "./Celebration";
 import { notifyDayChanged } from "./NowBar";
+import { toast } from "./Toast";
 
 export type ReviewItem = {
   id: string;
@@ -52,24 +54,34 @@ export function ReviewClient({
       setError(null);
       try {
         if (kind === "complete" || kind === "skip") {
-          const res = await fetch(`/api/v1/activities/${current.id}`, {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-              "If-Match": String(current.revision),
-            },
-            body: JSON.stringify({
+          const delivery = await sendRebasedStatusChange({
+            path: `/api/v1/activities/${current.id}`,
+            onlineRevision: current.revision,
+            body: {
               editScope: "this",
               occurrenceKey: current.occurrenceKey,
               status: kind === "complete" ? "completed" : "skipped",
               completedAt:
                 kind === "complete" ? new Date().toISOString() : null,
-            }),
+            },
           });
-          if (!res.ok) {
+          if (delivery.state === "unavailable") {
+            setError(
+              "You’re offline and this device couldn’t save that change. Reconnect and try again.",
+            );
+            setBusy(false);
+            return;
+          }
+          if (
+            delivery.state === "server" &&
+            !delivery.response.ok
+          ) {
             setError("Couldn't update it — try again");
             setBusy(false);
             return;
+          }
+          if (delivery.state === "queued") {
+            toast("Saved on this device — it’ll sync when you’re back");
           }
         } else {
           // Move this occurrence only (occurrence override), not the whole series.

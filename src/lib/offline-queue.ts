@@ -130,7 +130,7 @@ export async function enqueueMutation(
     db.close();
     dispatchQueueChanged();
   } catch {
-    // IndexedDB unavailable — return null (caller falls back to direct fetch).
+    // IndexedDB unavailable — caller must preserve the user's unsaved input.
     return null;
   }
 

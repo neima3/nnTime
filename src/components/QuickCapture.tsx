@@ -189,10 +189,9 @@ export function QuickCapture() {
 
       if (proposal.startMin != null) {
         const date = proposal.date ?? clientToday(zone);
-        const res = await fetch("/api/v1/activities", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        const delivery = await sendReplaySafeCreate({
+          path: "/api/v1/activities",
+          body: {
             tz: zone,
             dtstartLocal: localMinutesToInstant(date, proposal.startMin, zone),
             title: proposal.title,
@@ -200,24 +199,47 @@ export function QuickCapture() {
             durationMin: proposal.durationMin ?? 30,
             energy: proposal.energy ?? null,
             source: "manual",
-          }),
+          },
         });
-        if (!res.ok) throw new Error("create failed");
-        toast(`On the timeline — ${date === clientToday(zone) ? "today" : date} ${formatTime(proposal.startMin, hourCycle)}`);
+        if (delivery.state === "unavailable") {
+          toast("You’re offline and this device couldn’t save that plan");
+          setSaving(false);
+          return;
+        }
+        if (delivery.state === "server" && !delivery.response.ok) {
+          throw new Error("create failed");
+        }
+        toast(
+          delivery.state === "queued"
+            ? "Saved on this device — it’ll join your timeline when you’re back"
+            : `On the timeline — ${date === clientToday(zone) ? "today" : date} ${formatTime(proposal.startMin, hourCycle)}`,
+        );
       } else {
-        const res = await fetch("/api/v1/tasks", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        const delivery = await sendReplaySafeCreate({
+          path: "/api/v1/tasks",
+          body: {
             bucket: proposal.date ? "anytime" : "inbox",
             date: proposal.date ?? undefined,
             title: proposal.title,
             emoji: proposal.emoji,
             energy: proposal.energy ?? undefined,
-          }),
+          },
         });
-        if (!res.ok) throw new Error("create failed");
-        toast(proposal.date ? `Planned for ${proposal.date}` : "Captured — it's in your inbox");
+        if (delivery.state === "unavailable") {
+          toast("You’re offline and this device couldn’t save that task");
+          setSaving(false);
+          return;
+        }
+        if (delivery.state === "server" && !delivery.response.ok) {
+          throw new Error("create failed");
+        }
+        toast(
+          delivery.state === "queued"
+            ? "Saved on this device — it’ll appear when you’re back"
+            : proposal.date
+              ? `Planned for ${proposal.date}`
+              : "Captured — it's in your inbox",
+        );
       }
       notifyDayChanged();
       setProposal(null);

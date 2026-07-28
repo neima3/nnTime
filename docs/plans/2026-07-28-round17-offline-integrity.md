@@ -15,7 +15,7 @@
 - [x] Task 1 — typed offline delivery policy and red/green unit coverage
 - [x] Task 2 — durable queue summaries, dismissal, and shell conflict UX
 - [x] Task 3 — migrate the existing working paths and add an adoption gate
-- [ ] Task 4 — adopt every fully local replay-safe create/status surface
+- [x] Task 4 — adopt every fully local replay-safe create/status surface
 - [ ] Task 5 — production-mode browser proof and adversarial review
 - [ ] Task 6 — full verification, handoff, exact-SHA release, and live proof
 
@@ -149,19 +149,19 @@ await dismissTerminalMutations("user-a")
 
 ### Steps
 
-- [ ] Extend the adoption test with one named expectation per eligible call
+- [x] Extend the adoption test with one named expectation per eligible call
   site. Verify RED before each migration batch.
-- [ ] Migrate creates in Activity Editor, Inbox, Stats mood, Routines, Peak
+- [x] Migrate creates in Activity Editor, Inbox, Stats mood, Routines, Peak
   Focus, and confirmed Quick Capture proposals.
-- [ ] Migrate Review Today complete/skip to the rebased status helper.
-- [ ] For `queued`, clear only inputs that are durably stored and show
+- [x] Migrate Review Today complete/skip to the rebased status helper.
+- [x] For `queued`, clear only inputs that are durably stored and show
   surface-specific “saved on this device” copy.
-- [ ] For `unavailable`, preserve form input and show copy that the change was
+- [x] For `unavailable`, preserve form input and show copy that the change was
   not saved.
-- [ ] Keep unsafe mutations direct and online-only. Add source assertions that
+- [x] Keep unsafe mutations direct and online-only. Add source assertions that
   deletes, focus transitions, checklist overrides, general edits, imports, and
   promotions never call the offline helper.
-- [ ] Run focused tests after each surface batch, then all Vitest tests.
+- [x] Run focused tests after each surface batch, then all Vitest tests.
 
 ## Task 5 — Browser proof and review
 

@@ -17,6 +17,7 @@ import { CalendarPlus, Check, Sparkles, X } from "lucide-react";
 import { clientToday } from "@/lib/client-date";
 import { detectTimezone } from "@/lib/timezone";
 import { localMinutesToInstant } from "@/lib/adapters";
+import { sendReplaySafeCreate } from "@/lib/offline-mutation";
 import { toast } from "./Toast";
 import {
   hourLabel,
@@ -70,10 +71,9 @@ export function PeakFocusNudge() {
     setProtecting(true);
     try {
       const zone = detectTimezone();
-      const res = await fetch("/api/v1/activities", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const delivery = await sendReplaySafeCreate({
+        path: "/api/v1/activities",
+        body: {
           tz: zone,
           dtstartLocal: localMinutesToInstant(clientToday(), peakHour * 60, zone),
           title: "Focus time",
@@ -81,9 +81,20 @@ export function PeakFocusNudge() {
           durationMin: 45,
           rrule: "FREQ=DAILY",
           source: "manual",
-        }),
+        },
       });
-      if (!res.ok) {
+      if (delivery.state === "queued") {
+        setProtectedDaily(true);
+        toast("Saved on this device — your focus hour will sync when you’re back");
+        setProtecting(false);
+        return;
+      }
+      if (delivery.state === "unavailable") {
+        toast("You’re offline and this device couldn’t save the focus block");
+        setProtecting(false);
+        return;
+      }
+      if (!delivery.response.ok) {
         toast("Couldn't block it — try again");
         setProtecting(false);
         return;

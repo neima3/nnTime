@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pause, Play, PlayCircle, Plus, Trash2 } from "lucide-react";
 import { clientToday } from "@/lib/client-date";
+import { sendReplaySafeCreate } from "@/lib/offline-mutation";
 import { toast } from "./Toast";
 import { RoutinePlayer } from "./RoutinePlayer";
 
@@ -66,18 +67,28 @@ export function RoutinesClient({
       .filter(Boolean)
       .map((s) => ({ title: s, durationMin: 10 }));
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const res = await fetch("/api/v1/routines", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+    const delivery = await sendReplaySafeCreate({
+      path: "/api/v1/routines",
+      body: {
         title: t,
         emoji,
         steps,
         schedule: { tz, rrule: "FREQ=DAILY", paused: false },
-      }),
+      },
     });
     setBusy(false);
-    if (!res.ok) {
+    if (delivery.state === "queued") {
+      toast("Saved on this device — your routine will appear when you’re back");
+      setOpen(false);
+      setTitle("");
+      setStepsText("");
+      return;
+    }
+    if (delivery.state === "unavailable") {
+      toast("You’re offline and this device couldn’t save the routine");
+      return;
+    }
+    if (!delivery.response.ok) {
       toast("Couldn't create it — try again");
       return;
     }

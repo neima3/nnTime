@@ -8,6 +8,7 @@ import { formatHourLabel } from "@/lib/time-format";
 import { useHourCycle } from "@/lib/use-hour-cycle";
 import { RewardGarden } from "./RewardGarden";
 import { WeeklyReflection } from "./WeeklyReflection";
+import { sendReplaySafeCreate } from "@/lib/offline-mutation";
 
 type EstimateCalibration = {
   sessions: number;
@@ -99,13 +100,20 @@ export function StatsClient() {
 
   async function sendMood(mood: string) {
     setMoodBusy(true);
-    const res = await fetch("/api/v1/mood", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mood }),
+    const delivery = await sendReplaySafeCreate({
+      path: "/api/v1/mood",
+      body: { mood },
     });
     setMoodBusy(false);
-    if (!res.ok) {
+    if (delivery.state === "queued") {
+      toast("Mood saved on this device — it’ll sync when you’re back");
+      return;
+    }
+    if (delivery.state === "unavailable") {
+      toast("You’re offline and this device couldn’t save that mood");
+      return;
+    }
+    if (!delivery.response.ok) {
       toast("Couldn't save that — try again");
       return;
     }

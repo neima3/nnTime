@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { catClasses, type CategoryId } from "@/lib/mock";
 import { clientToday } from "@/lib/client-date";
+import { sendReplaySafeCreate } from "@/lib/offline-mutation";
 import { toast } from "./Toast";
 import { PickForMe, type PickCandidate } from "./PickForMe";
 
@@ -127,16 +128,29 @@ export function InboxClient({
     setBusy("create");
     setError(null);
     try {
-      const res = await fetch("/api/v1/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const delivery = await sendReplaySafeCreate({
+        path: "/api/v1/tasks",
+        body: {
           bucket: "inbox",
           title,
           emoji: "📋",
           priority: "none",
-        }),
+        },
       });
+      if (delivery.state === "queued") {
+        setDraft("");
+        setBusy(null);
+        toast("Saved on this device — it’ll join your inbox when you’re back");
+        return;
+      }
+      if (delivery.state === "unavailable") {
+        setError(
+          "You’re offline and this device couldn’t save it. Keep this open and reconnect.",
+        );
+        setBusy(null);
+        return;
+      }
+      const res = delivery.response;
       if (!res.ok) {
         setError("Couldn't add it — try again");
         setBusy(null);

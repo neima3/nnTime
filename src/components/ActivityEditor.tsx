@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { localMinutesToInstant } from "@/lib/adapters";
 import { clientToday } from "@/lib/client-date";
+import { sendReplaySafeCreate } from "@/lib/offline-mutation";
+import { toast } from "./Toast";
 
 const CATEGORY_UI = [
   { key: "peach", fill: "bg-cat-peach", ink: "text-cat-peach-ink", label: "Life" },
@@ -274,10 +276,9 @@ export function ActivityEditor(props: ActivityEditorProps) {
         repeat === "custom" ? customRrule : buildRrule(repeat, date, repeatN);
 
       if (props.mode === "create") {
-        const res = await fetch("/api/v1/activities", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        const delivery = await sendReplaySafeCreate({
+          path: "/api/v1/activities",
+          body: {
             tz,
             dtstartLocal,
             rrule,
@@ -292,8 +293,21 @@ export function ActivityEditor(props: ActivityEditorProps) {
               ? checklistTemplate
               : undefined,
             source: "manual",
-          }),
+          },
         });
+        if (delivery.state === "queued") {
+          toast("Saved on this device — it’ll appear when you’re back");
+          router.push(`/app/today?date=${date}`);
+          return;
+        }
+        if (delivery.state === "unavailable") {
+          setError(
+            "You’re offline and this device couldn’t save it. Keep this open and reconnect.",
+          );
+          setSaving(false);
+          return;
+        }
+        const res = delivery.response;
         if (res.status === 401) {
           setError("Sign in to save activities.");
           setSaving(false);
