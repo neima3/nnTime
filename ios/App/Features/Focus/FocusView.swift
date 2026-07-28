@@ -31,6 +31,9 @@ struct FocusView: View {
     @State private var linkedRevision = 1
     @State private var checklist: [(label: String, done: Bool)] = []
     @State private var scene: SoundscapeScene?
+    /// Companion mode (T11 / R10) — mirrors the web toggle + presence card.
+    @State private var companion = KairoPrefs.companion
+    @State private var companionBreath = false
     @State private var liveActivity: ActivityKit.Activity<FocusAttributes>?
 
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
@@ -137,6 +140,11 @@ struct FocusView: View {
                             // A ritual is a fresh, unlinked session.
                             linkedActivityId = nil
                             checklist = []
+                            // The body-double ritual is the companion's front door.
+                            if r.id == "double" && !companion {
+                                companion = true
+                                KairoPrefs.companion = true
+                            }
                             // Auto-start the ritual's vibe (parity with web).
                             scene = r.sound
                             if let s = r.sound { SoundscapeEngine.shared.play(s) }
@@ -158,6 +166,25 @@ struct FocusView: View {
                 }
                 .padding(.horizontal, 4)
             }
+
+            Button {
+                companion.toggle()
+                KairoPrefs.companion = companion
+            } label: {
+                HStack(spacing: 5) {
+                    Text("🫂")
+                    Text("Companion \(companion ? "on" : "off") · quiet company while you work")
+                }
+                .font(.kBody(13, weight: .semibold))
+                .foregroundStyle(companion ? Color.kIris : Color.kInkSoft)
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                .background(
+                    Capsule().fill(companion ? Color.kIrisSoft : Color.kSurface)
+                        .overlay(Capsule().stroke(companion ? Color.kIris : Color.kBorder, lineWidth: 1))
+                )
+            }
+            .accessibilityLabel("Companion \(companion ? "on" : "off")")
+            .accessibilityHint("A quiet presence that stays with you through the session")
 
             HStack(spacing: 6) {
                 ForEach([15, 25, 45, 60], id: \.self) { m in
@@ -253,6 +280,49 @@ struct FocusView: View {
                 }
                 .padding(.horizontal, 16).padding(.vertical, 12)
                 .background(RoundedRectangle(cornerRadius: 16).fill(Color.kCatButter))
+            }
+
+            if companion {
+                let elapsedMin = max(0, session.targetDurationMin - remaining / 60)
+                let compState: CompanionLines.State =
+                    session.state == "paused" ? .paused : (inOvertime ? .overtime : .running)
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle().fill(Color.kIrisSoft).frame(width: 36, height: 36)
+                        Circle().fill(Color.kIris).frame(width: 10, height: 10)
+                            .scaleEffect(companionBreath ? 1.25 : 0.85)
+                            .opacity(companionBreath ? 1 : 0.6)
+                    }
+                    .onAppear {
+                        guard !KairoPrefs.reducedStimulation,
+                              !UIAccessibility.isReduceMotionEnabled else { return }
+                        withAnimation(.easeInOut(duration: 1.3).repeatForever(autoreverses: true)) {
+                            companionBreath = true
+                        }
+                    }
+                    .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("COMPANION").font(.kBody(10, weight: .bold)).kerning(1.2)
+                            .foregroundStyle(Color.kInkFaint)
+                        Text(CompanionLines.line(elapsedMin: elapsedMin, state: compState))
+                            .font(.kBody(13.5, weight: .semibold))
+                            .foregroundStyle(Color.kInkSoft)
+                    }
+                    Spacer(minLength: 0)
+                    Button {
+                        companion = false
+                        KairoPrefs.companion = false
+                    } label: {
+                        Text("Solo").font(.kBody(12, weight: .semibold)).foregroundStyle(Color.kInkFaint)
+                    }
+                    .accessibilityLabel("Solo — turn the companion off")
+                }
+                .padding(.horizontal, 16).padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .kCard(radius: 16)
+                .padding(.horizontal, 24)
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel("Companion")
             }
 
             HStack(spacing: 18) {

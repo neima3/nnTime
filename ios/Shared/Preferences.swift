@@ -73,6 +73,13 @@ enum KairoPrefs {
         set { store.set(newValue, forKey: "kairo-onboarded") }
     }
 
+    /// Companion mode (T11) — quiet presence during focus. Device-local like
+    /// the web (a vibe, not data — never synced); same storage key.
+    static var companion: Bool {
+        get { store.bool(forKey: "kairo-companion") }
+        set { store.set(newValue, forKey: "kairo-companion") }
+    }
+
     /// Local reminders for upcoming activities (T2). Defaults on once the user
     /// grants permission; the toggle lives in Settings.
     static var remindersEnabled: Bool {

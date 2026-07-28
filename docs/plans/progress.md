@@ -1,5 +1,33 @@
 # Progress log
 
+## 2026-07-27 — Round 10: iOS companion parity (Fable)
+
+Roadmap: `docs/plans/2026-07-27-round10-ios-companion.md`. Round 9's web
+companion (T11) had left iOS behind — the sharpest cross-platform gap this
+session created, closed the same way KTime mirrors time-format.ts:
+
+- **`CompanionLines.swift` (Shared)** — the exact web lines and 4-minute
+  rotation math from src/lib/companion.ts; `CompanionLinesTests` (5 tests)
+  pins the mirror to the web's own test values, including the never-shames
+  register check. If the web copy changes, iOS fails on purpose.
+- **FocusView**: Companion toggle chip on setup (same "kairo-companion"
+  device-local key via KairoPrefs — a vibe, not data, never synced); the
+  Body-double ritual switches it on; during a session a presence card with
+  the rotating line and a Solo escape. The breathing dot animates only when
+  BOTH reduced-stimulation and the system Reduce Motion allow it.
+- **KairoRound10Tour**: ritual → "Companion on" → start → card shows the
+  web's exact first line → Solo dismisses → session completed (account left
+  clean). Two real XCUITest traps fixed along the way: SwiftUI concatenates
+  the chip's emoji into its accessible name (match by CONTAINS, not
+  identifier), and the done-state label is the full sentence ("23 min of
+  real focus") so exact-match staticTexts never hit it. The tour also
+  self-heals from a leftover active session.
+- **10E (HealthKit mindful minutes) deliberately deferred** — new
+  entitlement + usage strings touch signing; that's its own clean slice,
+  recorded in the roadmap as open.
+
+Full iOS suite green (Executed-line verified below). Web untouched.
+
 ## 2026-07-26 — Round 9: E07 energy-pattern learning ("charged hours") (Fable)
 
 Roadmap: `docs/plans/2026-07-26-round9-energy-pattern.md`. With the round-3
