@@ -40,7 +40,7 @@ final class KairoRound11Tour: XCTestCase {
         )
         XCTAssertTrue(
             app.staticTexts[
-                "Completed focus sessions become mindful minutes in Apple Health. Kairo never reads your Health data."
+                "Writes mindful minutes only. This setting never reads Health data."
             ].exists,
             "the consent surface must name exactly what leaves Kairo"
         )

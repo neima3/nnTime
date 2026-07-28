@@ -43,6 +43,8 @@
 	<true/>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Kairo saves completed focus sessions as mindful minutes so your focused time can appear in Apple Health.</string>
+	<key>NSHealthShareUsageDescription</key>
+	<string>Kairo reads recent sleep times to suggest a private wind-down reminder on this iPhone.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

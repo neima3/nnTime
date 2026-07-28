@@ -11,6 +11,9 @@ struct SettingsView: View {
     @State private var healthSyncOn = KairoPrefs.healthSyncEnabled
     @State private var healthSyncBusy = false
     @State private var healthSyncStatus: HealthKitEnableResult?
+    @State private var sleepWindDownOn = KairoPrefs.sleepWindDownEnabled
+    @State private var sleepWindDownBusy = false
+    @State private var sleepWindDownStatus: SleepWindDownEnableResult?
 
     var body: some View {
         ZStack {
@@ -149,7 +152,7 @@ struct SettingsView: View {
                     }
 
                     group("Apple Health") {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 10) {
                             Toggle(isOn: Binding(
                                 get: { healthSyncOn },
                                 set: { setHealthSync($0) }
@@ -162,10 +165,10 @@ struct SettingsView: View {
                             .disabled(healthSyncBusy)
                             .accessibilityLabel("Save focused minutes")
                             .accessibilityHint(
-                                "With your permission, saves completed focus sessions as mindful minutes. Kairo does not read Health data."
+                                "With your permission, writes completed focus sessions as mindful minutes. This control never reads Health data."
                             )
 
-                            Text("Completed focus sessions become mindful minutes in Apple Health. Kairo never reads your Health data.")
+                            Text("Writes mindful minutes only. This setting never reads Health data.")
                                 .font(.kBody(12.5))
                                 .foregroundStyle(Color.kInkSoft)
 
@@ -178,6 +181,38 @@ struct SettingsView: View {
                                 Text(healthSyncMessage)
                                     .font(.kBody(12))
                                     .foregroundStyle(healthSyncOn ? Color.kIris : Color.kInkFaint)
+                            }
+
+                            divider
+
+                            Toggle(isOn: Binding(
+                                get: { sleepWindDownOn },
+                                set: { setSleepWindDown($0) }
+                            )) {
+                                Text("Sleep-aware wind-down")
+                                    .font(.kBody(15, weight: .medium))
+                                    .foregroundStyle(Color.kInk)
+                            }
+                            .tint(.kIris)
+                            .disabled(sleepWindDownBusy)
+                            .accessibilityLabel("Sleep-aware wind-down")
+                            .accessibilityHint(
+                                "With your permission, reads recent Sleep Analysis on this iPhone to suggest a wind-down time. Nothing is uploaded."
+                            )
+
+                            Text("Reads recent sleep times on this iPhone to suggest when to wind down. Nothing is uploaded.")
+                                .font(.kBody(12.5))
+                                .foregroundStyle(Color.kInkSoft)
+
+                            HStack(spacing: 6) {
+                                if sleepWindDownBusy {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                        .tint(.kIris)
+                                }
+                                Text(sleepWindDownMessage)
+                                    .font(.kBody(12))
+                                    .foregroundStyle(sleepWindDownOn ? Color.kIris : Color.kInkFaint)
                             }
                         }
                         .padding(16)
@@ -317,7 +352,7 @@ struct SettingsView: View {
         } else {
             remindersOn = false
             KairoPrefs.remindersEnabled = false
-            NotificationManager.cancelAll()
+            Task { await NotificationManager.cancelActivityReminders() }
         }
     }
 
@@ -363,6 +398,74 @@ struct SettingsView: View {
                 }
             }
         }
+    }
+
+    private var sleepWindDownMessage: String {
+        if sleepWindDownBusy { return "Checking your private sleep pattern…" }
+        switch sleepWindDownStatus {
+        case let .enabled(schedule):
+            return "Wind-down around \(clockText(schedule.windDownMinute)) · 45 min before your usual sleep time."
+        case let .notificationsOff(schedule):
+            return "Pattern ready for \(clockText(schedule.windDownMinute)). Turn on notifications in iOS Settings to get the nudge."
+        case let .quietHours(schedule):
+            return "Pattern ready for \(clockText(schedule.windDownMinute)). Quiet hours are keeping this time silent."
+        case .noPattern:
+            return "No recent sleep pattern is available. Health access may be limited, or Kairo may need four nights."
+        case .unavailable:
+            return "Apple Health isn't available on this device."
+        case .failed:
+            return "Kairo couldn't refresh your sleep pattern. Nothing was uploaded — try again."
+        case .disabled, .none:
+            return sleepWindDownOn
+                ? "Connected · Kairo will refresh the pattern on this iPhone."
+                : "Off by default. You choose if Kairo reads anything."
+        }
+    }
+
+    private func setSleepWindDown(_ on: Bool) {
+        UISelectionFeedbackGenerator().selectionChanged()
+        guard on else {
+            sleepWindDownOn = false
+            sleepWindDownStatus = .disabled
+            Task {
+                _ = await HealthKitManager.shared.setSleepWindDownEnabled(false)
+            }
+            return
+        }
+
+        sleepWindDownBusy = true
+        sleepWindDownStatus = nil
+        Task {
+            let result = await HealthKitManager.shared.setSleepWindDownEnabled(true)
+            await MainActor.run {
+                sleepWindDownBusy = false
+                sleepWindDownStatus = result
+                sleepWindDownOn = KairoPrefs.sleepWindDownEnabled
+                UINotificationFeedbackGenerator().notificationOccurred(
+                    sleepWindDownOn ? .success : .warning
+                )
+            }
+        }
+    }
+
+    private func clockText(_ minute: Int) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        guard let date = calendar.date(from: DateComponents(
+            year: 2001,
+            month: 1,
+            day: 1,
+            hour: minute / 60,
+            minute: minute % 60
+        )) else {
+            return "—"
+        }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = KairoPrefs.uses12Hour ? "h:mm a" : "HH:mm"
+        return formatter.string(from: date)
     }
 
     private func group(_ title: String, @ViewBuilder content: () -> some View) -> some View {
