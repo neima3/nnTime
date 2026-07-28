@@ -9,7 +9,7 @@ struct WeeklyIntentionsCard: View {
     @State private var items: [Intention] = []
     @State private var draft = ""
     @State private var revision: Int?
-    @State private var prefs: [String: Any] = [:]
+    @State private var prefs: NotificationPreferences = [:]
     @State private var loaded = false
 
     struct Intention: Identifiable {
@@ -88,19 +88,28 @@ struct WeeklyIntentionsCard: View {
     // MARK: Data
 
     private func load() async {
-        guard let obj = try? await KairoAPI.shared.settingsRaw() else {
+        guard let settings = try? await KairoAPI.shared.settings() else {
             await MainActor.run { loaded = true }
             return
         }
-        let rev = obj["revision"] as? Int
-        let np = obj["notificationPrefs"] as? [String: Any] ?? [:]
+        let rev = settings.revision
+        let np = settings.notificationPrefs ?? [:]
         var loadedItems: [Intention] = []
-        if let intent = np["intentions"] as? [String: Any],
-           intent["week"] as? String == weekKey,
-           let arr = intent["items"] as? [[String: Any]] {
+        if let intent = np["intentions"]?.objectValue,
+           intent["week"]?.stringValue == weekKey,
+           let arr = intent["items"]?.arrayValue
+        {
             loadedItems = arr.compactMap {
-                guard let t = $0["text"] as? String else { return nil }
-                return Intention(text: t, done: ($0["done"] as? Bool) ?? false)
+                guard
+                    let row = $0.objectValue,
+                    let text = row["text"]?.stringValue
+                else {
+                    return nil
+                }
+                return Intention(
+                    text: text,
+                    done: row["done"]?.boolValue ?? false
+                )
             }
         }
         await MainActor.run {
@@ -114,13 +123,21 @@ struct WeeklyIntentionsCard: View {
     private func persist() {
         guard let rev = revision else { return }
         var np = prefs
-        np["intentions"] = [
-            "week": weekKey,
-            "items": items.map { ["text": $0.text, "done": $0.done] },
-        ]
+        np["intentions"] = .object([
+            "week": .string(weekKey),
+            "items": .array(items.map {
+                .object([
+                    "text": .string($0.text),
+                    "done": .boolean($0.done),
+                ])
+            }),
+        ])
         prefs = np
         Task {
-            if let updated = try? await KairoAPI.shared.updateSettings(patch: ["notificationPrefs": np], revision: rev) {
+            if let updated = try? await KairoAPI.shared.updateSettings(
+                update: .init(notificationPrefs: np),
+                revision: rev
+            ) {
                 await MainActor.run { revision = updated.revision }
             }
         }

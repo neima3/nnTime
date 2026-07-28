@@ -1,288 +1,684 @@
 import Foundation
-
-// MARK: - Kairo REST client (ADR-002/003)
-// Cookie-session auth via Better Auth; every /api/v1 mutation carries
-// If-Match revision. Cookies persist in HTTPCookieStorage across launches.
+import KairoAPIClient
+import OpenAPIRuntime
 
 enum APIError: LocalizedError {
-    case http(Int, String?)
-    case unauthorized
-    case conflict
+    case http(Int, String?, JSONValue?)
+    case unauthorized(String?)
+    case conflict(String?, JSONValue?)
     case network(Error)
     case decoding(Error)
 
     var errorDescription: String? {
         switch self {
-        case .http(let code, let message): message ?? "Request failed (\(code))"
-        case .unauthorized: "Please sign in again."
-        case .conflict: "Someone else changed this — pull to refresh."
-        case .network: "Couldn't reach Kairo — check your connection."
-        case .decoding: "Unexpected response from the server."
+        case let .http(code, message, _):
+            message ?? "Request failed (\(code))"
+        case let .unauthorized(message):
+            message ?? "Please sign in again."
+        case let .conflict(message, _):
+            message ?? "Someone else changed this — pull to refresh."
+        case .network:
+            "Couldn't reach Kairo — check your connection."
+        case .decoding:
+            "Unexpected response from the server."
         }
+    }
+}
+
+enum UUIDv7Generator {
+    static func generate() -> String {
+        var random = [UInt8](repeating: 0, count: 10)
+        for index in random.indices {
+            random[index] = UInt8.random(in: .min ... .max)
+        }
+        return generate(
+            timestampMilliseconds: UInt64(
+                Date().timeIntervalSince1970 * 1_000
+            ),
+            randomBytes: random
+        )
+    }
+
+    static func generate(
+        timestampMilliseconds: UInt64,
+        randomBytes: [UInt8]
+    ) -> String {
+        precondition(randomBytes.count >= 10)
+        let timestamp = timestampMilliseconds & 0x0000_FFFF_FFFF_FFFF
+        var bytes = [UInt8](repeating: 0, count: 16)
+        bytes[0] = UInt8((timestamp >> 40) & 0xff)
+        bytes[1] = UInt8((timestamp >> 32) & 0xff)
+        bytes[2] = UInt8((timestamp >> 24) & 0xff)
+        bytes[3] = UInt8((timestamp >> 16) & 0xff)
+        bytes[4] = UInt8((timestamp >> 8) & 0xff)
+        bytes[5] = UInt8(timestamp & 0xff)
+        bytes[6] = 0x70 | (randomBytes[0] & 0x0f)
+        bytes[7] = randomBytes[1]
+        bytes[8] = 0x80 | (randomBytes[2] & 0x3f)
+        for index in 9 ..< 16 {
+            bytes[index] = randomBytes[index - 6]
+        }
+        let hex = bytes.map { String(format: "%02x", $0) }.joined()
+        return [
+            String(hex.prefix(8)),
+            String(hex.dropFirst(8).prefix(4)),
+            String(hex.dropFirst(12).prefix(4)),
+            String(hex.dropFirst(16).prefix(4)),
+            String(hex.dropFirst(20).prefix(12)),
+        ].joined(separator: "-")
     }
 }
 
 actor KairoAPI {
     static let shared = KairoAPI()
 
-    /// Live by default; override with KAIRO_BASE_URL for local dev
-    /// (simulator can hit http://127.0.0.1:3456 when ATS-exempted).
-    nonisolated let baseURL: URL = {
+    nonisolated let baseURL: URL
+    private let authSession: URLSession
+    private let planner: KairoAPIClient.Client
+    private let idempotencyKeyProvider: @Sendable () -> String
+
+    init(
+        baseURL: URL = KairoAPI.defaultBaseURL(),
+        session: URLSession = KairoClient.makeSharedCookieSession(),
+        timezoneIdentifierProvider: @escaping @Sendable () -> String = {
+            TimeZone.current.identifier
+        },
+        idempotencyKeyProvider: @escaping @Sendable () -> String = {
+            UUIDv7Generator.generate()
+        }
+    ) {
+        self.baseURL = baseURL
+        authSession = session
+        planner = KairoClient(
+            baseURL: Self.plannerServerURL(baseURL),
+            session: session,
+            middlewares: [
+                TimezoneMiddleware(
+                    timezoneIdentifierProvider:
+                        timezoneIdentifierProvider
+                ),
+            ]
+        ).client
+        self.idempotencyKeyProvider = idempotencyKeyProvider
+    }
+
+    init(
+        baseURL: URL,
+        plannerTransport: any ClientTransport,
+        session: URLSession = KairoClient.makeSharedCookieSession(),
+        timezoneIdentifierProvider: @escaping @Sendable () -> String,
+        idempotencyKeyProvider: @escaping @Sendable () -> String
+    ) {
+        self.baseURL = baseURL
+        authSession = session
+        planner = KairoClient(
+            baseURL: Self.plannerServerURL(baseURL),
+            transport: plannerTransport,
+            middlewares: [
+                TimezoneMiddleware(
+                    timezoneIdentifierProvider:
+                        timezoneIdentifierProvider
+                ),
+            ]
+        ).client
+        self.idempotencyKeyProvider = idempotencyKeyProvider
+    }
+
+    private static func defaultBaseURL() -> URL {
         if let raw = ProcessInfo.processInfo.environment["KAIRO_BASE_URL"],
-           let url = URL(string: raw) {
+           let url = URL(string: raw)
+        {
             return url
         }
         return URL(string: "https://time.neima.me")!
-    }()
+    }
 
-    private let session: URLSession = {
-        let config = URLSessionConfiguration.default
-        config.httpCookieStorage = .shared
-        config.httpShouldSetCookies = true
-        config.timeoutIntervalForRequest = 20
-        return URLSession(configuration: config)
-    }()
+    private static func plannerServerURL(_ baseURL: URL) -> URL {
+        baseURL
+            .appending(path: "api")
+            .appending(path: "v1")
+    }
 
-    private let decoder: JSONDecoder = {
-        let d = JSONDecoder()
-        d.dateDecodingStrategy = .custom { decoder in
-            let s = try decoder.singleValueContainer().decode(String.self)
-            let iso = ISO8601DateFormatter()
-            iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            if let date = iso.date(from: s) { return date }
-            iso.formatOptions = [.withInternetDateTime]
-            if let date = iso.date(from: s) { return date }
-            // date-only (YYYY-MM-DD)
-            let df = DateFormatter()
-            df.dateFormat = "yyyy-MM-dd"
-            df.timeZone = TimeZone(identifier: "UTC")
-            if let date = df.date(from: s) { return date }
-            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Bad date: \(s)"))
-        }
-        return d
-    }()
+    // MARK: Better Auth
 
-    // MARK: Core request
+    private enum AuthEndpoint {
+        case signIn
+        case signUp
+        case signOut
 
-    @discardableResult
-    private func request<T: Decodable>(
-        _ method: String,
-        _ path: String,
-        query: [URLQueryItem] = [],
-        body: [String: Any?]? = nil,
-        ifMatch: Int? = nil,
-        as type: T.Type
-    ) async throws -> T {
-        var components = URLComponents(url: baseURL.appending(path: path), resolvingAgainstBaseURL: false)!
-        if !query.isEmpty { components.queryItems = query }
-        var req = URLRequest(url: components.url!)
-        req.httpMethod = method
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue(TimeZone.current.identifier, forHTTPHeaderField: "x-timezone")
-        if let ifMatch { req.setValue(String(ifMatch), forHTTPHeaderField: "If-Match") }
-        if let body {
-            let clean = body.compactMapValues { $0 }
-            req.httpBody = try JSONSerialization.data(withJSONObject: clean)
-        }
-
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await session.data(for: req)
-        } catch {
-            throw APIError.network(error)
-        }
-        guard let http = response as? HTTPURLResponse else { throw APIError.http(0, nil) }
-        switch http.statusCode {
-        case 200...299: break
-        case 401: throw APIError.unauthorized
-        case 409: throw APIError.conflict
-        default:
-            let message = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])
-                .flatMap { $0["error"] as? [String: Any] }
-                .flatMap { $0["message"] as? String }
-            throw APIError.http(http.statusCode, message)
-        }
-        if T.self == EmptyResponse.self { return EmptyResponse() as! T }
-        do {
-            return try decoder.decode(T.self, from: data)
-        } catch {
-            throw APIError.decoding(error)
+        var pathComponents: [String] {
+            switch self {
+            case .signIn: ["api", "auth", "sign-in", "email"]
+            case .signUp: ["api", "auth", "sign-up", "email"]
+            case .signOut: ["api", "auth", "sign-out"]
+            }
         }
     }
 
-    // MARK: Auth (Better Auth)
+    @discardableResult
+    private func authRequest<T: Decodable>(
+        _ endpoint: AuthEndpoint,
+        body: [String: String],
+        as type: T.Type
+    ) async throws -> T {
+        let url = endpoint.pathComponents.reduce(baseURL) {
+            $0.appending(path: $1)
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(
+            "application/json",
+            forHTTPHeaderField: "Content-Type"
+        )
+        request.httpBody = try JSONEncoder().encode(body)
+
+        do {
+            let (data, response) = try await authSession.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                throw APIError.http(0, nil, nil)
+            }
+            switch http.statusCode {
+            case 200 ... 299:
+                break
+            case 401:
+                throw APIError.unauthorized(nil)
+            default:
+                throw APIError.http(
+                    http.statusCode,
+                    Self.authErrorMessage(data),
+                    nil
+                )
+            }
+            if T.self == EmptyResponse.self {
+                return EmptyResponse() as! T
+            }
+            do {
+                return try JSONDecoder().decode(T.self, from: data)
+            } catch {
+                throw APIError.decoding(error)
+            }
+        } catch let error as APIError {
+            throw error
+        } catch {
+            if Self.isCancellation(error) {
+                throw CancellationError()
+            }
+            throw APIError.network(error)
+        }
+    }
+
+    private static func authErrorMessage(_ data: Data) -> String? {
+        (try? JSONSerialization.jsonObject(with: data) as? [String: Any])
+            .flatMap { $0["error"] as? [String: Any] }
+            .flatMap { $0["message"] as? String }
+    }
 
     func signIn(email: String, password: String) async throws {
-        _ = try await request("POST", "/api/auth/sign-in/email",
-                              body: ["email": email, "password": password],
-                              as: AuthResponse.self)
+        _ = try await authRequest(
+            .signIn,
+            body: ["email": email, "password": password],
+            as: AuthResponse.self
+        )
     }
 
     func signUp(name: String, email: String, password: String) async throws {
-        _ = try await request("POST", "/api/auth/sign-up/email",
-                              body: ["name": name.isEmpty ? "Planner" : name, "email": email, "password": password],
-                              as: AuthResponse.self)
+        _ = try await authRequest(
+            .signUp,
+            body: [
+                "name": name.isEmpty ? "Planner" : name,
+                "email": email,
+                "password": password,
+            ],
+            as: AuthResponse.self
+        )
     }
 
     func signOut() async {
-        _ = try? await request("POST", "/api/auth/sign-out", body: [:], as: EmptyResponse.self)
-        // Belt and braces: drop cookies locally too.
-        for cookie in HTTPCookieStorage.shared.cookies ?? [] {
-            HTTPCookieStorage.shared.deleteCookie(cookie)
+        _ = try? await authRequest(
+            .signOut,
+            body: [:],
+            as: EmptyResponse.self
+        )
+        let cookieStorage =
+            authSession.configuration.httpCookieStorage ?? .shared
+        for cookie in cookieStorage.cookies ?? [] {
+            cookieStorage.deleteCookie(cookie)
         }
     }
 
-    /// Settings fetch doubles as the session probe (and seeds timezone).
+    // MARK: Settings and categories
+
     func settings() async throws -> UserSettings {
-        try await request("GET", "/api/v1/settings", as: UserSettings.self)
-    }
-
-    func updateSettings(patch: [String: Any?], revision: Int) async throws -> UserSettings {
-        try await request("PATCH", "/api/v1/settings", body: patch, ifMatch: revision, as: UserSettings.self)
-    }
-
-    /// Raw settings JSON (for the flexible notificationPrefs blob), fetched
-    /// through the cookie session so auth works.
-    func settingsRaw() async throws -> [String: Any] {
-        var req = URLRequest(url: baseURL.appending(path: "/api/v1/settings"))
-        req.setValue(TimeZone.current.identifier, forHTTPHeaderField: "x-timezone")
-        let (data, response) = try await session.data(for: req)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw APIError.http((response as? HTTPURLResponse)?.statusCode ?? 0, nil)
+        try await plannerCall {
+            try GeneratedAPIAdapters.settings(
+                await planner.getUserSettings()
+            )
         }
-        return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
     }
 
-    // MARK: Day + activities
+    func updateSettings(
+        update: SettingsUpdate,
+        revision: Int
+    ) async throws -> UserSettings {
+        let key = idempotencyKeyProvider()
+        return try await plannerCall {
+            let output = try await planner.updateUserSettings(
+                headers: .init(
+                    Idempotency_hyphen_Key: key,
+                    If_hyphen_Match: String(revision)
+                ),
+                body: .json(
+                    try GeneratedAPIAdapters.settingsUpdate(update)
+                )
+            )
+            return try GeneratedAPIAdapters.updatedSettings(output)
+        }
+    }
+
+    func categories() async throws -> [PlannerCategory] {
+        try await plannerCall {
+            try GeneratedAPIAdapters.categories(
+                await planner.listCategories()
+            )
+        }
+    }
+
+    // MARK: Day and activities
 
     func day(_ date: String) async throws -> DayResponse {
-        try await request("GET", "/api/v1/day/\(date)", as: DayResponse.self)
+        try await plannerCall {
+            try GeneratedAPIAdapters.day(
+                await planner.getDay(path: .init(date: date))
+            )
+        }
     }
 
     func createActivity(
-        tz: String, dtstartLocal: String, title: String, emoji: String,
-        durationMin: Int, rrule: String?, categoryId: String?,
-        checklist: [[String: Any]]? = nil
+        tz: String,
+        dtstartLocal: String,
+        title: String,
+        emoji: String,
+        durationMin: Int,
+        rrule: String?,
+        categoryId: String?,
+        checklist: [ChecklistUpdateItem]? = nil
     ) async throws -> Activity {
-        try await request("POST", "/api/v1/activities", body: [
-            "tz": tz, "dtstartLocal": dtstartLocal, "title": title,
-            "emoji": emoji, "durationMin": durationMin, "rrule": rrule,
-            "categoryId": categoryId, "source": "manual",
-            "checklistTemplate": checklist,
-        ], as: Activity.self)
+        let key = idempotencyKeyProvider()
+        return try await plannerCall {
+            let checklist = try checklist?.map {
+                Components.Schemas.ActivitySeriesCreateRequest
+                    .checklistTemplatePayloadPayload(
+                        additionalProperties:
+                            try GeneratedAPIAdapters.checklistObject($0)
+                    )
+            }
+            let output = try await planner.createActivitySeries(
+                headers: .init(Idempotency_hyphen_Key: key),
+                body: .json(.init(
+                    tz: tz,
+                    dtstartLocal: try Self.date(dtstartLocal),
+                    rrule: rrule,
+                    title: title,
+                    emoji: emoji,
+                    categoryId: categoryId,
+                    durationMin: try Self.int32(durationMin),
+                    checklistTemplate: checklist,
+                    source: .manual
+                ))
+            )
+            return try GeneratedAPIAdapters.activity(output)
+        }
     }
 
     func setStatus(
-        activityId: String, revision: Int, occurrenceKey: String?,
-        status: String, completedAt: String?
+        activityId: String,
+        revision: Int,
+        occurrenceKey: String?,
+        status: ActivityStatus,
+        completedAt: String?
     ) async throws -> Activity {
-        try await request("PATCH", "/api/v1/activities/\(activityId)", body: [
-            "editScope": "this", "occurrenceKey": occurrenceKey,
-            "status": status, "completedAt": completedAt,
-        ], ifMatch: revision, as: Activity.self)
+        try await updateActivity(
+            activityId: activityId,
+            revision: revision,
+            update: .init(
+                editScope: .this,
+                occurrenceKey: try occurrenceKey.map(Self.date),
+                status: status,
+                completedAt: try completedAt.map {
+                    .value(try Self.date($0))
+                } ?? .null
+            )
+        )
     }
 
     func updateActivity(
-        activityId: String, revision: Int, patch: [String: Any?]
+        activityId: String,
+        revision: Int,
+        update: ActivityUpdate
     ) async throws -> Activity {
-        var body = patch
-        body["editScope"] = "all"
-        return try await request("PATCH", "/api/v1/activities/\(activityId)", body: body, ifMatch: revision, as: Activity.self)
+        let key = idempotencyKeyProvider()
+        var update = update
+        if update.editScope == nil {
+            update.editScope = .all
+        }
+        return try await plannerCall {
+            let output = try await planner.updateActivitySeries(
+                path: .init(id: activityId),
+                query: .init(
+                    editScope: update.editScope.map {
+                        switch $0 {
+                        case .this: .this
+                        case .thisAndFuture: .this_and_future
+                        case .all: .all
+                        }
+                    }
+                ),
+                headers: .init(
+                    Idempotency_hyphen_Key: key,
+                    If_hyphen_Match: String(revision)
+                ),
+                body: .json(
+                    try GeneratedAPIAdapters.activityUpdate(update)
+                )
+            )
+            return try GeneratedAPIAdapters.updatedActivity(output)
+        }
     }
 
-    /// Move one occurrence to a new start instant (15-min snapped upstream).
     func moveActivity(
-        activityId: String, revision: Int, occurrenceKey: String?, startAt: String
+        activityId: String,
+        revision: Int,
+        occurrenceKey: String?,
+        startAt: String
     ) async throws -> Activity {
-        try await request("PATCH", "/api/v1/activities/\(activityId)", body: [
-            "editScope": "this", "occurrenceKey": occurrenceKey, "startAt": startAt,
-        ], ifMatch: revision, as: Activity.self)
+        try await updateActivity(
+            activityId: activityId,
+            revision: revision,
+            update: .init(
+                editScope: .this,
+                occurrenceKey: try occurrenceKey.map(Self.date),
+                startAt: try Self.date(startAt)
+            )
+        )
     }
 
-    /// Persist a checklist state for one occurrence.
     func setChecklist(
-        activityId: String, revision: Int, occurrenceKey: String?,
-        checklist: [[String: Any]]
+        activityId: String,
+        revision: Int,
+        occurrenceKey: String?,
+        checklist: [ChecklistUpdateItem]
     ) async throws -> Activity {
-        try await request("PATCH", "/api/v1/activities/\(activityId)", body: [
-            "editScope": "this", "occurrenceKey": occurrenceKey,
-            "checklistOverride": checklist,
-        ], ifMatch: revision, as: Activity.self)
+        try await updateActivity(
+            activityId: activityId,
+            revision: revision,
+            update: .init(
+                editScope: .this,
+                occurrenceKey: try occurrenceKey.map(Self.date),
+                checklistOverride: .value(checklist)
+            )
+        )
     }
 
-    func deleteActivity(activityId: String, revision: Int) async throws {
-        _ = try await request("DELETE", "/api/v1/activities/\(activityId)",
-                              ifMatch: revision, as: EmptyResponse.self)
+    func deleteActivity(
+        activityId: String,
+        revision: Int
+    ) async throws {
+        let key = idempotencyKeyProvider()
+        try await plannerCall {
+            try GeneratedAPIAdapters.empty(
+                await planner.deleteActivitySeries(
+                    path: .init(id: activityId),
+                    query: .init(editScope: .all),
+                    headers: .init(
+                        Idempotency_hyphen_Key: key,
+                        If_hyphen_Match: String(revision)
+                    )
+                )
+            )
+        }
     }
 
-    // MARK: Tasks (inbox / anytime)
+    // MARK: Tasks
 
     func tasks(bucket: String?) async throws -> [TaskItem] {
-        var query: [URLQueryItem] = []
-        if let bucket { query.append(URLQueryItem(name: "bucket", value: bucket)) }
-        let page: Page<TaskItem> = try await request("GET", "/api/v1/tasks", query: query, as: Page<TaskItem>.self)
-        return page.items
+        try await plannerCall {
+            try GeneratedAPIAdapters.tasks(
+                await planner.listTasks(
+                    query: .init(bucket: try bucket.map(Self.taskBucket))
+                )
+            )
+        }
     }
 
     func createTask(title: String, bucket: String) async throws -> TaskItem {
-        try await request("POST", "/api/v1/tasks",
-                          body: ["title": title, "bucket": bucket],
-                          as: TaskItem.self)
+        let key = idempotencyKeyProvider()
+        return try await plannerCall {
+            let output = try await planner.createTask(
+                headers: .init(Idempotency_hyphen_Key: key),
+                body: .json(.init(
+                    bucket: try Self.taskBucket(bucket),
+                    title: title
+                ))
+            )
+            return try GeneratedAPIAdapters.task(output)
+        }
     }
 
     func deleteTask(id: String, revision: Int) async throws {
-        _ = try await request("DELETE", "/api/v1/tasks/\(id)", ifMatch: revision, as: EmptyResponse.self)
+        let key = idempotencyKeyProvider()
+        try await plannerCall {
+            try GeneratedAPIAdapters.empty(
+                await planner.deleteTask(
+                    path: .init(id: id),
+                    headers: .init(
+                        Idempotency_hyphen_Key: key,
+                        If_hyphen_Match: String(revision)
+                    )
+                )
+            )
+        }
     }
 
-    // MARK: Search (H3)
+    // MARK: Search, stats, and mood
 
-    /// Planner search across activity series + tasks. Matching/ranking is done
-    /// server-side by `src/lib/search.ts`, so results match the web exactly.
-    func search(_ query: String, limit: Int = 25) async throws -> SearchResponse {
-        try await request(
-            "GET", "/api/v1/search",
-            query: [
-                URLQueryItem(name: "q", value: query),
-                URLQueryItem(name: "limit", value: String(limit)),
-            ],
-            as: SearchResponse.self)
+    func search(_ query: String, limit: Int = 25) async throws
+        -> SearchResponse
+    {
+        try await plannerCall {
+            try GeneratedAPIAdapters.search(
+                await planner.search(query: .init(q: query, limit: limit))
+            )
+        }
     }
-
-    // MARK: Stats
 
     func stats() async throws -> StatsResponse {
-        try await request("GET", "/api/v1/stats", as: StatsResponse.self)
+        try await plannerCall {
+            try GeneratedAPIAdapters.stats(await planner.getStats())
+        }
     }
 
-    // MARK: Mood
-
     func postMood(_ mood: String) async throws {
-        _ = try await request("POST", "/api/v1/mood", body: ["mood": mood], as: EmptyResponse.self)
+        let key = idempotencyKeyProvider()
+        try await plannerCall {
+            try GeneratedAPIAdapters.empty(
+                await planner.createMoodCheckin(
+                    headers: .init(Idempotency_hyphen_Key: key),
+                    body: .json(.init(mood: try Self.mood(mood)))
+                )
+            )
+        }
     }
 
     // MARK: Routines
 
     func routines() async throws -> [Routine] {
-        let page: Page<Routine> = try await request("GET", "/api/v1/routines", as: Page<Routine>.self)
-        return page.items
+        try await plannerCall {
+            try GeneratedAPIAdapters.routines(await planner.listRoutines())
+        }
     }
 
-    // MARK: Focus sessions (ADR-004, server-authoritative)
+    // MARK: Focus sessions
 
     func activeFocus() async throws -> FocusSnapshot {
-        try await request("GET", "/api/v1/focus-sessions", as: FocusSnapshot.self)
+        try await plannerCall {
+            try GeneratedAPIAdapters.focus(
+                await planner.getActiveFocusSession()
+            )
+        }
     }
 
-    func startFocus(minutes: Int, title: String, emoji: String) async throws -> FocusSnapshot {
-        try await request("POST", "/api/v1/focus-sessions", body: [
-            "targetDurationMin": minutes, "title": title, "emoji": emoji,
-        ], as: FocusSnapshot.self)
+    func startFocus(
+        minutes: Int,
+        title: String,
+        emoji: String
+    ) async throws -> FocusSnapshot {
+        let key = idempotencyKeyProvider()
+        return try await plannerCall {
+            try GeneratedAPIAdapters.startedFocus(
+                await planner.startFocusSession(
+                    headers: .init(Idempotency_hyphen_Key: key),
+                    body: .json(.init(
+                        targetDurationMin: minutes,
+                        title: title,
+                        emoji: emoji
+                    ))
+                )
+            )
+        }
     }
 
-    func focusAction(id: String, body: [String: Any?]) async throws -> FocusSnapshot {
-        try await request("PATCH", "/api/v1/focus-sessions/\(id)", body: body, as: FocusSnapshot.self)
+    func focusAction(
+        id: String,
+        revision: Int,
+        command: FocusCommand
+    ) async throws -> FocusSnapshot {
+        let key = idempotencyKeyProvider()
+        return try await plannerCall {
+            try GeneratedAPIAdapters.updatedFocus(
+                await planner.updateFocusSession(
+                    path: .init(id: id),
+                    headers: .init(
+                        Idempotency_hyphen_Key: key,
+                        If_hyphen_Match: String(revision)
+                    ),
+                    body: .json(
+                        try GeneratedAPIAdapters.focusCommand(command)
+                    )
+                )
+            )
+        }
+    }
+
+    // MARK: Boundary helpers
+
+    private func plannerCall<T>(
+        _ operation: () async throws -> T
+    ) async throws -> T {
+        do {
+            return try await operation()
+        } catch let error as GeneratedAPIAdapterError {
+            throw Self.apiError(error)
+        } catch let error as APIError {
+            throw error
+        } catch let error as DecodingError {
+            throw APIError.decoding(error)
+        } catch {
+            if Self.isCancellation(error) {
+                throw CancellationError()
+            }
+            throw APIError.network(error)
+        }
+    }
+
+    private static func isCancellation(_ error: Error) -> Bool {
+        if error is CancellationError {
+            return true
+        }
+        if let urlError = error as? URLError,
+           urlError.code == .cancelled
+        {
+            return true
+        }
+        if let clientError = error as? ClientError {
+            return isCancellation(clientError.underlyingError)
+        }
+        return false
+    }
+
+    private static func apiError(
+        _ error: GeneratedAPIAdapterError
+    ) -> APIError {
+        switch error {
+        case let .http(_, statusCode, error):
+            .http(statusCode, error.message, error.details)
+        case let .unauthorized(_, _, error):
+            .unauthorized(error.message)
+        case let .conflict(_, _, error):
+            .conflict(error.message, error.details)
+        case let .notFound(_, statusCode, error):
+            .http(statusCode, error.message, error.details)
+        case let .undocumented(_, statusCode):
+            .http(statusCode, nil, nil)
+        case let .malformedValue(path):
+            .decoding(
+                DecodingError.dataCorrupted(.init(
+                    codingPath: [],
+                    debugDescription: "Malformed generated value at \(path)"
+                ))
+            )
+        }
+    }
+
+    private static func date(_ value: String) throws -> Date {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [
+            .withInternetDateTime,
+            .withFractionalSeconds,
+        ]
+        if let date = formatter.date(from: value) {
+            return date
+        }
+        formatter.formatOptions = [.withInternetDateTime]
+        if let date = formatter.date(from: value) {
+            return date
+        }
+        throw GeneratedAPIAdapterError.malformedValue(path: "date")
+    }
+
+    private static func int32(_ value: Int) throws -> Int32 {
+        guard let result = Int32(exactly: value) else {
+            throw GeneratedAPIAdapterError.malformedValue(path: "Int32")
+        }
+        return result
+    }
+
+    private static func taskBucket(
+        _ value: String
+    ) throws -> Components.Schemas.TaskBucket {
+        guard let bucket = Components.Schemas.TaskBucket(rawValue: value)
+        else {
+            throw GeneratedAPIAdapterError.malformedValue(
+                path: "Task.bucket"
+            )
+        }
+        return bucket
+    }
+
+    private static func mood(
+        _ value: String
+    ) throws -> Components.Schemas.MoodCheckinRequest.moodPayload {
+        guard
+            let mood = Components.Schemas.MoodCheckinRequest
+                .moodPayload(rawValue: value)
+        else {
+            throw GeneratedAPIAdapterError.malformedValue(
+                path: "MoodCheckin.mood"
+            )
+        }
+        return mood
     }
 }
 
-struct EmptyResponse: Decodable { init() {} }
+struct EmptyResponse: Decodable {
+    init() {}
+}

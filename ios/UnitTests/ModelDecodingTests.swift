@@ -1,14 +1,12 @@
 import XCTest
 @testable import Kairo
 
-/// Golden-fixture tests for the wire-model JSON decoding + the custom
-/// date-decoding strategy used by `KairoAPI` (App/API/KairoAPI.swift).
+/// Golden-fixture tests for presentation-model JSON compatibility and the
+/// legacy date fixtures used by app-only helpers.
 ///
 /// No network involved — every fixture below is an inline JSON string.
-/// `makeDecoder()` mirrors the private `decoder` property inside `KairoAPI`
-/// field-for-field: fractional ISO8601 → plain ISO8601 → date-only
-/// (YYYY-MM-DD, UTC) → throw. If that closure ever changes, update it here
-/// too so these tests stay honest about what's actually shipped.
+/// The generated planner transport owns shipping response decoding; these
+/// fixtures keep presentation-model Codable compatibility explicit.
 final class ModelDecodingTests: XCTestCase {
 
     // MARK: - Decoder under test
@@ -213,7 +211,8 @@ final class ModelDecodingTests: XCTestCase {
         {
           "session": {
             "id": "focus_1", "state": "running",
-            "targetDurationMin": 25, "startedAt": "2026-07-19T13:30:00.000Z"
+            "targetDurationMin": 25, "startedAt": "2026-07-19T13:30:00.000Z",
+            "revision": 4
           },
           "remainingSec": 900
         }
@@ -222,6 +221,7 @@ final class ModelDecodingTests: XCTestCase {
         XCTAssertEqual(snap.session?.id, "focus_1")
         XCTAssertEqual(snap.session?.state, "running")
         XCTAssertEqual(snap.session?.targetDurationMin, 25)
+        XCTAssertEqual(snap.session?.revision, 4)
         XCTAssertEqual(snap.session?.startedAt, utcDate(2026, 7, 19, 13, 30, 0))
         XCTAssertEqual(snap.remainingSec, 900)
     }

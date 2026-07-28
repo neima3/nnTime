@@ -116,7 +116,9 @@ struct TemplatesView: View {
         applying = t.id
         let today = KTime.dateString(Date(), zone: app.timezone)
         let dtstart = KTime.instant(date: today, minutes: 9 * 60, zone: app.timezone)
-        let checklist = t.steps.map { ["label": $0, "done": false] as [String: Any] }
+        let checklist = t.steps.map {
+            ChecklistUpdateItem(label: $0, done: false)
+        }
         do {
             _ = try await KairoAPI.shared.createActivity(
                 tz: app.timezone.identifier, dtstartLocal: dtstart,

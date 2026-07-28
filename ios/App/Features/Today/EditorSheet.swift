@@ -300,7 +300,9 @@ struct EditorSheet: View {
                 activityId: editing.id,
                 revision: stepsRevision ?? editing.revision,
                 occurrenceKey: editing.occurrenceKey,
-                checklist: steps.map { ["label": $0.label, "done": $0.done] }
+                checklist: steps.map {
+                    .init(label: $0.label, done: $0.done)
+                }
             )
             stepsRevision = updated.revision
         } catch {
@@ -333,14 +335,20 @@ struct EditorSheet: View {
                 _ = try await KairoAPI.shared.updateActivity(
                     activityId: editing.id,
                     revision: editing.revision,
-                    patch: [
-                        "title": title.trimmingCharacters(in: .whitespaces),
-                        "emoji": emoji,
-                        "categoryId": categoryId,
-                        "durationMin": durationMin,
-                        "dtstartLocal": KTime.instant(date: date, minutes: startMin, zone: app.timezone),
-                        "tz": app.timezone.identifier,
-                    ]
+                    update: .init(
+                        tz: app.timezone.identifier,
+                        dtstartLocal: KTime.instantDate(
+                            date: date,
+                            minutes: startMin,
+                            zone: app.timezone
+                        ),
+                        title: title.trimmingCharacters(in: .whitespaces),
+                        emoji: .value(emoji),
+                        categoryId: categoryId.map {
+                            .value($0)
+                        } ?? .null,
+                        durationMin: durationMin
+                    )
                 )
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
                 dismiss()
@@ -355,7 +363,9 @@ struct EditorSheet: View {
                 durationMin: durationMin,
                 rrule: repeats.rrule,
                 categoryId: categoryId,
-                checklist: steps.isEmpty ? nil : steps.map { ["label": $0.label, "done": false] }
+                checklist: steps.isEmpty ? nil : steps.map {
+                    .init(label: $0.label, done: false)
+                }
             )
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             onCreated?()

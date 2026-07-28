@@ -93,12 +93,23 @@ struct SettingsView: View {
                                 // label re-renders in the new format immediately.
                                 KairoPrefs.hourCycle = v
                                 app.a11yGeneration += 1
-                                Task { await saveSettings(["hourCycle": v]) }
+                                Task {
+                                    await saveSettings(.init(
+                                        hourCycle:
+                                            HourCyclePreference(rawValue: v)
+                                    ))
+                                }
                             }
                             segmented(title: "Week starts", options: [("0", "Sunday"), ("1", "Monday")],
                                       selected: String(weekStart)) { v in
                                 weekStart = Int(v) ?? 0
-                                Task { await saveSettings(["weekStart": Int(v) ?? 0]) }
+                                Task {
+                                    await saveSettings(.init(
+                                        weekStart: WeekStart(
+                                            rawValue: Int(v) ?? 0
+                                        )
+                                    ))
+                                }
                             }
                         }
                         .padding(16)
@@ -320,9 +331,12 @@ struct SettingsView: View {
         }
     }
 
-    private func saveSettings(_ patch: [String: Any?]) async {
+    private func saveSettings(_ update: SettingsUpdate) async {
         guard let rev = settingsRevision else { return }
-        if let updated = try? await KairoAPI.shared.updateSettings(patch: patch, revision: rev) {
+        if let updated = try? await KairoAPI.shared.updateSettings(
+            update: update,
+            revision: rev
+        ) {
             await MainActor.run { settingsRevision = updated.revision }
         }
     }

@@ -20,6 +20,14 @@ struct UserSettings: Decodable {
     let revision: Int
 }
 
+struct PlannerCategory: Identifiable, Equatable, Sendable {
+    let id: String
+    let key: String
+    let label: String
+    let sortOrder: Int
+    let revision: Int
+}
+
 struct DayResponse: Decodable {
     let date: String
     let zone: String
@@ -59,7 +67,7 @@ struct TaskItem: Decodable, Identifiable {
     let createdAt: Date?
 }
 
-/// GET /api/v1/search (H3). One row per matched activity series or task.
+/// Planner search response (H3). One row per activity series or task.
 struct SearchResponse: Decodable {
     let query: String
     /// Today in the user's planning zone — the client labels dates against this.
@@ -150,6 +158,7 @@ struct FocusSession: Decodable, Identifiable {
     let state: String
     let targetDurationMin: Int
     let startedAt: Date?
+    let revision: Int
 }
 
 // MARK: - Typed mutation models
@@ -202,6 +211,46 @@ indirect enum JSONValue:
         case let .array(value): try container.encode(value)
         case .null: try container.encodeNil()
         }
+    }
+}
+
+extension JSONValue {
+    var objectValue: NotificationPreferences? {
+        guard case let .object(value) = self else { return nil }
+        return value
+    }
+
+    var arrayValue: [JSONValue]? {
+        guard case let .array(value) = self else { return nil }
+        return value
+    }
+
+    var stringValue: String? {
+        guard case let .string(value) = self else { return nil }
+        return value
+    }
+
+    var boolValue: Bool? {
+        guard case let .boolean(value) = self else { return nil }
+        return value
+    }
+
+    var foundationValue: Any {
+        switch self {
+        case let .string(value): value
+        case let .integer(value): value
+        case let .number(value): value
+        case let .boolean(value): value
+        case let .object(value): value.mapValues(\.foundationValue)
+        case let .array(value): value.map(\.foundationValue)
+        case .null: NSNull()
+        }
+    }
+}
+
+extension Dictionary where Key == String, Value == JSONValue {
+    var foundationObject: [String: Any] {
+        mapValues(\.foundationValue)
     }
 }
 
@@ -493,13 +542,30 @@ enum KTime {
 
     /// Local wall-clock minutes on a date in a zone → UTC ISO instant.
     static func instant(date: String, minutes: Int, zone: TimeZone) -> String {
+        let instant = instantDate(
+            date: date,
+            minutes: minutes,
+            zone: zone
+        )
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return iso.string(from: instant)
+    }
+
+    static func instantDate(
+        date: String,
+        minutes: Int,
+        zone: TimeZone
+    ) -> Date {
         let df = DateFormatter()
         df.dateFormat = "yyyy-MM-dd HH:mm"
         df.timeZone = zone
-        let d = df.date(from: "\(date) \(String(format: "%02d:%02d", minutes / 60, minutes % 60))") ?? Date()
-        let iso = ISO8601DateFormatter()
-        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return iso.string(from: d)
+        let time = String(
+            format: "%02d:%02d",
+            minutes / 60,
+            minutes % 60
+        )
+        return df.date(from: "\(date) \(time)") ?? Date()
     }
 
     static func nowMinutes(in zone: TimeZone) -> Int {

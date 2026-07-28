@@ -482,7 +482,7 @@ struct TodayView: View {
                 activityId: block.id,
                 revision: block.revision,
                 occurrenceKey: block.occurrenceKey,
-                status: newDone ? "completed" : "pending",
+                status: newDone ? .completed : .pending,
                 completedAt: newDone ? ISO8601DateFormatter().string(from: Date()) : nil
             )
             await load()

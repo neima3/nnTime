@@ -98,13 +98,23 @@ final class AppState {
     /// server's current blob so keys this app doesn't model are preserved.
     func pushSharedPrefs() async {
         do {
-            let raw = try await KairoAPI.shared.settingsRaw()
-            let existing = raw["notificationPrefs"] as? [String: Any] ?? [:]
-            let revision = raw["revision"] as? Int ?? 1
-            let merged = KairoPrefs.sharedPrefsPatch(merging: existing)
+            let settings = try await KairoAPI.shared.settings()
+            var merged = settings.notificationPrefs ?? [:]
+            merged["highContrast"] = .boolean(KairoPrefs.highContrast)
+            merged["dyslexiaFont"] = .boolean(KairoPrefs.dyslexiaFont)
+            merged["largerText"] = .boolean(KairoPrefs.largerText)
+            merged["quietHours"] = .object([
+                "enabled": .boolean(KairoPrefs.quietHoursEnabled),
+                "start": .integer(KairoPrefs.quietStartHour),
+                "end": .integer(KairoPrefs.quietEndHour),
+            ])
             _ = try await KairoAPI.shared.updateSettings(
-                patch: ["notificationPrefs": merged, "reducedStimulation": reducedStimulation],
-                revision: revision)
+                update: .init(
+                    reducedStimulation: reducedStimulation,
+                    notificationPrefs: merged
+                ),
+                revision: settings.revision
+            )
         } catch {
             // Offline or a revision conflict — the local cache still holds, and
             // the next successful settings read reconciles.
@@ -141,13 +151,16 @@ final class AppState {
     /// Pull the account's shared prefs (accessibility modes + quiet hours) and
     /// adopt them — this is what makes a change made on the web show up here.
     func adoptSharedPrefs() async {
-        guard let raw = try? await KairoAPI.shared.settingsRaw() else { return }
-        let prefs = raw["notificationPrefs"] as? [String: Any] ?? [:]
-        let reduced = raw["reducedStimulation"] as? Bool ?? reducedStimulation
+        guard let settings = try? await KairoAPI.shared.settings() else {
+            return
+        }
+        let prefs = settings.notificationPrefs ?? [:]
         KairoPrefs.adopt(
-            notificationPrefs: prefs,
-            reducedStimulation: reduced,
-            hourCycle: raw["hourCycle"] as? String)
+            notificationPrefs: prefs.foundationObject,
+            reducedStimulation:
+                settings.reducedStimulation ?? reducedStimulation,
+            hourCycle: settings.hourCycle
+        )
         highContrast = KairoPrefs.highContrast
         dyslexiaFont = KairoPrefs.dyslexiaFont
         largerText = KairoPrefs.largerText
@@ -157,19 +170,15 @@ final class AppState {
     }
 
     func loadCategories() async {
-        struct Category: Decodable { let id: String; let key: String }
-        struct CategoryPage: Decodable { let items: [Category] }
-        // Lightweight direct fetch; failures just mean default colors.
         do {
-            var req = URLRequest(url: KairoAPI.shared.baseURL.appending(path: "/api/v1/categories"))
-            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            let (data, _) = try await URLSession.shared.data(for: req)
-            let page = try JSONDecoder().decode(CategoryPage.self, from: data)
+            let categories = try await KairoAPI.shared.categories()
             var map: [String: KairoCategory] = [:]
             var byKey: [String: String] = [:]
-            for c in page.items {
-                if let cat = KairoCategory(rawValue: c.key) { map[c.id] = cat }
-                byKey[c.key] = c.id
+            for category in categories {
+                if let value = KairoCategory(rawValue: category.key) {
+                    map[category.id] = value
+                }
+                byKey[category.key] = category.id
             }
             categoryMap = map
             categoryIdByKey = byKey

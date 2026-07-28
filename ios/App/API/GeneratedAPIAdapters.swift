@@ -88,6 +88,38 @@ enum GeneratedAPIAdapters {
         }
     }
 
+    static func updatedSettings(
+        _ output: Operations.updateUserSettings.Output
+    ) throws -> UserSettings {
+        switch output {
+        case let .ok(response):
+            return try settings(response.body.json)
+        case let .badRequest(response):
+            throw try documentedError(
+                operation: Operations.updateUserSettings.id,
+                statusCode: 400,
+                envelope: response.body.json
+            )
+        case let .unauthorized(response):
+            throw try documentedError(
+                operation: Operations.updateUserSettings.id,
+                statusCode: 401,
+                envelope: response.body.json
+            )
+        case let .conflict(response):
+            throw try documentedError(
+                operation: Operations.updateUserSettings.id,
+                statusCode: 409,
+                envelope: response.body.json
+            )
+        case let .undocumented(statusCode, _):
+            throw GeneratedAPIAdapterError.undocumented(
+                operation: Operations.updateUserSettings.id,
+                statusCode: statusCode
+            )
+        }
+    }
+
     static func settings(
         _ value: Components.Schemas.UserSettings
     ) throws -> UserSettings {
@@ -154,6 +186,44 @@ enum GeneratedAPIAdapters {
             occurrenceKey: nil,
             status: nil
         )
+    }
+
+    static func updatedActivity(
+        _ output: Operations.updateActivitySeries.Output
+    ) throws -> Activity {
+        switch output {
+        case let .ok(response):
+            return try activity(response.body.json)
+        case let .badRequest(response):
+            throw try documentedError(
+                operation: Operations.updateActivitySeries.id,
+                statusCode: 400,
+                envelope: response.body.json
+            )
+        case let .unauthorized(response):
+            throw try documentedError(
+                operation: Operations.updateActivitySeries.id,
+                statusCode: 401,
+                envelope: response.body.json
+            )
+        case let .notFound(response):
+            throw try documentedError(
+                operation: Operations.updateActivitySeries.id,
+                statusCode: 404,
+                envelope: response.body.json
+            )
+        case let .conflict(response):
+            throw try documentedError(
+                operation: Operations.updateActivitySeries.id,
+                statusCode: 409,
+                envelope: response.body.json
+            )
+        case let .undocumented(statusCode, _):
+            throw GeneratedAPIAdapterError.undocumented(
+                operation: Operations.updateActivitySeries.id,
+                statusCode: statusCode
+            )
+        }
     }
 
     static func activity(
@@ -223,6 +293,54 @@ enum GeneratedAPIAdapters {
             revision: Int(value.revision),
             createdAt: value.createdAt
         )
+    }
+
+    static func tasks(
+        _ output: Operations.listTasks.Output
+    ) throws -> [TaskItem] {
+        switch output {
+        case let .ok(response):
+            return try response.body.json.items.map(task)
+        case let .unauthorized(response):
+            throw try documentedError(
+                operation: Operations.listTasks.id,
+                statusCode: 401,
+                envelope: response.body.json
+            )
+        case let .undocumented(statusCode, _):
+            throw GeneratedAPIAdapterError.undocumented(
+                operation: Operations.listTasks.id,
+                statusCode: statusCode
+            )
+        }
+    }
+
+    static func categories(
+        _ output: Operations.listCategories.Output
+    ) throws -> [PlannerCategory] {
+        switch output {
+        case let .ok(response):
+            return try response.body.json.items.map {
+                .init(
+                    id: $0.id,
+                    key: $0.key,
+                    label: $0.label,
+                    sortOrder: Int($0.sortOrder),
+                    revision: Int($0.revision)
+                )
+            }
+        case let .unauthorized(response):
+            throw try documentedError(
+                operation: Operations.listCategories.id,
+                statusCode: 401,
+                envelope: response.body.json
+            )
+        case let .undocumented(statusCode, _):
+            throw GeneratedAPIAdapterError.undocumented(
+                operation: Operations.listCategories.id,
+                statusCode: statusCode
+            )
+        }
     }
 
     static func search(
@@ -419,11 +537,82 @@ enum GeneratedAPIAdapters {
                     id: $0.id,
                     state: $0.state.rawValue,
                     targetDurationMin: Int($0.targetDurationMin),
-                    startedAt: $0.startedAt
+                    startedAt: $0.startedAt,
+                    revision: Int($0.revision)
                 )
             },
             remainingSec: value.remainingSec
         )
+    }
+
+    static func startedFocus(
+        _ output: Operations.startFocusSession.Output
+    ) throws -> FocusSnapshot {
+        switch output {
+        case let .created(response):
+            return focus(try response.body.json)
+        case let .badRequest(response):
+            throw try documentedError(
+                operation: Operations.startFocusSession.id,
+                statusCode: 400,
+                envelope: response.body.json
+            )
+        case let .unauthorized(response):
+            throw try documentedError(
+                operation: Operations.startFocusSession.id,
+                statusCode: 401,
+                envelope: response.body.json
+            )
+        case let .conflict(response):
+            throw try documentedError(
+                operation: Operations.startFocusSession.id,
+                statusCode: 409,
+                envelope: response.body.json
+            )
+        case let .undocumented(statusCode, _):
+            throw GeneratedAPIAdapterError.undocumented(
+                operation: Operations.startFocusSession.id,
+                statusCode: statusCode
+            )
+        }
+    }
+
+    static func updatedFocus(
+        _ output: Operations.updateFocusSession.Output
+    ) throws -> FocusSnapshot {
+        switch output {
+        case let .ok(response):
+            return focus(try response.body.json)
+        case let .badRequest(response):
+            throw try documentedError(
+                operation: Operations.updateFocusSession.id,
+                statusCode: 400,
+                envelope: response.body.json
+            )
+        case let .unauthorized(response):
+            throw try documentedError(
+                operation: Operations.updateFocusSession.id,
+                statusCode: 401,
+                envelope: response.body.json
+            )
+        case let .notFound(response):
+            throw try documentedError(
+                operation: Operations.updateFocusSession.id,
+                statusCode: 404,
+                envelope: response.body.json
+            )
+        case let .conflict(response):
+            throw try documentedError(
+                operation: Operations.updateFocusSession.id,
+                statusCode: 409,
+                envelope: response.body.json
+            )
+        case let .undocumented(statusCode, _):
+            throw GeneratedAPIAdapterError.undocumented(
+                operation: Operations.updateFocusSession.id,
+                statusCode: statusCode
+            )
+        }
     }
 
     static func settingsUpdate(
@@ -544,7 +733,7 @@ enum GeneratedAPIAdapters {
         return .init(label: label, done: done)
     }
 
-    private static func checklistObject(
+    static func checklistObject(
         _ value: ChecklistUpdateItem
     ) throws -> OpenAPIObjectContainer {
         var object: [String: (any Sendable)?] = ["label": value.label]
@@ -552,6 +741,94 @@ enum GeneratedAPIAdapters {
             object["done"] = done
         }
         return try OpenAPIObjectContainer(unvalidatedValue: object)
+    }
+
+    static func empty(
+        _ output: Operations.deleteActivitySeries.Output
+    ) throws {
+        switch output {
+        case .noContent:
+            return
+        case let .unauthorized(response):
+            throw try documentedError(
+                operation: Operations.deleteActivitySeries.id,
+                statusCode: 401,
+                envelope: response.body.json
+            )
+        case let .notFound(response):
+            throw try documentedError(
+                operation: Operations.deleteActivitySeries.id,
+                statusCode: 404,
+                envelope: response.body.json
+            )
+        case let .conflict(response):
+            throw try documentedError(
+                operation: Operations.deleteActivitySeries.id,
+                statusCode: 409,
+                envelope: response.body.json
+            )
+        case let .undocumented(statusCode, _):
+            throw GeneratedAPIAdapterError.undocumented(
+                operation: Operations.deleteActivitySeries.id,
+                statusCode: statusCode
+            )
+        }
+    }
+
+    static func empty(_ output: Operations.deleteTask.Output) throws {
+        switch output {
+        case .noContent:
+            return
+        case let .unauthorized(response):
+            throw try documentedError(
+                operation: Operations.deleteTask.id,
+                statusCode: 401,
+                envelope: response.body.json
+            )
+        case let .notFound(response):
+            throw try documentedError(
+                operation: Operations.deleteTask.id,
+                statusCode: 404,
+                envelope: response.body.json
+            )
+        case let .conflict(response):
+            throw try documentedError(
+                operation: Operations.deleteTask.id,
+                statusCode: 409,
+                envelope: response.body.json
+            )
+        case let .undocumented(statusCode, _):
+            throw GeneratedAPIAdapterError.undocumented(
+                operation: Operations.deleteTask.id,
+                statusCode: statusCode
+            )
+        }
+    }
+
+    static func empty(
+        _ output: Operations.createMoodCheckin.Output
+    ) throws {
+        switch output {
+        case .created:
+            return
+        case let .badRequest(response):
+            throw try documentedError(
+                operation: Operations.createMoodCheckin.id,
+                statusCode: 400,
+                envelope: response.body.json
+            )
+        case let .unauthorized(response):
+            throw try documentedError(
+                operation: Operations.createMoodCheckin.id,
+                statusCode: 401,
+                envelope: response.body.json
+            )
+        case let .undocumented(statusCode, _):
+            throw GeneratedAPIAdapterError.undocumented(
+                operation: Operations.createMoodCheckin.id,
+                statusCode: statusCode
+            )
+        }
     }
 
     static func documentedError(

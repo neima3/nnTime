@@ -4,7 +4,7 @@ import SwiftUI
 //
 // "Where did I put that?" — type a few letters, get the matching blocks and
 // to-dos across your whole planner, tap one to land on its day. Matching and
-// ranking happen server-side (GET /api/v1/search, src/lib/search.ts) so results
+// ranking happen server-side (the generated search operation) so results
 // are identical to the web.
 //
 // Debounced so typing doesn't fire a request per keystroke, and every state

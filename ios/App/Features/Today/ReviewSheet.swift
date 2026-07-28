@@ -74,10 +74,10 @@ struct ReviewSheet: View {
         case .complete:
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             _ = try? await KairoAPI.shared.setStatus(activityId: item.id, revision: item.revision, occurrenceKey: item.occurrenceKey,
-                status: "completed", completedAt: ISO8601DateFormatter().string(from: Date()))
+                status: .completed, completedAt: ISO8601DateFormatter().string(from: Date()))
         case .letGo:
             _ = try? await KairoAPI.shared.setStatus(activityId: item.id, revision: item.revision, occurrenceKey: item.occurrenceKey,
-                status: "skipped", completedAt: nil)
+                status: .skipped, completedAt: nil)
         case .tomorrow:
             var cal = Calendar(identifier: .gregorian); cal.timeZone = zone
             let comps = date.split(separator: "-").compactMap { Int($0) }

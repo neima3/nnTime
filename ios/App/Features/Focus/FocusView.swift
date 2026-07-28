@@ -270,7 +270,7 @@ struct FocusView: View {
                                 .background(Capsule().fill(Color.kCatButterInk))
                         }
                         Button {
-                            Task { await action(["action": "extend", "addMinutes": 5]) }
+                            Task { await action(.extend(.five)) }
                         } label: {
                             Text("+5 more").font(.kBody(13, weight: .bold)).foregroundStyle(Color.kCatButterInk)
                                 .padding(.horizontal, 14).padding(.vertical, 7)
@@ -327,15 +327,14 @@ struct FocusView: View {
 
             HStack(spacing: 18) {
                 controlButton("plus", size: 56, label: "Extend 5 minutes") {
-                    Task { await action(["action": "extend", "addMinutes": 5]) }
+                    Task { await action(.extend(.five)) }
                 }
                 controlButton(session.state == "paused" ? "play.fill" : "pause.fill", size: 76, filled: true,
                               label: session.state == "paused" ? "Resume" : "Pause") {
                     Task {
-                        await action([
-                            "action": "transition",
-                            "state": session.state == "paused" ? "running" : "paused",
-                        ])
+                        await action(.transition(
+                            session.state == "paused" ? .running : .paused
+                        ))
                     }
                 }
                 controlButton("checkmark", size: 56, label: "Complete session") {
@@ -374,7 +373,9 @@ struct FocusView: View {
         guard let id = linkedActivityId else { return }
         checklist[i].done.toggle()
         UISelectionFeedbackGenerator().selectionChanged()
-        let payload = checklist.map { ["label": $0.label, "done": $0.done] as [String: Any] }
+        let payload = checklist.map {
+            ChecklistUpdateItem(label: $0.label, done: $0.done)
+        }
         if let updated = try? await KairoAPI.shared.setChecklist(
             activityId: id, revision: linkedRevision, occurrenceKey: linkedOccurrenceKey, checklist: payload
         ) {
@@ -511,13 +512,17 @@ struct FocusView: View {
         } catch {}
     }
 
-    private func action(_ body: [String: Any?]) async {
+    private func action(_ command: FocusCommand) async {
         guard let session else { return }
         do {
-            let state = try await KairoAPI.shared.focusAction(id: session.id, body: body)
+            let state = try await KairoAPI.shared.focusAction(
+                id: session.id,
+                revision: session.revision,
+                command: command
+            )
             self.session = state.session
             remaining = state.remainingSec ?? remaining
-            if body["action"] as? String == "extend" { overtime = 0 }
+            if case .extend = command { overtime = 0 }
             await updateLiveActivity()
         } catch {}
     }
@@ -527,7 +532,8 @@ struct FocusView: View {
         do {
             _ = try await KairoAPI.shared.focusAction(
                 id: current.id,
-                body: ["action": "transition", "state": "completed"]
+                revision: current.revision,
+                command: .transition(.completed)
             )
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             session = nil
