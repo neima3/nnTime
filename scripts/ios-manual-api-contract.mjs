@@ -145,37 +145,203 @@ function matchingBrace(source, openingIndex) {
   return -1;
 }
 
-function authRequestRange(maskedSource) {
-  const declaration =
-    /\bfunc\s+authRequest(?:\s*<[^>{}]*>)?\s*\(/g.exec(maskedSource);
+function declarationRange(maskedSource, pattern) {
+  const declaration = pattern.exec(maskedSource);
   if (!declaration) return null;
   const openingIndex = maskedSource.indexOf("{", declaration.index);
   if (openingIndex < 0) return null;
   const closingIndex = matchingBrace(maskedSource, openingIndex);
   if (closingIndex < 0) return null;
-  return { start: declaration.index, end: closingIndex + 1 };
+  return {
+    start: declaration.index,
+    bodyStart: openingIndex,
+    end: closingIndex + 1,
+  };
 }
 
 function isInside(index, range) {
   return range !== null && index >= range.start && index < range.end;
 }
 
-function containsManualTransportOutsideAuth(source, allowAuthRequest) {
+function authEndpointContract(source) {
   const masked = maskCommentsAndStrings(source);
-  const allowedRange = allowAuthRequest ? authRequestRange(masked) : null;
-  const patterns = [
+  const enumRange = declarationRange(
+    masked,
+    /\bprivate\s+enum\s+AuthEndpoint\s*\{/g,
+  );
+  if (!enumRange) return { valid: false, range: null };
+
+  const enumMasked = masked.slice(enumRange.start, enumRange.end);
+  const enumSource = source.slice(enumRange.start, enumRange.end);
+  const cases = [
+    ...enumMasked.matchAll(
+      /^\s*case\s+([A-Za-z_][A-Za-z0-9_]*)\s*$/gm,
+    ),
+  ].map((match) => match[1]);
+  if (cases.length === 0 || new Set(cases).size !== cases.length) {
+    return { valid: false, range: enumRange };
+  }
+
+  const propertyRange = declarationRange(
+    enumMasked,
+    /\bvar\s+pathComponents\s*:\s*\[\s*String\s*\]\s*\{/g,
+  );
+  if (!propertyRange) {
+    return { valid: false, range: enumRange };
+  }
+
+  const propertyMasked = enumMasked.slice(
+    propertyRange.start,
+    propertyRange.end,
+  );
+  const propertySource = enumSource.slice(
+    propertyRange.start,
+    propertyRange.end,
+  );
+  if (!/\bswitch\s+self\s*\{/.test(propertyMasked)) {
+    return { valid: false, range: enumRange };
+  }
+  if (/\bdefault\s*:/.test(propertyMasked)) {
+    return { valid: false, range: enumRange };
+  }
+
+  const branchCases = [
+    ...propertyMasked.matchAll(
+      /\bcase\s+\.([A-Za-z_][A-Za-z0-9_]*)\s*:/g,
+    ),
+  ].map((match) => match[1]);
+  if (
+    branchCases.length !== cases.length ||
+    new Set(branchCases).size !== branchCases.length ||
+    branchCases.some((name) => !cases.includes(name))
+  ) {
+    return { valid: false, range: enumRange };
+  }
+
+  for (const name of cases) {
+    const marker = `case .${name}:`;
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const branchPattern = new RegExp(
+      `\\bcase\\s+\\.${escapedName}\\s*:\\s*\\[([^\\]]]*)\\]`,
+    );
+    let branch = branchPattern.exec(propertySource);
+    if (!branch) {
+      const markerIndex = propertySource.indexOf(marker);
+      const arrayStart = propertySource.indexOf(
+        "[",
+        markerIndex + marker.length,
+      );
+      const arrayEnd = propertySource.indexOf("]", arrayStart + 1);
+      if (markerIndex >= 0 && arrayStart >= 0 && arrayEnd > arrayStart) {
+        branch = [
+          propertySource.slice(markerIndex, arrayEnd + 1),
+          propertySource.slice(arrayStart + 1, arrayEnd),
+        ];
+      }
+    }
+    const markerIndex = propertySource.indexOf(marker);
+    const lineEnd = propertySource.indexOf("\n", markerIndex);
+    const branchLine = propertySource
+      .slice(markerIndex, lineEnd < 0 ? undefined : lineEnd)
+      .trim();
+    if (!branch || branchLine !== `${marker} [${branch[1]}]`) {
+      return { valid: false, range: enumRange };
+    }
+
+    const arraySource = branch[1];
+    const components = [
+      ...arraySource.matchAll(/"([^"\\]*)"/g),
+    ].map((match) => match[1]);
+    const nonLiterals = arraySource
+      .replace(/"[^"\\]*"/g, "")
+      .replace(/[\s,]/g, "");
+    if (
+      nonLiterals.length > 0 ||
+      components.length < 3 ||
+      components[0] !== "api" ||
+      components[1] !== "auth" ||
+      components.some(
+        (component) => !/^[A-Za-z0-9-]+$/.test(component),
+      )
+    ) {
+      return { valid: false, range: enumRange };
+    }
+  }
+
+  return { valid: true, range: enumRange };
+}
+
+const URL_SESSION_PRIMITIVE =
+  /\.\s*(?:data|dataTask|upload|uploadTask|download|downloadTask|bytes|webSocketTask|streamTask)\s*\(\s*(?:for|from|with|withResumeData|withHostName|withNetService)\s*:/g;
+
+function authRequestContract(source, endpointContract) {
+  if (!endpointContract.valid) return { valid: false, range: null };
+
+  const masked = maskCommentsAndStrings(source);
+  const range = declarationRange(
+    masked,
+    /\bprivate\s+func\s+authRequest(?:\s*<[^>{}]*>)?\s*\(/g,
+  );
+  if (!range) return { valid: false, range: null };
+
+  const functionSource = masked.slice(range.start, range.end);
+  const hasClosedSignature =
+    /\bprivate\s+func\s+authRequest(?:\s*<[^>{}]*>)?\s*\(\s*_\s+endpoint\s*:\s*AuthEndpoint(?:\s*,|\s*\))/s.test(
+      functionSource,
+    );
+  const buildsFromEndpoint =
+    /\bendpoint\s*\.\s*pathComponents\s*\.\s*reduce\s*\(\s*baseURL\s*\)/.test(
+      functionSource,
+    ) &&
+    /\$0\s*\.\s*appending\s*\(\s*path\s*:\s*\$1\s*\)/.test(
+      functionSource,
+    );
+  const requestMatches = [
+    ...functionSource.matchAll(/\bURLRequest\s*\(/g),
+  ];
+  const sessionMatches = [
+    ...functionSource.matchAll(URL_SESSION_PRIMITIVE),
+  ];
+  const hasClosedTransport =
+    requestMatches.length === 1 &&
+    /\bURLRequest\s*\(\s*url\s*:\s*url\s*\)/.test(functionSource) &&
+    sessionMatches.length === 1 &&
+    /\bauthSession\s*\.\s*data\s*\(\s*for\s*:\s*request\s*\)/.test(
+      functionSource,
+    );
+
+  return {
+    valid: hasClosedSignature && buildsFromEndpoint && hasClosedTransport,
+    range:
+      hasClosedSignature && buildsFromEndpoint && hasClosedTransport
+        ? range
+        : null,
+  };
+}
+
+function manualTransportOutsideRange(source, allowedRange) {
+  const masked = maskCommentsAndStrings(source);
+  const requestPatterns = [
     /\bURLRequest\s*\(/g,
-    /\.\s*data\s*\(\s*for\s*:/g,
     /\bfunc\s+request(?:\s*<[^>{}]*>)?\s*\(/g,
     /(?<![.\w])request\s*\(/g,
   ];
 
-  for (const pattern of patterns) {
+  let request = false;
+  for (const pattern of requestPatterns) {
     for (const match of masked.matchAll(pattern)) {
-      if (!isInside(match.index, allowedRange)) return true;
+      if (!isInside(match.index, allowedRange)) request = true;
     }
   }
-  return false;
+
+  let session = false;
+  for (const match of masked.matchAll(URL_SESSION_PRIMITIVE)) {
+    if (!isInside(match.index, allowedRange)) {
+      session = true;
+    }
+  }
+
+  return { request, session };
 }
 
 function documentedOperationIDs(spec) {
@@ -210,20 +376,30 @@ export function validateGeneratedClientAdoption({ sources, spec, project }) {
   const facade = sources.find(
     ({ path }) => normalizedPath(path).endsWith(FACADE_PATH),
   );
+  const endpointContract = facade
+    ? authEndpointContract(facade.source)
+    : { valid: false, range: null };
+  const authContract = facade
+    ? authRequestContract(facade.source, endpointContract)
+    : { valid: false, range: null };
 
   for (const file of sources) {
     const path = normalizedPath(file.path);
     if (file.source.includes("/api/v1")) {
       failures.push(`${path} contains a handwritten /api/v1 path`);
     }
-    if (
-      containsManualTransportOutsideAuth(
-        file.source,
-        path.endsWith(FACADE_PATH),
-      )
-    ) {
+    const manualTransport = manualTransportOutsideRange(
+      file.source,
+      path.endsWith(FACADE_PATH) ? authContract.range : null,
+    );
+    if (manualTransport.request) {
       failures.push(
         `${path} contains manual URLRequest transport outside KairoAPI.authRequest`,
+      );
+    }
+    if (manualTransport.session) {
+      failures.push(
+        `${path} contains manual URLSession transport outside KairoAPI.authRequest`,
       );
     }
     if (
@@ -238,8 +414,19 @@ export function validateGeneratedClientAdoption({ sources, spec, project }) {
 
   if (!facade) {
     failures.push("ios/App/API/KairoAPI.swift is missing");
-  } else if (!/^\s*import\s+KairoAPIClient\s*$/m.test(facade.source)) {
-    failures.push("KairoAPI.swift must import KairoAPIClient");
+  } else {
+    if (!/^\s*import\s+KairoAPIClient\s*$/m.test(facade.source)) {
+      failures.push("KairoAPI.swift must import KairoAPIClient");
+    }
+    if (!endpointContract.valid) {
+      failures.push(
+        "KairoAPI AuthEndpoint.pathComponents must contain only closed /api/auth/* paths",
+      );
+    } else if (!authContract.valid) {
+      failures.push(
+        "KairoAPI manual auth transport must use a closed AuthEndpoint-based authRequest boundary",
+      );
+    }
   }
 
   const operationIDs = facade

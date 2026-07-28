@@ -74,8 +74,25 @@ function facadeSource(
       private let planner: KairoAPIClient.Client
       private let authSession: URLSession
 
-      private func authRequest() async throws {
-        let url = URL(string: "https://time.neima.me/api/auth/sign-out")!
+      private enum AuthEndpoint {
+        case signIn
+        case signOut
+
+        var pathComponents: [String] {
+          switch self {
+          case .signIn: ["api", "auth", "sign-in", "email"]
+          case .signOut: ["api", "auth", "sign-out"]
+          }
+        }
+      }
+
+      private func authRequest<T>(
+        _ endpoint: AuthEndpoint,
+        as type: T.Type
+      ) async throws {
+        let url = endpoint.pathComponents.reduce(baseURL) {
+          $0.appending(path: $1)
+        }
         let request = URLRequest(url: url)
         _ = try await authSession.data(for: request)
       }
@@ -151,6 +168,103 @@ describe("generated Swift client adoption gate", () => {
     );
   });
 
+  it.each([
+    "URLSession.shared.data(from: plannerURL)",
+    "URLSession.shared.dataTask(with: plannerRequest)",
+    "URLSession.shared.uploadTask(with: plannerRequest, from: body)",
+    "URLSession.shared.download(from: plannerURL)",
+    "URLSession.shared.downloadTask(with: plannerRequest)",
+    "URLSession.shared.bytes(from: plannerURL)",
+    "URLSession.shared.webSocketTask(with: plannerURL)",
+  ])("rejects manual URLSession primitive %s", (primitive) => {
+    const result = validate([
+      {
+        path: "ios/App/API/KairoAPI.swift",
+        source: facadeSource(),
+      },
+      {
+        path: "ios/App/Features/Search/SearchView.swift",
+        source: `_ = ${primitive}`,
+      },
+    ]);
+
+    expect(result.failures).toContain(
+      "ios/App/Features/Search/SearchView.swift contains manual URLSession transport outside KairoAPI.authRequest",
+    );
+  });
+
+  it("does not confuse ActivityKit request calls with manual network transport", () => {
+    expect(
+      validate([
+        {
+          path: "ios/App/API/KairoAPI.swift",
+          source: facadeSource(),
+        },
+        {
+          path: "ios/App/Features/Focus/FocusView.swift",
+          source:
+            "liveActivity = try ActivityKit.Activity<FocusAttributes>.request(attributes: attributes)",
+        },
+      ]).failures,
+    ).toEqual([]);
+  });
+
+  it("ignores transport spellings and braces inside comments and strings", () => {
+    const source = facadeSource(
+      requiredOperations,
+      `
+        // func authRequest(_ path: String) { URLSession.shared.data(from: url) }
+        let diagnostic = "URLRequest(url: plannerURL) } dataTask(with: request)"
+      `,
+    );
+
+    expect(
+      validate([
+        {
+          path: "ios/App/API/KairoAPI.swift",
+          source,
+        },
+      ]).failures,
+    ).toEqual([]);
+  });
+
+  it("keeps the proven auth range scoped across nested closures", () => {
+    const nestedAuth = facadeSource(
+      requiredOperations,
+      `
+        func escapedTransport(url: URL) async throws {
+          let request = URLRequest(url: url)
+          _ = try await URLSession.shared.data(for: request)
+        }
+      `,
+    ).replace(
+      "let url = endpoint.pathComponents.reduce(baseURL)",
+      `
+        let resolveBaseURL = {
+          { () -> URL in
+            let misleadingBrace = "}"
+            return baseURL
+          }()
+        }
+        _ = resolveBaseURL()
+        let url = endpoint.pathComponents.reduce(baseURL)
+      `,
+    );
+
+    const result = validate([
+      {
+        path: "ios/App/API/KairoAPI.swift",
+        source: nestedAuth,
+      },
+    ]);
+    expect(result.failures).toContain(
+      "ios/App/API/KairoAPI.swift contains manual URLRequest transport outside KairoAPI.authRequest",
+    );
+    expect(result.failures).toContain(
+      "ios/App/API/KairoAPI.swift contains manual URLSession transport outside KairoAPI.authRequest",
+    );
+  });
+
   it("allows Better Auth transport only inside the facade authRequest function", () => {
     expect(
       validate([
@@ -177,6 +291,61 @@ describe("generated Swift client adoption gate", () => {
     ]);
     expect(escaped.failures).toContain(
       "ios/App/API/KairoAPI.swift contains manual URLRequest transport outside KairoAPI.authRequest",
+    );
+  });
+
+  it("rejects an authRequest boundary that accepts a dynamic path", () => {
+    const dynamicAuthRequest = facadeSource()
+      .replace("_ endpoint: AuthEndpoint", "_ path: String")
+      .replace(
+        "endpoint.pathComponents.reduce(baseURL)",
+        "pathComponents(path).reduce(baseURL)",
+      );
+    const result = validate([
+      {
+        path: "ios/App/API/KairoAPI.swift",
+        source: dynamicAuthRequest,
+      },
+    ]);
+
+    expect(result.failures).toContain(
+      "KairoAPI manual auth transport must use a closed AuthEndpoint-based authRequest boundary",
+    );
+  });
+
+  it("rejects an AuthEndpoint path that can target the planner API", () => {
+    const plannerCapableEndpoint = facadeSource().replace(
+      'case .signOut: ["api", "auth", "sign-out"]',
+      'case .signOut: ["api", "v1", "settings"]',
+    );
+    const result = validate([
+      {
+        path: "ios/App/API/KairoAPI.swift",
+        source: plannerCapableEndpoint,
+      },
+    ]);
+
+    expect(result.failures).toContain(
+      "KairoAPI AuthEndpoint.pathComponents must contain only closed /api/auth/* paths",
+    );
+  });
+
+  it("rejects a dynamic AuthEndpoint path branch", () => {
+    const dynamicEndpoint = facadeSource()
+      .replace("case signOut", "case signOut\n        case dynamic")
+      .replace(
+        'case .signOut: ["api", "auth", "sign-out"]',
+        'case .signOut: ["api", "auth", "sign-out"]\n          case .dynamic: dynamicPathComponents',
+      );
+    const result = validate([
+      {
+        path: "ios/App/API/KairoAPI.swift",
+        source: dynamicEndpoint,
+      },
+    ]);
+
+    expect(result.failures).toContain(
+      "KairoAPI AuthEndpoint.pathComponents must contain only closed /api/auth/* paths",
     );
   });
 
