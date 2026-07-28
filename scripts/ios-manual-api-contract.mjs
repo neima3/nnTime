@@ -284,21 +284,124 @@ function escapedPattern(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function urlSessionMemberCalls(source) {
+function isURLSessionType(type) {
+  return /^(?:Foundation\.)?URLSession[!?]?$/.test(type.trim());
+}
+
+function isSessionLikeIdentifier(identifier) {
+  return /session$/i.test(identifier) || /^session/i.test(identifier);
+}
+
+function isProvenNonNetworkInitializer(initializer) {
+  const nominalConstructor =
+    /^(?:[A-Za-z_][A-Za-z0-9_]*\s*\.\s*)*([A-Z][A-Za-z0-9_]*)\s*\(/.exec(
+      initializer,
+    );
+  if (
+    nominalConstructor &&
+    nominalConstructor[1] !== "URLSession"
+  ) {
+    return true;
+  }
+  return /^AVAudioSession\s*\.\s*sharedInstance\s*\(/.test(
+    initializer,
+  );
+}
+
+function urlSessionProvenance(source) {
   const masked = maskCommentsAndStrings(source);
   const sessionIdentifiers = new Set();
+  const factoryNames = new Set();
+  const bindings = [];
 
   for (const match of masked.matchAll(
     /\b([A-Za-z_][A-Za-z0-9_]*)\s*:\s*URLSession\b/g,
   )) {
     sessionIdentifiers.add(match[1]);
   }
+
   for (const match of masked.matchAll(
-    /\b(?:let|var)\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*URLSession\s*(?:\.\s*shared\b|\()/g,
+    /\bfunc\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s*<[^>{}]*>)?\s*\([^)]*\)\s*(?:async\s*)?(?:throws\s*)?->\s*(?:Foundation\.)?URLSession\b/g,
   )) {
-    sessionIdentifiers.add(match[1]);
+    factoryNames.add(match[1]);
   }
 
+  for (const match of masked.matchAll(
+    /\b(?:let|var)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?::\s*([^=\n]+?))?\s*=\s*([^\n;]+)/g,
+  )) {
+    bindings.push({
+      name: match[1],
+      type: match[2]?.trim() ?? null,
+      initializer: match[3].trim(),
+    });
+  }
+
+  for (const binding of bindings) {
+    if (binding.type && isURLSessionType(binding.type)) {
+      sessionIdentifiers.add(binding.name);
+      continue;
+    }
+    if (
+      /^URLSession\s*(?:\.\s*shared\b|\()/.test(
+        binding.initializer,
+      )
+    ) {
+      sessionIdentifiers.add(binding.name);
+      continue;
+    }
+    const factoryCall =
+      /^(?:(?:Self|[A-Za-z_][A-Za-z0-9_]*)\s*\.\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*\(/.exec(
+        binding.initializer,
+      );
+    if (factoryCall && factoryNames.has(factoryCall[1])) {
+      sessionIdentifiers.add(binding.name);
+    }
+  }
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const binding of bindings) {
+      if (sessionIdentifiers.has(binding.name)) continue;
+      const alias = /^([A-Za-z_][A-Za-z0-9_]*)$/.exec(
+        binding.initializer,
+      );
+      if (alias && sessionIdentifiers.has(alias[1])) {
+        sessionIdentifiers.add(binding.name);
+        changed = true;
+      }
+    }
+  }
+
+  const ambiguousBindings = bindings
+    .filter((binding) => {
+      if (sessionIdentifiers.has(binding.name) || binding.type) {
+        return false;
+      }
+      if (isProvenNonNetworkInitializer(binding.initializer)) {
+        return false;
+      }
+      const alias = /^([A-Za-z_][A-Za-z0-9_]*)$/.exec(
+        binding.initializer,
+      );
+      const sessionLikeInitializer =
+        (alias && isSessionLikeIdentifier(alias[1])) ||
+        /\b[A-Za-z_][A-Za-z0-9_]*Session\s*\(/i.test(
+          binding.initializer,
+        );
+      return (
+        isSessionLikeIdentifier(binding.name) ||
+        sessionLikeInitializer
+      );
+    })
+    .map((binding) => binding.name);
+
+  return { ambiguousBindings, masked, sessionIdentifiers };
+}
+
+function urlSessionAnalysis(source) {
+  const provenance = urlSessionProvenance(source);
+  const { masked, sessionIdentifiers } = provenance;
   const calls = [];
   const directPatterns = [
     /\bURLSession\s*\.\s*shared\s*\.\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(/g,
@@ -320,11 +423,14 @@ function urlSessionMemberCalls(source) {
     }
   }
 
-  return [
-    ...new Map(
-      calls.map((call) => [`${call.index}:${call.member}`, call]),
-    ).values(),
-  ];
+  return {
+    ambiguousBindings: provenance.ambiguousBindings,
+    calls: [
+      ...new Map(
+        calls.map((call) => [`${call.index}:${call.member}`, call]),
+      ).values(),
+    ],
+  };
 }
 
 function authRequestContract(source, endpointContract) {
@@ -362,8 +468,8 @@ function authRequestContract(source, endpointContract) {
   const requestMatches = [
     ...functionSource.matchAll(/\bURLRequest\s*\(/g),
   ];
-  const sessionMatches = urlSessionMemberCalls(source).filter((call) =>
-    isInside(call.index, range),
+  const sessionMatches = urlSessionAnalysis(source).calls.filter(
+    (call) => isInside(call.index, range),
   );
   const hasClosedTransport =
     requestMatches.length === 1 &&
@@ -390,6 +496,7 @@ function authRequestContract(source, endpointContract) {
 
 function manualTransportOutsideRange(source, allowedRange) {
   const masked = maskCommentsAndStrings(source);
+  const sessionAnalysis = urlSessionAnalysis(source);
   const requestPatterns = [
     /\bURLRequest\s*\(/g,
     /\bfunc\s+request(?:\s*<[^>{}]*>)?\s*\(/g,
@@ -404,7 +511,7 @@ function manualTransportOutsideRange(source, allowedRange) {
   }
 
   let session = false;
-  for (const call of urlSessionMemberCalls(source)) {
+  for (const call of sessionAnalysis.calls) {
     if (
       !BENIGN_URL_SESSION_MEMBERS.has(call.member) &&
       !isInside(call.index, allowedRange)
@@ -413,7 +520,11 @@ function manualTransportOutsideRange(source, allowedRange) {
     }
   }
 
-  return { request, session };
+  return {
+    ambiguousSession: sessionAnalysis.ambiguousBindings.length > 0,
+    request,
+    session,
+  };
 }
 
 function documentedOperationIDs(spec) {
@@ -472,6 +583,11 @@ export function validateGeneratedClientAdoption({ sources, spec, project }) {
     if (manualTransport.session) {
       failures.push(
         `${path} contains manual URLSession transport outside KairoAPI.authRequest`,
+      );
+    }
+    if (manualTransport.ambiguousSession) {
+      failures.push(
+        `${path} contains an ambiguous session-like binding without an explicit non-network type`,
       );
     }
     if (

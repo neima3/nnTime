@@ -232,6 +232,113 @@ describe("generated Swift client adoption gate", () => {
     ).toEqual([]);
   });
 
+  it("rejects request calls through fixed-point URLSession aliases", () => {
+    const result = validate([
+      {
+        path: "ios/App/API/KairoAPI.swift",
+        source: facadeSource(),
+      },
+      {
+        path: "ios/App/Services/AliasedTransport.swift",
+        source: `
+          let primary: URLSession = .shared
+          let firstAlias = primary
+          let secondAlias = firstAlias
+          _ = secondAlias.requestProducer(for: plannerRequest)
+        `,
+      },
+    ]);
+
+    expect(result.failures).toContain(
+      "ios/App/Services/AliasedTransport.swift contains manual URLSession transport outside KairoAPI.authRequest",
+    );
+  });
+
+  it("rejects request calls through a current-file URLSession factory result", () => {
+    const result = validate([
+      {
+        path: "ios/App/API/KairoAPI.swift",
+        source: facadeSource(),
+      },
+      {
+        path: "ios/App/Services/FactoryTransport.swift",
+        source: `
+          private func makeSession() -> URLSession {
+            URLSession.shared
+          }
+          let transport = makeSession()
+          _ = transport.data(from: plannerURL)
+        `,
+      },
+    ]);
+
+    expect(result.failures).toContain(
+      "ios/App/Services/FactoryTransport.swift contains manual URLSession transport outside KairoAPI.authRequest",
+    );
+  });
+
+  it("rejects an untyped session-like factory binding with unknown provenance", () => {
+    const result = validate([
+      {
+        path: "ios/App/API/KairoAPI.swift",
+        source: facadeSource(),
+      },
+      {
+        path: "ios/App/Services/AmbiguousTransport.swift",
+        source: `
+          let requestSession = makeTransport()
+          requestSession.finishTasksAndInvalidate()
+        `,
+      },
+    ]);
+
+    expect(result.failures).toContain(
+      "ios/App/Services/AmbiguousTransport.swift contains an ambiguous session-like binding without an explicit non-network type",
+    );
+  });
+
+  it("rejects URLSession calls through explicitly typed function and closure parameters", () => {
+    const result = validate([
+      {
+        path: "ios/App/API/KairoAPI.swift",
+        source: facadeSource(),
+      },
+      {
+        path: "ios/App/Services/ParameterTransport.swift",
+        source: `
+          func run(_ client: URLSession) {
+            _ = client.requestProducer(for: plannerRequest)
+          }
+          let closure = { (transport: URLSession) in
+            _ = transport.dataTaskPublisher(for: plannerRequest)
+          }
+        `,
+      },
+    ]);
+
+    expect(result.failures).toContain(
+      "ios/App/Services/ParameterTransport.swift contains manual URLSession transport outside KairoAPI.authRequest",
+    );
+  });
+
+  it("allows an explicitly non-network session-like local type", () => {
+    expect(
+      validate([
+        {
+          path: "ios/App/API/KairoAPI.swift",
+          source: facadeSource(),
+        },
+        {
+          path: "ios/App/Services/PlaybackSession.swift",
+          source: `
+            let session: PlaybackSession = PlaybackSession()
+            session.finishTasksAndInvalidate()
+          `,
+        },
+      ]).failures,
+    ).toEqual([]);
+  });
+
   it("ignores transport spellings and braces inside comments and strings", () => {
     const source = facadeSource(
       requiredOperations,
