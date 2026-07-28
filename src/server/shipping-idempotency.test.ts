@@ -10,10 +10,14 @@ import * as schema from "./db/schema";
 import {
   appendPlannerEvent,
   createActivitySeries,
+  createRoutine,
   createTask,
   deleteActivitySeries,
   deleteTask,
   getOrCreateSettings,
+  listRoutineSchedules,
+  listRoutineSteps,
+  listRoutines,
   updateSettings,
   type Db,
 } from "./dal";
@@ -56,6 +60,64 @@ async function user(label: string): Promise<string> {
 }
 
 describe("shipping native mutation idempotency", () => {
+  itDb("replays routine creation without duplicating its steps or schedule", async () => {
+    const userId = await user("routine-create-idempotency");
+    const key = crypto.randomUUID();
+    let executions = 0;
+    const execute = async (db: Db) => {
+      executions += 1;
+      const routine = await createRoutine(
+        userId,
+        {
+          title: "Morning reset",
+          steps: [
+            { title: "Stretch", durationMin: 5 },
+            { title: "Plan", durationMin: 10 },
+          ],
+          schedule: {
+            tz: "America/New_York",
+            rrule: "FREQ=DAILY",
+            paused: false,
+          },
+        },
+        { db },
+      );
+      return Response.json(routine, { status: 201 });
+    };
+
+    const first = await withIdempotency(
+      userId,
+      key,
+      "POST",
+      "/api/v1/routines",
+      execute,
+      { db: env!.db as Db },
+    );
+    const replay = await withIdempotency(
+      userId,
+      key,
+      "POST",
+      "/api/v1/routines",
+      execute,
+      { db: env!.db as Db },
+    );
+    const routines = await listRoutines(userId, { db: env!.db });
+    const steps = await listRoutineSteps(userId, routines[0]!.id, {
+      db: env!.db,
+    });
+    const schedules = await listRoutineSchedules(userId, routines[0]!.id, {
+      db: env!.db,
+    });
+
+    expect(first.status).toBe(201);
+    expect(replay.status).toBe(201);
+    expect(replay.headers.get("idempotent-replay")).toBe("true");
+    expect(executions).toBe(1);
+    expect(routines).toHaveLength(1);
+    expect(steps).toHaveLength(2);
+    expect(schedules).toHaveLength(1);
+  });
+
   itDb("replays settings PATCH without a second revision bump", async () => {
     const userId = await user("settings-idempotency");
     const settings = await getOrCreateSettings(userId, { db: env!.db });

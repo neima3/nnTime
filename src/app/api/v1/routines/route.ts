@@ -11,6 +11,7 @@ import {
 import { handleErrors, parseBody } from "@/server/api-errors";
 import { sumRoutineDurationMinutes } from "@/server/routine-duration";
 import { routineCreate } from "@/server/schemas/routine";
+import { withIdempotency } from "@/server/idempotency";
 
 export async function GET() {
   return handleErrors(async () => {
@@ -39,16 +40,23 @@ export async function GET() {
 export async function POST(request: Request) {
   return handleErrors(async () => {
     const { userId } = await requireSession();
-    const body = await parseBody(request, routineCreate);
-    if (body instanceof Response) return body;
-    const routine = await createRoutine(userId, {
-      title: body.title,
-      emoji: body.emoji,
-      categoryId: body.categoryId,
-      notes: body.notes,
-      steps: body.steps,
-      schedule: body.schedule,
+    const key = request.headers.get("idempotency-key");
+    return withIdempotency(userId, key, "POST", "/api/v1/routines", async (db) => {
+      const body = await parseBody(request, routineCreate);
+      if (body instanceof Response) return body;
+      const routine = await createRoutine(
+        userId,
+        {
+          title: body.title,
+          emoji: body.emoji,
+          categoryId: body.categoryId,
+          notes: body.notes,
+          steps: body.steps,
+          schedule: body.schedule,
+        },
+        { db },
+      );
+      return Response.json(routine, { status: 201 });
     });
-    return Response.json(routine, { status: 201 });
   });
 }

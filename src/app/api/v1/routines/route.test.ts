@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   listRoutineSteps: vi.fn(),
   listRoutineSchedules: vi.fn(),
   createRoutineSchedule: vi.fn(),
+  withIdempotency: vi.fn(),
 }));
 
 vi.mock("@/server/auth-session", () => ({
@@ -23,6 +24,10 @@ vi.mock("@/server/dal", () => ({
   createRoutineSchedule: mocks.createRoutineSchedule,
 }));
 
+vi.mock("@/server/idempotency", () => ({
+  withIdempotency: mocks.withIdempotency,
+}));
+
 import { GET, POST } from "./route";
 
 describe("POST /api/v1/routines", () => {
@@ -35,13 +40,25 @@ describe("POST /api/v1/routines", () => {
       title: "Morning reset",
       revision: 1,
     });
+    mocks.withIdempotency.mockImplementation(
+      async (
+        _userId: string,
+        _key: string | null,
+        _method: string,
+        _path: string,
+        execute: (db: unknown) => Promise<Response>,
+      ) => execute("transaction-db"),
+    );
   });
 
   it("delegates the complete routine bundle to one atomic DAL call", async () => {
     const response = await POST(
       new Request("https://time.neima.me/api/v1/routines", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": "routine-key-1",
+        },
         body: JSON.stringify({
           title: "Morning reset",
           steps: [
@@ -58,22 +75,33 @@ describe("POST /api/v1/routines", () => {
     );
 
     expect(response.status).toBe(201);
+    expect(mocks.withIdempotency).toHaveBeenCalledWith(
+      "user-1",
+      "routine-key-1",
+      "POST",
+      "/api/v1/routines",
+      expect.any(Function),
+    );
     expect(mocks.createRoutine).toHaveBeenCalledTimes(1);
-    expect(mocks.createRoutine).toHaveBeenCalledWith("user-1", {
-      title: "Morning reset",
-      emoji: undefined,
-      categoryId: undefined,
-      notes: undefined,
-      steps: [
-        { title: "Stretch", durationMin: 5 },
-        { title: "Plan", durationMin: 10 },
-      ],
-      schedule: {
-        tz: "America/New_York",
-        rrule: "FREQ=DAILY",
-        paused: false,
+    expect(mocks.createRoutine).toHaveBeenCalledWith(
+      "user-1",
+      {
+        title: "Morning reset",
+        emoji: undefined,
+        categoryId: undefined,
+        notes: undefined,
+        steps: [
+          { title: "Stretch", durationMin: 5 },
+          { title: "Plan", durationMin: 10 },
+        ],
+        schedule: {
+          tz: "America/New_York",
+          rrule: "FREQ=DAILY",
+          paused: false,
+        },
       },
-    });
+      { db: "transaction-db" },
+    );
     expect(mocks.createRoutineSchedule).not.toHaveBeenCalled();
   });
 });

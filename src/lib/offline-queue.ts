@@ -93,13 +93,18 @@ export interface QueuedMutation {
   rebasePath?: string;
 }
 
+export type QueuedMutationInput = Omit<
+  QueuedMutation,
+  "id" | "userId" | "createdAt" | "attempts" | "status"
+>;
+
 /**
  * Enqueue a mutation. If online, it's flushed immediately. If offline, it
  * stays in the queue until reconnect.
  */
 export async function enqueueMutation(
   userId: string,
-  mutation: Omit<QueuedMutation, "id" | "userId" | "createdAt" | "attempts" | "status">,
+  mutation: QueuedMutationInput,
 ): Promise<QueuedMutation | null> {
   const entry: QueuedMutation = {
     ...mutation,
