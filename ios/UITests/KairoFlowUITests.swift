@@ -89,7 +89,13 @@ final class KairoFlowUITests: XCTestCase {
         app.tabBars.buttons["Week"].tap()
         XCTAssertTrue(app.staticTexts["TODAY"].waitForExistence(timeout: 12), "Week should mark today")
         app.tabBars.buttons["Focus"].tap()
-        XCTAssertTrue(app.buttons["Start focus"].waitForExistence(timeout: 8))
+        let idleFocus = app.buttons["Start focus"].firstMatch
+        let activeFocus = app.buttons["Complete session"].firstMatch
+        XCTAssertTrue(
+            idleFocus.waitForExistence(timeout: 8)
+                || activeFocus.waitForExistence(timeout: 8),
+            "Focus should render either its idle or active-session controls"
+        )
         app.tabBars.buttons["More"].tap()
         XCTAssertTrue(app.staticTexts["Planning timezone"].waitForExistence(timeout: 8), "More rows should render")
     }

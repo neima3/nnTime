@@ -20,7 +20,7 @@ struct CompleteActivityIntent: AppIntent {
 
     func perform() async throws -> some IntentResult {
         // Optimistic: flip the cache so the widget updates instantly.
-        if var snap = DayCache.read() {
+        if let snap = DayCache.read() {
             let blocks = snap.blocks.map { b -> CachedBlock in
                 guard b.activityId == activityId else { return b }
                 return CachedBlock(title: b.title, emoji: b.emoji, startMin: b.startMin,

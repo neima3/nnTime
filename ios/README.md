@@ -33,6 +33,16 @@ xcodebuild -project Kairo.xcodeproj -scheme Kairo \
 every tab — end-to-end against production. `KairoScreenshotTour` captures
 per-screen attachments for design review.
 
+Run the app-hosted unit bundle with a fail-fast Main Thread Checker scan:
+
+```bash
+./scripts/ios-main-thread-gate.sh
+```
+
+The gate uses a booted iPhone simulator by default. Set
+`KAIRO_SIMULATOR_ID` to target a specific simulator when other Xcode test
+runs are active.
+
 ## Run on a real iPhone
 
 Signing is already wired: **simulator builds stay unsigned** (so `xcodebuild

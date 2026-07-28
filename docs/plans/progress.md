@@ -1,5 +1,43 @@
 # Progress log
 
+## 2026-07-27 — Round 12: iOS main-actor release hardening (Codex)
+
+Roadmap: `docs/plans/2026-07-27-round12-main-actor.md`. Closed the native
+runtime-correctness gap exposed after Round 11:
+
+- **Compile-time UI isolation.** The SwiftUI environment model `AppState` is
+  now `@MainActor`, covering UIKit trait updates and every observable-state
+  mutation before and after async suspension.
+- **A warning is now a failing gate.** `scripts/ios-main-thread-gate.sh`
+  regenerates the Xcode project, runs the 37 app-hosted unit tests in isolated
+  temporary DerivedData, preserves `xcodebuild` failures, and rejects any
+  `Main Thread Checker:` output. The RED run passed its assertions but failed
+  on both `UIApplication.connectedScenes` and `UIWindowScene.windows`; the
+  GREEN run passed 37/37 with neither warning.
+- **Shared-QA smoke is state-aware.** The full-flight XCUITest initially
+  failed because another runner's legitimate overtime focus session hid the
+  idle `Start focus` control. The tab smoke now accepts either the idle control
+  or the server-authoritative active-session `Complete session` control,
+  without ending another runner's session. The focused test then passed.
+- **Full gates.** Web lint, typecheck, build, and 44 files / 547 tests passed.
+  iOS passed 37 unit tests and 16 serial UI tests with zero failures and no
+  Main Thread Checker match. The unsigned generic arm64 device build
+  succeeded; its stale `var` warning in the widget intent was removed.
+- **Parity unchanged.** This is correctness hardening, not feature inflation:
+  web **89.74%**, iOS/combined **87.08%**; both gates pass.
+- **Host contention handled honestly.** A separate checkout was running
+  Xcode against the original simulator. Final evidence used a distinct,
+  already-migrated iPhone 17 Pro plus isolated DerivedData rather than treating
+  runner termination as an app failure.
+
+**Still not physically verified:** the checkout still lacks
+`ios/Signing.local.xcconfig`, so the Health permission sheet and a mindful
+sample in Apple Health remain unclaimed.
+
+**Next:** run `./scripts/ios-device-install.sh <TEAM_ID>` on the connected
+iPhone and complete the Round 11 HealthKit release check. After that, begin
+K04's separate sleep-schedule-read / wind-down-suggestion tranche.
+
 ## 2026-07-27 — Production-readiness pass + a launch crash caught before it shipped (Fable)
 
 **Ops hardening (goal: production ready):**
