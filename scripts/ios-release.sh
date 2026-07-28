@@ -31,8 +31,8 @@ if [[ ! "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
   exit 65
 fi
 
-TEAM_ID=""
-if [[ -f ios/Signing.local.xcconfig ]]; then
+TEAM_ID="${KAIRO_DEVELOPMENT_TEAM:-}"
+if [[ -z "$TEAM_ID" && -f ios/Signing.local.xcconfig ]]; then
   TEAM_ID="$(
     sed -n 's/^KAIRO_DEVELOPMENT_TEAM[[:space:]]*=[[:space:]]*//p' \
       ios/Signing.local.xcconfig | tr -d '[:space:]'
@@ -169,7 +169,7 @@ preflight() {
     exit 67
   fi
   if [[ -z "$TEAM_ID" ]]; then
-    echo "KAIRO_DEVELOPMENT_TEAM is missing from ios/Signing.local.xcconfig." >&2
+    echo "KAIRO_DEVELOPMENT_TEAM is missing from the environment and ios/Signing.local.xcconfig." >&2
     exit 68
   fi
 

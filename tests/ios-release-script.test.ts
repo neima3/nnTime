@@ -10,6 +10,7 @@ const baseEnvironment = {
   KAIRO_RELEASE_DRY_RUN: "1",
   KAIRO_ALLOW_DIRTY: "1",
   KAIRO_BUILD_NUMBER: "314",
+  KAIRO_DEVELOPMENT_TEAM: "TESTTEAM123",
 };
 
 function run(mode: string) {

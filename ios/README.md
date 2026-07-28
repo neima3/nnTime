@@ -47,7 +47,8 @@ runs are active.
 
 Signing is already wired: **simulator builds stay unsigned** (so `xcodebuild
 test` and CI work with no Apple account at all), and **device builds** sign
-automatically with a team read from `ios/Signing.local.xcconfig` (gitignored).
+automatically with a team read from `KAIRO_DEVELOPMENT_TEAM` or
+`ios/Signing.local.xcconfig` (gitignored).
 See `ios/Signing.xcconfig` for the mechanism.
 
 Three one-time steps need a human — they need your Apple ID password, 2FA, and
@@ -130,7 +131,8 @@ The release gate requires:
 
 - a clean checkout and a positive integer `KAIRO_BUILD_NUMBER` (otherwise the
   git commit count is used);
-- the team in ignored `ios/Signing.local.xcconfig`;
+- the team in `KAIRO_DEVELOPMENT_TEAM` or ignored
+  `ios/Signing.local.xcconfig`;
 - an Xcode Apple account with distribution access, or the complete optional
   `KAIRO_ASC_KEY_PATH`, `KAIRO_ASC_KEY_ID`, and `KAIRO_ASC_ISSUER_ID` triplet;
 - an App Store Connect app record for `me.neima.kairo`.

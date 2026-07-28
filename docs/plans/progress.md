@@ -48,9 +48,9 @@ with no operation inventory, and CI did not compile generated Swift.
 - **First-push feedback became release coverage.** GitHub’s Linux unit job
   exposed that the Round 14 Apple release-contract suites require `plutil`;
   those 15 tests now run with XcodeGen on the macOS native-contract worker
-  while the other 615 remain on the Postgres-backed Linux worker. The first
-  E2E flight also proved Better Auth user IDs are opaque text, not guaranteed
-  UUIDs. The focus
+  using a synthetic environment-provided team ID, while the other 615 remain
+  on the Postgres-backed Linux worker. The first E2E flight also proved Better
+  Auth user IDs are opaque text, not guaranteed UUIDs. The focus
   runtime/OpenAPI contract now reflects that real identity shape, and the
   previously failing Companion flow passes in the complete 7-test browser
   suite.
