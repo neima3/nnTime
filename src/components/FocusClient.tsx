@@ -147,6 +147,10 @@ export function FocusClient({
   /** Companion mode (T11 — body doubling): quiet presence during the session.
    *  Device-local preference; the "Body double" ritual switches it on. */
   const [companion, setCompanion] = useState(false);
+  const mutationInFlightRef = useRef(false);
+  const [mutationPending, setMutationPending] = useState(false);
+  const startAttemptRef = useRef<{ fingerprint: string; key: string } | null>(null);
+  const patchAttemptRef = useRef<{ fingerprint: string; key: string } | null>(null);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -231,6 +235,8 @@ export function FocusClient({
       if (data.session) {
         setSession(data.session);
         setRemainingSec(data.remainingSec ?? 0);
+      } else {
+        setSession(null);
       }
     } catch {
       /* offline */
@@ -240,50 +246,38 @@ export function FocusClient({
 
   useEffect(() => {
     // Load active session after mount (auth-bound fetch; no SSR session object).
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/v1/focus-sessions");
-        if (cancelled) return;
-        if (res.status === 401 || !res.ok) {
-          setLoading(false);
-          return;
-        }
-        const data = await res.json();
-        if (cancelled) return;
-        if (data.session) {
-          setSession(data.session);
-          setRemainingSec(data.remainingSec ?? 0);
-        }
-      } catch {
-        /* offline */
-      }
-      if (!cancelled) setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    const initialHydrate = setTimeout(() => void hydrate(), 0);
+    return () => clearTimeout(initialHydrate);
+  }, [hydrate]);
 
-  // Local tick while running (server is source of truth; rehydrate periodically).
+  // Local tick while running; active sessions rehydrate periodically in every
+  // state so a paused tab still converges after another device completes it.
   // When remaining hits zero and the session keeps running, count overtime up
   // instead of sitting silently on 00:00.
   useEffect(() => {
-    if (!session || session.state !== "running") return;
-    const tick = setInterval(() => {
-      setRemainingSec((s) => {
-        if (s <= 1) {
-          setOvertimeSec((o) => o + 1);
-          return 0;
-        }
-        return s - 1;
-      });
-    }, 1000);
+    if (
+      !session ||
+      (session.state !== "running" && session.state !== "paused")
+    ) {
+      return;
+    }
+    const tick =
+      session.state === "running"
+        ? setInterval(() => {
+            setRemainingSec((s) => {
+              if (s <= 1) {
+                setOvertimeSec((o) => o + 1);
+                return 0;
+              }
+              return s - 1;
+            });
+          }, 1000)
+        : null;
     const rehydrate = setInterval(() => {
       void hydrate();
     }, 15000);
     return () => {
-      clearInterval(tick);
+      if (tick) clearInterval(tick);
       clearInterval(rehydrate);
     };
   }, [session, hydrate]);
@@ -327,75 +321,124 @@ export function FocusClient({
   }, [breakSec]);
 
   const start = useCallback(async (minutes?: number) => {
+    if (mutationInFlightRef.current) return;
+    mutationInFlightRef.current = true;
+    setMutationPending(true);
     setError(null);
     setFinished(null);
     setBreakSec(null);
-    const res = await fetch("/api/v1/focus-sessions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        targetDurationMin: minutes ?? durationMin,
-        title,
-        emoji,
-      }),
-    });
-    if (res.status === 401) {
-      setError("Sign in to start a focus session.");
-      return;
+    const body = {
+      targetDurationMin: minutes ?? durationMin,
+      title,
+      emoji,
+    };
+    const fingerprint = JSON.stringify(body);
+    if (startAttemptRef.current?.fingerprint !== fingerprint) {
+      startAttemptRef.current = {
+        fingerprint,
+        key: crypto.randomUUID(),
+      };
     }
-    if (!res.ok) {
-      setError("Couldn't start the session — try again");
-      return;
+    try {
+      const res = await fetch("/api/v1/focus-sessions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": startAttemptRef.current.key,
+        },
+        body: JSON.stringify(body),
+      });
+      startAttemptRef.current = null;
+      if (res.status === 401) {
+        setError("Sign in to start a focus session.");
+        return;
+      }
+      if (!res.ok) {
+        setError("Couldn't start the session — try again");
+        return;
+      }
+      const data = await res.json();
+      setSession(data.session);
+      setRemainingSec(data.remainingSec);
+    } catch {
+      setError("You're offline. Reconnect and try again.");
+    } finally {
+      mutationInFlightRef.current = false;
+      setMutationPending(false);
     }
-    const data = await res.json();
-    setSession(data.session);
-    setRemainingSec(data.remainingSec);
   }, [durationMin, title, emoji]);
 
   const patch = useCallback(
     async (body: Record<string, unknown>) => {
-      if (!session) return;
+      if (!session || mutationInFlightRef.current) return;
+      mutationInFlightRef.current = true;
+      setMutationPending(true);
       setError(null);
-      const res = await fetch(`/api/v1/focus-sessions/${session.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "If-Match": String(session.revision),
-        },
-        body: JSON.stringify(body),
+      const fingerprint = JSON.stringify({
+        id: session.id,
+        revision: session.revision,
+        body,
       });
-      if (!res.ok) {
-        setError("That didn't go through — try again.");
-        return;
+      if (patchAttemptRef.current?.fingerprint !== fingerprint) {
+        patchAttemptRef.current = {
+          fingerprint,
+          key: crypto.randomUUID(),
+        };
       }
-      const data = await res.json();
-      if (data.session.state === "completed") {
-        // Post-session flow: celebrate, then offer a break / keep going / done.
-        const focusedMin = Math.max(
-          1,
-          Math.round(
-            (session.targetDurationMin * 60 - remainingSec + overtimeSec) / 60,
-          ),
-        );
-        celebrate(window.innerWidth / 2, window.innerHeight / 2 - 80);
-        setFinished({ focusedMin });
-        setSession(null);
-        setRemainingSec(durationMin * 60);
-        router.refresh();
-        return;
-      }
-      setSession(data.session);
-      setRemainingSec(data.remainingSec ?? 0);
-      if (
-        data.session.state === "skipped" ||
-        data.session.state === "cancelled"
-      ) {
-        setSession(null);
-        setRemainingSec(durationMin * 60);
-        router.refresh();
+      try {
+        const res = await fetch(`/api/v1/focus-sessions/${session.id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "If-Match": String(session.revision),
+            "Idempotency-Key": patchAttemptRef.current.key,
+          },
+          body: JSON.stringify(body),
+        });
+        patchAttemptRef.current = null;
+        if (res.status === 409) {
+          await hydrate();
+          setError("Focus changed elsewhere — refreshed to the latest session.");
+          return;
+        }
+        if (!res.ok) {
+          setError("That didn't go through — try again.");
+          return;
+        }
+        const data = await res.json();
+        if (data.session.state === "completed") {
+          // Post-session flow: celebrate, then offer a break / keep going / done.
+          const focusedMin = Math.max(
+            1,
+            Math.round(
+              (session.targetDurationMin * 60 - remainingSec + overtimeSec) / 60,
+            ),
+          );
+          celebrate(window.innerWidth / 2, window.innerHeight / 2 - 80);
+          setFinished({ focusedMin });
+          setSession(null);
+          setRemainingSec(durationMin * 60);
+          router.refresh();
+          return;
+        }
+        setSession(data.session);
+        setRemainingSec(data.remainingSec ?? 0);
+        if (
+          data.session.state === "skipped" ||
+          data.session.state === "cancelled"
+        ) {
+          setSession(null);
+          setRemainingSec(durationMin * 60);
+          router.refresh();
+        }
+      } catch {
+        setError("You're offline. Reconnect and try again.");
+      } finally {
+        mutationInFlightRef.current = false;
+        setMutationPending(false);
       }
     },
-    [session, router, remainingSec, overtimeSec, durationMin],
+    [session, router, remainingSec, overtimeSec, durationMin, hydrate],
   );
 
   if (loading) {
@@ -531,7 +574,8 @@ export function FocusClient({
           <button
             type="button"
             onClick={() => void start(10)}
-            className="rounded-2xl border border-border bg-surface py-3.5 text-[15px] font-semibold text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+            disabled={mutationPending}
+            className="rounded-2xl border border-border bg-surface py-3.5 text-[15px] font-semibold text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:cursor-wait disabled:opacity-60"
           >
             Keep going +10 min
           </button>
@@ -653,7 +697,8 @@ export function FocusClient({
         <button
           type="button"
           onClick={() => void start()}
-          className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-iris px-8 py-3.5 text-[15px] font-semibold text-ink-inverse shadow-float transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+          disabled={mutationPending}
+          className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-iris px-8 py-3.5 text-[15px] font-semibold text-ink-inverse shadow-float transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:cursor-wait disabled:opacity-60"
         >
           <Play size={17} fill="currentColor" />
           Start focus
@@ -720,7 +765,8 @@ export function FocusClient({
               onClick={() =>
                 void patch({ action: "transition", state: "completed" })
               }
-              className="rounded-xl bg-cat-butter-ink px-3 py-1.5 text-[13px] font-bold text-cat-butter"
+              disabled={mutationPending}
+              className="rounded-xl bg-cat-butter-ink px-3 py-1.5 text-[13px] font-bold text-cat-butter disabled:cursor-wait disabled:opacity-60"
             >
               Wrap up
             </button>
@@ -730,7 +776,8 @@ export function FocusClient({
                 setOvertimeSec(0);
                 void patch({ action: "extend", addMinutes: 5 });
               }}
-              className="rounded-xl px-2.5 py-1.5 text-[13px] font-bold text-cat-butter-ink hover:bg-cat-butter-ink/10"
+              disabled={mutationPending}
+              className="rounded-xl px-2.5 py-1.5 text-[13px] font-bold text-cat-butter-ink hover:bg-cat-butter-ink/10 disabled:cursor-wait disabled:opacity-60"
             >
               +5 more
             </button>
@@ -810,7 +857,8 @@ export function FocusClient({
             type="button"
             aria-label="Extend 5 minutes"
             onClick={() => void patch({ action: "extend", addMinutes: 5 })}
-            className="grid size-14 place-items-center rounded-full border border-border bg-surface text-ink-soft shadow-card transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+            disabled={mutationPending}
+            className="grid size-14 place-items-center rounded-full border border-border bg-surface text-ink-soft shadow-card transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:cursor-wait disabled:opacity-60"
           >
             <Plus size={22} />
           </button>
@@ -825,7 +873,8 @@ export function FocusClient({
               state: isPaused ? "running" : "paused",
             })
           }
-          className="grid size-20 place-items-center rounded-full bg-iris text-ink-inverse shadow-float transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+          disabled={mutationPending}
+          className="grid size-20 place-items-center rounded-full bg-iris text-ink-inverse shadow-float transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:cursor-wait disabled:opacity-60"
         >
           {isPaused ? (
             <Play size={30} fill="currentColor" />
@@ -838,7 +887,8 @@ export function FocusClient({
             type="button"
             aria-label="Skip session"
             onClick={() => void patch({ action: "transition", state: "skipped" })}
-            className="grid size-14 place-items-center rounded-full border border-border bg-surface text-ink-soft shadow-card transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+            disabled={mutationPending}
+            className="grid size-14 place-items-center rounded-full border border-border bg-surface text-ink-soft shadow-card transition-colors hover:text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:cursor-wait disabled:opacity-60"
           >
             <SkipForward size={22} />
           </button>
@@ -849,7 +899,8 @@ export function FocusClient({
       <button
         type="button"
         onClick={() => void patch({ action: "transition", state: "completed" })}
-        className="mt-8 inline-flex items-center gap-2 rounded-xl bg-success-soft px-5 py-2.5 text-[14px] font-semibold text-success focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+        disabled={mutationPending}
+        className="mt-8 inline-flex items-center gap-2 rounded-xl bg-success-soft px-5 py-2.5 text-[14px] font-semibold text-success focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:cursor-wait disabled:opacity-60"
       >
         <Check size={16} strokeWidth={3} />
         Complete
@@ -861,7 +912,8 @@ export function FocusClient({
             key={m}
             type="button"
             onClick={() => void patch({ action: "extend", addMinutes: m })}
-            className="rounded-full border border-border bg-surface px-3 py-1 text-[12px] font-semibold text-ink-soft hover:text-ink"
+            disabled={mutationPending}
+            className="rounded-full border border-border bg-surface px-3 py-1 text-[12px] font-semibold text-ink-soft hover:text-ink disabled:cursor-wait disabled:opacity-60"
           >
             +{m} min
           </button>
