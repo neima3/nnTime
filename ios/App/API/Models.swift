@@ -16,6 +16,7 @@ struct UserSettings: Decodable {
     let reducedStimulation: Bool?
     let hourCycle: String?
     let weekStart: Int?
+    let notificationPrefs: NotificationPreferences?
     let revision: Int
 }
 
@@ -23,6 +24,7 @@ struct DayResponse: Decodable {
     let date: String
     let zone: String
     let activities: [Activity]
+    let anytimeTasks: [TaskItem]?
     let occurrenceStatusBySeries: [String: String]?
 }
 
@@ -148,6 +150,241 @@ struct FocusSession: Decodable, Identifiable {
     let state: String
     let targetDurationMin: Int
     let startedAt: Date?
+}
+
+// MARK: - Typed mutation models
+
+typealias NotificationPreferences = [String: NotificationPreferenceValue]
+
+indirect enum NotificationPreferenceValue:
+    Codable,
+    Equatable,
+    Sendable
+{
+    case string(String)
+    case integer(Int)
+    case number(Double)
+    case boolean(Bool)
+    case object(NotificationPreferences)
+    case array([NotificationPreferenceValue])
+    case null
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() {
+            self = .null
+        } else if let value = try? container.decode(Bool.self) {
+            self = .boolean(value)
+        } else if let value = try? container.decode(Int.self) {
+            self = .integer(value)
+        } else if let value = try? container.decode(Double.self) {
+            self = .number(value)
+        } else if let value = try? container.decode(String.self) {
+            self = .string(value)
+        } else if let value = try? container.decode(NotificationPreferences.self) {
+            self = .object(value)
+        } else {
+            self = .array(
+                try container.decode([NotificationPreferenceValue].self)
+            )
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case let .string(value): try container.encode(value)
+        case let .integer(value): try container.encode(value)
+        case let .number(value): try container.encode(value)
+        case let .boolean(value): try container.encode(value)
+        case let .object(value): try container.encode(value)
+        case let .array(value): try container.encode(value)
+        case .null: try container.encodeNil()
+        }
+    }
+}
+
+enum UpdateField<Value: Equatable & Sendable>: Equatable, Sendable {
+    case unchanged
+    case null
+    case value(Value)
+}
+
+struct SettingsUpdate: Equatable, Sendable {
+    var timezone: String?
+    var locale: String?
+    var weekStart: WeekStart?
+    var hourCycle: HourCyclePreference?
+    var theme: ThemePreference?
+    var reducedStimulation: Bool?
+    var notificationPrefs: NotificationPreferences?
+
+    init(
+        timezone: String? = nil,
+        locale: String? = nil,
+        weekStart: WeekStart? = nil,
+        hourCycle: HourCyclePreference? = nil,
+        theme: ThemePreference? = nil,
+        reducedStimulation: Bool? = nil,
+        notificationPrefs: NotificationPreferences? = nil
+    ) {
+        self.timezone = timezone
+        self.locale = locale
+        self.weekStart = weekStart
+        self.hourCycle = hourCycle
+        self.theme = theme
+        self.reducedStimulation = reducedStimulation
+        self.notificationPrefs = notificationPrefs
+    }
+}
+
+enum WeekStart: Int, Equatable, Sendable {
+    case sunday = 0
+    case monday
+    case tuesday
+    case wednesday
+    case thursday
+    case friday
+    case saturday
+}
+
+enum HourCyclePreference: String, Equatable, Sendable {
+    case h12
+    case h24
+}
+
+enum ThemePreference: String, Equatable, Sendable {
+    case system
+    case light
+    case dark
+}
+
+enum ActivityEditScope: String, Equatable, Sendable {
+    case this
+    case thisAndFuture = "this_and_future"
+    case all
+}
+
+enum ActivityEnergy: String, Equatable, Sendable {
+    case low
+    case medium
+    case high
+}
+
+enum ActivityPriority: String, Equatable, Sendable {
+    case none
+    case low
+    case high
+}
+
+enum ActivityStatus: String, Equatable, Sendable {
+    case pending
+    case completed
+    case skipped
+    case cancelled
+}
+
+enum ActivitySource: String, Equatable, Sendable {
+    case manual
+    case routine
+    case calendar
+}
+
+struct ChecklistUpdateItem: Codable, Equatable, Hashable, Sendable {
+    var label: String
+    var done: Bool?
+}
+
+struct ActivityUpdate: Equatable, Sendable {
+    var editScope: ActivityEditScope?
+    var occurrenceKey: Date?
+    var tz: String?
+    var dtstartLocal: Date?
+    var rrule: UpdateField<String>
+    var exdate: UpdateField<[String]>
+    var rdate: UpdateField<[Date]>
+    var title: String?
+    var emoji: UpdateField<String>
+    var categoryId: UpdateField<String>
+    var durationMin: Int?
+    var checklistTemplate: [ChecklistUpdateItem]?
+    var energy: UpdateField<ActivityEnergy>
+    var priority: ActivityPriority?
+    var tags: UpdateField<[String]>
+    var notes: UpdateField<String>
+    var source: ActivitySource?
+    var sourceRef: UpdateField<String>
+    var status: ActivityStatus?
+    var startAt: Date?
+    var completedAt: UpdateField<Date>
+    var checklistOverride: UpdateField<[ChecklistUpdateItem]>
+
+    init(
+        editScope: ActivityEditScope? = nil,
+        occurrenceKey: Date? = nil,
+        tz: String? = nil,
+        dtstartLocal: Date? = nil,
+        rrule: UpdateField<String> = .unchanged,
+        exdate: UpdateField<[String]> = .unchanged,
+        rdate: UpdateField<[Date]> = .unchanged,
+        title: String? = nil,
+        emoji: UpdateField<String> = .unchanged,
+        categoryId: UpdateField<String> = .unchanged,
+        durationMin: Int? = nil,
+        checklistTemplate: [ChecklistUpdateItem]? = nil,
+        energy: UpdateField<ActivityEnergy> = .unchanged,
+        priority: ActivityPriority? = nil,
+        tags: UpdateField<[String]> = .unchanged,
+        notes: UpdateField<String> = .unchanged,
+        source: ActivitySource? = nil,
+        sourceRef: UpdateField<String> = .unchanged,
+        status: ActivityStatus? = nil,
+        startAt: Date? = nil,
+        completedAt: UpdateField<Date> = .unchanged,
+        checklistOverride: UpdateField<[ChecklistUpdateItem]> = .unchanged
+    ) {
+        self.editScope = editScope
+        self.occurrenceKey = occurrenceKey
+        self.tz = tz
+        self.dtstartLocal = dtstartLocal
+        self.rrule = rrule
+        self.exdate = exdate
+        self.rdate = rdate
+        self.title = title
+        self.emoji = emoji
+        self.categoryId = categoryId
+        self.durationMin = durationMin
+        self.checklistTemplate = checklistTemplate
+        self.energy = energy
+        self.priority = priority
+        self.tags = tags
+        self.notes = notes
+        self.source = source
+        self.sourceRef = sourceRef
+        self.status = status
+        self.startAt = startAt
+        self.completedAt = completedAt
+        self.checklistOverride = checklistOverride
+    }
+}
+
+enum FocusTransitionState: String, Equatable, Sendable {
+    case running
+    case paused
+    case completed
+    case skipped
+    case cancelled
+}
+
+enum FocusCommand: Equatable, Sendable {
+    case transition(FocusTransitionState)
+    case extend(FocusExtensionMinutes)
+}
+
+enum FocusExtensionMinutes: Int, Equatable, Sendable {
+    case one = 1
+    case five = 5
+    case ten = 10
 }
 
 // MARK: - View model shapes
