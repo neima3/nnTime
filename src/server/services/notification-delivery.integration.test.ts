@@ -8,6 +8,7 @@ import {
   type EphemeralDb,
 } from "../db/test-db";
 import {
+  activityOccurrences,
   activitySeries,
   notificationJobs,
   userSettings,
@@ -15,6 +16,7 @@ import {
 } from "../db/schema";
 import type { PushDeliveryResult } from "./push";
 import { deliverDueNotificationJobs } from "./notification-delivery";
+import { activityFireTimes } from "./notification-policy";
 
 const NOW = new Date("2026-07-28T23:00:00.000Z");
 const OCCURRENCE = new Date("2026-07-28T22:30:00.000Z");
@@ -84,6 +86,10 @@ async function seedJob(
   if (!env) throw new Error("DB unavailable");
   const type = input.type ?? "start";
   const isReview = type === "review-today" || type === "weekly-review";
+  const defaultFireAt =
+    activityFireTimes(OCCURRENCE, 30).find(
+      (candidate) => candidate.type === type,
+    )?.fireAt ?? new Date(NOW.getTime() - 60_000);
   const seriesId =
     input.entityId ?? (isReview ? null : await seedSeries(userId));
   const id = input.id ?? uuidv7();
@@ -94,7 +100,7 @@ async function seedJob(
     entityId: seriesId,
     occurrenceKey: isReview ? null : OCCURRENCE,
     type,
-    fireAt: input.fireAt ?? new Date(NOW.getTime() - 60_000),
+    fireAt: input.fireAt ?? defaultFireAt,
     expiresAt: input.expiresAt ?? new Date(NOW.getTime() + 30 * 60_000),
     dedupKey: input.dedupKey ?? `${userId}:${id}:${type}`,
     state: input.state ?? "pending",
@@ -177,7 +183,11 @@ describe("deliverDueNotificationJobs", () => {
     const unsubscribedUser = await seedUser();
 
     const disabledId = await seedJob(disabledUser);
-    const quietId = await seedJob(quietUser);
+    const quietId = await seedJob(quietUser, {
+      // The original fire time was before quiet hours, but a delayed delivery
+      // attempt must respect the user's quiet hours at the actual send time.
+      fireAt: new Date("2026-07-28T21:59:00.000Z"),
+    });
     const missingId = await seedJob(missingUser, { entityId: uuidv7() });
     const unconfiguredId = await seedJob(unconfiguredUser);
     const unsubscribedId = await seedJob(unsubscribedUser);
@@ -258,6 +268,51 @@ describe("deliverDueNotificationJobs", () => {
       attempts: 5,
       lastError: "retry-exhausted",
       claimedAt: null,
+    });
+  });
+
+  itDb("revalidates occurrence state and copy immediately before sending", async () => {
+    const completedUser = await seedUser();
+    const completedSeriesId = await seedSeries(completedUser);
+    await env!.db.insert(activityOccurrences).values({
+      id: uuidv7(),
+      userId: completedUser,
+      seriesId: completedSeriesId,
+      occurrenceKey: OCCURRENCE,
+      status: "completed",
+    });
+    const completedJobId = await seedJob(completedUser, {
+      entityId: completedSeriesId,
+    });
+
+    const renamedUser = await seedUser();
+    const renamedSeriesId = await seedSeries(renamedUser);
+    await env!.db.insert(activityOccurrences).values({
+      id: uuidv7(),
+      userId: renamedUser,
+      seriesId: renamedSeriesId,
+      occurrenceKey: OCCURRENCE,
+      title: "Renamed just this time",
+      status: "pending",
+    });
+    await seedJob(renamedUser, { entityId: renamedSeriesId });
+
+    const send = vi.fn().mockResolvedValue(SUCCESS);
+    const result = await deliverDueNotificationJobs({
+      db: env!.db,
+      now: NOW,
+      limit: 20,
+      send,
+    });
+
+    expect(result).toMatchObject({ delivered: 1, suppressed: 1 });
+    expect(await getJob(completedJobId)).toMatchObject({
+      state: "suppressed",
+      lastError: "source-missing",
+    });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]?.[1]).toMatchObject({
+      title: "🌿 Renamed just this time",
     });
   });
 

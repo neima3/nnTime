@@ -6,6 +6,7 @@ import type { Db } from "../dal";
 import { isQuietAt } from "@/lib/quiet-hours";
 import { instantToWallFields } from "../temporal/zone";
 import {
+  activityFireTimes,
   buildPushPayload,
   notificationTypeEnabled,
   retryDelayMs,
@@ -188,7 +189,7 @@ export async function deliverDueNotificationJobs(
       continue;
     }
 
-    const quietHour = instantToWallFields(job.fireAt, timezone).hour;
+    const quietHour = instantToWallFields(now, timezone).hour;
     if (isQuietAt(prefs, quietHour)) {
       await transitionJob(db, job.id, {
         state: "suppressed",
@@ -223,8 +224,43 @@ export async function deliverDueNotificationJobs(
         summary.suppressed++;
         continue;
       }
+      const [occurrence] = await db
+        .select()
+        .from(schema.activityOccurrences)
+        .where(
+          and(
+            eq(schema.activityOccurrences.userId, job.userId),
+            eq(schema.activityOccurrences.seriesId, series.id),
+            eq(
+              schema.activityOccurrences.occurrenceKey,
+              job.occurrenceKey!,
+            ),
+            isNull(schema.activityOccurrences.deletedAt),
+          ),
+        )
+        .limit(1);
+      const startAt = occurrence?.startAt ?? job.occurrenceKey!;
+      const durationMin =
+        occurrence?.durationMin ?? series.durationMin;
+      const stillDesired =
+        (occurrence?.status ?? "pending") === "pending" &&
+        activityFireTimes(startAt, durationMin).some(
+          (candidate) =>
+            candidate.type === job.type &&
+            candidate.fireAt.getTime() === job.fireAt.getTime(),
+        );
+      if (!stillDesired) {
+        await transitionJob(db, job.id, {
+          state: "suppressed",
+          lastError: "source-missing",
+          claimedAt: null,
+          updatedAt: now,
+        });
+        summary.suppressed++;
+        continue;
+      }
       payload = buildPushPayload(job.type, {
-        title: series.title,
+        title: occurrence?.title ?? series.title,
         emoji: series.emoji ?? undefined,
         entityId: series.id,
       });
