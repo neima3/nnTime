@@ -90,7 +90,7 @@ export function OfflineIndicator({ userId }: { userId: string | null }) {
             </>
           ) : (
             <p>
-              {!online && "You’re offline"}
+              {!online && <>You&apos;re offline</>}
               {!online && pending > 0 && " · "}
               {pending > 0 &&
                 `${pending} change${pending === 1 ? "" : "s"} queued`}

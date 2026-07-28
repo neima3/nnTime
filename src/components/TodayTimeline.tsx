@@ -13,7 +13,7 @@ import { localMinutesToInstant } from "@/lib/adapters";
 import { toast } from "./Toast";
 import { notifyDayChanged } from "./NowBar";
 import { useLowBattery } from "./LowBattery";
-import { enqueueMutation, resolveQueueUser } from "@/lib/offline-queue";
+import { sendRebasedStatusChange } from "@/lib/offline-mutation";
 import { getStatsCached } from "@/lib/stats-cache";
 
 interface TodayTimelineProps {
@@ -158,30 +158,29 @@ export function TodayTimeline({
       try {
         const act = activities.find((a) => a.id === id);
         const occurrenceKey = act?.occurrenceKey;
+        if (!occurrenceKey) return { ok: false };
         const currentDone = offlineDone[id] ?? act?.done ?? false;
         const nextStatus = currentDone ? "pending" : "completed";
 
-        // Offline (T13): a status flip is the one edit that's safe to replay —
-        // it touches nothing else, so the queue re-reads the revision on
-        // reconnect (rebase-on-replay) and can't clobber a concurrent edit.
-        if (typeof navigator !== "undefined" && !navigator.onLine) {
-          const queueUser = resolveQueueUser(null);
-          const queued = queueUser
-            ? await enqueueMutation(queueUser, {
-                method: "PATCH",
-                path: `/api/v1/activities/${id}`,
-                rebasePath: `/api/v1/activities/${id}`,
-                body: {
-                  editScope: "this",
-                  occurrenceKey,
-                  status: nextStatus,
-                  completedAt:
-                    nextStatus === "completed" ? new Date().toISOString() : null,
-                },
-                idempotencyKey: crypto.randomUUID(),
-              })
-            : null;
-          if (!queued) return { ok: false };
+        let revision = act?.revision;
+        if (revision == null && navigator.onLine) {
+          const getRes = await fetch(`/api/v1/activities/${id}`);
+          if (!getRes.ok) return { ok: false };
+          revision = (await getRes.json()).revision;
+        }
+        const delivery = await sendRebasedStatusChange({
+          path: `/api/v1/activities/${id}`,
+          body: {
+            editScope: "this",
+            occurrenceKey,
+            status: nextStatus,
+            completedAt:
+              nextStatus === "completed" ? new Date().toISOString() : null,
+          },
+          // The queue ignores this while offline and re-reads before replay.
+          onlineRevision: revision ?? 0,
+        });
+        if (delivery.state === "queued") {
           setOfflineDone((prev) => ({ ...prev, [id]: nextStatus === "completed" }));
           toast(
             nextStatus === "completed"
@@ -190,28 +189,16 @@ export function TodayTimeline({
           );
           return { ok: true };
         }
-
-        let revision = act?.revision;
-        if (revision == null) {
-          const getRes = await fetch(`/api/v1/activities/${id}`);
-          if (!getRes.ok) return { ok: false };
-          revision = (await getRes.json()).revision;
+        if (delivery.state === "unavailable") {
+          toast("This change wasn't saved — reconnect and try again");
+          return { ok: false };
         }
 
-        const res = await fetch(`/api/v1/activities/${id}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "If-Match": String(revision),
-          },
-          body: JSON.stringify({
-            editScope: "this",
-            occurrenceKey,
-            status: nextStatus,
-            completedAt:
-              nextStatus === "completed" ? new Date().toISOString() : null,
-          }),
-        });
+        const res = delivery.response;
+        if (res.status === 409) {
+          toast("Someone else just touched this — refresh to see the latest");
+          return { ok: false };
+        }
         if (!res.ok) return { ok: false };
         toast(nextStatus === "completed" ? "Nice — marked done" : "Restored");
         router.refresh();

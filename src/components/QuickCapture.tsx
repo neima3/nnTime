@@ -15,8 +15,7 @@ import { toast } from "./Toast";
 import { notifyDayChanged } from "./NowBar";
 import { localMinutesToInstant } from "@/lib/adapters";
 import { clientToday } from "@/lib/client-date";
-import { enqueueMutation, resolveQueueUser } from "@/lib/offline-queue";
-import { useSession } from "@/lib/auth-client";
+import { sendReplaySafeCreate } from "@/lib/offline-mutation";
 import { formatTime } from "@/lib/time-format";
 import { useHourCycle } from "@/lib/use-hour-cycle";
 
@@ -58,8 +57,6 @@ function getSpeechRecognition(): (new () => SpeechRecognitionLike) | null {
 
 export function QuickCapture() {
   const hourCycle = useHourCycle();
-  const { data: session } = useSession();
-  const userId = session?.user?.id ?? null;
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
@@ -273,39 +270,26 @@ export function QuickCapture() {
       if (!title || saving) return;
       setSaving(true);
 
-      // Offline capture (T13): a thought you had on the train is exactly what
-      // this box is for, so losing it to a dead connection is the worst possible
-      // failure. Queue it in IndexedDB and let the offline queue replay it on
-      // reconnect. Inbox creates are safe to replay — a plain POST carrying an
-      // Idempotency-Key, no revision and no If-Match to go stale.
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
-        const queueUser = resolveQueueUser(userId);
-        const queued = queueUser
-          ? await enqueueMutation(queueUser, {
-              method: "POST",
-              path: "/api/v1/tasks",
-              body: { bucket: "inbox", title },
-              idempotencyKey: crypto.randomUUID(),
-            })
-          : null;
-        setSaving(false);
-        if (queued) {
+      try {
+        const delivery = await sendReplaySafeCreate({
+          path: "/api/v1/tasks",
+          body: { bucket: "inbox", title },
+        });
+        if (delivery.state === "queued") {
+          setSaving(false);
           setText("");
           setCaptured((n) => n + 1);
           toast("Saved on this device — it'll land in your inbox when you're back");
           if (!keepOpen) setOpen(false);
-        } else {
-          toast("You're offline and this device can't hold it — copy it somewhere safe");
+          return;
         }
-        return;
-      }
+        if (delivery.state === "unavailable") {
+          setSaving(false);
+          toast("You're offline and this device can't hold it — copy it somewhere safe");
+          return;
+        }
 
-      try {
-        const res = await fetch("/api/v1/tasks", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bucket: "inbox", title }),
-        });
+        const res = delivery.response;
         if (res.status === 401) {
           toast("Sign in to capture thoughts");
           setSaving(false);
@@ -340,7 +324,7 @@ export function QuickCapture() {
         setSaving(false);
       }
     },
-    [text, saving, userId],
+    [text, saving],
   );
 
   return (
