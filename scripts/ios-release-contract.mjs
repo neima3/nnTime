@@ -183,7 +183,10 @@ export function readRepositoryReleaseContract(
     widgetBundleId: widgetSettings.PRODUCT_BUNDLE_IDENTIFIER,
     marketingVersion: String(baseSettings.MARKETING_VERSION ?? ""),
     buildNumber: String(
-      buildNumber ?? baseSettings.CURRENT_PROJECT_VERSION ?? "",
+      buildNumber ??
+        baseSettings.KAIRO_BUILD_NUMBER ??
+        baseSettings.CURRENT_PROJECT_VERSION ??
+        "",
     ),
     appGroups: entitlements["com.apple.security.application-groups"] ?? [],
     hasHealthKit: entitlements["com.apple.developer.healthkit"] === true,

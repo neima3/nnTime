@@ -11,7 +11,10 @@ settings:
   base:
     SWIFT_VERSION: "5.9"
     MARKETING_VERSION: "1.0.0"
-    CURRENT_PROJECT_VERSION: "1"
+    KAIRO_BUILD_NUMBER: "1"
+    CURRENT_PROJECT_VERSION: "$(KAIRO_BUILD_NUMBER)"
+    KAIRO_GIT_SHA: "development"
+    KAIRO_BUILD_DATE: "development"
     CODE_SIGN_STYLE: Automatic
     # Simulator builds stay unsigned so `xcodebuild test` and CI work with no
     # Apple account at all. Device builds sign with the team from

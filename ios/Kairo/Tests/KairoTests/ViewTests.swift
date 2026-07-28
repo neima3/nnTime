@@ -3,7 +3,7 @@ import Testing
 import SwiftUI
 @testable import Kairo
 
-@Suite struct ViewTests {
+@Suite @MainActor struct ViewTests {
     @Test func todayTimelineViewInstantiates() {
         let activities = [
             ActivityRow(id: "1", title: "Morning", emoji: "🌤️",

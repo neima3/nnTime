@@ -10,39 +10,35 @@ import Foundation
 public struct ReleasePreflight: Sendable {
     /// The app bundle identifier.
     public let bundleId: String
-    /// The App Store Connect app ID.
-    public let appStoreConnectAppId: String
     /// The signing certificate name.
     public let signingCertificate: String
-    /// The entitlements file path.
-    public let entitlementsPath: String
     /// Whether the privacy manifest (PrivacyInfo.xcprivacy) exists.
     public let hasPrivacyManifest: Bool
-    /// Whether universal links are configured (associated domains).
-    public let hasUniversalLinks: Bool
-    /// Whether Sign in with Apple capability is enabled.
-    public let hasSignInWithApple: Bool
-    /// Whether push notifications capability is enabled.
-    public let hasPushNotifications: Bool
+    /// Whether the app and widget share the Kairo App Group.
+    public let hasAppGroup: Bool
+    /// Whether the application has the HealthKit entitlement.
+    public let hasHealthKit: Bool
+    /// Whether the app explains Health reads.
+    public let hasHealthShareUsageDescription: Bool
+    /// Whether the app explains Health writes.
+    public let hasHealthUpdateUsageDescription: Bool
 
     public init(
-        bundleId: String = "com.neima.kairo",
-        appStoreConnectAppId: String = "",
+        bundleId: String = "me.neima.kairo",
         signingCertificate: String = "Apple Distribution",
-        entitlementsPath: String = "Kairo.entitlements",
         hasPrivacyManifest: Bool = false,
-        hasUniversalLinks: Bool = true,
-        hasSignInWithApple: Bool = true,
-        hasPushNotifications: Bool = true
+        hasAppGroup: Bool = true,
+        hasHealthKit: Bool = true,
+        hasHealthShareUsageDescription: Bool = true,
+        hasHealthUpdateUsageDescription: Bool = true
     ) {
         self.bundleId = bundleId
-        self.appStoreConnectAppId = appStoreConnectAppId
         self.signingCertificate = signingCertificate
-        self.entitlementsPath = entitlementsPath
         self.hasPrivacyManifest = hasPrivacyManifest
-        self.hasUniversalLinks = hasUniversalLinks
-        self.hasSignInWithApple = hasSignInWithApple
-        self.hasPushNotifications = hasPushNotifications
+        self.hasAppGroup = hasAppGroup
+        self.hasHealthKit = hasHealthKit
+        self.hasHealthShareUsageDescription = hasHealthShareUsageDescription
+        self.hasHealthUpdateUsageDescription = hasHealthUpdateUsageDescription
     }
 
     /// Run all preflight checks. Returns a list of failures (empty = ready).
@@ -50,10 +46,15 @@ public struct ReleasePreflight: Sendable {
         var failures: [String] = []
         if bundleId.isEmpty { failures.append("Bundle ID not set") }
         if signingCertificate.isEmpty { failures.append("Signing certificate not set") }
-        if !hasUniversalLinks { failures.append("Universal links not configured") }
-        if !hasSignInWithApple { failures.append("Sign in with Apple not enabled") }
-        if !hasPushNotifications { failures.append("Push notifications not enabled") }
         if !hasPrivacyManifest { failures.append("Privacy manifest (PrivacyInfo.xcprivacy) missing") }
+        if !hasAppGroup { failures.append("App Group not configured") }
+        if !hasHealthKit { failures.append("HealthKit entitlement not configured") }
+        if !hasHealthShareUsageDescription {
+            failures.append("NSHealthShareUsageDescription missing")
+        }
+        if !hasHealthUpdateUsageDescription {
+            failures.append("NSHealthUpdateUsageDescription missing")
+        }
         return failures
     }
 

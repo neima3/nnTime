@@ -13,14 +13,12 @@ import Foundation
 
     @Test func preflightPassesWithAllChecks() {
         let preflight = ReleasePreflight(
-            bundleId: "com.neima.kairo",
-            hasPrivacyManifest: true,
-            hasUniversalLinks: true,
-            hasSignInWithApple: true,
-            hasPushNotifications: true
+            bundleId: "me.neima.kairo",
+            hasPrivacyManifest: true
         )
         #expect(preflight.runChecks().isEmpty)
         #expect(preflight.isReady)
+        #expect(preflight.bundleId == "me.neima.kairo")
     }
 
     @Test func preflightDetectsMissingBundleId() {
@@ -29,13 +27,20 @@ import Foundation
         #expect(failures.contains("Bundle ID not set"))
     }
 
-    @Test func preflightDetectsMissingCapabilities() {
+    @Test func preflightDetectsMissingRequiredAppCapabilities() {
         let preflight = ReleasePreflight(
-            hasUniversalLinks: false,
-            hasSignInWithApple: false,
-            hasPushNotifications: false
+            hasPrivacyManifest: true,
+            hasAppGroup: false,
+            hasHealthKit: false,
+            hasHealthShareUsageDescription: false,
+            hasHealthUpdateUsageDescription: false
         )
         let failures = preflight.runChecks()
-        #expect(failures.count == 4) // 3 capabilities + privacy manifest
+        #expect(failures == [
+            "App Group not configured",
+            "HealthKit entitlement not configured",
+            "NSHealthShareUsageDescription missing",
+            "NSHealthUpdateUsageDescription missing",
+        ])
     }
 }

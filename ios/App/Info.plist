@@ -20,6 +20,10 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>KairoGitCommit</key>
+	<string>$(KAIRO_GIT_SHA)</string>
+	<key>KairoBuildDate</key>
+	<string>$(KAIRO_BUILD_DATE)</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>BricolageGrotesque[opsz,wdth,wght].ttf</string>

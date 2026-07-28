@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   expectedPrivacyContract,
+  readRepositoryReleaseContract,
   validateReleaseContract,
 } from "../scripts/ios-release-contract.mjs";
+import { resolve } from "node:path";
 
 const validContract = {
   appBundleId: "me.neima.kairo",
@@ -22,6 +24,11 @@ const validContract = {
 };
 
 describe("iOS release contract", () => {
+  it("keeps the checked-in app target aligned with the release contract", () => {
+    const repositoryContract = readRepositoryReleaseContract(resolve("."));
+    expect(validateReleaseContract(repositoryContract)).toEqual([]);
+  });
+
   it("accepts Kairo's exact production release contract", () => {
     expect(validateReleaseContract(validContract)).toEqual([]);
   });
