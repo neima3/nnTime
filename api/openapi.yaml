@@ -716,7 +716,8 @@ paths:
       tags: [Routines]
       summary: Add a schedule to a routine
       description: |
-        Carries the recurrence + `paused` + `nextRunAt`. A durable job
+        The client supplies recurrence + `paused`; the server owns
+        `nextRunAt`. A durable job
         materializes occurrences 48h ahead (ADR-004), deduped on
         `(routine_schedule_id, occurrence_key)`.
       operationId: createRoutineSchedule
@@ -1746,7 +1747,7 @@ components:
         id: { type: string, format: uuid }
         userId: { type: string, format: uuid }
         routineId: { type: string, format: uuid }
-        tz: { type: string }
+        tz: { type: string, minLength: 1 }
         rrule: { type: [string, 'null'] }
         paused: { type: boolean }
         nextRunAt: { type: [string, 'null'], format: date-time }

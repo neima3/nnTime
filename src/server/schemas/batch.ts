@@ -31,7 +31,7 @@ export const batchOp = z.object({
 
 /** POST /api/v1/batch request body. */
 export const batchRequest = z.object({
-  operations: z.array(batchOp),
+  operations: z.array(batchOp).max(50),
 });
 
 /** One result, positionally aligned with the request operations array. */
