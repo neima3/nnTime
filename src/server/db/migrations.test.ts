@@ -14,7 +14,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { v7 as uuidv7 } from "uuid";
 import { createEphemeralDb, rethrowIfMigrationFailure, insertUser, type EphemeralDb } from "./test-db";
-import { focusSessions, users } from "./schema";
+import { focusSessions, notificationJobs, schedulerRuns, users } from "./schema";
 import { eq, sql } from "drizzle-orm";
 
 let env: EphemeralDb | null = null;
@@ -80,6 +80,8 @@ describe("migrations apply and schema is complete", () => {
       "idempotency_keys",
       "change_log",
       "rate_limit_buckets",
+      "notification_jobs",
+      "scheduler_runs",
     ];
     for (const t of expected) {
       expect(tableNames).toContain(t);
@@ -104,6 +106,10 @@ describe("migrations apply and schema is complete", () => {
       "focus_state",
       "planner_event_type",
       "change_op",
+      "notification_job_type",
+      "notification_job_state",
+      "notification_entity_type",
+      "scheduler_run_state",
     ]) {
       expect(enumNames).toContain(e);
     }
@@ -117,6 +123,44 @@ describe("migrations apply and schema is complete", () => {
     const cols = (result as { data_type: string; is_identity: string }[])[0];
     expect(cols.data_type).toBe("bigint");
     expect(cols.is_identity).toBe("YES");
+  });
+
+  itDb("notification jobs have durable dedup and due indexes", async () => {
+    const result = await getDb().execute<{ indexname: string }>(
+      sql`SELECT indexname FROM pg_indexes WHERE schemaname='public' AND tablename='notification_jobs'`,
+    );
+    const indexNames = (result as { indexname: string }[]).map((row) => row.indexname);
+    expect(indexNames).toContain("notification_jobs_dedup_idx");
+    expect(indexNames).toContain("notification_jobs_due_idx");
+    expect(indexNames).toContain("notification_jobs_user_entity_idx");
+  });
+});
+
+describe("ADR-004: durable notification jobs", () => {
+  itDb("rejects duplicate dedup keys", async () => {
+    const userId = uuidv7();
+    await insertUser(getDb(), userId);
+    const now = new Date("2026-07-28T18:00:00.000Z");
+    const entityId = uuidv7();
+    const values = {
+      id: uuidv7(),
+      userId,
+      entityType: "activity" as const,
+      entityId,
+      occurrenceKey: now,
+      type: "start" as const,
+      fireAt: now,
+      expiresAt: new Date(now.getTime() + 30 * 60_000),
+      dedupKey: `${userId}:activity:${entityId}:${now.toISOString()}:start:${now.toISOString()}`,
+      state: "pending" as const,
+      nextAttemptAt: now,
+      payload: {},
+    };
+
+    await getDb().insert(notificationJobs).values(values);
+    await expect(
+      getDb().insert(notificationJobs).values({ ...values, id: uuidv7() }),
+    ).rejects.toThrow();
   });
 });
 
@@ -207,5 +251,42 @@ describe("FK cascade on user delete", () => {
       .from(focusSessions)
       .where(eq(focusSessions.userId, userId));
     expect(remaining).toHaveLength(0);
+  });
+
+  itDb("deleting a user removes notification jobs but retains scheduler runs", async () => {
+    const userId = uuidv7();
+    await insertUser(getDb(), userId);
+    const now = new Date("2026-07-28T18:00:00.000Z");
+    const entityId = uuidv7();
+    await getDb().insert(notificationJobs).values({
+      id: uuidv7(),
+      userId,
+      entityType: "activity",
+      entityId,
+      occurrenceKey: now,
+      type: "start",
+      fireAt: now,
+      expiresAt: new Date(now.getTime() + 30 * 60_000),
+      dedupKey: `${userId}:activity:${entityId}:${now.toISOString()}:start:${now.toISOString()}`,
+      state: "pending",
+      nextAttemptAt: now,
+      payload: {},
+    });
+    const [run] = await getDb()
+      .insert(schedulerRuns)
+      .values({ id: uuidv7(), state: "succeeded", startedAt: now, finishedAt: now })
+      .returning();
+
+    await getDb().delete(users).where(eq(users.id, userId));
+
+    expect(
+      await getDb()
+        .select()
+        .from(notificationJobs)
+        .where(eq(notificationJobs.userId, userId)),
+    ).toHaveLength(0);
+    expect(
+      await getDb().select().from(schedulerRuns).where(eq(schedulerRuns.id, run.id)),
+    ).toHaveLength(1);
   });
 });

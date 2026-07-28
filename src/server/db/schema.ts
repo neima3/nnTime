@@ -33,6 +33,7 @@ import {
   index,
   bigint,
   primaryKey,
+  check,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -85,6 +86,32 @@ export const plannerEventType = pgEnum("planner_event_type", [
 ]);
 /** ADR-002: change_log op for the incremental sync feed. */
 export const changeOp = pgEnum("change_op", ["upsert", "delete"]);
+/** ADR-004: durable notification job identity and lifecycle. */
+export const notificationJobType = pgEnum("notification_job_type", [
+  "start",
+  "halfway",
+  "wrap-up",
+  "review-today",
+  "weekly-review",
+]);
+export const notificationJobState = pgEnum("notification_job_state", [
+  "pending",
+  "processing",
+  "retry",
+  "sent",
+  "suppressed",
+  "expired",
+  "cancelled",
+]);
+export const notificationEntityType = pgEnum("notification_entity_type", [
+  "activity",
+  "review",
+]);
+export const schedulerRunState = pgEnum("scheduler_run_state", [
+  "running",
+  "succeeded",
+  "failed",
+]);
 
 /* -------------------------------------------------------------------------- */
 /* Identity & settings                                                        */
@@ -511,6 +538,101 @@ export const pushSubscriptions = pgTable(
 );
 
 /* -------------------------------------------------------------------------- */
+/* Durable notification jobs + scheduler evidence (ADR-004)                  */
+/* -------------------------------------------------------------------------- */
+
+export const notificationJobs = pgTable(
+  "notification_jobs",
+  {
+    id: uuid("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    entityType: notificationEntityType("entity_type").notNull(),
+    entityId: uuid("entity_id"),
+    occurrenceKey: timestamp("occurrence_key", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    type: notificationJobType("type").notNull(),
+    fireAt: timestamp("fire_at", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    expiresAt: timestamp("expires_at", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    dedupKey: text("dedup_key").notNull(),
+    state: notificationJobState("state").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    lastError: text("last_error"),
+    claimedAt: timestamp("claimed_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    deliveredAt: timestamp("delivered_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    payload: jsonb("payload").notNull().default({}),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "date",
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("notification_jobs_dedup_idx").on(t.dedupKey),
+    index("notification_jobs_due_idx").on(t.state, t.nextAttemptAt, t.fireAt),
+    index("notification_jobs_user_entity_idx").on(
+      t.userId,
+      t.entityType,
+      t.entityId,
+      t.occurrenceKey,
+    ),
+    check(
+      "notification_jobs_entity_check",
+      sql`(
+        (${t.entityType} = 'activity' AND ${t.entityId} IS NOT NULL AND ${t.occurrenceKey} IS NOT NULL)
+        OR
+        (${t.entityType} = 'review' AND ${t.entityId} IS NULL AND ${t.occurrenceKey} IS NULL)
+      )`,
+    ),
+  ],
+);
+
+export const schedulerRuns = pgTable(
+  "scheduler_runs",
+  {
+    id: uuid("id").primaryKey(),
+    state: schedulerRunState("state").notNull(),
+    startedAt: timestamp("started_at", {
+      withTimezone: true,
+      mode: "date",
+    }).notNull(),
+    finishedAt: timestamp("finished_at", {
+      withTimezone: true,
+      mode: "date",
+    }),
+    summary: jsonb("summary").notNull().default({}),
+    lastError: text("last_error"),
+  },
+  (t) => [index("scheduler_runs_started_idx").on(t.startedAt)],
+);
+
+/* -------------------------------------------------------------------------- */
 /* Append-only history (ADR-001) — stats & streaks read ONLY this             */
 /* -------------------------------------------------------------------------- */
 
@@ -639,6 +761,8 @@ export type DbRoutineStep = typeof routineSteps.$inferSelect;
 export type DbRoutineSchedule = typeof routineSchedules.$inferSelect;
 export type DbFocusSession = typeof focusSessions.$inferSelect;
 export type DbPushSubscription = typeof pushSubscriptions.$inferSelect;
+export type DbNotificationJob = typeof notificationJobs.$inferSelect;
+export type DbSchedulerRun = typeof schedulerRuns.$inferSelect;
 export type DbPlannerEvent = typeof plannerEvents.$inferSelect;
 
 /** All user-owned tables, for invariant checks (schema-invariants.test.ts). */
@@ -655,5 +779,6 @@ export const userOwnedTables = {
   routine_schedules: routineSchedules,
   focus_sessions: focusSessions,
   push_subscriptions: pushSubscriptions,
+  notification_jobs: notificationJobs,
   planner_events: plannerEvents,
 } as const;

@@ -21,9 +21,11 @@ import {
   checklistItems,
   focusSessions,
   idempotencyKeys,
+  notificationJobs,
   plannerEvents,
   pushSubscriptions,
   routineSchedules,
+  schedulerRuns,
   routineSteps,
   routines,
   tags,
@@ -134,6 +136,44 @@ describe("ADR-004: focus_sessions has the active-session columns", () => {
   });
 });
 
+describe("ADR-004: durable notification infrastructure", () => {
+  it("notification_jobs has durable state, dedup, claim, and retry columns", () => {
+    const cols = columnNames(notificationJobs as unknown);
+    for (const name of [
+      "id",
+      "userId",
+      "entityType",
+      "entityId",
+      "occurrenceKey",
+      "type",
+      "fireAt",
+      "expiresAt",
+      "dedupKey",
+      "state",
+      "attempts",
+      "nextAttemptAt",
+      "lastError",
+      "claimedAt",
+      "deliveredAt",
+      "createdAt",
+      "updatedAt",
+    ]) {
+      expect(cols).toContain(name);
+    }
+  });
+
+  it("scheduler_runs contains only aggregate operational evidence", () => {
+    const cols = columnNames(schedulerRuns as unknown);
+    expect(cols).toContain("id");
+    expect(cols).toContain("state");
+    expect(cols).toContain("startedAt");
+    expect(cols).toContain("finishedAt");
+    expect(cols).toContain("summary");
+    expect(cols).toContain("lastError");
+    expect(cols).not.toContain("userId");
+  });
+});
+
 describe("ADR-002: sync infrastructure tables", () => {
   it("idempotency_keys has composite PK fields + TTL", () => {
     const cols = columnNames(idempotencyKeys as unknown);
@@ -158,10 +198,11 @@ describe("ADR-002: sync infrastructure tables", () => {
 describe("every user-owned table is in the registry", () => {
   it("userOwnedTables covers all owned tables", () => {
     const names = Object.keys(userOwnedTables);
-    // 13 owned tables (users is the identity root, not "owned").
-    expect(names).toHaveLength(13);
+    // 14 owned tables (users is the identity root, not "owned").
+    expect(names).toHaveLength(14);
     expect(names).toContain("user_settings");
     expect(names).toContain("planner_events");
     expect(names).toContain("focus_sessions");
+    expect(names).toContain("notification_jobs");
   });
 });
