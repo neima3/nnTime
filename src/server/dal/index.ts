@@ -693,6 +693,11 @@ export async function createRoutine(
     categoryId?: string;
     notes?: string;
     steps?: { title: string; durationMin?: number | null }[];
+    schedule?: {
+      tz: string;
+      rrule?: string | null;
+      paused?: boolean;
+    };
   },
   opts: { db?: Db } = {},
 ) {
@@ -724,6 +729,28 @@ export async function createRoutine(
       });
     }
     await appendChangeLog(tdb, userId, "routines", id, "upsert", routine!.revision);
+    if (input.schedule) {
+      const scheduleId = crypto.randomUUID();
+      const [schedule] = await tdb
+        .insert(schema.routineSchedules)
+        .values({
+          id: scheduleId,
+          userId,
+          routineId: id,
+          tz: input.schedule.tz,
+          rrule: input.schedule.rrule ?? null,
+          paused: input.schedule.paused ?? false,
+        })
+        .returning();
+      await appendChangeLog(
+        tdb,
+        userId,
+        "routine_schedules",
+        scheduleId,
+        "upsert",
+        schedule!.revision,
+      );
+    }
     return routine!;
   });
 }

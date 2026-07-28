@@ -7,7 +7,6 @@ import {
   createRoutine,
   listRoutineSteps,
   listRoutineSchedules,
-  createRoutineSchedule,
 } from "@/server/dal";
 import { handleErrors, parseBody } from "@/server/api-errors";
 import { routineCreate } from "@/server/schemas/routine";
@@ -47,15 +46,8 @@ export async function POST(request: Request) {
       categoryId: body.categoryId,
       notes: body.notes,
       steps: body.steps,
+      schedule: body.schedule,
     });
-    if (body.schedule) {
-      await createRoutineSchedule(userId, {
-        routineId: routine.id,
-        tz: body.schedule.tz,
-        rrule: body.schedule.rrule,
-        paused: body.schedule.paused,
-      });
-    }
     return Response.json(routine, { status: 201 });
   });
 }
