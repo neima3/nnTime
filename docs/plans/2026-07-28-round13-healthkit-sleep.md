@@ -25,7 +25,7 @@ XCUITest, XcodeGen, Next.js verification gates.
 - Create: `ios/App/Services/SleepScheduleInference.swift`
 - Create: `ios/UnitTests/SleepScheduleInferenceTests.swift`
 
-- [ ] **Step 1: Write failing inference tests.**
+- [x] **Step 1: Write failing inference tests.**
 
 Create tests covering:
 
@@ -44,7 +44,7 @@ Use a fixed Gregorian calendar with
 near midnight, never noon, and that only four distinct local nights satisfy
 the evidence threshold.
 
-- [ ] **Step 2: Run the focused tests and verify RED.**
+- [x] **Step 2: Run the focused tests and verify RED.**
 
 ```bash
 cd ios
@@ -61,7 +61,7 @@ xcodebuild test \
 Expected: compilation fails because `SleepSample`, `SleepStage`,
 `SleepSchedule`, and `SleepScheduleInference` do not exist.
 
-- [ ] **Step 3: Implement the pure types and inference.**
+- [x] **Step 3: Implement the pure types and inference.**
 
 Define:
 
@@ -107,11 +107,11 @@ sort, take the median, and normalize modulo 1440. Derive wind-down by
 subtracting 45 minutes modulo 1440. Use `calendar.nextDate` for the next
 notification so DST behavior belongs to the user's calendar.
 
-- [ ] **Step 4: Re-run the focused tests and verify GREEN.**
+- [x] **Step 4: Re-run the focused tests and verify GREEN.**
 
 Expected: all six tests pass with zero failures.
 
-- [ ] **Step 5: Commit the pure unit.**
+- [x] **Step 5: Commit the pure unit.**
 
 ```bash
 git add ios/App/Services/SleepScheduleInference.swift \
@@ -126,7 +126,7 @@ git commit -m "feat(R13): infer private sleep wind-down schedule"
 - Modify: `ios/Shared/Preferences.swift`
 - Modify: `ios/UnitTests/HealthKitManagerTests.swift`
 
-- [ ] **Step 1: Extend the fake client and write failing manager tests.**
+- [x] **Step 1: Extend the fake client and write failing manager tests.**
 
 Add protocol expectations for:
 
@@ -152,14 +152,14 @@ Inject a scheduling closure and cancel closure into `HealthKitManager`; record
 calls in test boxes. Existing mindful-session tests must continue passing
 without coupling the two preferences.
 
-- [ ] **Step 2: Run the manager bundle and verify RED.**
+- [x] **Step 2: Run the manager bundle and verify RED.**
 
 Use the Task 1 command with
 `-only-testing:KairoUnitTests/HealthKitManagerTests`.
 
 Expected: compilation fails on the missing sleep protocol and result APIs.
 
-- [ ] **Step 3: Add the device-local preference and manager result model.**
+- [x] **Step 3: Add the device-local preference and manager result model.**
 
 Add:
 
@@ -183,7 +183,7 @@ enum SleepWindDownEnableResult: Equatable {
 Extend the manager initializer with defaulted sleep preference, scheduler, and
 cancel dependencies so existing focused-minute callers remain unchanged.
 
-- [ ] **Step 4: Implement HealthKit authorization and query.**
+- [x] **Step 4: Implement HealthKit authorization and query.**
 
 In `AppleHealthKitClient`:
 
@@ -218,11 +218,11 @@ func refreshSleepWindDown(
 An empty query maps to `.noPattern`, not `.denied`, because HealthKit does not
 reveal read denial.
 
-- [ ] **Step 5: Re-run all HealthKit and inference tests.**
+- [x] **Step 5: Re-run all HealthKit and inference tests.**
 
 Expected: all new and existing HealthKit tests pass.
 
-- [ ] **Step 6: Commit the HealthKit boundary.**
+- [x] **Step 6: Commit the HealthKit boundary.**
 
 ```bash
 git add ios/App/Services/HealthKitManager.swift \
@@ -238,7 +238,7 @@ git commit -m "feat(R13): add private HealthKit sleep read"
 - Modify: `ios/App/KairoApp.swift`
 - Create: `ios/UnitTests/NotificationManagerTests.swift`
 
-- [ ] **Step 1: Write failing notification-planning tests.**
+- [x] **Step 1: Write failing notification-planning tests.**
 
 Test internal pure helpers:
 
@@ -253,11 +253,11 @@ The activity filter input should include `start-a`, `cushion-a`,
 `kairo-sleep-wind-down`, and an unrelated identifier; only the first two may
 be returned for removal.
 
-- [ ] **Step 2: Run the focused tests and verify RED.**
+- [x] **Step 2: Run the focused tests and verify RED.**
 
 Expected: compilation fails on the missing filter/planner APIs.
 
-- [ ] **Step 3: Preserve unrelated pending requests.**
+- [x] **Step 3: Preserve unrelated pending requests.**
 
 Replace the activity path's blanket removal with:
 
@@ -280,7 +280,7 @@ static func cancelSleepWindDown()
 `cancelActivityReminders()` removes only `start-` and `cushion-` identifiers.
 The existing Settings reminders-off flow must call this narrower API.
 
-- [ ] **Step 4: Schedule exactly one sleep suggestion.**
+- [x] **Step 4: Schedule exactly one sleep suggestion.**
 
 Implement an async scheduler that first removes the stable sleep identifier,
 checks notification authorization and quiet hours, builds the next local date
@@ -295,19 +295,19 @@ Return a typed result for scheduled, notifications off, quiet hours, or
 failure. Never request notification permission implicitly from foreground
 refresh.
 
-- [ ] **Step 5: Refresh on app activation.**
+- [x] **Step 5: Refresh on app activation.**
 
 Observe `scenePhase` in `KairoApp`. When it becomes `.active` and
 `KairoPrefs.sleepWindDownEnabled` is true, call
 `HealthKitManager.shared.refreshSleepWindDown()` in a task. The default-off
 path must do no Health query.
 
-- [ ] **Step 6: Re-run notification, HealthKit, and main-thread tests.**
+- [x] **Step 6: Re-run notification, HealthKit, and main-thread tests.**
 
 Expected: focused tests pass and `./scripts/ios-main-thread-gate.sh` reports no
 `Main Thread Checker:` match.
 
-- [ ] **Step 7: Commit notification isolation.**
+- [x] **Step 7: Commit notification isolation.**
 
 ```bash
 git add ios/App/Services/NotificationManager.swift \
@@ -323,7 +323,7 @@ git commit -m "feat(R13): schedule isolated wind-down suggestions"
 - Modify: `ios/App/Info.plist`
 - Create: `ios/UITests/KairoRound13Tour.swift`
 
-- [ ] **Step 1: Write the failing XCUITest.**
+- [x] **Step 1: Write the failing XCUITest.**
 
 The test signs into the synthetic QA account, opens More → Settings, selects
 Light, and scrolls to Apple Health. Assert:
@@ -340,12 +340,12 @@ app.staticTexts[
 Capture Light and Dark screenshots without tapping either toggle or opening a
 system permission sheet.
 
-- [ ] **Step 2: Run the focused UI test and verify RED.**
+- [x] **Step 2: Run the focused UI test and verify RED.**
 
 Expected: failure because the sleep control and corrected disclosures do not
 exist.
 
-- [ ] **Step 3: Add the read usage description.**
+- [x] **Step 3: Add the read usage description.**
 
 Add:
 
@@ -356,7 +356,7 @@ Add:
 
 Keep the existing mindful write description unchanged.
 
-- [ ] **Step 4: Build the two-control Apple Health card.**
+- [x] **Step 4: Build the two-control Apple Health card.**
 
 Add independent view state:
 
@@ -381,11 +381,11 @@ The sleep toggle invokes `setSleepWindDownEnabled`; disabling cancels only its
 notification. Its accessibility hint explicitly says it reads Sleep Analysis
 locally and uploads nothing.
 
-- [ ] **Step 5: Re-run the focused UI test in Light and Dark.**
+- [x] **Step 5: Re-run the focused UI test in Light and Dark.**
 
 Expected: pass with both controls visible and screenshots attached.
 
-- [ ] **Step 6: Commit the consent surface.**
+- [x] **Step 6: Commit the consent surface.**
 
 ```bash
 git add ios/App/Features/More/SettingsView.swift \
@@ -402,7 +402,7 @@ git commit -m "feat(R13): expose sleep-aware wind-down consent"
 - Modify: `docs/plans/progress.md`
 - Modify: `ios/README.md`
 
-- [ ] **Step 1: Run the full native suite serially.**
+- [x] **Step 1: Run the full native suite serially.**
 
 ```bash
 cd ios
@@ -418,7 +418,7 @@ xcodebuild test \
 Require every unit and UI test to pass and explicitly scan the complete log for
 `Main Thread Checker:`.
 
-- [ ] **Step 2: Build the generic arm64 device target.**
+- [x] **Step 2: Build the generic arm64 device target.**
 
 ```bash
 xcodebuild \
@@ -434,7 +434,7 @@ xcodebuild \
 Inspect the built app's Info.plist for both Health descriptions and its
 expanded entitlements for `com.apple.developer.healthkit`.
 
-- [ ] **Step 3: Run all web gates.**
+- [x] **Step 3: Run all web gates.**
 
 ```bash
 pnpm lint
@@ -447,13 +447,13 @@ node scripts/parity.mjs
 Expected: lint/typecheck/build green, 44+ files and 547+ tests pass, both parity
 gates stay above 85%.
 
-- [ ] **Step 4: Capture and inspect native visual evidence.**
+- [x] **Step 4: Capture and inspect native visual evidence.**
 
 Export the Round 13 XCUITest Light/Dark attachments to
 `browser-qa/round13-healthkit-sleep/`, inspect both images, and keep them
 git-ignored.
 
-- [ ] **Step 5: Update documentation honestly.**
+- [x] **Step 5: Update documentation honestly.**
 
 Document the new privacy boundary, the test counts, visual evidence, and exact
 remaining device proof. Update K04 from “sleep read remains” to “sleep read
@@ -461,7 +461,7 @@ implemented; signed physical-iPhone authorization, mindful sample, real sleep
 query, and local notification remain to be proven.” Keep K04 at partial credit
 until that proof exists.
 
-- [ ] **Step 6: Review and commit the coherent tranche.**
+- [x] **Step 6: Review and commit the coherent tranche.**
 
 ```bash
 git diff --check
@@ -478,4 +478,3 @@ Fast-forward `main`, push, wait for the exact SHA's Coolify deployment to reach
 desktop/mobile live browser smoke. This is native-only, so exact deployed SHA
 plus live runtime health proves the web deployment; it does not replace the
 physical HealthKit release proof.
-

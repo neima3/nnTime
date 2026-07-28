@@ -1,5 +1,52 @@
 # Progress log
 
+## 2026-07-28 — Round 13: private sleep-aware wind-down (Codex)
+
+Roadmap: `docs/plans/2026-07-28-round13-healthkit-sleep.md`. Completed K04's
+separately scoped HealthKit sleep-read tranche without weakening Round 11's
+write-only boundary:
+
+- **Independent, explicit consent.** The Apple Health Settings card now has
+  separate, default-off controls for mindful-minute writes and Sleep Analysis
+  reads. The disclosure states exactly what each control does; both
+  preferences remain device-local.
+- **Value-only Health boundary.** `AppleHealthKitClient` queries only recent
+  Sleep Analysis categories. It maps them into value-only `SleepSample`
+  structs, exposes no source metadata, logs no samples, and uploads or
+  persists nothing.
+- **Honest inference.** A pure `SleepScheduleInference` collapses split sleep
+  stages into local nights, rejects in-bed and awake records, requires at
+  least four distinct nights in a 28-day window, and uses a midnight-safe
+  median. The suggestion is 45 minutes before the inferred sleep start.
+- **Notification coexistence.** Kairo owns one stable local wind-down request.
+  Activity reminder reconciliation now removes only Kairo's `start-` and
+  `cushion-` requests, preserving the sleep suggestion and unrelated
+  notifications. Foreground refresh never asks for notification permission
+  implicitly and respects quiet hours.
+- **TDD and full native proof.** Focused suites were driven RED before
+  implementation. The final serial native flight passed **56 unit tests and
+  17 UI tests** with zero failures and no Main Thread Checker diagnostic. The
+  consent surface passed in Light and Dark on an isolated iPhone 17 Pro
+  simulator and its screenshots were visually inspected.
+- **Web and parity gates.** Lint, typecheck, build, and **44 files / 547
+  tests** passed. Parity remains intentionally unchanged at web **89.74%** and
+  iOS/combined **87.08%** because K04 stays partial until real Health data is
+  exercised.
+- **Real-device release gate.** The arm64 Release target built both unsigned
+  and signed. The signed app contains both Health purpose strings plus the
+  `com.apple.developer.healthkit` entitlement, installed on the connected
+  physical iPhone as Kairo 1.0.0, and launched successfully.
+
+**Still requires phone interaction:** accept or deny the two Health permission
+sheets, complete a focus session and confirm its mindful sample in Health,
+enable sleep-aware wind-down against real sleep history, and observe the local
+notification. Installation and launch do not prove those user-controlled
+flows.
+
+**Next:** release the exact Round 13 SHA through Coolify, verify live health
+and browser smoke, then complete the four physical HealthKit interaction
+checks above before promoting K04 beyond partial.
+
 ## 2026-07-28 — Round 12: full-surface quality sweep (first since Round 6) (Fable)
 
 Roadmap: `docs/plans/2026-07-27-round12-quality-sweep.md`. 39 captures
@@ -32,7 +79,6 @@ mobile stacking, the new companion chip and charged-hours card, planner,
 templates, routines, play, review, settings.
 
 Gates: 547 unit + 7/7 E2E + build green.
-
 
 ## 2026-07-27 — Round 12: iOS main-actor release hardening (Codex)
 

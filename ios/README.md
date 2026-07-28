@@ -81,6 +81,34 @@ unsigned simulator each process falls back to its own container, so the widget
 only shows real data once signing + the `group.me.neima.kairo` entitlement are
 active — i.e. on a real device.
 
+### Apple Health privacy and device proof
+
+Kairo exposes two independent, default-off Apple Health controls:
+
+- **Save focused minutes** requests write-only access to Mindful Sessions.
+  Kairo writes only after the server accepts a completed focus session and
+  uses the focus UUID as the HealthKit sync identifier.
+- **Sleep-aware wind-down** requests read-only access to recent Sleep Analysis.
+  The app derives a typical sleep time on-device from at least four recent
+  nights and schedules one local suggestion 45 minutes earlier. Raw Health
+  samples, source metadata, and the derived schedule are never uploaded or
+  persisted.
+
+HealthKit deliberately does not reveal whether read access was denied, so an
+empty sleep result is presented as insufficient history or possibly limited
+access—not as a false authorization claim. Foreground refresh runs only while
+the sleep control is enabled and never opens a permission sheet by itself.
+
+After a signed install, the physical-device release check is:
+
+1. Open Settings → Apple Health and exercise each toggle independently.
+2. Complete a focus session and confirm one Mindful Session in Health.
+3. Enable sleep-aware wind-down with at least four nights of Sleep Analysis.
+4. Confirm the derived time in Kairo and observe its local notification.
+
+Do not treat a successful signed build, install, or simulator tour as proof of
+these user-controlled HealthKit interactions.
+
 ### TestFlight (over-the-air, no cable)
 Preferable for daily use: builds install from the TestFlight app and last 90
 days. Needs an App Store Connect app record for `me.neima.kairo` plus an App
