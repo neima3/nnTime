@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-@testable import Kairo
+@testable import KairoAPIClient
 
 @Suite struct KairoContractTests {
     @Test func clientInstantiates() {

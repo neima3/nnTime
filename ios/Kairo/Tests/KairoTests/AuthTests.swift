@@ -1,7 +1,7 @@
 // Phase 7B tests — Keychain, Sign in with Apple config, deep links.
 import Testing
 import Foundation
-@testable import Kairo
+@testable import KairoAPIClient
 
 @Suite struct AuthTests {
 

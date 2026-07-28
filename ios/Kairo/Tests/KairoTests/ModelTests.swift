@@ -1,7 +1,7 @@
 // Phase 7D tests — planner UI models.
 import Testing
 import Foundation
-@testable import Kairo
+@testable import KairoAPIClient
 
 @Suite struct ModelTests {
     @Test func activityRowTimeFormat() {

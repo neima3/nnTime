@@ -1,7 +1,7 @@
 // Phase 7F tests — release preflight checklist.
 import Testing
 import Foundation
-@testable import Kairo
+@testable import KairoAPIClient
 
 @Suite struct PreflightTests {
     @Test func preflightDetectsMissingPrivacyManifest() {

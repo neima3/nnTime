@@ -1,4 +1,9 @@
-# Kairo iOS
+# KairoAPIClient
+
+Local Swift package for Kairo's generated OpenAPI client and native contract
+support. The package remains in `ios/Kairo`, while its library product and
+importable module are named `KairoAPIClient`. Its existing sources stay in
+`Sources/Kairo` through the explicit target path in `Package.swift`.
 
 ## Build & Test
 
@@ -14,7 +19,7 @@ swift build --package-path ios/Kairo
 # Run tests
 swift test --package-path ios/Kairo
 
-# Open in Xcode (opens Package.swift — Xcode resolves SPM deps automatically)
+# Inspect the package in Xcode (Xcode resolves SPM dependencies automatically)
 open ios/Kairo/Package.swift
 ```
 
@@ -23,14 +28,16 @@ open ios/Kairo/Package.swift
 because Swift OpenAPI Generator requires the document inside its target. Never
 edit the package copy directly. GitHub Actions checks both copies, validates
 the shipping app's manual `/api/v1` calls against the canonical operations,
-and compiles this generated client on macOS.
+and compiles this generated client on macOS. Swift package tests use
+`@testable import KairoAPIClient`.
 
-## Archive for TestFlight
+## Shipping app integration
 
-1. Open `Package.swift` in Xcode
-2. Select a physical device target
-3. Product → Archive (requires Apple Developer account + signing)
-4. Window → Organizer → Distribute App → TestFlight
+`ios/project.yml` declares this directory as a local package and links the
+`KairoAPIClient` product only to the shipping `Kairo` application target. Run
+`xcodegen generate` from `ios/` after project changes. The widget does not link
+the package. The shipping app's transport adoption is tracked separately; this
+package link does not change runtime API behavior by itself.
 
 ## Architecture
 

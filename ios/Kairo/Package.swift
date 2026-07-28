@@ -10,7 +10,7 @@ let package = Package(
         .macOS("14.0")
     ],
     products: [
-        .library(name: "Kairo", targets: ["Kairo"]),
+        .library(name: "KairoAPIClient", targets: ["KairoAPIClient"]),
     ],
     dependencies: [
         // Swift OpenAPI Generator — generates client code from the OpenAPI spec.
@@ -22,18 +22,19 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "Kairo",
+            name: "KairoAPIClient",
             dependencies: [
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
                 .product(name: "OpenAPIURLSession", package: "swift-openapi-urlsession"),
             ],
+            path: "Sources/Kairo",
             plugins: [
                 .plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator"),
             ]
         ),
         .testTarget(
             name: "KairoTests",
-            dependencies: ["Kairo"]
+            dependencies: ["KairoAPIClient"]
         ),
     ]
 )

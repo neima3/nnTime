@@ -1,7 +1,7 @@
 // Phase 7E tests — focus state + local notifications.
 import Testing
 import Foundation
-@testable import Kairo
+@testable import KairoAPIClient
 
 @Suite struct FocusTests {
     @Test func remainingSecondsFullSession() {

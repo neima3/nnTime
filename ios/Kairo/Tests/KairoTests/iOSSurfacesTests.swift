@@ -1,7 +1,7 @@
 // Phase 8 tests — widgets, Live Activity, HealthKit, privacy labels.
 import Testing
 import Foundation
-@testable import Kairo
+@testable import KairoAPIClient
 
 @Suite struct iOSSurfacesTests {
     // 8A: Widget config.

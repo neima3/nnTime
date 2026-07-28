@@ -1,7 +1,7 @@
 // Phase 7C tests — sync state, offline queue, purge.
 import Testing
 import Foundation
-@testable import Kairo
+@testable import KairoAPIClient
 
 @Suite struct SyncTests {
 

@@ -22,6 +22,9 @@ settings:
     CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]: "NO"
     CODE_SIGNING_REQUIRED[sdk=iphonesimulator*]: "NO"
     DEVELOPMENT_TEAM: "$(KAIRO_DEVELOPMENT_TEAM)"
+packages:
+  KairoAPIClient:
+    path: Kairo
 targets:
   Kairo:
     type: application
@@ -47,6 +50,8 @@ targets:
       - target: KairoWidget
         embed: true
         ENABLE_PREVIEWS: "YES"
+      - package: KairoAPIClient
+        product: KairoAPIClient
   KairoUITests:
     type: bundle.ui-testing
     platform: iOS

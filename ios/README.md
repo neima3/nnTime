@@ -7,8 +7,8 @@ Mono bundled — SIL OFL, licenses alongside the TTFs in `App/Fonts/`).
 
 ## Layout
 - `App/` — the application (theme, API client, features, fonts, assets)
-- `Kairo/` — Phase-7A SPM contract-proof library (OpenAPI client + golden
-  tests), independent of the app
+- `Kairo/` — local Swift package exposing the generated OpenAPI client as the
+  `KairoAPIClient` module (plus contract and golden tests)
 - `UITests/` — XCUITest E2E flight + screenshot tour (run against the live
   API with the labeled QA account)
 - `project.yml` — XcodeGen definition (the .xcodeproj is generated, not
@@ -20,8 +20,17 @@ brew install xcodegen   # once
 cd ios
 xcodegen generate
 xcodebuild -project Kairo.xcodeproj -scheme Kairo \
-  -destination 'platform=iOS Simulator,name=iPhone 17' build
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -skipPackagePluginValidation build
 ```
+
+XcodeGen links the local `KairoAPIClient` package product only to the `Kairo`
+application target. The widget remains independent of the network package.
+Regenerating the project resolves the package from `ios/Kairo`; no generated
+`.xcodeproj` files are committed. The command-line build explicitly permits
+the `OpenAPIGenerator` build-tool plugin declared in `Kairo/Package.swift`;
+interactive Xcode builds can approve that Apple package plugin in the UI
+instead.
 Point at a local API with the `KAIRO_BASE_URL` env var in the scheme.
 
 ## Tests

@@ -1,7 +1,7 @@
 // Phase 7D view tests — verify SwiftUI views instantiate correctly.
 import Testing
 import SwiftUI
-@testable import Kairo
+@testable import KairoAPIClient
 
 @Suite @MainActor struct ViewTests {
     @Test func todayTimelineViewInstantiates() {
