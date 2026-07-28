@@ -68,27 +68,103 @@ describe("ADR-004 focus state machine", () => {
 
   itDb("running → paused → running → completed", async () => {
     const session = await startFocusSession(userId, { targetDurationMin: 10 }, { db: env!.db });
-    const paused = await transitionFocusSession(userId, session.id, "paused", { db: env!.db });
+    const paused = await transitionFocusSession(
+      userId,
+      session.id,
+      "paused",
+      session.revision,
+      { db: env!.db },
+    );
     expect(paused.state).toBe("paused");
-    const resumed = await transitionFocusSession(userId, session.id, "running", { db: env!.db });
+    const resumed = await transitionFocusSession(
+      userId,
+      session.id,
+      "running",
+      paused.revision,
+      { db: env!.db },
+    );
     expect(resumed.state).toBe("running");
-    const done = await transitionFocusSession(userId, session.id, "completed", { db: env!.db });
+    const done = await transitionFocusSession(
+      userId,
+      session.id,
+      "completed",
+      resumed.revision,
+      { db: env!.db },
+    );
     expect(done.state).toBe("completed");
+  });
+
+  itDb("transition rejects a stale client revision and accepts the current one", async () => {
+    const session = await startFocusSession(
+      userId,
+      { targetDurationMin: 10 },
+      { db: env!.db },
+    );
+
+    await expect(
+      transitionFocusSession(
+        userId,
+        session.id,
+        "paused",
+        session.revision - 1,
+        { db: env!.db },
+      ),
+    ).rejects.toMatchObject({
+      message: "revision mismatch",
+      serverState: expect.objectContaining({
+        id: session.id,
+        revision: session.revision,
+      }),
+    });
+
+    const paused = await transitionFocusSession(
+      userId,
+      session.id,
+      "paused",
+      session.revision,
+      { db: env!.db },
+    );
+    expect(paused.state).toBe("paused");
+    expect(paused.revision).toBe(session.revision + 1);
   });
 
   itDb("illegal transition (completed → running) rejected", async () => {
     const session = await startFocusSession(userId, { targetDurationMin: 5 }, { db: env!.db });
-    await transitionFocusSession(userId, session.id, "completed", { db: env!.db });
+    const completed = await transitionFocusSession(
+      userId,
+      session.id,
+      "completed",
+      session.revision,
+      { db: env!.db },
+    );
     await expect(
-      transitionFocusSession(userId, session.id, "running", { db: env!.db }),
+      transitionFocusSession(
+        userId,
+        session.id,
+        "running",
+        completed.revision,
+        { db: env!.db },
+      ),
     ).rejects.toThrow("illegal transition");
   });
 
   itDb("quick-extend adds minutes to target duration", async () => {
     const session = await startFocusSession(userId, { targetDurationMin: 25 }, { db: env!.db });
-    const extended = await extendFocusSession(userId, session.id, 5, { db: env!.db });
+    const extended = await extendFocusSession(
+      userId,
+      session.id,
+      5,
+      session.revision,
+      { db: env!.db },
+    );
     expect(extended.targetDurationMin).toBe(30);
-    const extended2 = await extendFocusSession(userId, session.id, 10, { db: env!.db });
+    const extended2 = await extendFocusSession(
+      userId,
+      session.id,
+      10,
+      extended.revision,
+      { db: env!.db },
+    );
     expect(extended2.targetDurationMin).toBe(40);
   });
 
@@ -111,7 +187,13 @@ describe("ADR-004 focus state machine", () => {
     const session = await startFocusSession(userId, { targetDurationMin: 25 }, { db: env!.db });
     // Brief running interval, then pause — accumulated pause must stay ~0.
     await new Promise((r) => setTimeout(r, 50));
-    const paused = await transitionFocusSession(userId, session.id, "paused", { db: env!.db });
+    const paused = await transitionFocusSession(
+      userId,
+      session.id,
+      "paused",
+      session.revision,
+      { db: env!.db },
+    );
     expect(paused.state).toBe("paused");
     expect(paused.accumulatedPauseSec).toBe(0);
     expect(paused.currentIntervalStartedAt).not.toBeNull();
@@ -169,4 +251,3 @@ describe("getRemainingSec pure derivation", () => {
     expect(remaining).toBe(17 * 60);
   });
 });
-

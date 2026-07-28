@@ -289,7 +289,8 @@ final class KairoAPITransportTests: XCTestCase {
                         status: .badRequest,
                         body: Self.errorEnvelope(
                             code: "BAD_DATE",
-                            message: "Use YYYY-MM-DD"
+                            message: "Use YYYY-MM-DD",
+                            retryable: true
                         )
                     )
                 case "getUserSettings":
@@ -320,17 +321,23 @@ final class KairoAPITransportTests: XCTestCase {
         do {
             _ = try await api.day("not-a-date")
             XCTFail("Expected bad request")
-        } catch let APIError.http(code, message, details) {
-            XCTAssertEqual(code, 400)
-            XCTAssertEqual(message, "Use YYYY-MM-DD")
-            XCTAssertNil(details)
+        } catch let error as APIError {
+            XCTAssertEqual(error.statusCode, 400)
+            XCTAssertEqual(error.serverError?.code, "BAD_DATE")
+            XCTAssertEqual(error.serverError?.message, "Use YYYY-MM-DD")
+            XCTAssertEqual(error.serverError?.retryable, true)
+            XCTAssertNil(error.serverError?.details)
         }
 
         do {
             _ = try await api.settings()
             XCTFail("Expected unauthorized")
-        } catch let APIError.unauthorized(message) {
-            XCTAssertEqual(message, "Session expired")
+        } catch let error as APIError {
+            XCTAssertEqual(error.statusCode, 401)
+            XCTAssertEqual(error.serverError?.code, "UNAUTHORIZED")
+            XCTAssertEqual(error.serverError?.message, "Session expired")
+            XCTAssertEqual(error.serverError?.retryable, false)
+            XCTAssertNil(error.serverError?.details)
         }
 
         do {
@@ -339,10 +346,16 @@ final class KairoAPITransportTests: XCTestCase {
                 revision: 8
             )
             XCTFail("Expected conflict")
-        } catch let APIError.conflict(message, details) {
-            XCTAssertEqual(message, "Settings changed elsewhere")
+        } catch let error as APIError {
+            XCTAssertEqual(error.statusCode, 409)
+            XCTAssertEqual(error.serverError?.code, "REVISION_CONFLICT")
             XCTAssertEqual(
-                details,
+                error.serverError?.message,
+                "Settings changed elsewhere"
+            )
+            XCTAssertEqual(error.serverError?.retryable, false)
+            XCTAssertEqual(
+                error.serverError?.details,
                 .object(["currentRevision": .integer(9)])
             )
         }
@@ -415,7 +428,7 @@ final class KairoAPITransportTests: XCTestCase {
         }
     }
 
-    func testSignOutClearsTheInjectedSessionCookieStore() async throws {
+    func testSignOutClearsOnlyConfiguredKairoAuthCookies() async throws {
         let storage = HTTPCookieStorage.sharedCookieStorage(
             forGroupContainerIdentifier: "KairoAPITransportTests.\(UUID())"
         )
@@ -424,14 +437,31 @@ final class KairoAPITransportTests: XCTestCase {
         configuration.httpShouldSetCookies = true
         configuration.protocolClasses = [SuccessfulAuthURLProtocol.self]
         let session = URLSession(configuration: configuration)
-        let cookie = try XCTUnwrap(HTTPCookie(properties: [
-            .domain: "time.neima.me",
-            .path: "/",
-            .name: "better-auth.session_token",
-            .value: "isolated-token",
-            .secure: "TRUE",
-        ]))
-        storage.setCookie(cookie)
+        let cookies = try [
+            Self.cookie(
+                name: "better-auth.session_token",
+                domain: "time.neima.me",
+                path: "/"
+            ),
+            Self.cookie(
+                name: "analytics",
+                domain: "time.neima.me",
+                path: "/"
+            ),
+            Self.cookie(
+                name: "better-auth.session_token",
+                domain: "other.neima.me",
+                path: "/"
+            ),
+            Self.cookie(
+                name: "better-auth.session_token",
+                domain: "time.neima.me",
+                path: "/other"
+            ),
+        ]
+        for cookie in cookies {
+            storage.setCookie(cookie)
+        }
         let api = KairoAPI(
             baseURL: URL(string: "https://time.neima.me")!,
             session: session
@@ -439,7 +469,16 @@ final class KairoAPITransportTests: XCTestCase {
 
         await api.signOut()
 
-        XCTAssertTrue(storage.cookies?.isEmpty ?? true)
+        XCTAssertEqual(
+            Set((storage.cookies ?? []).map {
+                "\($0.name)|\($0.domain)|\($0.path)"
+            }),
+            [
+                "analytics|time.neima.me|/",
+                "better-auth.session_token|other.neima.me|/",
+                "better-auth.session_token|time.neima.me|/other",
+            ]
+        )
     }
 
     func testShippingAppContainsNoPlannerPathLiteral() throws {
@@ -653,15 +692,30 @@ final class KairoAPITransportTests: XCTestCase {
     private static func errorEnvelope(
         code: String,
         message: String,
-        details: String? = nil
+        details: String? = nil,
+        retryable: Bool = false
     ) -> String {
         """
         {"error":{
           "code":"\(code)","message":"\(message)",
           \(details.map { "\"details\":\($0)," } ?? "")
-          "retryable":false
+          "retryable":\(retryable)
         }}
         """
+    }
+
+    private static func cookie(
+        name: String,
+        domain: String,
+        path: String
+    ) throws -> HTTPCookie {
+        try XCTUnwrap(HTTPCookie(properties: [
+            .domain: domain,
+            .path: path,
+            .name: name,
+            .value: "\(name)-\(domain)-\(path)",
+            .secure: "TRUE",
+        ]))
     }
 }
 

@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   startFocusSession: vi.fn(),
   getRemainingSec: vi.fn(),
   appendPlannerEvent: vi.fn(),
+  withIdempotency: vi.fn(),
+  database: {},
 }));
 
 vi.mock("@/server/auth-session", () => ({
@@ -22,6 +24,10 @@ vi.mock("@/server/dal", () => ({
   appendPlannerEvent: mocks.appendPlannerEvent,
   ConflictError: class ConflictError extends Error {},
   NotFoundError: class NotFoundError extends Error {},
+}));
+
+vi.mock("@/server/idempotency", () => ({
+  withIdempotency: mocks.withIdempotency,
 }));
 
 import { GET, POST } from "./route";
@@ -47,6 +53,15 @@ describe("/api/v1/focus-sessions wire responses", () => {
     mocks.requireSession.mockResolvedValue({ userId: sessionRow.userId });
     mocks.getRemainingSec.mockReturnValue(1499);
     mocks.appendPlannerEvent.mockResolvedValue(undefined);
+    mocks.withIdempotency.mockImplementation(
+      async (
+        _userId: string,
+        _key: string | null,
+        _method: string,
+        _path: string,
+        execute: (database: object) => Promise<Response>,
+      ) => execute(mocks.database),
+    );
   });
 
   it("serializes a production-shaped active session row", async () => {
@@ -74,7 +89,10 @@ describe("/api/v1/focus-sessions wire responses", () => {
     const response = await POST(
       new Request("https://time.neima.me/api/v1/focus-sessions", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": "01980000-7000-8000-8000-000000000099",
+        },
         body: JSON.stringify({ targetDurationMin: 25 }),
       }),
     );
@@ -88,5 +106,28 @@ describe("/api/v1/focus-sessions wire responses", () => {
       },
       remainingSec: 1499,
     });
+    expect(mocks.withIdempotency).toHaveBeenCalledWith(
+      sessionRow.userId,
+      "01980000-7000-8000-8000-000000000099",
+      "POST",
+      "/api/v1/focus-sessions",
+      expect.any(Function),
+    );
+    expect(mocks.startFocusSession).toHaveBeenCalledWith(
+      sessionRow.userId,
+      {
+        targetDurationMin: 25,
+        activityOccurrenceId: undefined,
+      },
+      { db: mocks.database },
+    );
+    expect(mocks.appendPlannerEvent).toHaveBeenCalledWith(
+      sessionRow.userId,
+      expect.objectContaining({
+        entityType: "focus_session",
+        eventType: "focus_start",
+      }),
+      { db: mocks.database },
+    );
   });
 });

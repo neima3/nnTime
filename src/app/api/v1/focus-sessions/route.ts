@@ -16,6 +16,7 @@ import {
   focusSessionCreateRequest,
   focusSnapshotResponse,
 } from "@/server/schemas/focus-session";
+import { withIdempotency } from "@/server/idempotency";
 
 export async function GET() {
   return handleErrors(async () => {
@@ -46,31 +47,44 @@ export async function POST(request: Request) {
     const { userId } = await requireSession();
     const body = await parseBody(request, focusSessionCreateRequest);
     if (body instanceof Response) return body;
-    const session = await startFocusSession(userId, {
-      targetDurationMin: body.targetDurationMin,
-      activityOccurrenceId: body.activityOccurrenceId,
-    });
-    await appendPlannerEvent(userId, {
-      entityType: "focus_session",
-      entityId: session.id,
-      eventType: "focus_start",
-      payload: {
-        targetDurationMin: body.targetDurationMin,
-        title: body.title,
-      },
-    }).catch(() => {});
-    const remainingSec = getRemainingSec({
-      state: session.state as FocusState,
-      startedAt: session.startedAt,
-      targetDurationMin: session.targetDurationMin,
-      accumulatedPauseSec: session.accumulatedPauseSec,
-      currentIntervalStartedAt: session.currentIntervalStartedAt,
-    });
-    return Response.json(
-      focusSnapshotResponse.parse({ session, remainingSec }),
-      {
-        status: 201,
-        headers: { "cache-control": "private, no-store" },
+    const key = request.headers.get("idempotency-key");
+    return withIdempotency(
+      userId,
+      key,
+      "POST",
+      "/api/v1/focus-sessions",
+      async (db) => {
+        const session = await startFocusSession(
+          userId,
+          {
+            targetDurationMin: body.targetDurationMin,
+            activityOccurrenceId: body.activityOccurrenceId,
+          },
+          { db },
+        );
+        await appendPlannerEvent(userId, {
+          entityType: "focus_session",
+          entityId: session.id,
+          eventType: "focus_start",
+          payload: {
+            targetDurationMin: body.targetDurationMin,
+            title: body.title,
+          },
+        }, { db }).catch(() => {});
+        const remainingSec = getRemainingSec({
+          state: session.state as FocusState,
+          startedAt: session.startedAt,
+          targetDurationMin: body.targetDurationMin,
+          accumulatedPauseSec: session.accumulatedPauseSec,
+          currentIntervalStartedAt: session.currentIntervalStartedAt,
+        });
+        return Response.json(
+          focusSnapshotResponse.parse({ session, remainingSec }),
+          {
+            status: 201,
+            headers: { "cache-control": "private, no-store" },
+          },
+        );
       },
     );
   });

@@ -153,7 +153,16 @@ export async function DELETE(
     if (!ifMatch) {
       return errorResponse("precondition_required", "If-Match header required", 428);
     }
-    await deleteActivitySeries(userId, id, Number(ifMatch));
-    return new Response(null, { status: 204 });
+    const key = request.headers.get("idempotency-key");
+    return withIdempotency(
+      userId,
+      key,
+      "DELETE",
+      `/api/v1/activities/${id}`,
+      async (db) => {
+        await deleteActivitySeries(userId, id, Number(ifMatch), { db });
+        return new Response(null, { status: 204 });
+      },
+    );
   });
 }

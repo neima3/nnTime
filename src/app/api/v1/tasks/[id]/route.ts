@@ -6,6 +6,7 @@ import { requireSession } from "@/server/auth-session";
 import { getTask, updateTask, deleteTask } from "@/server/dal";
 import { handleErrors, parseBody, errorResponse } from "@/server/api-errors";
 import { taskUpdate } from "@/server/schemas/task";
+import { withIdempotency } from "@/server/idempotency";
 
 export async function GET(
   _request: Request,
@@ -54,7 +55,16 @@ export async function DELETE(
     if (!ifMatch) {
       return errorResponse("precondition_required", "If-Match header required", 428);
     }
-    await deleteTask(userId, id, Number(ifMatch));
-    return new Response(null, { status: 204 });
+    const key = request.headers.get("idempotency-key");
+    return withIdempotency(
+      userId,
+      key,
+      "DELETE",
+      `/api/v1/tasks/${id}`,
+      async (db) => {
+        await deleteTask(userId, id, Number(ifMatch), { db });
+        return new Response(null, { status: 204 });
+      },
+    );
   });
 }

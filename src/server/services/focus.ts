@@ -86,6 +86,7 @@ export async function transitionFocusSession(
   userId: string,
   sessionId: string,
   newState: FocusState,
+  ifMatchRevision: number,
   opts: { db?: Db } = {},
 ) {
   const db = opts.db ?? dbDefault;
@@ -104,6 +105,9 @@ export async function transitionFocusSession(
       )
       .limit(1);
     if (!session) throw new Error("focus session not found");
+    if (session.revision !== ifMatchRevision) {
+      throw new ConflictError("revision mismatch", session);
+    }
 
     // Validate transition.
     if (!TRANSITIONS[session.state as FocusState]?.includes(newState)) {
@@ -136,12 +140,12 @@ export async function transitionFocusSession(
 
     const [updated] = await tdb
       .update(schema.focusSessions)
-      .set({ ...updates, revision: session.revision + 1 })
+      .set({ ...updates, revision: ifMatchRevision + 1 })
       .where(
         and(
           eq(schema.focusSessions.id, sessionId),
           eq(schema.focusSessions.userId, userId),
-          eq(schema.focusSessions.revision, session.revision),
+          eq(schema.focusSessions.revision, ifMatchRevision),
         ),
       )
       .returning();
@@ -172,6 +176,7 @@ export async function extendFocusSession(
   userId: string,
   sessionId: string,
   addMinutes: number,
+  ifMatchRevision: number,
   opts: { db?: Db } = {},
 ) {
   const db = opts.db ?? dbDefault;
@@ -186,6 +191,9 @@ export async function extendFocusSession(
     )
     .limit(1);
   if (!session) throw new Error("focus session not found");
+  if (session.revision !== ifMatchRevision) {
+    throw new ConflictError("revision mismatch", session);
+  }
   if (session.state !== "running" && session.state !== "paused") {
     throw new Error("can only extend an active session");
   }
@@ -193,14 +201,14 @@ export async function extendFocusSession(
     .update(schema.focusSessions)
     .set({
       targetDurationMin: session.targetDurationMin + addMinutes,
-      revision: session.revision + 1,
+      revision: ifMatchRevision + 1,
       updatedAt: new Date(),
     })
     .where(
       and(
         eq(schema.focusSessions.id, sessionId),
         eq(schema.focusSessions.userId, userId),
-        eq(schema.focusSessions.revision, session.revision),
+        eq(schema.focusSessions.revision, ifMatchRevision),
       ),
     )
     .returning();

@@ -30,25 +30,89 @@ const itDb = (name: string, fn: () => Promise<void> | void) =>
   it(name, async () => { if (!dbAvailable || !env) return; await fn(); });
 
 describe("Focus extend + multi-extend", () => {
+  itDb("extend rejects a stale client revision and accepts the current one", async () => {
+    const session = await startFocusSession(
+      userId,
+      { targetDurationMin: 25 },
+      { db: env!.db },
+    );
+
+    await expect(
+      extendFocusSession(
+        userId,
+        session.id,
+        5,
+        session.revision - 1,
+        { db: env!.db },
+      ),
+    ).rejects.toMatchObject({
+      message: "revision mismatch",
+      serverState: expect.objectContaining({
+        id: session.id,
+        revision: session.revision,
+      }),
+    });
+
+    const extended = await extendFocusSession(
+      userId,
+      session.id,
+      5,
+      session.revision,
+      { db: env!.db },
+    );
+    expect(extended.targetDurationMin).toBe(30);
+    expect(extended.revision).toBe(session.revision + 1);
+  });
+
   itDb("multiple extends accumulate correctly", async () => {
     const s = await startFocusSession(userId, { targetDurationMin: 25 }, { db: env!.db });
     
-    const e1 = await extendFocusSession(userId, s.id, 5, { db: env!.db });
+    const e1 = await extendFocusSession(
+      userId,
+      s.id,
+      5,
+      s.revision,
+      { db: env!.db },
+    );
     expect(e1.targetDurationMin).toBe(30);
     
-    const e2 = await extendFocusSession(userId, s.id, 10, { db: env!.db });
+    const e2 = await extendFocusSession(
+      userId,
+      s.id,
+      10,
+      e1.revision,
+      { db: env!.db },
+    );
     expect(e2.targetDurationMin).toBe(40);
     
-    const e3 = await extendFocusSession(userId, s.id, 1, { db: env!.db });
+    const e3 = await extendFocusSession(
+      userId,
+      s.id,
+      1,
+      e2.revision,
+      { db: env!.db },
+    );
     expect(e3.targetDurationMin).toBe(41);
   });
 
   itDb("cannot extend a completed session", async () => {
     const s = await startFocusSession(userId, { targetDurationMin: 10 }, { db: env!.db });
-    await transitionFocusSession(userId, s.id, "completed", { db: env!.db });
+    const completed = await transitionFocusSession(
+      userId,
+      s.id,
+      "completed",
+      s.revision,
+      { db: env!.db },
+    );
     
     await expect(
-      extendFocusSession(userId, s.id, 5, { db: env!.db }),
+      extendFocusSession(
+        userId,
+        s.id,
+        5,
+        completed.revision,
+        { db: env!.db },
+      ),
     ).rejects.toThrow("can only extend");
   });
 

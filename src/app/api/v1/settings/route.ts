@@ -8,6 +8,7 @@ import { requireSession } from "@/server/auth-session";
 import { getOrCreateSettings, updateSettings } from "@/server/dal";
 import { handleErrors, parseBody, errorResponse } from "@/server/api-errors";
 import { userSettingsUpdate } from "@/server/schemas/user-settings";
+import { withIdempotency } from "@/server/idempotency";
 
 export async function GET(request: Request) {
   return handleErrors(async () => {
@@ -27,7 +28,21 @@ export async function PATCH(request: Request) {
     }
     const body = await parseBody(request, userSettingsUpdate);
     if (body instanceof Response) return body;
-    const settings = await updateSettings(userId, body, Number(ifMatch));
-    return Response.json(settings);
+    const key = request.headers.get("idempotency-key");
+    return withIdempotency(
+      userId,
+      key,
+      "PATCH",
+      "/api/v1/settings",
+      async (db) => {
+        const settings = await updateSettings(
+          userId,
+          body,
+          Number(ifMatch),
+          { db },
+        );
+        return Response.json(settings);
+      },
+    );
   });
 }

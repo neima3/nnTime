@@ -8,6 +8,7 @@ import "server-only";
 import { and, eq, gt, sql } from "drizzle-orm";
 import db, { schema } from "@/server/db";
 import type { Db } from "@/server/dal";
+import { errorResponse } from "@/server/api-errors";
 
 const TTL_MS = 48 * 60 * 60 * 1000;
 
@@ -17,7 +18,9 @@ const REPLAY_HEADERS = {
 } as const;
 
 function replayResponse(status: number, body: unknown): Response {
-  // Stored body is JSON-serializable (or null). Response.json(null) is fine.
+  if (status === 204) {
+    return new Response(null, { status, headers: REPLAY_HEADERS });
+  }
   return Response.json(body ?? null, { status, headers: REPLAY_HEADERS });
 }
 
@@ -25,10 +28,17 @@ async function lookup(
   userId: string,
   key: string,
   database: Db = db,
-): Promise<{ responseStatus: number; responseBody: unknown } | null> {
+): Promise<{
+  requestMethod: string;
+  requestPath: string;
+  responseStatus: number;
+  responseBody: unknown;
+} | null> {
   const now = new Date();
   const rows = await database
     .select({
+      requestMethod: schema.idempotencyKeys.requestMethod,
+      requestPath: schema.idempotencyKeys.requestPath,
       responseStatus: schema.idempotencyKeys.responseStatus,
       responseBody: schema.idempotencyKeys.responseBody,
     })
@@ -96,6 +106,22 @@ export async function withIdempotency(
 
     const existing = await lookup(userId, key, lockedDb);
     if (existing) {
+      if (
+        existing.requestMethod !== method ||
+        existing.requestPath !== path
+      ) {
+        return errorResponse(
+          "idempotency_key_reused",
+          "Idempotency-Key was already used for another operation",
+          409,
+          {
+            details: {
+              originalMethod: existing.requestMethod,
+              originalPath: existing.requestPath,
+            },
+          },
+        );
+      }
       return replayResponse(existing.responseStatus, existing.responseBody);
     }
 

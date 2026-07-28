@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   extendFocusSession: vi.fn(),
   getRemainingSec: vi.fn(),
   appendPlannerEvent: vi.fn(),
+  withIdempotency: vi.fn(),
+  database: {},
 }));
 
 vi.mock("@/server/auth-session", () => ({
@@ -22,6 +24,10 @@ vi.mock("@/server/dal", () => ({
   appendPlannerEvent: mocks.appendPlannerEvent,
   ConflictError: class ConflictError extends Error {},
   NotFoundError: class NotFoundError extends Error {},
+}));
+
+vi.mock("@/server/idempotency", () => ({
+  withIdempotency: mocks.withIdempotency,
 }));
 
 import { PATCH } from "./route";
@@ -48,15 +54,28 @@ describe("PATCH /api/v1/focus-sessions/{id}", () => {
     mocks.transitionFocusSession.mockResolvedValue(sessionRow);
     mocks.getRemainingSec.mockReturnValue(899);
     mocks.appendPlannerEvent.mockResolvedValue(undefined);
+    mocks.withIdempotency.mockImplementation(
+      async (
+        _userId: string,
+        _key: string | null,
+        _method: string,
+        _path: string,
+        execute: (database: object) => Promise<Response>,
+      ) => execute(mocks.database),
+    );
   });
 
-  it("serializes a production-shaped row after the mutation commits", async () => {
+  it("enforces the observed revision and wraps the mutation idempotently", async () => {
     const response = await PATCH(
       new Request(
         `https://time.neima.me/api/v1/focus-sessions/${sessionRow.id}`,
         {
           method: "PATCH",
-          headers: { "content-type": "application/json" },
+          headers: {
+            "content-type": "application/json",
+            "if-match": "1",
+            "idempotency-key": "01980000-7000-8000-8000-000000000099",
+          },
           body: JSON.stringify({ action: "transition", state: "paused" }),
         },
       ),
@@ -73,5 +92,43 @@ describe("PATCH /api/v1/focus-sessions/{id}", () => {
       },
       remainingSec: 899,
     });
+    expect(mocks.withIdempotency).toHaveBeenCalledWith(
+      sessionRow.userId,
+      "01980000-7000-8000-8000-000000000099",
+      "PATCH",
+      `/api/v1/focus-sessions/${sessionRow.id}`,
+      expect.any(Function),
+    );
+    expect(mocks.transitionFocusSession).toHaveBeenCalledWith(
+      sessionRow.userId,
+      sessionRow.id,
+      "paused",
+      1,
+      { db: mocks.database },
+    );
+  });
+
+  it("requires If-Match before invoking the focus service", async () => {
+    const response = await PATCH(
+      new Request(
+        `https://time.neima.me/api/v1/focus-sessions/${sessionRow.id}`,
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "transition", state: "paused" }),
+        },
+      ),
+      { params: Promise.resolve({ id: sessionRow.id }) },
+    );
+
+    expect(response.status).toBe(428);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "precondition_required",
+        message: "If-Match header required",
+        retryable: false,
+      },
+    });
+    expect(mocks.transitionFocusSession).not.toHaveBeenCalled();
   });
 });

@@ -37,6 +37,113 @@ afterAll(async () => {
 });
 
 describe("withIdempotency concurrency", () => {
+  it("replays an empty 204 response without repeating the delete", async () => {
+    if (!dbAvailable || !env) return;
+    const key = crypto.randomUUID();
+    let executions = 0;
+    const execute = async () => {
+      executions += 1;
+      return new Response(null, { status: 204 });
+    };
+
+    const first = await withIdempotency(
+      userId,
+      key,
+      "DELETE",
+      "/api/v1/tasks/task-1",
+      execute,
+      { db: env.db as Db },
+    );
+    const replay = await withIdempotency(
+      userId,
+      key,
+      "DELETE",
+      "/api/v1/tasks/task-1",
+      execute,
+      { db: env.db as Db },
+    );
+
+    expect(first.status).toBe(204);
+    expect(replay.status).toBe(204);
+    expect(replay.headers.get("idempotent-replay")).toBe("true");
+    expect(await replay.text()).toBe("");
+    expect(executions).toBe(1);
+  });
+
+  it("rejects same-user key reuse for a different operation", async () => {
+    if (!dbAvailable || !env) return;
+    const key = crypto.randomUUID();
+    let executions = 0;
+    const execute = async () => {
+      executions += 1;
+      return Response.json({ ok: true }, { status: 200 });
+    };
+
+    await withIdempotency(
+      userId,
+      key,
+      "PATCH",
+      "/api/v1/settings",
+      execute,
+      { db: env.db as Db },
+    );
+    const reused = await withIdempotency(
+      userId,
+      key,
+      "DELETE",
+      "/api/v1/tasks/task-1",
+      execute,
+      { db: env.db as Db },
+    );
+
+    expect(reused.status).toBe(409);
+    expect(await reused.json()).toEqual({
+      error: {
+        code: "idempotency_key_reused",
+        message: "Idempotency-Key was already used for another operation",
+        retryable: false,
+        details: {
+          originalMethod: "PATCH",
+          originalPath: "/api/v1/settings",
+        },
+      },
+    });
+    expect(executions).toBe(1);
+  });
+
+  it("scopes identical keys independently by user", async () => {
+    if (!dbAvailable || !env) return;
+    const otherUserId = crypto.randomUUID();
+    await insertUser(env.db, otherUserId, "idempotency-other@test.com");
+    const key = crypto.randomUUID();
+    let executions = 0;
+    const execute = async () => {
+      executions += 1;
+      return Response.json({ execution: executions });
+    };
+
+    const first = await withIdempotency(
+      userId,
+      key,
+      "PATCH",
+      "/api/v1/settings",
+      execute,
+      { db: env.db as Db },
+    );
+    const other = await withIdempotency(
+      otherUserId,
+      key,
+      "PATCH",
+      "/api/v1/settings",
+      execute,
+      { db: env.db as Db },
+    );
+
+    expect(await first.json()).toEqual({ execution: 1 });
+    expect(await other.json()).toEqual({ execution: 2 });
+    expect(executions).toBe(2);
+  });
+
   it("allows only one same-key mood side effect", async () => {
     if (!dbAvailable || !env) return;
     const key = crypto.randomUUID();

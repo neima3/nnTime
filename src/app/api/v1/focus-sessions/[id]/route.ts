@@ -15,6 +15,7 @@ import {
   focusSessionPatchRequest,
   focusSnapshotResponse,
 } from "@/server/schemas/focus-session";
+import { withIdempotency } from "@/server/idempotency";
 
 export async function PATCH(
   request: Request,
@@ -23,65 +24,99 @@ export async function PATCH(
   return handleErrors(async () => {
     const { userId } = await requireSession();
     const { id } = await params;
+    const ifMatch = request.headers.get("if-match");
+    if (!ifMatch) {
+      return errorResponse(
+        "precondition_required",
+        "If-Match header required",
+        428,
+      );
+    }
     const body = await parseBody(request, focusSessionPatchRequest);
     if (body instanceof Response) return body;
-
-    try {
-      let session;
-      if (body.action === "transition") {
-        session = await transitionFocusSession(userId, id, body.state);
-        if (
-          body.state === "completed" ||
-          body.state === "skipped" ||
-          body.state === "cancelled"
-        ) {
-          // Reuse the same elapsed-time math the countdown uses (ADR-004:
-          // clients derive, never persist) to log actual vs. target minutes
-          // for time-estimation calibration (Phase 6).
-          const remainingSecAtStop = getRemainingSec({
+    const key = request.headers.get("idempotency-key");
+    const revision = Number(ifMatch);
+    return withIdempotency(
+      userId,
+      key,
+      "PATCH",
+      `/api/v1/focus-sessions/${id}`,
+      async (db) => {
+        try {
+          let session;
+          if (body.action === "transition") {
+            session = await transitionFocusSession(
+              userId,
+              id,
+              body.state,
+              revision,
+              { db },
+            );
+            if (
+              body.state === "completed" ||
+              body.state === "skipped" ||
+              body.state === "cancelled"
+            ) {
+              // Reuse the countdown math to log actual vs target minutes.
+              const remainingSecAtStop = getRemainingSec({
+                state: session.state as FocusState,
+                startedAt: session.startedAt,
+                targetDurationMin: session.targetDurationMin,
+                accumulatedPauseSec: session.accumulatedPauseSec,
+                currentIntervalStartedAt: session.currentIntervalStartedAt,
+              });
+              const elapsedMin = Math.max(
+                0,
+                Math.round(
+                  (
+                    session.targetDurationMin * 60 -
+                    remainingSecAtStop
+                  ) / 60,
+                ),
+              );
+              await appendPlannerEvent(userId, {
+                entityType: "focus_session",
+                entityId: id,
+                eventType: "focus_stop",
+                payload: {
+                  state: body.state,
+                  durationMin: session.targetDurationMin,
+                  targetDurationMin: session.targetDurationMin,
+                  elapsedMin,
+                },
+              }, { db }).catch(() => {});
+            }
+          } else {
+            session = await extendFocusSession(
+              userId,
+              id,
+              body.addMinutes,
+              revision,
+              { db },
+            );
+          }
+          const remainingSec = getRemainingSec({
             state: session.state as FocusState,
             startedAt: session.startedAt,
             targetDurationMin: session.targetDurationMin,
             accumulatedPauseSec: session.accumulatedPauseSec,
             currentIntervalStartedAt: session.currentIntervalStartedAt,
           });
-          const elapsedMin = Math.max(
-            0,
-            Math.round((session.targetDurationMin * 60 - remainingSecAtStop) / 60),
+          return Response.json(
+            focusSnapshotResponse.parse({ session, remainingSec }),
+            { headers: { "cache-control": "private, no-store" } },
           );
-          await appendPlannerEvent(userId, {
-            entityType: "focus_session",
-            entityId: id,
-            eventType: "focus_stop",
-            payload: {
-              state: body.state,
-              durationMin: session.targetDurationMin,
-              targetDurationMin: session.targetDurationMin,
-              elapsedMin,
-            },
-          }).catch(() => {});
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : "focus error";
+          if (msg.includes("not found")) {
+            throw new NotFoundError("focus_session");
+          }
+          if (msg.includes("illegal") || msg.includes("can only")) {
+            return errorResponse("bad_request", msg, 400);
+          }
+          throw e;
         }
-      } else {
-        session = await extendFocusSession(userId, id, body.addMinutes);
-      }
-      const remainingSec = getRemainingSec({
-        state: session.state as FocusState,
-        startedAt: session.startedAt,
-        targetDurationMin: session.targetDurationMin,
-        accumulatedPauseSec: session.accumulatedPauseSec,
-        currentIntervalStartedAt: session.currentIntervalStartedAt,
-      });
-      return Response.json(
-        focusSnapshotResponse.parse({ session, remainingSec }),
-        { headers: { "cache-control": "private, no-store" } },
-      );
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "focus error";
-      if (msg.includes("not found")) throw new NotFoundError("focus_session");
-      if (msg.includes("illegal") || msg.includes("can only")) {
-        return errorResponse("bad_request", msg, 400);
-      }
-      throw e;
-    }
+      },
+    );
   });
 }

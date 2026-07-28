@@ -3,20 +3,57 @@ import KairoAPIClient
 import OpenAPIRuntime
 
 enum APIError: LocalizedError {
-    case http(Int, String?, JSONValue?)
-    case unauthorized(String?)
-    case conflict(String?, JSONValue?)
+    case http(Int, ServerErrorData)
+    case unauthorized(Int, ServerErrorData)
+    case conflict(Int, ServerErrorData)
+    case authHTTP(Int, String?)
+    case authUnauthorized(String?)
     case network(Error)
     case decoding(Error)
 
+    var statusCode: Int? {
+        switch self {
+        case let .http(statusCode, _),
+             let .unauthorized(statusCode, _),
+             let .conflict(statusCode, _),
+             let .authHTTP(statusCode, _):
+            statusCode
+        case .authUnauthorized:
+            401
+        case .network, .decoding:
+            nil
+        }
+    }
+
+    var serverError: ServerErrorData? {
+        switch self {
+        case let .http(_, error),
+             let .unauthorized(_, error),
+             let .conflict(_, error):
+            error
+        case .authHTTP, .authUnauthorized, .network, .decoding:
+            nil
+        }
+    }
+
     var errorDescription: String? {
         switch self {
-        case let .http(code, message, _):
+        case let .http(code, error):
+            error.message.isEmpty
+                ? "Request failed (\(code))"
+                : error.message
+        case let .unauthorized(_, error):
+            error.message.isEmpty
+                ? "Please sign in again."
+                : error.message
+        case let .conflict(_, error):
+            error.message.isEmpty
+                ? "Someone else changed this — pull to refresh."
+                : error.message
+        case let .authHTTP(code, message):
             message ?? "Request failed (\(code))"
-        case let .unauthorized(message):
+        case let .authUnauthorized(message):
             message ?? "Please sign in again."
-        case let .conflict(message, _):
-            message ?? "Someone else changed this — pull to refresh."
         case .network:
             "Couldn't reach Kairo — check your connection."
         case .decoding:
@@ -175,18 +212,17 @@ actor KairoAPI {
         do {
             let (data, response) = try await authSession.data(for: request)
             guard let http = response as? HTTPURLResponse else {
-                throw APIError.http(0, nil, nil)
+                throw APIError.authHTTP(0, nil)
             }
             switch http.statusCode {
             case 200 ... 299:
                 break
             case 401:
-                throw APIError.unauthorized(nil)
+                throw APIError.authUnauthorized(nil)
             default:
-                throw APIError.http(
+                throw APIError.authHTTP(
                     http.statusCode,
-                    Self.authErrorMessage(data),
-                    nil
+                    Self.authErrorMessage(data)
                 )
             }
             if T.self == EmptyResponse.self {
@@ -241,9 +277,33 @@ actor KairoAPI {
         )
         let cookieStorage =
             authSession.configuration.httpCookieStorage ?? .shared
-        for cookie in cookieStorage.cookies ?? [] {
+        for cookie in cookieStorage.cookies ?? []
+        where Self.isConfiguredAuthCookie(cookie, baseURL: baseURL) {
             cookieStorage.deleteCookie(cookie)
         }
+    }
+
+    private static func isConfiguredAuthCookie(
+        _ cookie: HTTPCookie,
+        baseURL: URL
+    ) -> Bool {
+        guard let host = baseURL.host?.lowercased() else {
+            return false
+        }
+        let domain = cookie.domain
+            .lowercased()
+            .trimmingCharacters(in: CharacterSet(charactersIn: "."))
+        guard domain == host else {
+            return false
+        }
+        let configuredPath = baseURL.path.isEmpty ? "/" : baseURL.path
+        guard cookie.path == configuredPath else {
+            return false
+        }
+        let name = cookie.name.lowercased()
+        return name.hasPrefix("better-auth.")
+            || name.hasPrefix("__secure-better-auth.")
+            || name.hasPrefix("__host-better-auth.")
     }
 
     // MARK: Settings and categories
@@ -623,15 +683,23 @@ actor KairoAPI {
     ) -> APIError {
         switch error {
         case let .http(_, statusCode, error):
-            .http(statusCode, error.message, error.details)
+            .http(statusCode, error)
         case let .unauthorized(_, _, error):
-            .unauthorized(error.message)
+            .unauthorized(401, error)
         case let .conflict(_, _, error):
-            .conflict(error.message, error.details)
+            .conflict(409, error)
         case let .notFound(_, statusCode, error):
-            .http(statusCode, error.message, error.details)
+            .http(statusCode, error)
         case let .undocumented(_, statusCode):
-            .http(statusCode, nil, nil)
+            .http(
+                statusCode,
+                .init(
+                    code: "undocumented_response",
+                    message: "Request failed (\(statusCode))",
+                    retryable: statusCode == 429 || statusCode >= 500,
+                    details: nil
+                )
+            )
         case let .malformedValue(path):
             .decoding(
                 DecodingError.dataCorrupted(.init(
