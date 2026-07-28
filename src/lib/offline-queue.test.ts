@@ -8,7 +8,11 @@
  * refused with "this device can't hold it".
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { IDBFactory } from "fake-indexeddb";
 import {
+  dismissTerminalMutations,
+  enqueueMutation,
+  getQueueSummary,
   rememberUser,
   resolveQueueUser,
   executeMutation,
@@ -47,6 +51,7 @@ beforeEach(() => {
 
 afterEach(() => {
   delete (globalThis as { localStorage?: Storage }).localStorage;
+  vi.unstubAllGlobals();
 });
 
 describe("resolveQueueUser", () => {
@@ -177,5 +182,96 @@ describe("executeMutation rebase-on-replay", () => {
     });
     const result = await executeMutation(baseMutation);
     expect(result).toMatchObject({ success: false, terminal: false });
+  });
+});
+
+describe("durable queue summary and terminal acknowledgment", () => {
+  beforeEach(() => {
+    vi.stubGlobal("indexedDB", new IDBFactory());
+    vi.stubGlobal("navigator", { onLine: false });
+    vi.stubGlobal("window", { dispatchEvent: vi.fn() });
+    vi.stubGlobal(
+      "CustomEvent",
+      class<T> {
+        constructor(
+          public type: string,
+          public init?: CustomEventInit<T>,
+        ) {}
+      },
+    );
+  });
+
+  async function markTerminal(userId: string): Promise<void> {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("kairo-offline", 1);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const rows = await new Promise<QueuedMutation[]>((resolve, reject) => {
+      const request = db.transaction("mutations", "readonly")
+        .objectStore("mutations")
+        .getAll();
+      request.onsuccess = () => resolve(request.result as QueuedMutation[]);
+      request.onerror = () => reject(request.error);
+    });
+    const row = rows.find(
+      (candidate) => candidate.userId === userId && candidate.status === "pending",
+    )!;
+    await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction("mutations", "readwrite");
+      transaction.objectStore("mutations").put({
+        ...row,
+        status: "terminal",
+        lastError: "conflict",
+      });
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+    db.close();
+  }
+
+  async function queue(userId: string, suffix: string): Promise<void> {
+    await enqueueMutation(userId, {
+      method: "POST",
+      path: "/api/v1/tasks",
+      body: { bucket: "inbox", title: suffix },
+      idempotencyKey: `key-${suffix}`,
+    });
+  }
+
+  it("counts pending and terminal rows for only the requested user", async () => {
+    await queue("user-a", "a-pending");
+    await queue("user-a", "a-terminal");
+    await queue("user-b", "b-terminal");
+    await markTerminal("user-a");
+    await markTerminal("user-b");
+
+    await expect(getQueueSummary("user-a")).resolves.toEqual({
+      pending: 1,
+      terminal: 1,
+    });
+    await expect(getQueueSummary("user-b")).resolves.toEqual({
+      pending: 0,
+      terminal: 1,
+    });
+  });
+
+  it("dismisses only this user's terminal rows", async () => {
+    await queue("user-a", "a-pending");
+    await queue("user-a", "a-terminal");
+    await queue("user-b", "b-terminal");
+    await markTerminal("user-a");
+    await markTerminal("user-b");
+
+    await dismissTerminalMutations("user-a");
+
+    await expect(getQueueSummary("user-a")).resolves.toEqual({
+      pending: 1,
+      terminal: 0,
+    });
+    await expect(getQueueSummary("user-b")).resolves.toEqual({
+      pending: 0,
+      terminal: 1,
+    });
   });
 });

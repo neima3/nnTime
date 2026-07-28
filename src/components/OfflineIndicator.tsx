@@ -8,12 +8,20 @@
  */
 
 import { useEffect, useState } from "react";
-import { CloudOff } from "lucide-react";
-import { initOfflineQueue, getPendingCount, rememberUser } from "@/lib/offline-queue";
+import { useRouter } from "next/navigation";
+import { AlertTriangle, CloudOff, X } from "lucide-react";
+import {
+  dismissTerminalMutations,
+  getQueueSummary,
+  initOfflineQueue,
+  rememberUser,
+} from "@/lib/offline-queue";
 
 export function OfflineIndicator({ userId }: { userId: string | null }) {
+  const router = useRouter();
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(0);
+  const [terminal, setTerminal] = useState(0);
 
   useEffect(() => {
     if (!userId) return;
@@ -22,37 +30,84 @@ export function OfflineIndicator({ userId }: { userId: string | null }) {
     rememberUser(userId);
     const cleanup = initOfflineQueue(userId);
 
-    const updateStatus = () => {
+    const updateStatus = async () => {
       setOnline(navigator.onLine);
-      getPendingCount(userId).then(setPending);
+      const summary = await getQueueSummary(userId);
+      setPending(summary.pending);
+      setTerminal(summary.terminal);
+    };
+    const onQueueChanged = () => void updateStatus();
+    const onQueueDrained = () => {
+      void updateStatus();
+      router.refresh();
     };
 
-    updateStatus();
-    window.addEventListener("online", updateStatus);
-    window.addEventListener("offline", updateStatus);
+    void updateStatus();
+    window.addEventListener("online", onQueueChanged);
+    window.addEventListener("offline", onQueueChanged);
+    window.addEventListener("kairo:queue-changed", onQueueChanged);
+    window.addEventListener("kairo:queue-drained", onQueueDrained);
+    window.addEventListener("kairo:conflict", onQueueChanged);
 
-    // Poll pending count every 5s while offline.
-    const interval = setInterval(updateStatus, 5000);
+    const interval = setInterval(onQueueChanged, 5000);
 
     return () => {
       cleanup();
-      window.removeEventListener("online", updateStatus);
-      window.removeEventListener("offline", updateStatus);
+      window.removeEventListener("online", onQueueChanged);
+      window.removeEventListener("offline", onQueueChanged);
+      window.removeEventListener("kairo:queue-changed", onQueueChanged);
+      window.removeEventListener("kairo:queue-drained", onQueueDrained);
+      window.removeEventListener("kairo:conflict", onQueueChanged);
       clearInterval(interval);
     };
-  }, [userId]);
+  }, [router, userId]);
 
-  if (online && pending === 0) return null;
+  if (online && pending === 0 && terminal === 0) return null;
 
   return (
-    <div className="fixed bottom-20 left-1/2 z-30 -translate-x-1/2 rounded-xl bg-surface-raised px-4 py-2 shadow-float md:bottom-4">
-      <div className="flex items-center gap-2 text-[13px] font-semibold">
-        <CloudOff size={16} className={online ? "text-iris" : "text-now"} />
-        {!online && <span>You&apos;re offline</span>}
-        {pending > 0 && (
-          <span className="text-ink-soft">
-            {pending} change{pending === 1 ? "" : "s"} queued
-          </span>
+    <div
+      role={terminal > 0 ? "alert" : "status"}
+      className="fixed bottom-20 left-1/2 z-30 w-[min(92vw,34rem)] -translate-x-1/2 rounded-2xl border border-border bg-surface-raised px-4 py-3 shadow-float md:bottom-4"
+    >
+      <div className="flex items-start gap-2.5 text-[13px] font-semibold">
+        {terminal > 0 ? (
+          <AlertTriangle size={17} className="mt-0.5 shrink-0 text-now" />
+        ) : (
+          <CloudOff
+            size={17}
+            className={`mt-0.5 shrink-0 ${online ? "text-iris" : "text-now"}`}
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          {terminal > 0 ? (
+            <>
+              <p>A saved offline change couldn’t sync. Kairo kept the server version.</p>
+              {pending > 0 && (
+                <p className="mt-0.5 text-ink-soft">
+                  {pending} other change{pending === 1 ? "" : "s"} still queued
+                </p>
+              )}
+            </>
+          ) : (
+            <p>
+              {!online && "You’re offline"}
+              {!online && pending > 0 && " · "}
+              {pending > 0 &&
+                `${pending} change${pending === 1 ? "" : "s"} queued`}
+            </p>
+          )}
+        </div>
+        {terminal > 0 && userId && (
+          <button
+            type="button"
+            aria-label="Dismiss offline conflict"
+            onClick={() => {
+              void dismissTerminalMutations(userId);
+            }}
+            className="grid size-7 shrink-0 place-items-center rounded-lg text-ink-faint transition-colors hover:bg-surface-sunken hover:text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+          >
+            <X size={15} />
+          </button>
         )}
       </div>
     </div>

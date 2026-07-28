@@ -13,7 +13,7 @@
 ## Execution status
 
 - [x] Task 1 — typed offline delivery policy and red/green unit coverage
-- [ ] Task 2 — durable queue summaries, dismissal, and shell conflict UX
+- [x] Task 2 — durable queue summaries, dismissal, and shell conflict UX
 - [ ] Task 3 — migrate the existing working paths and add an adoption gate
 - [ ] Task 4 — adopt every fully local replay-safe create/status surface
 - [ ] Task 5 — production-mode browser proof and adversarial review

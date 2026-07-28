@@ -14,8 +14,11 @@ function response(status: number, body: unknown = {}): Response {
 
 function harness(overrides: Partial<OfflineMutationDependencies> = {}) {
   const queued: Array<{ userId: string; mutation: QueuedMutationInput }> = [];
-  const fetch = vi.fn(async (_input: string, _init?: RequestInit) =>
-    response(201, { id: "created-1", revision: 1 }),
+  const fetch = vi.fn(
+    async (...args: Parameters<OfflineMutationDependencies["fetch"]>) => {
+      void args;
+      return response(201, { id: "created-1", revision: 1 });
+    },
   );
   const dependencies: OfflineMutationDependencies = {
     fetch,
@@ -79,8 +82,11 @@ describe("sendReplaySafeCreate", () => {
     "queues retryable HTTP %s with the same key used by the first attempt",
     async (status) => {
       const queued: Array<{ userId: string; mutation: QueuedMutationInput }> = [];
-      const fetch = vi.fn(async (_input: string, _init?: RequestInit) =>
-        response(status),
+      const fetch = vi.fn(
+        async (...args: Parameters<OfflineMutationDependencies["fetch"]>) => {
+          void args;
+          return response(status);
+        },
       );
       const enqueue = vi.fn(async (userId: string, mutation: QueuedMutationInput) => {
         queued.push({ userId, mutation });

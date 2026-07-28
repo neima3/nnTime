@@ -34,6 +34,11 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
+function dispatchQueueChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("kairo:queue-changed"));
+}
+
 /**
  * Last signed-in user id, remembered so an offline mutation can still be keyed
  * correctly when the session hook hasn't resolved yet.
@@ -123,6 +128,7 @@ export async function enqueueMutation(
       tx.onerror = () => reject(tx.error);
     });
     db.close();
+    dispatchQueueChanged();
   } catch {
     // IndexedDB unavailable — return null (caller falls back to direct fetch).
     return null;
@@ -272,6 +278,7 @@ async function updateMutation(id: number, updates: Partial<QueuedMutation>): Pro
       tx.oncomplete = () => resolve();
     });
     db.close();
+    dispatchQueueChanged();
   } catch {
     // Ignore — best effort.
   }
@@ -287,6 +294,7 @@ async function removeMutation(id: number): Promise<void> {
       tx.oncomplete = () => resolve();
     });
     db.close();
+    dispatchQueueChanged();
   } catch {
     // Ignore.
   }
@@ -335,6 +343,12 @@ export async function purgeUserCache(userId: string): Promise<void> {
  * Get the count of pending mutations (for UI badge / status indicator).
  */
 export async function getPendingCount(userId: string): Promise<number> {
+  return (await getQueueSummary(userId)).pending;
+}
+
+export async function getQueueSummary(
+  userId: string,
+): Promise<{ pending: number; terminal: number }> {
   try {
     const db = await openDB();
     const all = await new Promise<QueuedMutation[]>((resolve) => {
@@ -342,9 +356,43 @@ export async function getPendingCount(userId: string): Promise<number> {
       req.onsuccess = () => resolve(req.result as QueuedMutation[]);
     });
     db.close();
-    return all.filter((m) => m.userId === userId && m.status === "pending").length;
+    const own = all.filter((mutation) => mutation.userId === userId);
+    return {
+      pending: own.filter((mutation) => mutation.status === "pending").length,
+      terminal: own.filter((mutation) => mutation.status === "terminal").length,
+    };
   } catch {
-    return 0;
+    return { pending: 0, terminal: 0 };
+  }
+}
+
+export async function dismissTerminalMutations(userId: string): Promise<void> {
+  try {
+    const db = await openDB();
+    const transaction = db.transaction(STORE, "readwrite");
+    const store = transaction.objectStore(STORE);
+    const all = await new Promise<QueuedMutation[]>((resolve, reject) => {
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result as QueuedMutation[]);
+      request.onerror = () => reject(request.error);
+    });
+    for (const mutation of all) {
+      if (
+        mutation.userId === userId &&
+        mutation.status === "terminal" &&
+        mutation.id != null
+      ) {
+        store.delete(mutation.id);
+      }
+    }
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+    db.close();
+    dispatchQueueChanged();
+  } catch {
+    // Best effort. A failed dismissal keeps the warning visible.
   }
 }
 
