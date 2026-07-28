@@ -13,9 +13,19 @@ import {
   dateStr,
   ianaTimezone,
   instant,
+  occurrenceStatusEnum,
+  uuid,
 } from "./common";
-import { activityOccurrenceResponse } from "./activity-occurrence";
+import { activitySeriesResponse } from "./activity-series";
 import { taskResponse } from "./task";
+
+/** Series response fields resolved for one occurrence in the requested day. */
+export const dayActivityResponse = activitySeriesResponse.extend({
+  /** Stable identity of this expanded occurrence. */
+  occurrenceKey: instant,
+  /** Effective occurrence status after applying any override. */
+  status: occurrenceStatusEnum,
+});
 
 /** GET /api/v1/day/{date} response body. */
 export const dayResponse = z.object({
@@ -27,10 +37,13 @@ export const dayResponse = z.object({
   start: instant,
   /** Exclusive UTC end of the resolved day ([start, end)). */
   end: instant,
-  /** Activity occurrences overlapping [start, end). */
-  activities: z.array(activityOccurrenceResponse),
+  /** Series-shaped activities resolved into occurrences overlapping [start, end). */
+  activities: z.array(dayActivityResponse),
   /** Anytime tasks attached to this date. */
   anytimeTasks: z.array(taskResponse),
+  /** Compatibility map from series id to its resolved occurrence status. */
+  occurrenceStatusBySeries: z.record(uuid, occurrenceStatusEnum),
 });
 
+export type DayActivityResponse = z.infer<typeof dayActivityResponse>;
 export type DayResponse = z.infer<typeof dayResponse>;

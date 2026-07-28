@@ -51,7 +51,7 @@ import { plannerEventResponse } from "./planner-event";
 import { userSettingsResponse } from "./user-settings";
 import { batchRequest, batchResponse } from "./batch";
 import { changeLogEntry, changesResponse } from "./change";
-import { dayResponse } from "./day";
+import { dayActivityResponse, dayResponse } from "./day";
 import { searchHit, searchResponse } from "./search";
 import {
   moodCheckinRequest,
@@ -85,6 +85,7 @@ export const responseSchemaRegistry = {
   BatchResponse: batchResponse,
   ChangeLogEntry: changeLogEntry,
   ChangesResponse: changesResponse,
+  DayActivity: dayActivityResponse,
   DayResponse: dayResponse,
   SearchHit: searchHit,
   SearchResponse: searchResponse,

@@ -1370,9 +1370,8 @@ components:
           description: Calendar day for `anytime` tasks; null for `inbox`.
         priority: { $ref: '#/components/schemas/Priority' }
         energy:
-          oneOf:
-            - $ref: '#/components/schemas/EnergyLevel'
-            - type: 'null'
+          type: [string, 'null']
+          enum: [low, medium, high, null]
         notes: { type: [string, 'null'] }
         convertedTo:
           type: [string, 'null']
@@ -1438,9 +1437,8 @@ components:
           items: { type: object, additionalProperties: true }
           description: Template checklist copied onto materialized occurrences.
         energy:
-          oneOf:
-            - $ref: '#/components/schemas/EnergyLevel'
-            - type: 'null'
+          type: [string, 'null']
+          enum: [low, medium, high, null]
         priority: { $ref: '#/components/schemas/Priority' }
         tags:
           type: [array, 'null']
@@ -1490,9 +1488,8 @@ components:
           type: [object, 'null']
           additionalProperties: true
         energy:
-          oneOf:
-            - $ref: '#/components/schemas/EnergyLevel'
-            - type: 'null'
+          type: [string, 'null']
+          enum: [low, medium, high, null]
         completedAt: { type: [string, 'null'], format: date-time }
         revision: { $ref: '#/components/schemas/Revision' }
         createdAt: { type: string, format: date-time }
@@ -1746,10 +1743,8 @@ components:
           description: HTTP status that the inner operation produced.
         body:
           description: The inner operation's response body, if any.
-          oneOf:
-            - type: object
-              additionalProperties: true
-            - type: 'null'
+          type: [object, 'null']
+          additionalProperties: true
         error: { $ref: '#/components/schemas/Error' }
 
     BatchResponse:
@@ -1847,7 +1842,7 @@ components:
           type: array
           items: { $ref: '#/components/schemas/SearchHit' }
         nextCursor:
-          type: 'null'
+          type: [string, 'null']
           description: Always `null` — search is capped rather than paginated.
 
     # ---- Insights ----------------------------------------------------------
@@ -1954,6 +1949,81 @@ components:
           enum: [true]
 
     # ---- Day read-model (ADR-001) -----------------------------------------
+    DayActivity:
+      type: object
+      description: |
+        An activity-series response resolved into one occurrence for the
+        requested day. It carries every series field plus stable occurrence
+        identity and effective status.
+      required:
+        - id
+        - userId
+        - tz
+        - dtstartLocal
+        - title
+        - durationMin
+        - priority
+        - source
+        - revision
+        - createdAt
+        - updatedAt
+        - occurrenceKey
+        - status
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        tz:
+          type: string
+          description: IANA zone for wall-clock expansion.
+        dtstartLocal:
+          type: string
+          format: date-time
+          description: Local dtstart as an RFC 3339 instant (stored timestamptz).
+        rrule:
+          type: [string, 'null']
+          description: RRULE string; null = one-off.
+        exdate:
+          type: [array, 'null']
+          items: { type: string, format: date }
+          description: EXDATE list (calendar dates).
+        rdate:
+          type: [array, 'null']
+          items: { type: string, format: date-time }
+          description: RDATE list (instants).
+        title: { type: string }
+        emoji: { type: [string, 'null'] }
+        categoryId: { type: [string, 'null'], format: uuid }
+        durationMin:
+          type: integer
+          format: int32
+          minimum: 0
+          description: Authoritative duration; end time is derived.
+        checklistTemplate:
+          type: array
+          items: { type: object, additionalProperties: true }
+          description: Template checklist copied onto materialized occurrences.
+        energy:
+          type: [string, 'null']
+          enum: [low, medium, high, null]
+        priority: { $ref: '#/components/schemas/Priority' }
+        tags:
+          type: [array, 'null']
+          items: { type: string, format: uuid }
+        notes: { type: [string, 'null'] }
+        source: { $ref: '#/components/schemas/ActivitySource' }
+        sourceRef:
+          type: [string, 'null']
+          description: Routine id or calendar provider id.
+        revision: { $ref: '#/components/schemas/Revision' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        deletedAt: { type: [string, 'null'], format: date-time }
+        occurrenceKey:
+          type: string
+          format: date-time
+          description: Stable identity of this expanded occurrence.
+        status: { $ref: '#/components/schemas/OccurrenceStatus' }
+
     DayResponse:
       type: object
       description: |
@@ -1963,23 +2033,28 @@ components:
         anytime tasks attached to `date` are returned separately.
         Overnight activities may appear split at midnight. Day snapshots
         are for rendering, not sync. (ADR-001.)
-      required: [date, tz, startUtc, endUtc, activities, anytimeTasks]
+      required: [date, zone, start, end, activities, anytimeTasks, occurrenceStatusBySeries]
       properties:
         date: { type: string, format: date }
-        tz:
+        zone:
           type: string
           description: The IANA zone used to resolve the day (echoed).
-        startUtc:
+        start:
           type: string
           format: date-time
           description: Inclusive lower UTC bound of the local day.
-        endUtc:
+        end:
           type: string
           format: date-time
           description: Exclusive upper UTC bound of the local day.
         activities:
           type: array
-          items: { $ref: '#/components/schemas/ActivityOccurrence' }
+          items: { $ref: '#/components/schemas/DayActivity' }
         anytimeTasks:
           type: array
           items: { $ref: '#/components/schemas/Task' }
+        occurrenceStatusBySeries:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/OccurrenceStatus'
+          description: Compatibility map from series id to occurrence status.
