@@ -451,6 +451,22 @@ import OpenAPIRuntime
             ),
             keys: activityKeys
         )
+        let activityNullKeys = contractNullKeys(
+            "KairoActivitySeriesUpdateRequest",
+            [
+                "rrule",
+                "exdate",
+                "rdate",
+                "emoji",
+                "categoryId",
+                "energy",
+                "tags",
+                "notes",
+                "sourceRef",
+                "completedAt",
+                "checklistOverride",
+            ]
+        )
         try assertExplicitNullRoundTrip(
             Components.Schemas.ActivitySeriesUpdateRequest(
                 rrule: .null,
@@ -465,19 +481,7 @@ import OpenAPIRuntime
                 completedAt: .null,
                 checklistOverride: .null
             ),
-            keys: [
-                "rrule",
-                "exdate",
-                "rdate",
-                "emoji",
-                "categoryId",
-                "energy",
-                "tags",
-                "notes",
-                "sourceRef",
-                "completedAt",
-                "checklistOverride",
-            ]
+            keys: activityNullKeys
         )
 
         let occurrenceKeys = contractKeys(
@@ -507,6 +511,17 @@ import OpenAPIRuntime
             ),
             keys: occurrenceKeys
         )
+        let occurrenceNullKeys = contractNullKeys(
+            "KairoActivityOccurrencePatchRequest",
+            [
+                "title",
+                "startAt",
+                "durationMin",
+                "checklistOverride",
+                "energy",
+                "completedAt",
+            ]
+        )
         try assertExplicitNullRoundTrip(
             Components.Schemas.ActivityOccurrencePatchRequest(
                 title: .null,
@@ -516,14 +531,7 @@ import OpenAPIRuntime
                 energy: .null,
                 completedAt: .null
             ),
-            keys: [
-                "title",
-                "startAt",
-                "durationMin",
-                "checklistOverride",
-                "energy",
-                "completedAt",
-            ]
+            keys: occurrenceNullKeys
         )
 
         let taskKeys = contractKeys(
@@ -555,6 +563,10 @@ import OpenAPIRuntime
             ),
             keys: taskKeys
         )
+        let taskNullKeys = contractNullKeys(
+            "KairoTaskUpdateRequest",
+            ["emoji", "categoryId", "date", "energy", "notes"]
+        )
         try assertExplicitNullRoundTrip(
             Components.Schemas.TaskUpdateRequest(
                 emoji: .null,
@@ -563,7 +575,7 @@ import OpenAPIRuntime
                 energy: .null,
                 notes: .null
             ),
-            keys: ["emoji", "categoryId", "date", "energy", "notes"]
+            keys: taskNullKeys
         )
 
         let tagKeys = contractKeys(
@@ -578,9 +590,13 @@ import OpenAPIRuntime
             ),
             keys: tagKeys
         )
+        let tagNullKeys = contractNullKeys(
+            "KairoTagUpdateRequest",
+            ["color"]
+        )
         try assertExplicitNullRoundTrip(
             Components.Schemas.TagUpdateRequest(color: .null),
-            keys: ["color"]
+            keys: tagNullKeys
         )
 
         let routineKeys = contractKeys(
@@ -599,13 +615,17 @@ import OpenAPIRuntime
             ),
             keys: routineKeys
         )
+        let routineNullKeys = contractNullKeys(
+            "KairoRoutineUpdateRequest",
+            ["emoji", "categoryId", "notes"]
+        )
         try assertExplicitNullRoundTrip(
             Components.Schemas.RoutineUpdateRequest(
                 emoji: .null,
                 categoryId: .null,
                 notes: .null
             ),
-            keys: ["emoji", "categoryId", "notes"]
+            keys: routineNullKeys
         )
     }
 
@@ -701,6 +721,14 @@ import OpenAPIRuntime
     }
 
     private func contractKeys(
+        _ typeName: String,
+        _ keys: [String]
+    ) -> Set<String> {
+        _ = typeName
+        return Set(keys)
+    }
+
+    private func contractNullKeys(
         _ typeName: String,
         _ keys: [String]
     ) -> Set<String> {

@@ -521,6 +521,20 @@ function swiftFixtureWireKeyInventory(
   return inventory;
 }
 
+function swiftNullableFixtureWireKeyInventory(
+  source: string,
+): Record<string, string[]> {
+  const inventory: Record<string, string[]> = {};
+  for (const match of source.matchAll(
+    /contractNullKeys\(\s*"([^"]+)",\s*\[([\s\S]*?)\]\s*\)/g,
+  )) {
+    inventory[match[1]!] = [...match[2]!.matchAll(/"([^"]+)"/g)]
+      .map((key) => key[1]!)
+      .sort();
+  }
+  return inventory;
+}
+
 describe("request OpenAPI contract", () => {
   const clearablePatchNames = clearablePatchComponents(spec);
   const requestSchemaRegistry = (
@@ -772,6 +786,36 @@ describe("request OpenAPI contract", () => {
       ]),
     );
     expect(fixtureInventory).toEqual(expected);
+  });
+
+  it("keeps exhaustive Swift explicit-null fixtures synced to OpenAPI nullability", () => {
+    const overrides = generatorConfig.typeOverrides?.schemas ?? {};
+    const expected = Object.fromEntries(
+      clearablePatchNames.map((componentName) => [
+        overrides[componentName],
+        Object.entries(components[componentName]?.properties ?? {})
+          .filter(([, property]) => isNullable(property, components))
+          .map(([propertyName]) => propertyName)
+          .sort(),
+      ]),
+    );
+    expect(
+      swiftNullableFixtureWireKeyInventory(swiftContractTestSource),
+    ).toEqual(expected);
+
+    const fixtureWithoutNullableValue = swiftContractTestSource.replace(
+      "                notes: .null,\n                sourceRef: .null,",
+      "                sourceRef: .null,",
+    );
+    expect(fixtureWithoutNullableValue).not.toBe(swiftContractTestSource);
+    const mutatedFixture = fixtureWithoutNullableValue.replace(
+        '                "notes",\n                "sourceRef",',
+        '                "sourceRef",',
+      );
+    expect(mutatedFixture).not.toBe(fixtureWithoutNullableValue);
+    expect(swiftNullableFixtureWireKeyInventory(mutatedFixture)).not.toEqual(
+      expected,
+    );
   });
 
   it("keeps request properties, requiredness, and nullability aligned with zod", () => {
