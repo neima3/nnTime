@@ -38,6 +38,7 @@ type Session = {
   state: "running" | "paused" | "completed" | "skipped" | "cancelled";
   targetDurationMin: number;
   startedAt: string;
+  revision: number;
 };
 
 function fmtRemain(sec: number) {
@@ -357,7 +358,10 @@ export function FocusClient({
       setError(null);
       const res = await fetch(`/api/v1/focus-sessions/${session.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": String(session.revision),
+        },
         body: JSON.stringify(body),
       });
       if (!res.ok) {
