@@ -8,6 +8,9 @@ struct SettingsView: View {
     @State private var weekStart = 0
     @State private var settingsRevision: Int?
     @State private var quietHours = KairoPrefs.quietHoursEnabled
+    @State private var healthSyncOn = KairoPrefs.healthSyncEnabled
+    @State private var healthSyncBusy = false
+    @State private var healthSyncStatus: HealthKitEnableResult?
 
     var body: some View {
         ZStack {
@@ -140,6 +143,41 @@ struct SettingsView: View {
                                     }
                                 }
                                 .tint(.kIris)
+                            }
+                        }
+                        .padding(16)
+                    }
+
+                    group("Apple Health") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Toggle(isOn: Binding(
+                                get: { healthSyncOn },
+                                set: { setHealthSync($0) }
+                            )) {
+                                Text("Save focused minutes")
+                                    .font(.kBody(15, weight: .medium))
+                                    .foregroundStyle(Color.kInk)
+                            }
+                            .tint(.kIris)
+                            .disabled(healthSyncBusy)
+                            .accessibilityLabel("Save focused minutes")
+                            .accessibilityHint(
+                                "With your permission, saves completed focus sessions as mindful minutes. Kairo does not read Health data."
+                            )
+
+                            Text("Completed focus sessions become mindful minutes in Apple Health. Kairo never reads your Health data.")
+                                .font(.kBody(12.5))
+                                .foregroundStyle(Color.kInkSoft)
+
+                            HStack(spacing: 6) {
+                                if healthSyncBusy {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                        .tint(.kIris)
+                                }
+                                Text(healthSyncMessage)
+                                    .font(.kBody(12))
+                                    .foregroundStyle(healthSyncOn ? Color.kIris : Color.kInkFaint)
                             }
                         }
                         .padding(16)
@@ -280,6 +318,50 @@ struct SettingsView: View {
             remindersOn = false
             KairoPrefs.remindersEnabled = false
             NotificationManager.cancelAll()
+        }
+    }
+
+    private var healthSyncMessage: String {
+        if healthSyncBusy { return "Connecting to Apple Health…" }
+        switch healthSyncStatus {
+        case .enabled:
+            return "Connected · future completed sessions will be saved."
+        case .unavailable:
+            return "Apple Health isn't available on this device."
+        case .denied:
+            return "Permission wasn't granted. You can change it in the Health app."
+        case .failed:
+            return "Apple Health couldn't connect. Nothing changed — try again."
+        case .disabled, .none:
+            return healthSyncOn
+                ? "Connected · future completed sessions will be saved."
+                : "Off by default. You choose if Kairo writes anything."
+        }
+    }
+
+    private func setHealthSync(_ on: Bool) {
+        UISelectionFeedbackGenerator().selectionChanged()
+        guard on else {
+            healthSyncOn = false
+            healthSyncStatus = .disabled
+            Task { _ = await HealthKitManager.shared.setEnabled(false) }
+            return
+        }
+
+        healthSyncBusy = true
+        healthSyncStatus = nil
+        Task {
+            let result = await HealthKitManager.shared.setEnabled(true)
+            await MainActor.run {
+                healthSyncBusy = false
+                healthSyncStatus = result
+                healthSyncOn = result == .enabled
+                if result == .enabled {
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                } else {
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                }
+            }
         }
     }
 

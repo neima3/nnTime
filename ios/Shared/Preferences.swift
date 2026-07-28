@@ -80,6 +80,13 @@ enum KairoPrefs {
         set { store.set(newValue, forKey: "kairo-companion") }
     }
 
+    /// Explicit, device-local permission to save completed focus sessions as
+    /// mindful minutes. Health data itself never enters Kairo's own storage.
+    static var healthSyncEnabled: Bool {
+        get { store.bool(forKey: "kairo-health-sync") }
+        set { store.set(newValue, forKey: "kairo-health-sync") }
+    }
+
     /// Local reminders for upcoming activities (T2). Defaults on once the user
     /// grants permission; the toggle lives in Settings.
     static var remindersEnabled: Bool {

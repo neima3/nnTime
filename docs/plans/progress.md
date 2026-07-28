@@ -1,5 +1,53 @@
 # Progress log
 
+## 2026-07-27 — Round 11: HealthKit mindful minutes (Codex)
+
+Roadmap: `docs/plans/2026-07-27-round11-healthkit.md`. Finished the deferred
+Round 10E as a deliberately narrow, privacy-first HealthKit slice:
+
+- **Explicit consent, off by default.** Settings now has a token-only Apple
+  Health card with `Save focused minutes`, clear write-only privacy copy,
+  busy/authorized/unavailable/denied/failure states, and a VoiceOver hint.
+  The preference is device-local and disabling it stops future writes.
+- **Isolated write boundary.** `HealthKitManager` wraps an injectable
+  `HealthKitClient`; production requests only `.mindfulSession` write access
+  and reads no Health data. Completed sessions use the focus UUID as
+  `HKMetadataKeySyncIdentifier` with version 1, so retries update rather than
+  multiply the sample.
+- **Server completion stays authoritative.** `FocusView` exports the exact
+  focused minutes only after the API accepts the completed transition.
+  Kairo shows the completed UI, haptic, ends the Live Activity, and stops the
+  soundscape before launching the best-effort HealthKit write, so even a slow
+  or failed save cannot delay or roll back completion.
+- **Capability and disclosure.** `com.apple.developer.healthkit = true` is in
+  both the app entitlement and XcodeGen source of truth.
+  `NSHealthUpdateUsageDescription` names the mindful-minute write.
+- **TDD evidence.** The focused bundle first failed to compile on the missing
+  `HealthKitClient`/`HealthKitManager`, then passed 9/9 manager tests. The
+  consent XCUITest first failed because no toggle existed, then passed.
+- **Full gates.** Web: lint, typecheck, build, and 44 files / 547 tests green.
+  iOS: 37 unit tests and 16 UI tests, zero failures; generic arm64 iOS device
+  build succeeded with signing disabled. The built Info.plist contains the
+  usage string and Xcode resolves `App/Kairo.entitlements`.
+- **Visual evidence.** Real iPhone 17 simulator screenshots in
+  `browser-qa/round11-healthkit/final/` were inspected in explicit Light and
+  Dark themes. The control is on-screen, accessible, and follows the existing
+  Settings hierarchy; artifacts remain git-ignored.
+- **Parity and tracker audit.** K04 is now honestly partial (0.5): mindful
+  writes shipped, sleep-schedule reads remain. F9/G9 were stale duplicates of
+  the Round 8 T15 Playwright CI suite and native tours, and are reconciled.
+  Recomputed parity: web **89.74%**, iOS/combined **87.08%**; both gates pass.
+
+**Not physically verified:** Xcode sees a connected iPhone, but this checkout
+has no `ios/Signing.local.xcconfig`; a signed install needs the developer Team
+ID plus the documented Apple-account/device interaction. Therefore the Health
+permission sheet and a real sample appearing in Apple Health were not claimed.
+
+**Next:** run `./scripts/ios-device-install.sh <TEAM_ID>`, opt in on the
+connected iPhone, complete a focus session, and verify the sample in Health.
+Only after that release check should K04's separate sleep-schedule-read /
+wind-down-suggestion tranche begin.
+
 ## 2026-07-27 — Round 10: iOS companion parity (Fable)
 
 Roadmap: `docs/plans/2026-07-27-round10-ios-companion.md`. Round 9's web

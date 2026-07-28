@@ -536,6 +536,14 @@ struct FocusView: View {
             endLiveActivity()
             SoundscapeEngine.shared.stop()
             scene = nil
+            let endedAt = Date()
+            Task {
+                _ = await HealthKitManager.shared.recordCompletedFocus(
+                    sessionId: current.id,
+                    minutes: focused,
+                    endedAt: endedAt
+                )
+            }
         } catch {}
     }
 }

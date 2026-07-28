@@ -20,5 +20,7 @@ The breathing dot respects reduced motion/stimulation.
 - [x] 10C KairoRound10Tour: ritual → "Companion on" chip → start → card
       visible → Solo. xcodegen after new files; trust "Executed N".
 - [x] 10D Docs + commit + push; CI green (web untouched).
-- [ ] 10E (stretch) HealthKit: opt-in toggle in Settings, write mindful
-      minutes on focus completion, usage strings + entitlement.
+- [x] 10E (stretch) HealthKit: opt-in toggle in Settings, write mindful
+      minutes on focus completion, usage strings + entitlement. Shipped and
+      simulator-verified in Round 11; physical-iPhone authorization and a
+      sample appearing in Apple Health remain a release check.

@@ -41,6 +41,8 @@
 	<false/>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Kairo saves completed focus sessions as mindful minutes so your focused time can appear in Apple Health.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

@@ -38,6 +38,7 @@ targets:
       properties:
         com.apple.security.application-groups:
           - group.me.neima.kairo
+        com.apple.developer.healthkit: true
     dependencies:
       - target: KairoWidget
         embed: true
