@@ -1,5 +1,65 @@
 # Progress log
 
+## 2026-07-29 — Round 21: native offline sync and conflict recovery (Codex)
+
+Roadmap:
+`docs/plans/2026-07-29-round21-native-sync.md`.
+
+- **Protected account-scoped sync state.** The native app now keeps cursor
+  checkpoints, ordered pending mutations, durable conflicts, and the matching
+  saved-day projection in atomically replaced files protected until first
+  unlock. Every read, enqueue, replay, presentation update, account change,
+  logout, and 401 purge is fenced to the expected local account scope.
+- **Generated transport and cursor recovery.** Generated OpenAPI operations
+  now cover the change feed plus task and activity-status mutations. Foreground
+  and offline-to-online synchronization pull incrementally, recover an invalid
+  cursor from a fresh checkpoint, replay in order with stable idempotency keys,
+  honor retry/backoff boundaries, and publish one consistent presentation
+  snapshot.
+- **Truthful offline Today and Inbox.** A matching cached day permits only the
+  ADR-approved completion toggle; create, edit, drag, delete, focus, review,
+  templates, and other unsafe actions stay unavailable. Inbox capture commits
+  to the protected outbox before appearing, survives termination, remains
+  editable while pending, and cannot cross an account transition.
+- **Durable conflict recovery.** Server conflicts retain their exact original
+  mutation and idempotency key. Retry is account-scoped, exact-ID, and
+  single-flight; failed retries preserve the recovery copy, successful retries
+  remove only that conflict, and legacy payload-less conflicts remain
+  truthfully dismiss-only. The bounded carousel, VoiceOver announcements,
+  44-point controls, reduced-stimulation behavior, and light/dark tokens were
+  independently reviewed.
+- **Quality review fixes.** The final pass moved Inbox recovery notices into
+  normal layout so Accessibility XXXL cannot cover the composer, changed
+  conflict body copy to the AA Rose ink token, kept Today text and controls
+  fully opaque while muting only card fills, and added a compact metadata
+  fallback so exact 390-point cards do not ellipsize.
+- **Deterministic UI evidence.** A fresh iPhone 14 simulator ran the complete
+  `KairoRound21SyncTour` at exactly 390 points: **6/6 passed, 0 failed, 0
+  skipped**. It proves cached-day safety, pending Inbox relaunch persistence,
+  retry/dismiss/navigation recovery, light/dark states, and Accessibility XXXL
+  action/composer reachability. Final ignored screenshots and the attachment
+  manifest are under
+  `browser-qa/round21-native-sync/post-review-exact-390/`.
+- **Full local gates.** `pnpm lint`, `pnpm typecheck`, **913 web tests**,
+  `pnpm build`, OpenAPI sync/adoption, and `pnpm ios:release:preflight` passed.
+  SwiftPM passed **45/45**. App-hosted unit tests passed **278**, with the one
+  expected simulator skip for unavailable file-protection attributes. The
+  exact-390 UI suite passed **6/6**, and the generic iOS Simulator Release
+  build passed. Independent specification review and final quality re-review
+  both approved the slice with no remaining P0-P2 findings.
+- **Roadmap truth.** Phase **7C is complete**. Implementation and review span
+  `501d63a..9bd6f47`; the final reviewed implementation SHA is
+  `9bd6f470bc0b747ba9f233b28d6b43d55aedb898` before this documentation commit.
+  Scripted parity remains web **89.74%** and iOS **85.96%**.
+
+**Not claimed:** Phase 7B remains blocked on production Resend/Apple provider
+configuration and a physical-iPhone lifecycle. Google sign-in, secure
+authenticated extension mutations, TestFlight processing, and App Store launch
+remain open. The legacy `KairoFlowUITests` broad flight was intentionally not
+run: it targets a live API account and creates, reschedules, completes, and
+deletes server data, so it is not an acceptable deterministic local or
+read-only production gate for this round.
+
 ## 2026-07-29 — Round 20: native auth completion code and simulator proof (Codex)
 
 Roadmap:

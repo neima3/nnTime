@@ -84,9 +84,10 @@ design work BEFORE the consuming subphase starts.
         linking are code-complete with simulator proof. REMAINS: configure
         Resend/Apple in production and prove the full lifecycle on a physical
         iPhone before checking this box.
-  - [ ] 7C Data/sync — generated CRUD transport and protected scoped read-only
-        Today cache shipped; native cursor sync, mutation replay, and conflict
-        UI remain
+  - [x] 7C Data/sync — generated CRUD transport, protected account-scoped
+        cache/outbox, cursor invalidation, ordered task/status replay, durable
+        conflict recovery, and deterministic offline UI evidence
+        (Round 21, 2026-07-29)
   - [x] 7D Planner UI (Today/editor/Anytime → Week/Routines; VoiceOver/Dynamic Type)
   - [x] 7E Focus + local notifications (background-safe reconstruction)
   - [x] 7F Repository release preflight + signed archive/export capability
