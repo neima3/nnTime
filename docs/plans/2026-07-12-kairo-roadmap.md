@@ -381,6 +381,9 @@ sound, and lock-screen privacy. Each tick has a durable run ledger and fails
 closed at the route boundary; production health reports real scheduler failure
 or lag instead of treating secret presence as success.
 Notification computation no longer writes planner history or sync feed rows.
+Released at `e33d106690f052512387a4901f17a2a7542af865` after exact-SHA web,
+production-browser, generated-contract, native-test/build, backup, and read-only
+live verification.
 8D privacy declarations, public policy,
 review-prep contract, and final scripted parity audit for iOS ≥85%. App Store
 upload, processing, review, and launch remain per-release states and are never

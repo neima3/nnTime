@@ -857,18 +857,18 @@ verify it is non-empty and readable with `pg_restore --list` or the matching
 format command, and record only path/size/checksum—never credentials or planner
 contents. This must precede the push because production auto-deploy is enabled.
 
-- [ ] **Step 8: Integrate and push**
+- [x] **Step 8: Integrate and push**
 
 Use `superpowers:finishing-a-development-branch`. Integrate into `main`
 without discarding unrelated user changes, push `main`, and verify the exact
 remote SHA.
 
-- [ ] **Step 9: Wait for exact-SHA CI**
+- [x] **Step 9: Wait for exact-SHA CI**
 
 Require every GitHub Actions job for the pushed SHA to pass. A passing earlier
 SHA is not release evidence.
 
-- [ ] **Step 10: Deploy and verify exact live SHA**
+- [x] **Step 10: Deploy and verify exact live SHA**
 
 Trigger the documented Coolify deployment. Wait for the deployment to report
 the exact source SHA, `finished`, and `running:healthy`. Verify read-only:

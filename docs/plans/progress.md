@@ -63,7 +63,10 @@ production-looking placeholder notification flow that wrote duplicate
   zero console warnings/errors, and all fourteen accessible switches. The
   inspected screenshots are
   `browser-qa/round18-durable-notifications/settings-desktop.png` and
-  `settings-mobile.png`.
+  `settings-mobile.png`. Live release QA also found the landing hero's blurred
+  decoration extending the mobile document by four pixels; the root now clips
+  only horizontal decoration. The exact 390×844 production recheck reports
+  `clientWidth=390`, `scrollWidth=390`, and a clean fresh-tab console.
 - **Native regression proof.** Swift build/test passed **57 tests / 9 suites**;
   release preflight and XcodeGen preparation passed; the app-hosted main-thread
   gate passed **77/77** with zero Main Thread Checker findings; and the serial
@@ -83,9 +86,21 @@ production-looking placeholder notification flow that wrote duplicate
   `859853d46784d1a3cb21a14014c9a0832991e23f008c84d0d8e9ee10847f1aa7`.
   No planner contents were inspected.
 
-**Release state:** the predeploy backup gate is complete. `main` integration,
-exact-SHA CI, Coolify deployment, and read-only live proof remain pending and
-must be appended here before Round 18 is called shipped.
+**Release state:** shipped. `main` release
+`e33d106690f052512387a4901f17a2a7542af865` passed GitHub Actions run
+`30443525089`: build/test, production-mode E2E, generated/native contract,
+shipping-app tests, and unsigned shipping build all succeeded. Coolify
+deployment `q90ebdpz3k6jqvychysw1ard` finished on that exact SHA and recovered
+to `running:healthy` after the normal cutover overlap. The next authenticated
+cron execution returned 200 with the durable notification summary; live health
+returned 200 with migrate/database/AI/scheduler all `ok` and 29-second
+scheduler lag. The signed-out settings UI settled into its sign-in boundary,
+`GET /api/v1/settings` returned the structured 401 contract, and landing-page
+CSP, HSTS, frame, MIME, referrer, permissions, and cross-origin headers were
+present. Production assets contained the new Halfway check-ins, Notification
+sounds, and Quiet hours controls. Read-only desktop/mobile screenshots are
+ignored under `browser-qa/round18-live/`; no production user or planner data was
+read or mutated.
 
 ## 2026-07-28 — Round 17: offline mutation integrity (Codex)
 
