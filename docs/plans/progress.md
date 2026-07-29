@@ -13,9 +13,17 @@ Roadmap:
 - **Generated transport and cursor recovery.** Generated OpenAPI operations
   now cover the change feed plus task and activity-status mutations. Foreground
   and offline-to-online synchronization pull incrementally, recover an invalid
-  cursor from a fresh checkpoint, replay in order with stable idempotency keys,
-  honor retry/backoff boundaries, and publish one consistent presentation
-  snapshot.
+  cursor from the server's separately contracted authoritative checkpoint,
+  replay in order with stable idempotency keys, continue pulling independent
+  remote changes while mutation replay is backed off, and publish one
+  consistent presentation snapshot.
+- **Whole-range ADR corrections.** Final adversarial review found and closed
+  three runtime gaps before integration: Today responses and offline status
+  enqueues are now fenced against account switches, a restored server can
+  explicitly rewind an invalid high cursor, and a backed-off mutation cannot
+  starve the change feed. Follow-up review also caught the new required
+  `checkpointCursor` missing from the zod response contract; the field and a
+  deep zod/OpenAPI parity regression now bind the runtime shape.
 - **Truthful offline Today and Inbox.** A matching cached day permits only the
   ADR-approved completion toggle; create, edit, drag, delete, focus, review,
   templates, and other unsafe actions stay unavailable. Inbox capture commits
@@ -40,16 +48,16 @@ Roadmap:
   action/composer reachability. Final ignored screenshots and the attachment
   manifest are under
   `browser-qa/round21-native-sync/post-review-exact-390/`.
-- **Full local gates.** `pnpm lint`, `pnpm typecheck`, **913 web tests**,
+- **Full local gates.** `pnpm lint`, `pnpm typecheck`, **914 web tests**,
   `pnpm build`, OpenAPI sync/adoption, and `pnpm ios:release:preflight` passed.
-  SwiftPM passed **45/45**. App-hosted unit tests passed **278**, with the one
+  SwiftPM passed **45/45**. App-hosted unit tests passed **283**, with the one
   expected simulator skip for unavailable file-protection attributes. The
   exact-390 UI suite passed **6/6**, and the generic iOS Simulator Release
-  build passed. Independent specification review and final quality re-review
-  both approved the slice with no remaining P0-P2 findings.
+  build passed. Independent specification, quality, and whole-range ADR reviews
+  drove the corrective passes; no known P0-P2 finding remains.
 - **Roadmap truth.** Phase **7C is complete**. Implementation and review span
-  `501d63a..9bd6f47`; the final reviewed implementation SHA is
-  `9bd6f470bc0b747ba9f233b28d6b43d55aedb898` before this documentation commit.
+  `501d63a..40ecdac`; the final reviewed implementation SHA is
+  `40ecdac66caed0602badb61b0c0766143b1654d3` before this documentation commit.
   Scripted parity remains web **89.74%** and iOS **85.96%**.
 
 **Not claimed:** Phase 7B remains blocked on production Resend/Apple provider
