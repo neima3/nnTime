@@ -22,6 +22,42 @@ final class KairoRound21SyncTour: XCTestCase {
         XCTAssertFalse(app.buttons["New activity"].exists)
         XCTAssertFalse(app.buttons["Review today"].exists)
         XCTAssertFalse(app.buttons["Pick for me"].exists)
+        XCTAssertFalse(app.buttons["Browse templates"].exists)
+        XCTAssertFalse(app.buttons["Focus on this"].exists)
+        XCTAssertFalse(app.buttons["Delete activity"].exists)
+
+        let cachedActivity = app.descendants(matching: .any)
+            .matching(
+                NSPredicate(
+                    format: "label BEGINSWITH %@",
+                    "Gentle planning,"
+                )
+            )
+            .firstMatch
+        XCTAssertTrue(cachedActivity.waitForExistence(timeout: 5))
+        let originalFrame = cachedActivity.frame
+
+        cachedActivity.tap()
+        XCTAssertFalse(
+            app.navigationBars["Edit activity"]
+                .waitForExistence(timeout: 1),
+            "A cached activity must not open the editor"
+        )
+
+        let dragStart = cachedActivity.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)
+        )
+        let dragEnd = cachedActivity.coordinate(
+            withNormalizedOffset: CGVector(dx: 0.5, dy: 1.2)
+        )
+        dragStart.press(forDuration: 0.5, thenDragTo: dragEnd)
+        XCTAssertEqual(
+            cachedActivity.frame,
+            originalFrame,
+            "A cached activity must not move while offline"
+        )
+        XCTAssertFalse(app.navigationBars["Templates"].exists)
+        XCTAssertFalse(app.navigationBars["Focus"].exists)
 
         let safeCompletion = app.buttons["Complete Gentle planning"]
         XCTAssertTrue(safeCompletion.waitForExistence(timeout: 5))
