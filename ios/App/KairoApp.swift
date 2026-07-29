@@ -370,7 +370,7 @@ final class AppState {
     }
 
     private func publishSyncPresentation(scope: String) async throws {
-        let capturedSessionScope = sessionScope
+        let capturedSessionScope: String? = sessionScope
         let snapshot = try await syncCoordinator.snapshot(scope: scope)
         await syncSnapshotBarrier()
         guard
@@ -387,7 +387,7 @@ final class AppState {
     }
 
     private func refreshSyncPresentation(scope: String) async {
-        let capturedSessionScope = sessionScope
+        let capturedSessionScope: String? = sessionScope
         do {
             try await publishSyncPresentation(scope: scope)
             syncStorageUnavailable = false
