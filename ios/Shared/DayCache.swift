@@ -1,6 +1,6 @@
 import Foundation
 
-struct CachedBlock: Codable {
+struct CachedBlock: Codable, Equatable {
     let title: String
     let emoji: String
     let startMin: Int
@@ -15,7 +15,16 @@ struct CachedBlock: Codable {
 }
 
 struct DayCacheStore {
-    struct Snapshot: Codable {
+    enum StoreError: Error, Equatable {
+        case invalidSnapshot
+        case scopeMismatch
+        case dateMismatch
+        case invalidOccurrenceIdentity
+        case occurrenceNotFound
+        case ambiguousOccurrence
+    }
+
+    struct Snapshot: Codable, Equatable {
         let version: Int
         let scope: String
         let date: String
@@ -58,6 +67,16 @@ struct DayCacheStore {
             blocks: blocks,
             savedAt: Date()
         )
+        try write(snapshot)
+    }
+
+    func write(_ snapshot: Snapshot) throws {
+        guard
+            snapshot.version == Self.version,
+            !snapshot.scope.isEmpty
+        else {
+            throw StoreError.invalidSnapshot
+        }
         try fileManager.createDirectory(
             at: fileURL.deletingLastPathComponent(),
             withIntermediateDirectories: true,
@@ -71,6 +90,78 @@ struct DayCacheStore {
             [.protectionKey: protection],
             ofItemAtPath: fileURL.path
         )
+    }
+
+    @discardableResult
+    func updateStatus(
+        scope: String,
+        date: String,
+        activityID: String,
+        occurrenceKey: String,
+        done: Bool
+    ) throws -> Snapshot {
+        guard
+            !activityID.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ).isEmpty,
+            !occurrenceKey.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ).isEmpty
+        else {
+            throw StoreError.invalidOccurrenceIdentity
+        }
+        guard
+            let data = try? Data(contentsOf: fileURL),
+            let snapshot = try? JSONDecoder().decode(
+                Snapshot.self,
+                from: data
+            ),
+            snapshot.version == Self.version,
+            !snapshot.scope.isEmpty
+        else {
+            throw StoreError.invalidSnapshot
+        }
+        guard snapshot.scope == scope else {
+            throw StoreError.scopeMismatch
+        }
+        guard snapshot.date == date else {
+            throw StoreError.dateMismatch
+        }
+
+        let matches = snapshot.blocks.indices.filter { index in
+            snapshot.blocks[index].activityId == activityID
+                && snapshot.blocks[index].occurrenceKey == occurrenceKey
+        }
+        guard !matches.isEmpty else {
+            throw StoreError.occurrenceNotFound
+        }
+        guard matches.count == 1, let index = matches.first else {
+            throw StoreError.ambiguousOccurrence
+        }
+
+        var blocks = snapshot.blocks
+        let block = blocks[index]
+        blocks[index] = CachedBlock(
+            title: block.title,
+            emoji: block.emoji,
+            startMin: block.startMin,
+            durationMin: block.durationMin,
+            done: done,
+            category: block.category,
+            activityId: block.activityId,
+            revision: block.revision,
+            occurrenceKey: block.occurrenceKey
+        )
+        let updated = Snapshot(
+            version: snapshot.version,
+            scope: snapshot.scope,
+            date: snapshot.date,
+            zone: snapshot.zone,
+            blocks: blocks,
+            savedAt: snapshot.savedAt
+        )
+        try write(updated)
+        return updated
     }
 
     func read(scope: String, date: String) -> Snapshot? {
@@ -137,6 +228,23 @@ enum DayCache {
 
     static func readLatest() -> Snapshot? {
         store.readLatest()
+    }
+
+    @discardableResult
+    static func updateStatus(
+        scope: String,
+        date: String,
+        activityID: String,
+        occurrenceKey: String,
+        done: Bool
+    ) throws -> Snapshot {
+        try store.updateStatus(
+            scope: scope,
+            date: date,
+            activityID: activityID,
+            occurrenceKey: occurrenceKey,
+            done: done
+        )
     }
 
     static func clear() {

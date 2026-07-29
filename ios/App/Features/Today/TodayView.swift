@@ -20,6 +20,10 @@ struct TodayView: View {
     @State private var ritualDismissedDay = ""
     @State private var showTemplates = false
     @State private var usingCachedDay = false
+    @State private var pendingOccurrences:
+        Set<OfflineTodayOccurrenceIdentity> = []
+    @State private var cachedMutationFailure:
+        OfflineTodayStatusMutation.Failure.Stage?
     /// 0 = today, ±n days.
     @State private var dayOffset = 0
 
@@ -82,7 +86,8 @@ struct TodayView: View {
                                     )
                                 },
                                 onOpen: { block in editingBlock = block },
-                                onMove: { block, newStart in Task { await move(block, to: newStart) } }
+                                onMove: { block, newStart in Task { await move(block, to: newStart) } },
+                                pendingOccurrences: pendingOccurrences
                             )
                             .padding(.horizontal, 16)
                             .padding(.bottom, 120)
@@ -196,6 +201,10 @@ struct TodayView: View {
         .task { await load() }
         .onReceive(tick) { _ in nowMin = KTime.nowMinutes(in: app.timezone) }
         .onReceive(NotificationCenter.default.publisher(for: .kairoDayChanged)) { _ in
+            Task { await load() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .kairoSyncCompleted)) { _ in
+            pendingOccurrences.removeAll()
             Task { await load() }
         }
     }
@@ -416,13 +425,28 @@ struct TodayView: View {
 
     private var cachedNotice: some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "lock.doc")
+            Image(
+                systemName:
+                    pendingOccurrences.isEmpty
+                        ? "lock.doc"
+                        : "checkmark.icloud"
+            )
                 .font(.system(size: 14, weight: .semibold))
             VStack(alignment: .leading, spacing: 2) {
-                Text("Saved day · read-only")
+                Text(
+                    pendingOccurrences.isEmpty
+                        ? "Saved day"
+                        : "Saved on this iPhone"
+                )
                     .font(.kBody(13, weight: .bold))
                 Text(
-                    "Reconnect to refresh or make changes. Nothing here will be sent while offline."
+                    cachedMutationFailure == .enqueue
+                        ? "Couldn’t save that change. Try again when your connection returns."
+                        : cachedMutationFailure == .cachePersistence
+                            ? "Your protected change is waiting to sync, but this saved-day view could not update."
+                        : pendingOccurrences.isEmpty
+                            ? "You can complete activities here. Other changes need a connection."
+                            : "Your change is protected and will sync when you reconnect."
                 )
                 .font(.kBody(12))
             }
@@ -436,7 +460,13 @@ struct TodayView: View {
         )
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            "Saved day, read-only. Reconnect to refresh or make changes."
+            cachedMutationFailure == .enqueue
+                ? "Saved day. Change not saved. Try again when your connection returns."
+                : cachedMutationFailure == .cachePersistence
+                    ? "Saved on this iPhone. Protected change pending sync. Saved day view could not update."
+                    : pendingOccurrences.isEmpty
+                        ? "Saved day. Completion is available. Other changes need a connection."
+                        : "Saved on this iPhone. Change pending sync."
         )
     }
 
@@ -471,6 +501,8 @@ struct TodayView: View {
                 .sorted { $0.startMin < $1.startMin }
             loadError = nil
             usingCachedDay = false
+            pendingOccurrences.removeAll()
+            cachedMutationFailure = nil
             app.offlineReadOnly = false
             if dayOffset == 0,
                let scope = await KairoAPI.shared.sessionScope()
@@ -550,6 +582,10 @@ struct TodayView: View {
 
     private func toggle(_ block: DayBlock) async {
         let newDone = !block.done
+        if usingCachedDay {
+            await toggleCached(block, done: newDone)
+            return
+        }
         if newDone {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
@@ -564,6 +600,97 @@ struct TodayView: View {
             await load()
         } catch {
             await load()
+        }
+    }
+
+    private func toggleCached(
+        _ block: DayBlock,
+        done: Bool
+    ) async {
+        guard
+            let scope = app.sessionScope,
+            let occurrenceKey = block.occurrenceKey,
+            OfflineTodayMutationPolicy.cachedDay
+                .allowsCompletion(for: block)
+        else {
+            return
+        }
+        cachedMutationFailure = nil
+        let identity = OfflineTodayOccurrenceIdentity(
+            activityID: block.id,
+            occurrenceKey: occurrenceKey
+        )
+        guard
+            let identity,
+            OfflineTodayMutationPolicy.cachedDay.canBegin(
+                identity,
+                pending: pendingOccurrences
+            )
+        else {
+            return
+        }
+        let optimisticBlocks: [DayBlock]
+        do {
+            optimisticBlocks = try CachedDayAdapter.settingCompletion(
+                done,
+                for: block,
+                in: blocks
+            )
+        } catch {
+            return
+        }
+        pendingOccurrences.insert(identity)
+        let mutation = OfflineTodayStatusMutation(
+            enqueue: { activityID, status, occurredAt, key in
+                _ = try await app.enqueueActivityStatus(
+                    activityID: activityID,
+                    status: status,
+                    occurredAt: occurredAt,
+                    occurrenceKey: key
+                )
+            },
+            persist: { scope, date, activityID, key, done in
+                _ = try DayCache.updateStatus(
+                    scope: scope,
+                    date: date,
+                    activityID: activityID,
+                    occurrenceKey: key,
+                    done: done
+                )
+            }
+        )
+
+        do {
+            try await mutation.perform(
+                scope: scope,
+                date: date,
+                block: block,
+                done: done
+            ) { renderedDone in
+                if renderedDone == done {
+                    blocks = optimisticBlocks
+                } else {
+                    blocks = (try? CachedDayAdapter.settingCompletion(
+                        block.done,
+                        for: block,
+                        in: blocks
+                    )) ?? blocks
+                }
+                pendingOccurrences.insert(identity)
+            }
+            if done {
+                UINotificationFeedbackGenerator()
+                    .notificationOccurred(.success)
+            }
+            WidgetCenter.shared.reloadAllTimelines()
+        } catch let failure as OfflineTodayStatusMutation.Failure {
+            cachedMutationFailure = failure.stage
+            if failure.stage == .enqueue {
+                pendingOccurrences.remove(identity)
+            }
+        } catch {
+            cachedMutationFailure = .enqueue
+            pendingOccurrences.remove(identity)
         }
     }
 }
@@ -597,6 +724,7 @@ struct TimelineCanvas: View {
     let onFocus: (DayBlock) -> Void
     let onOpen: (DayBlock) -> Void
     let onMove: (DayBlock, Int) -> Void
+    let pendingOccurrences: Set<OfflineTodayOccurrenceIdentity>
 
     private let ptPerMin: CGFloat = 1.7
 
@@ -658,7 +786,11 @@ struct TimelineCanvas: View {
                         let snapped = ((block.startMin + delta + 7) / 15) * 15
                         let clamped = max(0, min(23 * 60 + 45 - block.durationMin, snapped))
                         if clamped != block.startMin { onMove(block, clamped) }
-                    }
+                    },
+                    pending:
+                        OfflineTodayOccurrenceIdentity(block: block)
+                            .map { pendingOccurrences.contains($0) }
+                            ?? false
                 )
                     .frame(height: max(34, CGFloat(block.durationMin) * ptPerMin))
                     .padding(.leading, 52)
@@ -681,6 +813,7 @@ struct BlockCard: View {
     let onOpen: () -> Void
     /// Called with the dragged minute delta (positive = later).
     let onMove: (Int) -> Void
+    let pending: Bool
 
     @State private var dragOffset: CGFloat = 0
     @State private var lifting = false
@@ -739,7 +872,10 @@ struct BlockCard: View {
 
             Spacer(minLength: 4)
 
-            if !readOnly {
+            if !readOnly
+                || OfflineTodayMutationPolicy.cachedDay
+                    .allowsCompletion(for: block)
+            {
                 Button(action: onComplete) {
                     ZStack {
                         Circle()
@@ -766,6 +902,8 @@ struct BlockCard: View {
                         ? "Mark \(block.title) not done"
                         : "Complete \(block.title)"
                 )
+                .disabled(pending)
+                .opacity(pending ? 0.65 : 1)
             }
         }
         .padding(.horizontal, 12)
@@ -819,6 +957,11 @@ struct BlockCard: View {
             BlockAccessibilityModifier(
                 block: block,
                 readOnly: readOnly,
+                allowsCompletion:
+                    !readOnly
+                        || OfflineTodayMutationPolicy.cachedDay
+                            .allowsCompletion(for: block),
+                pending: pending,
                 onComplete: onComplete,
                 onFocus: onFocus,
                 onDelete: onDelete
@@ -830,6 +973,8 @@ struct BlockCard: View {
 private struct BlockAccessibilityModifier: ViewModifier {
     let block: DayBlock
     let readOnly: Bool
+    let allowsCompletion: Bool
+    let pending: Bool
     let onComplete: () -> Void
     let onFocus: () -> Void
     let onDelete: () -> Void
@@ -842,9 +987,28 @@ private struct BlockAccessibilityModifier: ViewModifier {
                 "\(block.title), \(KTime.hhmm(block.startMin)) to \(KTime.hhmm(block.endMin)), \(block.category.rawValue), \(block.done ? "done" : "not done")"
             )
         if readOnly {
-            labelled.accessibilityHint(
-                "Saved activity. Reconnect to make changes."
-            )
+            if allowsCompletion {
+                labelled
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityHint(
+                        pending
+                            ? "Saved on this iPhone and waiting to sync."
+                            : "Double tap to change completion. Other changes need a connection."
+                    )
+                    .accessibilityAction(
+                        named:
+                            block.done
+                                ? "Mark not done"
+                                : "Complete"
+                    ) {
+                        guard !pending else { return }
+                        onComplete()
+                    }
+            } else {
+                labelled.accessibilityHint(
+                    "Saved activity. Completion is unavailable because this occurrence cannot be identified safely."
+                )
+            }
         } else {
             labelled
                 .accessibilityAddTraits(.isButton)
