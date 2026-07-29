@@ -100,6 +100,40 @@ final class KairoRound20AuthTour: XCTestCase {
         attachScreenshot(app, name: "scrollable-auth-top")
     }
 
+    func testConnectedAccountReadyFixture() {
+        let app = launchSettings(appleState: "ready")
+        let control = app.buttons["Connect Apple account"]
+        reveal(control, in: app)
+
+        XCTAssertTrue(control.exists)
+        XCTAssertTrue(
+            app.staticTexts[
+                "Connect Apple only after signing in. Kairo keeps your current planner and never merges accounts silently."
+            ].exists
+        )
+        attachScreenshot(app, name: "apple-link-ready")
+    }
+
+    func testConnectedAccountLinkedAndExpiredFixtures() {
+        var app = launchSettings(appleState: "linked")
+        let linked = app.staticTexts["Apple is connected"]
+        reveal(linked, in: app)
+        XCTAssertTrue(linked.exists)
+        attachScreenshot(app, name: "apple-link-linked")
+
+        app.terminate()
+        app = launchSettings(appleState: "expired")
+        let retry = app.buttons["Try Apple connection again"]
+        reveal(retry, in: app)
+        XCTAssertTrue(retry.exists)
+        XCTAssertTrue(
+            app.staticTexts[
+                "This Apple connection request expired. Try again."
+            ].exists
+        )
+        attachScreenshot(app, name: "apple-link-expired")
+    }
+
     private func launch(
         capabilities: String,
         state: String? = nil,
@@ -136,5 +170,41 @@ final class KairoRound20AuthTour: XCTestCase {
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
+    }
+
+    private func launchSettings(
+        appleState: String
+    ) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-AppleInterfaceStyle",
+            "Light",
+            "-kairoSkipOnboarding",
+            "-kairoOfflineFixture",
+            "-kairoThemeFixture",
+            "light",
+            "-kairoAppleLinkFixture",
+            appleState,
+        ]
+        app.launch()
+        XCTAssertTrue(
+            app.tabBars.buttons["More"].waitForExistence(timeout: 8)
+        )
+        app.tabBars.buttons["More"].tap()
+        XCTAssertTrue(
+            app.staticTexts["Settings"].waitForExistence(timeout: 5)
+        )
+        app.staticTexts["Settings"].tap()
+        return app
+    }
+
+    private func reveal(
+        _ element: XCUIElement,
+        in app: XCUIApplication
+    ) {
+        for _ in 0 ..< 6 {
+            app.swipeUp()
+        }
+        _ = element.waitForExistence(timeout: 3)
     }
 }

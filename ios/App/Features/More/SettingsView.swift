@@ -14,6 +14,10 @@ struct SettingsView: View {
     @State private var sleepWindDownOn = KairoPrefs.sleepWindDownEnabled
     @State private var sleepWindDownBusy = false
     @State private var sleepWindDownStatus: SleepWindDownEnableResult?
+    @State private var appleLink = AppleLinkPresentationModel()
+    @State private var appleLinkChallenge: NativeAppleChallenge?
+    @State private var preparingAppleLink = false
+    @State private var applePreparationError: String?
 
     var body: some View {
         ZStack {
@@ -229,6 +233,12 @@ struct SettingsView: View {
                         .padding(16)
                     }
 
+                    if appleLink.showsControl {
+                        group("Connected accounts") {
+                            appleAccountContent
+                        }
+                    }
+
                     group("Your data") {
                         VStack(spacing: 0) {
                             linkRow("Export or delete on the web", "square.and.arrow.up",
@@ -265,6 +275,111 @@ struct SettingsView: View {
         }
         .toolbarBackground(Color.kCanvas, for: .navigationBar)
         .task { await loadSettings() }
+        .task { await loadAppleLink() }
+    }
+
+    private var appleAccountContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "person.crop.circle.badge.checkmark")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color.kIris)
+                    .frame(width: 36, height: 36)
+                    .background(
+                        RoundedRectangle(
+                            cornerRadius: 11,
+                            style: .continuous
+                        )
+                        .fill(Color.kIrisGhost)
+                    )
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Sign in with Apple")
+                        .font(.kBody(15, weight: .semibold))
+                        .foregroundStyle(Color.kInk)
+                    Text(
+                        "Connect Apple only after signing in. Kairo keeps your current planner and never merges accounts silently."
+                    )
+                    .font(.kBody(12.5))
+                    .foregroundStyle(Color.kInkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            if appleLink.state == .linked {
+                Label(
+                    "Apple is connected",
+                    systemImage: "checkmark.circle.fill"
+                )
+                .font(.kBody(13.5, weight: .semibold))
+                .foregroundStyle(Color.kSuccess)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(
+                        cornerRadius: 13,
+                        style: .continuous
+                    )
+                    .fill(Color.kSuccessSoft)
+                )
+                .accessibilityIdentifier("settings.apple.linked")
+            } else {
+                appleLinkControl
+            }
+
+            if let message =
+                appleLink.errorMessage ?? applePreparationError
+            {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundStyle(Color.kDanger)
+                    Text(message)
+                        .font(.kBody(12.5))
+                        .foregroundStyle(Color.kInkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityElement(children: .combine)
+            }
+
+            if appleLink.canRetry || applePreparationError != nil {
+                Button("Try Apple connection again") {
+                    Task {
+                        appleLink.retry()
+                        await prepareAppleLink()
+                    }
+                }
+                .font(.kBody(13.5, weight: .semibold))
+                .foregroundStyle(Color.kIris)
+                .frame(minHeight: 44)
+            }
+        }
+        .padding(16)
+    }
+
+    @ViewBuilder
+    private var appleLinkControl: some View {
+        if let appleLinkChallenge {
+            AppleSignInControl(
+                purpose: .link,
+                challenge: appleLinkChallenge,
+                disabled: appleLink.state == .linking,
+                completion: finishAppleLink
+            )
+        } else if preparingAppleLink {
+            HStack(spacing: 9) {
+                ProgressView().tint(.kIris)
+                Text("Preparing a secure Apple connection…")
+                    .font(.kBody(13.5, weight: .medium))
+                    .foregroundStyle(Color.kInkSoft)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.kSurfaceSunken)
+            )
+            .accessibilityElement(children: .combine)
+        }
     }
 
     private var divider: some View {
@@ -330,6 +445,109 @@ struct SettingsView: View {
             quietHours = KairoPrefs.quietHoursEnabled
         }
     }
+
+    @MainActor
+    private func loadAppleLink() async {
+#if DEBUG
+        if installAppleLinkFixture() {
+            return
+        }
+#endif
+        await appleLink.loadAvailability {
+            try await KairoAPI.shared.authCapabilities()
+        }
+        if appleLink.showsControl {
+            await prepareAppleLink()
+        }
+    }
+
+    @MainActor
+    private func prepareAppleLink() async {
+        guard !preparingAppleLink else {
+            return
+        }
+        preparingAppleLink = true
+        applePreparationError = nil
+        appleLinkChallenge = nil
+        do {
+            appleLinkChallenge =
+                try await KairoAPI.shared.appleChallenge(intent: .link)
+        } catch is CancellationError {
+            applePreparationError = nil
+        } catch let error as APIError {
+            applePreparationError = error.errorDescription
+        } catch {
+            applePreparationError =
+                "Apple couldn’t be prepared. Please try again."
+        }
+        preparingAppleLink = false
+    }
+
+    @MainActor
+    private func finishAppleLink(
+        _ result: Result<AppleIdentityCredential, Error>
+    ) async {
+        guard let challenge = appleLinkChallenge else {
+            return
+        }
+        let priorScope = app.sessionScope
+        let linkedScope = await appleLink.link(
+            currentScope: priorScope
+        ) {
+            let credential = try result.get()
+            _ = try await KairoAPI.shared.exchangeAppleCredential(
+                intent: .link,
+                challenge: challenge,
+                idToken: credential.idToken
+            )
+        }
+
+        if let linkedScope {
+            let currentScope = await KairoAPI.shared.sessionScope()
+            guard
+                linkedScope == priorScope,
+                currentScope == priorScope
+            else {
+                await app.handleSessionInvalidation()
+                return
+            }
+            UINotificationFeedbackGenerator()
+                .notificationOccurred(.success)
+        } else if appleLink.state == .expired {
+            appleLinkChallenge = nil
+        } else if appleLink.state == .sessionRequired {
+            await app.handleSessionInvalidation()
+        }
+    }
+
+#if DEBUG
+    @MainActor
+    private func installAppleLinkFixture() -> Bool {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard
+            let index = arguments.firstIndex(
+                of: "-kairoAppleLinkFixture"
+            ),
+            arguments.indices.contains(index + 1)
+        else {
+            return false
+        }
+        switch arguments[index + 1] {
+        case "linked":
+            appleLink.installFixture(state: .linked)
+        case "expired":
+            appleLink.installFixture(state: .expired)
+        default:
+            appleLink.installFixture(state: .ready)
+            appleLinkChallenge = .init(
+                state: "synthetic-link-state",
+                nonce: "synthetic-link-nonce",
+                expiresAt: Date().addingTimeInterval(3_600)
+            )
+        }
+        return true
+    }
+#endif
 
     private func saveSettings(_ update: SettingsUpdate) async {
         guard let rev = settingsRevision else { return }

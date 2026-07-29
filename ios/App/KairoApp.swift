@@ -140,19 +140,19 @@ final class AppState {
         authGeneration += 1
         let generation = authGeneration
 #if DEBUG
+        let fixtureArguments = ProcessInfo.processInfo.arguments
+        if let index = fixtureArguments.firstIndex(
+            of: "-kairoThemeFixture"
+        ), fixtureArguments.indices.contains(index + 1),
+           let fixtureTheme = KairoPrefs.Theme(
+               rawValue: fixtureArguments[index + 1]
+           )
+        {
+            theme = fixtureTheme
+        }
         if ProcessInfo.processInfo.arguments.contains(
             "-kairoSignedOutFixture"
         ) {
-            let arguments = ProcessInfo.processInfo.arguments
-            if let index = arguments.firstIndex(
-                of: "-kairoThemeFixture"
-            ), arguments.indices.contains(index + 1),
-               let fixtureTheme = KairoPrefs.Theme(
-                   rawValue: arguments[index + 1]
-               )
-            {
-                theme = fixtureTheme
-            }
             auth = .signedOut
             return
         }

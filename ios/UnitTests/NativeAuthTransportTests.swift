@@ -45,6 +45,7 @@ final class NativeAuthTransportTests: XCTestCase {
         XCTAssertEqual(result?.scope.count, 64)
         let savedSignInEnvelope = await vault.savedEnvelope()
         XCTAssertNotNil(savedSignInEnvelope)
+        let signInScope = await api.sessionScope()
 
         _ = try await api.appleChallenge(intent: .link)
         let linkResult = try await api.exchangeAppleCredential(
@@ -53,6 +54,10 @@ final class NativeAuthTransportTests: XCTestCase {
             idToken: "identity-token"
         )
         XCTAssertNil(linkResult)
+        let linkedEnvelope = await vault.savedEnvelope()
+        let linkedScope = await api.sessionScope()
+        XCTAssertEqual(linkedEnvelope, savedSignInEnvelope)
+        XCTAssertEqual(linkedScope, signInScope)
 
         let captures = await recorder.captures
         XCTAssertEqual(captures.map(\.operationID), [
@@ -232,6 +237,47 @@ final class NativeAuthTransportTests: XCTestCase {
         XCTAssertNil(sessionScope)
     }
 
+    func testAppleLinkUnauthorizedUsesNormalSessionInvalidation() async throws {
+        let recorder = NativeAuthOperationRecorder()
+        let storage = Self.cookieStorage()
+        storage.setCookie(try Self.sessionCookie(value: "session-a"))
+        let vault = MemorySessionEnvelopeStore()
+        let controller = NativeSessionController(
+            baseURL: URL(string: "https://time.neima.me")!,
+            cookieStorage: storage,
+            envelopeStore: vault
+        )
+        _ = try await controller.persist()
+        let api = KairoAPI(
+            baseURL: URL(string: "https://time.neima.me")!,
+            plannerTransport: NativeAuthPlannerTransport(
+                recorder: recorder,
+                exchangeStatus: .unauthorized
+            ),
+            session: Self.session(storage: storage),
+            sessionController: controller,
+            timezoneIdentifierProvider: { "UTC" },
+            idempotencyKeyProvider: { UUID().uuidString }
+        )
+        let challenge = try await api.appleChallenge(intent: .link)
+
+        do {
+            _ = try await api.exchangeAppleCredential(
+                intent: .link,
+                challenge: challenge,
+                idToken: "identity-token"
+            )
+            XCTFail("Expected unauthorized")
+        } catch let error as APIError {
+            XCTAssertEqual(error.statusCode, 401)
+        }
+
+        let savedEnvelope = await vault.savedEnvelope()
+        let sessionScope = await api.sessionScope()
+        XCTAssertNil(savedEnvelope)
+        XCTAssertNil(sessionScope)
+    }
+
     private static func cookieStorage() -> HTTPCookieStorage {
         .sharedCookieStorage(
             forGroupContainerIdentifier: "NativeAuthTransport.\(UUID())"
@@ -285,6 +331,7 @@ private actor NativeAuthOperationRecorder {
 
 private struct NativeAuthPlannerTransport: ClientTransport {
     let recorder: NativeAuthOperationRecorder
+    var exchangeStatus: HTTPResponse.Status = .ok
 
     func send(
         _ request: HTTPRequest,
@@ -310,7 +357,14 @@ private struct NativeAuthPlannerTransport: ClientTransport {
                 #"{"state":"state-1","nonce":"nonce-1","expiresAt":"2026-07-29T12:05:00Z"}"#
             )
         case "exchangeAppleCredential":
-            response = (.ok, #"{"redirect":false,"status":true}"#)
+            if exchangeStatus == .unauthorized {
+                response = (
+                    .unauthorized,
+                    #"{"error":{"code":"unauthorized","message":"Sign in again","retryable":false}}"#
+                )
+            } else {
+                response = (.ok, #"{"redirect":false,"status":true}"#)
+            }
         default:
             response = (.notFound, #"{}"#)
         }
