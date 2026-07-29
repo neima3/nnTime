@@ -69,12 +69,16 @@ production-looking placeholder notification flow that wrote duplicate
 - **Data safety.** All mutation, failure, delivery, and browser proof used
   synthetic local databases/accounts. Production planner, settings,
   subscriptions, notification rows, and user data have not been read or
-  changed. Production integration remains blocked until a fresh custom-format
-  backup is copied off-host and validated.
+  changed. The Jul 29 03:00 UTC production backup was copied off-host to
+  `/Users/nn/Backups/kairo/2026-07-29/kairo-prod-predeploy-20260729-030003.dmp`
+  before integration. It is a 562,700-byte PostgreSQL custom archive, mode
+  `0600`; `pg_restore --list` parsed it successfully and SHA-256 is
+  `859853d46784d1a3cb21a14014c9a0832991e23f008c84d0d8e9ee10847f1aa7`.
+  No planner contents were inspected.
 
-**Release state:** predeploy backup, `main` integration, exact-SHA CI, Coolify
-deployment, and read-only live proof remain pending and must be appended here
-before Round 18 is called shipped.
+**Release state:** the predeploy backup gate is complete. `main` integration,
+exact-SHA CI, Coolify deployment, and read-only live proof remain pending and
+must be appended here before Round 18 is called shipped.
 
 ## 2026-07-28 — Round 17: offline mutation integrity (Codex)
 

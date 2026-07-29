@@ -850,7 +850,7 @@ every completed task in this plan. The remaining order is:
 Run the full commands from Steps 1–2 again after docs. Confirm `git diff
 --check` and a clean intended diff. Commit the immutable Round 18 handoff.
 
-- [ ] **Step 7: Create the predeploy database backup**
+- [x] **Step 7: Create the predeploy database backup**
 
 Follow `docs/DEPLOYMENT.md` exactly. Store the backup outside the repository,
 verify it is non-empty and readable with `pg_restore --list` or the matching
