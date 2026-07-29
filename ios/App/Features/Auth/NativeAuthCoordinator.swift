@@ -14,6 +14,7 @@ final class NativeAuthCoordinator {
     enum Outcome: Equatable {
         case ignored
         case duplicate
+        case busy
         case completed
         case blocked
         case cancelled
@@ -50,11 +51,14 @@ final class NativeAuthCoordinator {
             return .ignored
         }
         let callbackKey = Self.digest(callback.token)
-        guard
-            !inFlightCallbacks.contains(callbackKey),
-            !completedCallbacks.contains(callbackKey)
-        else {
+        guard !completedCallbacks.contains(callbackKey) else {
             return .duplicate
+        }
+        guard !inFlightCallbacks.contains(callbackKey) else {
+            return .duplicate
+        }
+        guard inFlightCallbacks.isEmpty else {
+            return .busy
         }
 
         inFlightCallbacks.insert(callbackKey)

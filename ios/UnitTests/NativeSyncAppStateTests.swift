@@ -401,6 +401,57 @@ final class NativeSyncAppStateTests: XCTestCase {
         XCTAssertEqual(callCount, 2)
     }
 
+    func testDistinctCallbackOverlapKeepsSyncSuspendedUntilOwnerCompletes() async throws {
+        let transport = AppStateSyncTransport()
+        let (app, _) = try makeApp(transport: transport)
+        app.auth = .signedIn
+        app.sessionScope = "account-a"
+        try await app.activateSync(scope: "account-a")
+        _ = try await app.enqueueTaskCreate(title: "Keep me", bucket: "inbox")
+        let coordinator = NativeAuthCoordinator()
+        let gate = AppStateAuthCallbackGate()
+
+        let first = Task { @MainActor in
+            await coordinator.handle(
+                URL(string: "kairo://auth?token=first-overlap")!,
+                currentScope: "account-a",
+                prepareForAuthentication: {
+                    await app.beginAuthCallback()
+                    await gate.enter()
+                },
+                redeem: { _ in .init(scope: "account-a", replacedScope: nil) },
+                prepareForAccountSwitch: { _ in true },
+                bootstrap: {
+                    app.cancelAuthCallbackTransition()
+                }
+            )
+        }
+        await gate.waitUntilEntered()
+
+        let second = await coordinator.handle(
+            URL(string: "kairo://auth?token=second-overlap")!,
+            currentScope: "account-a",
+            prepareForAuthentication: {
+                app.cancelAuthCallbackTransition()
+            },
+            redeem: { _ in .init(scope: "account-b", replacedScope: nil) },
+            prepareForAccountSwitch: { _ in true },
+            bootstrap: {}
+        )
+
+        XCTAssertEqual(second, .busy)
+        await app.synchronize()
+        let callsWhileFirstOwnsTransition = await transport.callCount
+        XCTAssertEqual(callsWhileFirstOwnsTransition, 0)
+
+        await gate.release()
+        let firstOutcome = await first.value
+        XCTAssertEqual(firstOutcome, .completed)
+        await app.synchronize()
+        let callsAfterOwnerCompletes = await transport.callCount
+        XCTAssertEqual(callsAfterOwnerCompletes, 2)
+    }
+
     func testSuccessfulSignOutPurgesCoordinatorAndPresentation() async throws {
         let (app, coordinator) = try makeApp()
         app.sessionScope = "account-a"
@@ -638,3 +689,27 @@ private enum AppStateTransportOutcome: Sendable {
 }
 
 private struct AppStateNetworkError: Error {}
+
+private actor AppStateAuthCallbackGate {
+    private var entered = false
+    private var enteredWaiters: [CheckedContinuation<Void, Never>] = []
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func enter() async {
+        entered = true
+        let waiters = enteredWaiters
+        enteredWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+        await withCheckedContinuation { continuation = $0 }
+    }
+
+    func waitUntilEntered() async {
+        if entered { return }
+        await withCheckedContinuation { enteredWaiters.append($0) }
+    }
+
+    func release() {
+        continuation?.resume()
+        continuation = nil
+    }
+}
