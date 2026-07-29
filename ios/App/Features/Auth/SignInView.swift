@@ -546,9 +546,30 @@ struct SignInView: View {
     private func finish(
         _ session: NativeSessionController.PersistResult
     ) async {
-        if session.replacedScope != nil {
-            await app.prepareForAccountSwitch(newScope: session.scope)
+        await SignInSessionFinisher.finish(
+            session,
+            prepareForAccountSwitch: { scope in
+                await app.prepareForAccountSwitch(newScope: scope)
+            },
+            bootstrap: {
+                await app.bootstrap()
+            }
+        )
+    }
+}
+
+@MainActor
+enum SignInSessionFinisher {
+    static func finish(
+        _ session: NativeSessionController.PersistResult,
+        prepareForAccountSwitch: (String) async -> Bool,
+        bootstrap: () async -> Void
+    ) async {
+        if session.replacedScope != nil,
+           !(await prepareForAccountSwitch(session.scope))
+        {
+            return
         }
-        await app.bootstrap()
+        await bootstrap()
     }
 }

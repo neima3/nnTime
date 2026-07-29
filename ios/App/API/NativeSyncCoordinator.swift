@@ -172,6 +172,13 @@ actor NativeSyncCoordinator {
         activeScope = nil
     }
 
+    func suspendSynchronization() async {
+        guard let inFlight else { return }
+        inFlight.task.cancel()
+        _ = await inFlight.task.result
+        clearInFlightSynchronization(id: inFlight.id)
+    }
+
     private func performSynchronization(
         scope: String,
         explicitRetry: Bool

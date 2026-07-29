@@ -117,6 +117,24 @@ final class SignInPresentationTests: XCTestCase {
         XCTAssertFalse(model.isSignedIn)
     }
 
+    func testAccountReplacementPreparationFailureDoesNotBootstrap() async {
+        let recorder = SignInFinishRecorder()
+
+        await SignInSessionFinisher.finish(
+            .init(scope: "scope-b", replacedScope: "scope-a"),
+            prepareForAccountSwitch: { scope in
+                await recorder.append("prepare:\(scope)")
+                return false
+            },
+            bootstrap: {
+                await recorder.append("bootstrap")
+            }
+        )
+
+        let values = await recorder.values
+        XCTAssertEqual(values, ["prepare:scope-b"])
+    }
+
     func testAppleCredentialRequiresExactReturnedState() {
         let challenge = NativeAppleChallenge(
             state: "expected-state",
@@ -149,5 +167,13 @@ final class SignInPresentationTests: XCTestCase {
         )
 
         XCTAssertEqual(credential.idToken, "identity-token")
+    }
+}
+
+private actor SignInFinishRecorder {
+    private(set) var values: [String] = []
+
+    func append(_ value: String) {
+        values.append(value)
     }
 }

@@ -190,7 +190,7 @@ final class NativeAuthCoordinatorTests: XCTestCase {
         )
 
         let values = await recorder.values
-        XCTAssertEqual(outcome, .completed)
+        XCTAssertEqual(outcome, .blocked)
         XCTAssertEqual(coordinator.phase, .idle)
         XCTAssertEqual(values, ["redeem", "purge:scope-b"])
     }

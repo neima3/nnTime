@@ -15,6 +15,7 @@ final class NativeAuthCoordinator {
         case ignored
         case duplicate
         case completed
+        case blocked
         case failed
     }
 
@@ -65,9 +66,8 @@ final class NativeAuthCoordinator {
                 || currentScope.map({ $0 != session.scope }) == true
             {
                 guard await prepareForAccountSwitch(session.scope) else {
-                    completedCallbacks.insert(callbackKey)
                     phase = .idle
-                    return .completed
+                    return .blocked
                 }
             }
             await bootstrap()

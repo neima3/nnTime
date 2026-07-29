@@ -59,6 +59,7 @@ final class AppState {
     var isSyncing = false
     var lastSuccessfulSyncAt: Date?
     var syncStorageUnavailable = false
+    private var syncSuspendedForAuthTransition = false
 
     init(
         syncCoordinator: NativeSyncCoordinator? = nil,
@@ -202,6 +203,10 @@ final class AppState {
     }
 
     func synchronize(explicitRetry: Bool = false) async {
+        guard case .signedIn = auth else { return }
+        guard !syncStorageUnavailable, !syncSuspendedForAuthTransition else {
+            return
+        }
         guard let scope = sessionScope else { return }
         guard !isSyncing else { return }
         isSyncing = true
@@ -341,6 +346,7 @@ final class AppState {
                     enterSyncStorageFailure()
                     return
                 }
+                syncSuspendedForAuthTransition = false
                 auth = .signedIn
                 await synchronize()
             } else {
@@ -427,6 +433,7 @@ final class AppState {
                     enterSyncStorageFailure()
                     return
                 }
+                syncSuspendedForAuthTransition = false
                 auth = .signedIn
                 await synchronize()
             } else {
@@ -447,6 +454,7 @@ final class AppState {
                 enterSyncStorageFailure()
                 return
             }
+            syncSuspendedForAuthTransition = false
             auth = .signedIn
             await synchronize()
         case .signedOut:
@@ -528,6 +536,7 @@ final class AppState {
         await signOutAction()
         do {
             try await purgeLocalState()
+            syncSuspendedForAuthTransition = false
             auth = .signedOut
         } catch {
             enterSyncStorageFailure()
@@ -539,6 +548,7 @@ final class AppState {
         await invalidateSessionAction()
         do {
             try await purgeLocalState()
+            syncSuspendedForAuthTransition = false
             auth = .signedOut
         } catch {
             enterSyncStorageFailure()
@@ -547,6 +557,8 @@ final class AppState {
 
     @discardableResult
     func prepareForAccountSwitch(newScope: String) async -> Bool {
+        syncSuspendedForAuthTransition = true
+        await syncCoordinator.suspendSynchronization()
         authGeneration += 1
         do {
             try await purgeLocalState()
@@ -558,7 +570,9 @@ final class AppState {
         }
     }
 
-    func beginAuthCallback() {
+    func beginAuthCallback() async {
+        syncSuspendedForAuthTransition = true
+        await syncCoordinator.suspendSynchronization()
         authGeneration += 1
     }
 
@@ -566,12 +580,14 @@ final class AppState {
         guard case .signedIn = auth else {
             do {
                 try await purgeLocalState()
+                syncSuspendedForAuthTransition = false
                 auth = .signedOut
             } catch {
                 enterSyncStorageFailure()
             }
             return
         }
+        syncSuspendedForAuthTransition = false
     }
 
     private func purgeLocalState() async throws {
@@ -684,7 +700,7 @@ struct RootView: View {
         guard AuthCallback.parse(url) != nil else {
             return
         }
-        app.beginAuthCallback()
+        await app.beginAuthCallback()
         let outcome = await authCoordinator.handle(
             url,
             currentScope: app.sessionScope,

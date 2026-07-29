@@ -81,6 +81,7 @@ final class NativeSyncAppStateTests: XCTestCase {
     func testSynchronizationPublishesConflictPresentation() async throws {
         let transport = AppStateSyncTransport(taskOutcomes: [.http(422)])
         let (app, _) = try makeApp(transport: transport)
+        app.auth = .signedIn
         app.sessionScope = "account-a"
         try await app.activateSync(scope: "account-a")
         _ = try await app.enqueueTaskCreate(title: "Conflict", bucket: "inbox")
@@ -95,6 +96,7 @@ final class NativeSyncAppStateTests: XCTestCase {
     func testSynchronizationResetsSyncingAfterThrownNetworkError() async throws {
         let transport = AppStateSyncTransport(changeOutcomes: [.network])
         let (app, _) = try makeApp(transport: transport)
+        app.auth = .signedIn
         app.sessionScope = "account-a"
         try await app.activateSync(scope: "account-a")
 
@@ -107,6 +109,7 @@ final class NativeSyncAppStateTests: XCTestCase {
 
     func testCompletionNotificationPostsOnlyWhenSynchronizationNeedsRefresh() async throws {
         let (app, _) = try makeApp()
+        app.auth = .signedIn
         app.sessionScope = "account-a"
         try await app.activateSync(scope: "account-a")
         var notificationCount = 0
@@ -131,6 +134,7 @@ final class NativeSyncAppStateTests: XCTestCase {
     func testConcurrentSyncTriggersPostOneCompletionNotification() async throws {
         let transport = AppStateSyncTransport(suspendChanges: true)
         let (app, _) = try makeApp(transport: transport)
+        app.auth = .signedIn
         app.sessionScope = "account-a"
         try await app.activateSync(scope: "account-a")
         _ = try await app.enqueueTaskCreate(title: "One refresh", bucket: "inbox")
@@ -287,6 +291,54 @@ final class NativeSyncAppStateTests: XCTestCase {
         await assertInactive(coordinator, scope: "account-b")
     }
 
+    func testPurgeFailedAccountSwitchBlocksExplicitForegroundAndReconnectSync() async throws {
+        let transport = AppStateSyncTransport()
+        let (app, _) = try await makePurgeFailureApp(transport: transport)
+
+        let prepared = await app.prepareForAccountSwitch(newScope: "account-b")
+        XCTAssertFalse(prepared)
+
+        await app.synchronize(explicitRetry: true)
+        if AppState.shouldSynchronize(for: .active) {
+            await app.synchronize()
+        }
+        if NetworkMonitor.didReconnect(from: false, to: true) {
+            await app.synchronize()
+        }
+
+        let blockedCallCount = await transport.callCount
+        XCTAssertEqual(blockedCallCount, 0)
+    }
+
+    func testAuthCallbackFreezeWaitsForInFlightSyncBeforeReturning() async throws {
+        let transport = AppStateSyncTransport(suspendTaskCreate: true)
+        let (app, _) = try makeApp(transport: transport)
+        app.auth = .signedIn
+        app.sessionScope = "account-a"
+        try await app.activateSync(scope: "account-a")
+        _ = try await app.enqueueTaskCreate(title: "Keep me", bucket: "inbox")
+
+        let synchronization = Task { await app.synchronize() }
+        await transport.waitUntilTaskCreateStarts()
+        let callbackFreeze = Task { await app.beginAuthCallback() }
+        await transport.waitUntilTaskCreateWasCancelled()
+
+        let callsBeforeRelease = await transport.callCount
+        let changesBeforeRelease = await transport.changesCallCount
+        XCTAssertEqual(callsBeforeRelease, 1)
+        XCTAssertEqual(changesBeforeRelease, 0)
+
+        await transport.resumeTaskCreate()
+        await callbackFreeze.value
+        await synchronization.value
+
+        let changesAfterRelease = await transport.changesCallCount
+        XCTAssertEqual(changesAfterRelease, 0)
+        await app.synchronize()
+        let callsAfterBlockedRetry = await transport.callCount
+        XCTAssertEqual(callsAfterBlockedRetry, 1)
+    }
+
     func testSuccessfulSignOutPurgesCoordinatorAndPresentation() async throws {
         let (app, coordinator) = try makeApp()
         app.sessionScope = "account-a"
@@ -368,19 +420,29 @@ private actor AppStateSyncTransport: NativeSyncTransport {
     private var nextTaskOutcome = 0
     private var nextChangeOutcome = 0
     private var suspendChanges = false
+    private var suspendTaskCreate = false
     private var changesStarted = false
+    private var taskCreateStarted = false
+    private var taskCreateCancellationObserved = false
     private var changesStartWaiters: [CheckedContinuation<Void, Never>] = []
+    private var taskCreateStartWaiters: [CheckedContinuation<Void, Never>] = []
+    private var taskCreateCancellationWaiters: [CheckedContinuation<Void, Never>] = []
     private var changesResume: CheckedContinuation<Void, Never>?
+    private var taskCreateResume: CheckedContinuation<Void, Never>?
+    private var calls = 0
+    private var changesCalls = 0
 
     init(
         taskOutcomes: [AppStateTransportOutcome] = [],
         changeOutcomes: [AppStateTransportOutcome] = [],
         suspendChanges: Bool = false,
+        suspendTaskCreate: Bool = false,
         beforeTaskOutcome: @escaping @Sendable () -> Void = {}
     ) {
         self.taskOutcomes = taskOutcomes
         self.changeOutcomes = changeOutcomes
         self.suspendChanges = suspendChanges
+        self.suspendTaskCreate = suspendTaskCreate
         self.beforeTaskOutcome = beforeTaskOutcome
     }
 
@@ -389,6 +451,19 @@ private actor AppStateSyncTransport: NativeSyncTransport {
         bucket: String,
         idempotencyKey: String?
     ) async throws -> TaskItem {
+        calls += 1
+        taskCreateStarted = true
+        let startWaiters = taskCreateStartWaiters
+        taskCreateStartWaiters.removeAll()
+        startWaiters.forEach { $0.resume() }
+        if suspendTaskCreate {
+            suspendTaskCreate = false
+            await withTaskCancellationHandler {
+                await withCheckedContinuation { taskCreateResume = $0 }
+            } onCancel: {
+                Task { await self.observeTaskCreateCancellation() }
+            }
+        }
         if taskOutcomes.indices.contains(nextTaskOutcome) {
             let outcome = taskOutcomes[nextTaskOutcome]
             nextTaskOutcome += 1
@@ -422,6 +497,8 @@ private actor AppStateSyncTransport: NativeSyncTransport {
     }
 
     func changes(cursor: String?, limit: Int?) async throws -> ChangesPage {
+        calls += 1
+        changesCalls += 1
         changesStarted = true
         let waiters = changesStartWaiters
         changesStartWaiters.removeAll()
@@ -443,9 +520,36 @@ private actor AppStateSyncTransport: NativeSyncTransport {
         await withCheckedContinuation { changesStartWaiters.append($0) }
     }
 
+    func waitUntilTaskCreateStarts() async {
+        if taskCreateStarted { return }
+        await withCheckedContinuation { taskCreateStartWaiters.append($0) }
+    }
+
+    func waitUntilTaskCreateWasCancelled() async {
+        if taskCreateCancellationObserved { return }
+        await withCheckedContinuation {
+            taskCreateCancellationWaiters.append($0)
+        }
+    }
+
     func resumeChanges() {
         changesResume?.resume()
         changesResume = nil
+    }
+
+    func resumeTaskCreate() {
+        taskCreateResume?.resume()
+        taskCreateResume = nil
+    }
+
+    var callCount: Int { calls }
+    var changesCallCount: Int { changesCalls }
+
+    private func observeTaskCreateCancellation() {
+        taskCreateCancellationObserved = true
+        let waiters = taskCreateCancellationWaiters
+        taskCreateCancellationWaiters.removeAll()
+        waiters.forEach { $0.resume() }
     }
 }
 
