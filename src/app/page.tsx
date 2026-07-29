@@ -71,7 +71,7 @@ const features = [
 
 export default function LandingPage() {
   return (
-    <div className="min-h-dvh bg-canvas">
+    <div className="min-h-dvh overflow-x-clip bg-canvas">
       {/* nav */}
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-5">
         <div className="flex items-center gap-2.5">
