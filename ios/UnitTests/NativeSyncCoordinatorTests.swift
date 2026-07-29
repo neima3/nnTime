@@ -78,6 +78,79 @@ final class NativeSyncCoordinatorTests: XCTestCase {
         XCTAssertEqual(snapshot.lastSuccessfulSyncAt, now)
     }
 
+    func testInFlightIDProviderDoesNotConsumePersistedMutationOrConflictIDs() async throws {
+        let mutationID = UUID(uuidString: "00000000-0000-0000-0000-000000000011")!
+        let conflictID = UUID(uuidString: "00000000-0000-0000-0000-000000000012")!
+        let inFlightID = UUID(uuidString: "00000000-0000-0000-0000-000000000013")!
+        let (coordinator, _, _) = try makeCoordinator(
+            uuids: [mutationID, conflictID],
+            inFlightIDProvider: { inFlightID },
+            taskOutcomes: [.http(422)]
+        )
+        try await coordinator.activate(scope: "account-a")
+
+        let mutation = try await coordinator.enqueueTaskCreate(
+            title: "Conflict",
+            bucket: "inbox"
+        )
+        _ = try await coordinator.synchronize(scope: "account-a")
+
+        let snapshot = try await coordinator.snapshot(scope: "account-a")
+        guard let conflict = snapshot.conflicts.first else {
+            return XCTFail("Expected a durable conflict")
+        }
+        XCTAssertEqual(mutation.id, mutationID)
+        XCTAssertEqual(conflict.id, conflictID)
+    }
+
+    func testColdRelaunchReplaysPersistedCreatesInOrderWithOriginalDistinctKeys() async throws {
+        let firstID = UUID(uuidString: "00000000-0000-0000-0000-000000000021")!
+        let secondID = UUID(uuidString: "00000000-0000-0000-0000-000000000022")!
+        let flightID = UUID(uuidString: "00000000-0000-0000-0000-000000000023")!
+        let (firstCoordinator, store, transport) = try makeCoordinator(
+            idempotencyKeys: ["first-key", "second-key"],
+            uuids: [firstID, secondID],
+            inFlightIDProvider: { flightID }
+        )
+        try await firstCoordinator.activate(scope: "account-a")
+        let first = try await firstCoordinator.enqueueTaskCreate(
+            title: "First",
+            bucket: "inbox"
+        )
+        let second = try await firstCoordinator.enqueueTaskCreate(
+            title: "Second",
+            bucket: "inbox"
+        )
+        XCTAssertEqual(
+            try store.read(scope: "account-a")?.pendingMutations,
+            [first, second]
+        )
+
+        let currentTime = now
+        let relaunchedCoordinator = NativeSyncCoordinator(
+            store: store,
+            transport: transport,
+            clock: { currentTime },
+            uuidProvider: { UUID() },
+            idempotencyKeyProvider: { "must-not-replace-persisted-key" },
+            inFlightIDProvider: { flightID }
+        )
+        try await relaunchedCoordinator.activate(scope: "account-a")
+        _ = try await relaunchedCoordinator.synchronize(scope: "account-a")
+
+        let events = await transport.events
+        XCTAssertEqual(
+            events,
+            [
+                .taskCreate("First", "inbox", "first-key"),
+                .taskCreate("Second", "inbox", "second-key"),
+                .changes(nil),
+            ]
+        )
+        let snapshot = try await relaunchedCoordinator.snapshot(scope: "account-a")
+        XCTAssertEqual(snapshot.pendingCount, 0)
+    }
+
     func testActivityStatusRebasesOnFreshRevisionAndPreservesDurableValues() async throws {
         let (coordinator, _, transport) = try makeCoordinator(
             idempotencyKey: "status-key",
@@ -175,6 +248,25 @@ final class NativeSyncCoordinatorTests: XCTestCase {
         XCTAssertTrue(acknowledged.conflicts.isEmpty)
     }
 
+    func testGoneStatusActivityBecomesSafeDurableConflict() async throws {
+        let (coordinator, _, _) = try makeCoordinator(
+            activityOutcomes: [.http(410)]
+        )
+        try await coordinator.activate(scope: "account-a")
+        _ = try await coordinator.enqueueActivityStatus(
+            activityID: "activity-1",
+            status: .completed,
+            occurredAt: now,
+            occurrenceKey: "2026-07-29T12:00:00Z"
+        )
+
+        _ = try await coordinator.synchronize(scope: "account-a")
+
+        let snapshot = try await coordinator.snapshot(scope: "account-a")
+        XCTAssertEqual(snapshot.pendingCount, 0)
+        XCTAssertEqual(snapshot.conflicts.first?.reason, .activityMissing)
+    }
+
     func testRetryableFailuresPersistCappedBackoffAndExplicitRetryBypassesIt() async throws {
         let (coordinator, store, transport) = try makeCoordinator(
             taskOutcomes: [.network, .success]
@@ -199,6 +291,52 @@ final class NativeSyncCoordinatorTests: XCTestCase {
         let replayed = try await coordinator.snapshot(scope: "account-a")
         XCTAssertEqual(explicitEvents.filter(\.isTaskCreate).count, 2)
         XCTAssertEqual(replayed.pendingCount, 0)
+    }
+
+    func test429And5xxFailuresRemainPendingWithRetryDelay() async throws {
+        for status in [429, 500, 503] {
+            let (coordinator, store, _) = try makeCoordinator(
+                taskOutcomes: [.http(status)]
+            )
+            try await coordinator.activate(scope: "account-\(status)")
+            _ = try await coordinator.enqueueTaskCreate(
+                title: "Retry \(status)",
+                bucket: "inbox"
+            )
+
+            _ = try await coordinator.synchronize(scope: "account-\(status)")
+
+            let mutation = try XCTUnwrap(
+                try store.read(scope: "account-\(status)")?.pendingMutations.first
+            )
+            XCTAssertEqual(mutation.attemptCount, 1)
+            XCTAssertEqual(mutation.nextAttemptAt, now.addingTimeInterval(60))
+        }
+    }
+
+    func testRetryBackoffGrowsExponentiallyAndCapsAtThirtyMinutes() async throws {
+        let (coordinator, store, _) = try makeCoordinator(
+            taskOutcomes: Array(repeating: .network, count: 8)
+        )
+        try await coordinator.activate(scope: "account-a")
+        _ = try await coordinator.enqueueTaskCreate(title: "Retry", bucket: "inbox")
+
+        for (index, delay) in [60, 120, 240, 480, 960, 1_800, 1_800, 1_800]
+            .enumerated()
+        {
+            _ = try await coordinator.synchronize(
+                scope: "account-a",
+                explicitRetry: true
+            )
+            let mutation = try XCTUnwrap(
+                try store.read(scope: "account-a")?.pendingMutations.first
+            )
+            XCTAssertEqual(mutation.attemptCount, index + 1)
+            XCTAssertEqual(
+                mutation.nextAttemptAt,
+                now.addingTimeInterval(TimeInterval(delay))
+            )
+        }
     }
 
     func testNonAuthentication4xxBecomesConflictBut401RethrowsUntouched() async throws {
@@ -257,6 +395,70 @@ final class NativeSyncCoordinatorTests: XCTestCase {
             _ = try await coordinator.snapshot(scope: "account-a")
             XCTFail("Purged coordinators must not expose stale state")
         } catch {}
+    }
+
+    func testActivatePropagatesCorruptStoreReadWithoutDeletingDocument() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(
+            path: "KairoNativeSyncCorruptStoreTests-\(UUID())"
+        )
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = NativeSyncStore(directory: directory)
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+        try Data("not json".utf8).write(to: store.fileURL)
+        let coordinator = testCoordinator(store: store)
+
+        do {
+            try await coordinator.activate(scope: "account-a")
+            XCTFail("Expected corrupt document read to propagate")
+        } catch let error as NativeSyncStore.StoreError {
+            XCTAssertEqual(error, .invalidDocument)
+        }
+        XCTAssertTrue(FileManager.default.fileExists(atPath: store.fileURL.path))
+    }
+
+    func testActivatePropagatesDeterministicStoreWriteFailure() async throws {
+        let parentFile = FileManager.default.temporaryDirectory.appending(
+            path: "KairoNativeSyncWriteFailure-\(UUID())"
+        )
+        defer { try? FileManager.default.removeItem(at: parentFile) }
+        try Data().write(to: parentFile)
+        let store = NativeSyncStore(directory: parentFile)
+        let coordinator = testCoordinator(store: store)
+
+        do {
+            try await coordinator.activate(scope: "account-a")
+            XCTFail("Expected write through a regular-file parent to fail")
+        } catch {}
+        var isDirectory: ObjCBool = false
+        XCTAssertTrue(
+            FileManager.default.fileExists(
+                atPath: parentFile.path,
+                isDirectory: &isDirectory
+            )
+        )
+        XCTAssertFalse(isDirectory.boolValue)
+    }
+
+    func testPurgePropagatesStoreRemovalFailureWithoutClearingScope() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(
+            path: "KairoNativeSyncPurgeFailure-\(UUID())"
+        )
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileManager = FailingRemoveFileManager()
+        let store = NativeSyncStore(directory: directory, fileManager: fileManager)
+        let coordinator = testCoordinator(store: store)
+        try await coordinator.activate(scope: "account-a")
+        fileManager.failRemovals = true
+
+        do {
+            try await coordinator.purge()
+            XCTFail("Expected purge failure to propagate")
+        } catch TestStoreError.removeDenied {}
+        let snapshot = try await coordinator.snapshot(scope: "account-a")
+        XCTAssertEqual(snapshot.pendingCount, 0)
     }
 
     func testChangesUseCheckpointForDurableProgressAndNextCursorOnlyForPaging() async throws {
@@ -319,6 +521,9 @@ final class NativeSyncCoordinatorTests: XCTestCase {
 
     private func makeCoordinator(
         idempotencyKey: String = "key-1",
+        idempotencyKeys: [String]? = nil,
+        uuids: [UUID]? = nil,
+        inFlightIDProvider: @escaping @Sendable () -> UUID = { UUID() },
         taskOutcomes: [TransportOutcome] = [],
         activityOutcomes: [TransportOutcome] = [],
         activityRevisions: [Int] = [1],
@@ -341,18 +546,45 @@ final class NativeSyncCoordinatorTests: XCTestCase {
             changes: changes,
             suspendTaskCreate: suspendTaskCreate
         )
+        let uuidSource = UUIDSource(
+            values: uuids ?? [
+                UUID(uuidString: "00000000-0000-0000-0000-000000000007")!,
+            ]
+        )
+        let idempotencySource = StringSource(
+            values: idempotencyKeys ?? [idempotencyKey],
+            fallback: idempotencyKey
+        )
         return (
             NativeSyncCoordinator(
                 store: store,
                 transport: transport,
                 clock: { self.now },
-                uuidProvider: {
-                    UUID(uuidString: "00000000-0000-0000-0000-000000000007")!
-                },
-                idempotencyKeyProvider: { idempotencyKey }
+                uuidProvider: { uuidSource.next() },
+                idempotencyKeyProvider: { idempotencySource.next() },
+                inFlightIDProvider: inFlightIDProvider
             ),
             store,
             transport
+        )
+    }
+
+    private func testCoordinator(store: NativeSyncStore) -> NativeSyncCoordinator {
+        NativeSyncCoordinator(
+            store: store,
+            transport: SyncTransport(
+                taskOutcomes: [],
+                activityOutcomes: [],
+                statusOutcomes: [],
+                changeOutcomes: [],
+                activityRevisions: [1],
+                changes: [],
+                suspendTaskCreate: false
+            ),
+            clock: { self.now },
+            uuidProvider: { UUID() },
+            idempotencyKeyProvider: { "key" },
+            inFlightIDProvider: { UUID() }
         )
     }
 }
@@ -361,6 +593,53 @@ private enum TransportOutcome: Sendable {
     case success
     case http(Int)
     case network
+}
+
+private final class UUIDSource: @unchecked Sendable {
+    private var values: [UUID]
+
+    init(values: [UUID]) {
+        self.values = values
+    }
+
+    func next() -> UUID {
+        guard !values.isEmpty else {
+            return UUID()
+        }
+        return values.removeFirst()
+    }
+}
+
+private final class StringSource: @unchecked Sendable {
+    private var values: [String]
+    private let fallback: String
+
+    init(values: [String], fallback: String) {
+        self.values = values
+        self.fallback = fallback
+    }
+
+    func next() -> String {
+        guard !values.isEmpty else {
+            return fallback
+        }
+        return values.removeFirst()
+    }
+}
+
+private enum TestStoreError: Error {
+    case removeDenied
+}
+
+private final class FailingRemoveFileManager: FileManager {
+    var failRemovals = false
+
+    override func removeItem(at URL: URL) throws {
+        if failRemovals {
+            throw TestStoreError.removeDenied
+        }
+        try super.removeItem(at: URL)
+    }
 }
 
 private enum SyncEvent: Equatable, Sendable {

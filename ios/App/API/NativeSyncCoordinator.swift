@@ -32,6 +32,7 @@ actor NativeSyncCoordinator {
     private let clock: @Sendable () -> Date
     private let uuidProvider: @Sendable () -> UUID
     private let idempotencyKeyProvider: @Sendable () -> String
+    private let inFlightIDProvider: @Sendable () -> UUID
     private var activeScope: String?
     private var inFlight: InFlightSynchronization?
 
@@ -42,13 +43,15 @@ actor NativeSyncCoordinator {
         uuidProvider: @escaping @Sendable () -> UUID = { UUID() },
         idempotencyKeyProvider: @escaping @Sendable () -> String = {
             UUIDv7Generator.generate()
-        }
+        },
+        inFlightIDProvider: @escaping @Sendable () -> UUID = { UUID() }
     ) {
         self.store = store
         self.transport = transport
         self.clock = clock
         self.uuidProvider = uuidProvider
         self.idempotencyKeyProvider = idempotencyKeyProvider
+        self.inFlightIDProvider = inFlightIDProvider
     }
 
     func activate(scope: String) throws {
@@ -136,7 +139,7 @@ actor NativeSyncCoordinator {
             return try await inFlight.task.value
         }
 
-        let id = UUID()
+        let id = inFlightIDProvider()
         let task = Task { [weak self] () throws -> NativeSyncSynchronizationResult in
             guard let self else {
                 throw CancellationError()
