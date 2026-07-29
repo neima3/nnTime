@@ -197,7 +197,7 @@ actor NativeSyncCoordinator {
             }
 
             do {
-                try await replay(mutation)
+                try await replay(mutation, scope: scope)
                 try removeMutation(id: mutation.id, from: scope)
                 replaySucceeded = true
             } catch is CancellationError {
@@ -224,7 +224,10 @@ actor NativeSyncCoordinator {
         return .init(refreshRequired: replaySucceeded || feedAdvanced)
     }
 
-    private func replay(_ mutation: NativeSyncMutation) async throws {
+    private func replay(
+        _ mutation: NativeSyncMutation,
+        scope: String
+    ) async throws {
         switch mutation.kind {
         case let .taskCreate(task):
             _ = try await transport.createTask(
@@ -232,11 +235,15 @@ actor NativeSyncCoordinator {
                 bucket: task.bucket,
                 idempotencyKey: task.idempotencyKey
             )
+            try Task.checkCancellation()
+            _ = try requiredActiveScope(matching: scope)
         case let .activityStatus(status):
             guard let activityStatus = ActivityStatus(rawValue: status.status) else {
                 throw NativeSyncCoordinatorError.invalidStatus
             }
             let activity = try await transport.activity(id: status.activityID)
+            try Task.checkCancellation()
+            _ = try requiredActiveScope(matching: scope)
             _ = try await transport.setStatus(
                 activityId: status.activityID,
                 revision: activity.revision,
@@ -245,6 +252,8 @@ actor NativeSyncCoordinator {
                 completedAt: timestamp(status.occurredAt),
                 idempotencyKey: status.idempotencyKey
             )
+            try Task.checkCancellation()
+            _ = try requiredActiveScope(matching: scope)
         }
     }
 
@@ -296,6 +305,7 @@ actor NativeSyncCoordinator {
 
         for _ in 0 ..< 10 {
             let page = try await transport.changes(cursor: cursor, limit: 100)
+            try Task.checkCancellation()
             _ = try requiredActiveScope(matching: scope)
             if let checkpointCursor = page.checkpointCursor {
                 var document = try document(for: scope)

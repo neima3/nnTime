@@ -519,6 +519,80 @@ final class NativeSyncCoordinatorTests: XCTestCase {
         XCTAssertEqual(events.filter(\.isTaskCreate).count, 1)
     }
 
+    func testAccountSwitchDuringSuspendedActivityReadCannotSubmitOldStatus() async throws {
+        let (coordinator, _, transport) = try makeCoordinator(suspendActivityRead: true)
+        try await coordinator.activate(scope: "account-a")
+        _ = try await coordinator.enqueueActivityStatus(
+            activityID: "activity-a",
+            status: .completed,
+            occurredAt: now,
+            occurrenceKey: "2026-07-29T12:00:00Z"
+        )
+
+        let oldSynchronization = Task<NativeSyncSynchronizationResult?, Never> {
+            do {
+                return try await coordinator.synchronize(scope: "account-a")
+            } catch {
+                return nil
+            }
+        }
+        await transport.waitUntilActivityReadStarts()
+
+        try await coordinator.activate(scope: "account-b")
+        await transport.resumeActivityRead()
+
+        let oldResult = await oldSynchronization.value
+        XCTAssertNil(oldResult)
+        let events = await transport.events
+        XCTAssertFalse(events.contains { event in
+            if case .status = event { return true }
+            return false
+        })
+        let currentSnapshot = try await coordinator.snapshot(scope: "account-b")
+        XCTAssertEqual(currentSnapshot.pendingCount, 0)
+        XCTAssertTrue(currentSnapshot.conflicts.isEmpty)
+        do {
+            _ = try await coordinator.snapshot(scope: "account-a")
+            XCTFail("Old account state must remain inaccessible")
+        } catch {}
+    }
+
+    func testPurgeDuringSuspendedActivityReadCannotSubmitOldStatus() async throws {
+        let (coordinator, store, transport) = try makeCoordinator(suspendActivityRead: true)
+        try await coordinator.activate(scope: "account-a")
+        _ = try await coordinator.enqueueActivityStatus(
+            activityID: "activity-a",
+            status: .completed,
+            occurredAt: now,
+            occurrenceKey: "2026-07-29T12:00:00Z"
+        )
+
+        let oldSynchronization = Task<NativeSyncSynchronizationResult?, Never> {
+            do {
+                return try await coordinator.synchronize(scope: "account-a")
+            } catch {
+                return nil
+            }
+        }
+        await transport.waitUntilActivityReadStarts()
+
+        try await coordinator.purge()
+        await transport.resumeActivityRead()
+
+        let oldResult = await oldSynchronization.value
+        XCTAssertNil(oldResult)
+        let events = await transport.events
+        XCTAssertFalse(events.contains { event in
+            if case .status = event { return true }
+            return false
+        })
+        XCTAssertFalse(FileManager.default.fileExists(atPath: store.fileURL.path))
+        do {
+            _ = try await coordinator.snapshot(scope: "account-a")
+            XCTFail("Purged state must not remain accessible")
+        } catch {}
+    }
+
     private func makeCoordinator(
         idempotencyKey: String = "key-1",
         idempotencyKeys: [String]? = nil,
@@ -530,7 +604,8 @@ final class NativeSyncCoordinatorTests: XCTestCase {
         statusOutcomes: [TransportOutcome] = [],
         changes: [ChangesPage] = [],
         changeOutcomes: [TransportOutcome] = [],
-        suspendTaskCreate: Bool = false
+        suspendTaskCreate: Bool = false,
+        suspendActivityRead: Bool = false
     ) throws -> (NativeSyncCoordinator, NativeSyncStore, SyncTransport) {
         let directory = FileManager.default.temporaryDirectory.appending(
             path: "KairoNativeSyncCoordinatorTests-\(UUID())"
@@ -544,7 +619,8 @@ final class NativeSyncCoordinatorTests: XCTestCase {
             changeOutcomes: changeOutcomes,
             activityRevisions: activityRevisions,
             changes: changes,
-            suspendTaskCreate: suspendTaskCreate
+            suspendTaskCreate: suspendTaskCreate,
+            suspendActivityRead: suspendActivityRead
         )
         let uuidSource = UUIDSource(
             values: uuids ?? [
@@ -579,7 +655,8 @@ final class NativeSyncCoordinatorTests: XCTestCase {
                 changeOutcomes: [],
                 activityRevisions: [1],
                 changes: [],
-                suspendTaskCreate: false
+                suspendTaskCreate: false,
+                suspendActivityRead: false
             ),
             clock: { self.now },
             uuidProvider: { UUID() },
@@ -672,9 +749,13 @@ private actor SyncTransport: NativeSyncTransport {
     private var activityRevisions: [Int]
     private var changesPages: [ChangesPage]
     private var suspendTaskCreate: Bool
+    private var suspendActivityRead: Bool
     private var taskCreateStarted = false
     private var taskStartWaiters: [CheckedContinuation<Void, Never>] = []
     private var taskResume: CheckedContinuation<Void, Never>?
+    private var activityReadStarted = false
+    private var activityReadStartWaiters: [CheckedContinuation<Void, Never>] = []
+    private var activityReadResume: CheckedContinuation<Void, Never>?
     private(set) var events: [SyncEvent] = []
 
     init(
@@ -684,7 +765,8 @@ private actor SyncTransport: NativeSyncTransport {
         changeOutcomes: [TransportOutcome],
         activityRevisions: [Int],
         changes: [ChangesPage],
-        suspendTaskCreate: Bool
+        suspendTaskCreate: Bool,
+        suspendActivityRead: Bool
     ) {
         self.taskOutcomes = taskOutcomes
         self.activityOutcomes = activityOutcomes
@@ -693,6 +775,7 @@ private actor SyncTransport: NativeSyncTransport {
         self.activityRevisions = activityRevisions
         changesPages = changes
         self.suspendTaskCreate = suspendTaskCreate
+        self.suspendActivityRead = suspendActivityRead
     }
 
     func createTask(
@@ -723,6 +806,14 @@ private actor SyncTransport: NativeSyncTransport {
 
     func activity(id: String) async throws -> Activity {
         events.append(.activity(id))
+        activityReadStarted = true
+        let waiters = activityReadStartWaiters
+        activityReadStartWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+        if suspendActivityRead {
+            suspendActivityRead = false
+            await withCheckedContinuation { activityReadResume = $0 }
+        }
         try resolve(&activityOutcomes)
         let revision = activityRevisions.isEmpty ? 1 : activityRevisions.removeFirst()
         return .init(
@@ -791,6 +882,16 @@ private actor SyncTransport: NativeSyncTransport {
     func resumeTaskCreate() {
         taskResume?.resume()
         taskResume = nil
+    }
+
+    func waitUntilActivityReadStarts() async {
+        if activityReadStarted { return }
+        await withCheckedContinuation { activityReadStartWaiters.append($0) }
+    }
+
+    func resumeActivityRead() {
+        activityReadResume?.resume()
+        activityReadResume = nil
     }
 
     private func resolve(_ outcomes: inout [TransportOutcome]) throws {
