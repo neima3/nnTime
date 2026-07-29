@@ -7,7 +7,7 @@ import { ArrowRight, Globe2, Loader2, Mail } from "lucide-react";
 import { signIn, signUp } from "@/lib/auth-client";
 import { detectTimezone } from "@/lib/timezone";
 import type { AuthCapabilities } from "@/server/auth-capabilities";
-import { startGoogleSignIn } from "./google-auth-flow";
+import { signInWithGoogle } from "./google-auth-integration";
 
 type Mode = "sign-in" | "sign-up";
 
@@ -97,9 +97,8 @@ export function AuthForm({
   }
 
   function onGoogleSignIn() {
-    void startGoogleSignIn({
+    void signInWithGoogle({
       mode,
-      invoke: (options) => signIn.social(options),
       lock: googleLock,
       setPending: setGooglePending,
       setError,

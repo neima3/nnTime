@@ -14,7 +14,6 @@ import {
   User,
 } from "lucide-react";
 import { invalidateSettingsCache } from "@/lib/settings-cache";
-import { authClient } from "@/lib/auth-client";
 import { publishHourCycle } from "@/lib/use-hour-cycle";
 import { toHourCycle } from "@/lib/time-format";
 import {
@@ -33,11 +32,11 @@ import {
 } from "@/lib/quiet-hours";
 import { SignedOutCard, SkeletonRows } from "./EmptyState";
 import { PushReminders } from "./PushReminders";
+import { ConnectedSignInMethods } from "./google-auth-flow";
 import {
-  ConnectedSignInMethods,
-  loadConnectedProviders,
-  startGoogleLink,
-} from "./google-auth-flow";
+  linkGoogleFromSettings,
+  loadSettingsConnectedProviders,
+} from "./google-auth-integration";
 
 type Settings = {
   timezone: string;
@@ -420,14 +419,17 @@ export function SettingsClient() {
     let cancelled = false;
     methodsLoadStarted.current = true;
     void Promise.all([
-      loadConnectedProviders(() => authClient.listAccounts()),
+      loadSettingsConnectedProviders({
+        authenticated: authed,
+        settingsReady: settings !== null,
+      }),
       fetch("/api/v1/auth/capabilities")
         .then((response) => (response.ok ? response.json() : null))
         .then((capabilities) => capabilities?.google === true)
         .catch(() => false),
     ])
       .then(([providers, available]) => {
-        if (cancelled) return;
+        if (cancelled || !providers) return;
         setConnectedProviders(providers);
         setGoogleAvailable(available);
       })
@@ -593,8 +595,7 @@ export function SettingsClient() {
   }, [deleteConfirm]);
 
   const linkGoogle = useCallback(() => {
-    void startGoogleLink({
-      invoke: (options) => authClient.linkSocial(options),
+    void linkGoogleFromSettings({
       lock: googleLinkLock,
       setPending: setLinkingGoogle,
       setError: setLinkError,
