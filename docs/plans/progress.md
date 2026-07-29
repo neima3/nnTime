@@ -1,5 +1,53 @@
 # Progress log
 
+## 2026-07-29 — Round 19: native session and offline integrity (Codex)
+
+Roadmap:
+`docs/plans/2026-07-29-round19-native-session-integrity.md`.
+
+- **Shipping session continuity.** The SwiftUI app now persists only configured
+  Better Auth cookies in a Keychain envelope protected after first unlock,
+  restores them before its first generated-client probe, and derives a local
+  SHA-256 scope that is never logged or transmitted. Auth and generated planner
+  requests share one cookie store.
+- **Honest auth state.** Only structured 401 evidence signs out. Network,
+  rate-limit, retryable server, decoding, and cancellation paths have explicit
+  policy coverage; a restored account without usable cached data gets a
+  recoverable connection screen instead of a false login prompt. Generation
+  fencing prevents overlapping bootstrap/logout work from reviving stale state.
+- **Protected read-only Today.** The former unscoped `UserDefaults` blob is now
+  a versioned, atomically replaced app-group file with
+  `NSFileProtectionCompleteUntilFirstUserAuthentication`. Reads require an
+  exact local scope and planning date. Matching cached blocks render under a
+  prominent saved/read-only notice with edit, drag, complete, delete, focus,
+  review, template, and FAB mutations removed while scrolling remains intact.
+- **One purge boundary.** Logout, account replacement, and later 401 clear the
+  Keychain envelope, configured cookies, protected day snapshot, URL cache,
+  pending activity reminders, account-derived presentation settings, and
+  in-memory timezone/category/offline state. Onboarding and explicit device
+  Health consent remain.
+- **False extension actions removed.** The prior widget and Live Activity
+  controls used a different cookie store, could fail remotely, and could still
+  optimistically change local UI. Widgets are now truthfully read-only and Live
+  Activity actions open the authenticated app. H03/H04 parity credits were
+  reduced to partial; iOS parity remains above gate at **85.96%**.
+- **Dead prototype claims removed.** Unwired package auth/Apple/deep-link and
+  offline-queue sources/tests were deleted. Phase 7/8 roadmap checkmarks now
+  show native Apple/magic-link, cursor/mutation/conflict sync, Google sign-in,
+  and secure extension credentials as remaining work.
+- **Evidence.** 45 generated-client package tests, 101 app-hosted unit tests,
+  the main-thread gate, unsigned shipping build, and the focused real-simulator
+  offline UI flow pass. Simulator proof is stored under ignored
+  `browser-qa/round19-native-session-integrity/`; it verifies the saved-day
+  notice and absence of mutation controls. Web gates pass with 83 files / 861
+  tests, lint, typecheck, production build, OpenAPI sync/adoption, and release
+  preflight.
+
+**Not claimed:** a production-account online→offline→logout lifecycle was not
+mutated for evidence; the simulator flow is synthetic. Native magic links,
+Sign in with Apple, Google sign-in, secure widget credential propagation,
+offline mutation replay, physical-device proof, and TestFlight remain open.
+
 ## 2026-07-28 — Round 18: durable notifications and truthful scheduler health (Codex)
 
 Roadmap:

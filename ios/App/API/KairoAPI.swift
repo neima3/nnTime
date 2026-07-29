@@ -112,11 +112,13 @@ actor KairoAPI {
     nonisolated let baseURL: URL
     private let authSession: URLSession
     private let planner: KairoAPIClient.Client
+    private let sessionController: NativeSessionController
     private let idempotencyKeyProvider: @Sendable () -> String
 
     init(
         baseURL: URL = KairoAPI.defaultBaseURL(),
         session: URLSession = KairoClient.makeSharedCookieSession(),
+        sessionController: NativeSessionController? = nil,
         timezoneIdentifierProvider: @escaping @Sendable () -> String = {
             TimeZone.current.identifier
         },
@@ -126,6 +128,11 @@ actor KairoAPI {
     ) {
         self.baseURL = baseURL
         authSession = session
+        self.sessionController = sessionController ?? NativeSessionController(
+            baseURL: baseURL,
+            cookieStorage:
+                session.configuration.httpCookieStorage ?? .shared
+        )
         planner = KairoClient(
             baseURL: Self.plannerServerURL(baseURL),
             session: session,
@@ -143,11 +150,17 @@ actor KairoAPI {
         baseURL: URL,
         plannerTransport: any ClientTransport,
         session: URLSession = KairoClient.makeSharedCookieSession(),
+        sessionController: NativeSessionController? = nil,
         timezoneIdentifierProvider: @escaping @Sendable () -> String,
         idempotencyKeyProvider: @escaping @Sendable () -> String
     ) {
         self.baseURL = baseURL
         authSession = session
+        self.sessionController = sessionController ?? NativeSessionController(
+            baseURL: baseURL,
+            cookieStorage:
+                session.configuration.httpCookieStorage ?? .shared
+        )
         planner = KairoClient(
             baseURL: Self.plannerServerURL(baseURL),
             transport: plannerTransport,
@@ -218,6 +231,7 @@ actor KairoAPI {
             case 200 ... 299:
                 break
             case 401:
+                await invalidateAndNotify()
                 throw APIError.authUnauthorized(nil)
             default:
                 throw APIError.authHTTP(
@@ -249,15 +263,25 @@ actor KairoAPI {
             .flatMap { $0["message"] as? String }
     }
 
-    func signIn(email: String, password: String) async throws {
+    @discardableResult
+    func signIn(
+        email: String,
+        password: String
+    ) async throws -> NativeSessionController.PersistResult {
         _ = try await authRequest(
             .signIn,
             body: ["email": email, "password": password],
             as: AuthResponse.self
         )
+        return try await sessionController.persist()
     }
 
-    func signUp(name: String, email: String, password: String) async throws {
+    @discardableResult
+    func signUp(
+        name: String,
+        email: String,
+        password: String
+    ) async throws -> NativeSessionController.PersistResult {
         _ = try await authRequest(
             .signUp,
             body: [
@@ -267,6 +291,7 @@ actor KairoAPI {
             ],
             as: AuthResponse.self
         )
+        return try await sessionController.persist()
     }
 
     func signOut() async {
@@ -275,35 +300,26 @@ actor KairoAPI {
             body: [:],
             as: EmptyResponse.self
         )
-        let cookieStorage =
-            authSession.configuration.httpCookieStorage ?? .shared
-        for cookie in cookieStorage.cookies ?? []
-        where Self.isConfiguredAuthCookie(cookie, baseURL: baseURL) {
-            cookieStorage.deleteCookie(cookie)
-        }
+        await sessionController.invalidate()
     }
 
-    private static func isConfiguredAuthCookie(
-        _ cookie: HTTPCookie,
-        baseURL: URL
-    ) -> Bool {
-        guard let host = baseURL.host?.lowercased() else {
-            return false
-        }
-        let domain = cookie.domain
-            .lowercased()
-            .trimmingCharacters(in: CharacterSet(charactersIn: "."))
-        guard domain == host else {
-            return false
-        }
-        let configuredPath = baseURL.path.isEmpty ? "/" : baseURL.path
-        guard cookie.path == configuredPath else {
-            return false
-        }
-        let name = cookie.name.lowercased()
-        return name.hasPrefix("better-auth.")
-            || name.hasPrefix("__secure-better-auth.")
-            || name.hasPrefix("__host-better-auth.")
+    func restoreSession() async throws -> String? {
+        try await sessionController.restore()
+    }
+
+    func sessionScope() async -> String? {
+        await sessionController.currentScope()
+    }
+
+    @discardableResult
+    func persistCurrentSession() async throws
+        -> NativeSessionController.PersistResult
+    {
+        try await sessionController.persist()
+    }
+
+    func invalidateSession() async {
+        await sessionController.invalidate()
     }
 
     // MARK: Settings and categories
@@ -637,8 +653,15 @@ actor KairoAPI {
         do {
             return try await operation()
         } catch let error as GeneratedAPIAdapterError {
-            throw Self.apiError(error)
+            let mapped = Self.apiError(error)
+            if case .unauthorized = mapped {
+                await invalidateAndNotify()
+            }
+            throw mapped
         } catch let error as APIError {
+            if case .unauthorized = error {
+                await invalidateAndNotify()
+            }
             throw error
         } catch {
             if Self.isCancellation(error) {
@@ -649,6 +672,16 @@ actor KairoAPI {
             }
             throw APIError.network(error)
         }
+    }
+
+    private func invalidateAndNotify() async {
+        guard await sessionController.invalidate() else {
+            return
+        }
+        NotificationCenter.default.post(
+            name: .kairoSessionInvalidated,
+            object: nil
+        )
     }
 
     private static func isCancellation(_ error: Error) -> Bool {

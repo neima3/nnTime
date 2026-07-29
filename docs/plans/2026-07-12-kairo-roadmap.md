@@ -76,17 +76,23 @@ design work BEFORE the consuming subphase starts.
   - [x] 6D Performance (Lighthouse ≥90 mobile)
   - [x] 6E Dogfood QA sweep, P0/P1 fixes
   - [x] 6F Scripted parity audit — web ≥85% with per-row evidence
-- [x] Phase 7 — iOS app
+- [ ] Phase 7 — iOS app
   - [x] 7A Contract proof (Swift OpenAPI toolchain compiles in CI)
-  - [x] 7B Native auth on device (Sign in with Apple, Keychain, deep links)
-  - [x] 7C Data/sync (shared revision/cursor protocol, offline, logout purge)
+  - [ ] 7B Native auth on device — email/password cookie continuity,
+        Keychain restore, 401 handling, and logout purge shipped; Sign in with
+        Apple and native magic-link/deep-link completion remain
+  - [ ] 7C Data/sync — generated CRUD transport and protected scoped read-only
+        Today cache shipped; native cursor sync, mutation replay, and conflict
+        UI remain
   - [x] 7D Planner UI (Today/editor/Anytime → Week/Routines; VoiceOver/Dynamic Type)
   - [x] 7E Focus + local notifications (background-safe reconstruction)
   - [x] 7F Repository release preflight + signed archive/export capability
         (TestFlight status is release-specific evidence, not implied here)
-- [x] Phase 8 — iOS surfaces + launch → **85% iOS PARITY GATE**
-  - [x] 8A Interactive widgets + Live Activity/Dynamic Island
-  - [x] 8B Google sign-in (web+iOS), Apple Reminders import decision executed
+- [ ] Phase 8 — iOS surfaces + launch → **85% iOS PARITY GATE**
+  - [ ] 8A Read-only widgets + Live Activity/Dynamic Island ship; authenticated
+        extension mutations remain blocked on a secure session bridge
+  - [ ] 8B Google sign-in (web+iOS) remains; Apple Reminders import decision
+        executed
   - [x] 8C Ongoing hardening: repeated restore drill, E2E suite in CI, monitoring
   - [x] 8D Privacy/review-prep contract + scripted parity gate
         (App Store upload, processing, and launch are tracked per release)

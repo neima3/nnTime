@@ -122,10 +122,23 @@ struct SignInView: View {
         busy = true
         error = nil
         do {
+            let session: NativeSessionController.PersistResult
             if mode == .signIn {
-                try await KairoAPI.shared.signIn(email: email, password: password)
+                session = try await KairoAPI.shared.signIn(
+                    email: email,
+                    password: password
+                )
             } else {
-                try await KairoAPI.shared.signUp(name: name, email: email, password: password)
+                session = try await KairoAPI.shared.signUp(
+                    name: name,
+                    email: email,
+                    password: password
+                )
+            }
+            if session.replacedScope != nil {
+                await app.prepareForAccountSwitch(
+                    newScope: session.scope
+                )
             }
             await app.bootstrap()
         } catch let apiError as APIError {

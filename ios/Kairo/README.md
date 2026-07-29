@@ -44,12 +44,15 @@ this package link does not change runtime API behavior by itself.
 ## Architecture
 
 - `Sources/Kairo/Kairo.swift` — API client wrapper (generated from openapi.yaml)
-- `Sources/Kairo/Auth.swift` — Keychain, Sign in with Apple, deep links
-- `Sources/Kairo/Sync.swift` — Offline mutation queue, sync state
 - `Sources/Kairo/Models.swift` — SwiftUI view models
 - `Sources/Kairo/Views.swift` — SwiftUI views (timeline, inbox, focus, ring)
 - `Sources/Kairo/Focus.swift` — Focus session state machine
 - `Sources/Kairo/ReleasePreflight.swift` — Pre-flight checklist gate
 - `Sources/Kairo/iOSSurfaces.swift` — Widgets, Live Activity, HealthKit, privacy labels
 
-44 tests across 8 suites. swift build + swift test pass.
+Shipping session continuity and the read-only scoped cache live in the app
+target under `ios/App/API` and `ios/Shared`; this package intentionally does
+not claim native Apple sign-in, magic-link handling, or an offline mutation
+queue.
+
+45 tests across 7 suites. `swift build` + `swift test` pass.

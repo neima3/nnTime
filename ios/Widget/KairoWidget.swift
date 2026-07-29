@@ -29,7 +29,7 @@ struct NextUpProvider: TimelineProvider {
         var entries = [entry(at: now)]
 
         // Re-render at every upcoming block boundary today.
-        if let snap = DayCache.read(), let zone = TimeZone(identifier: snap.zone) {
+        if let snap = DayCache.readLatest(), let zone = TimeZone(identifier: snap.zone) {
             var cal = Calendar(identifier: .gregorian)
             cal.timeZone = zone
             let startOfDay = cal.startOfDay(for: now)
@@ -63,7 +63,7 @@ struct NextUpProvider: TimelineProvider {
     }
 
     private func entry(at date: Date) -> NextUpEntry {
-        guard let snap = DayCache.read(), let zone = TimeZone(identifier: snap.zone) else {
+        guard let snap = DayCache.readLatest(), let zone = TimeZone(identifier: snap.zone) else {
             return NextUpEntry(date: date, block: nil, isCurrent: false, blocks: [], nowMin: 0)
         }
         var cal = Calendar(identifier: .gregorian)
@@ -292,14 +292,7 @@ struct NextUpWidgetView: View {
                             .frame(width: 30, height: 30)
                             .background(Circle().fill(.white.opacity(0.65)))
                         Spacer()
-                        if let id = block.activityId, let rev = block.revision, !block.done {
-                            Button(intent: CompleteActivityIntent(activityId: id, revision: rev, occurrenceKey: block.occurrenceKey)) {
-                                Image(systemName: "circle")
-                                    .font(.system(size: 20, weight: .semibold))
-                                    .foregroundStyle(ink(block.category).opacity(0.55))
-                            }
-                            .buttonStyle(.plain)
-                        } else if entry.isCurrent {
+                        if entry.isCurrent {
                             Circle()
                                 .fill(Color(red: 1.0, green: 0.361, blue: 0.302))
                                 .frame(width: 7, height: 7)

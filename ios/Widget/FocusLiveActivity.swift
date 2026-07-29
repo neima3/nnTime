@@ -48,21 +48,13 @@ struct FocusLiveActivity: Widget {
                     .foregroundStyle(context.state.overtime ? now : ink)
                     .frame(minWidth: 78, alignment: .trailing)
                 }
-                HStack(spacing: 8) {
-                    Button(intent: ExtendFocusIntent(sessionId: context.attributes.sessionId)) {
-                        Label("+10 min", systemImage: "plus")
-                            .font(.system(size: 13, weight: .bold))
-                            .frame(maxWidth: .infinity)
-                    }
-                    .tint(skyInk)
-                    Button(intent: CompleteFocusIntent(sessionId: context.attributes.sessionId)) {
-                        Label("Done", systemImage: "checkmark")
-                            .font(.system(size: 13, weight: .bold))
-                            .frame(maxWidth: .infinity)
-                    }
-                    .tint(Color(red: 0.137, green: 0.502, blue: 0.361))
+                Link(destination: URL(string: "kairo://focus")!) {
+                    Label("Open Kairo to adjust", systemImage: "arrow.up.forward.app")
+                        .font(.system(size: 13, weight: .bold))
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(skyInk)
             }
             .foregroundStyle(ink)
             .padding(14)
@@ -94,21 +86,13 @@ struct FocusLiveActivity: Widget {
                     .frame(maxWidth: 70, alignment: .trailing)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    HStack(spacing: 10) {
-                        Button(intent: ExtendFocusIntent(sessionId: context.attributes.sessionId)) {
-                            Label("+10", systemImage: "plus")
-                                .font(.system(size: 13, weight: .bold))
-                                .frame(maxWidth: .infinity)
-                        }
-                        .tint(skyInk)
-                        Button(intent: CompleteFocusIntent(sessionId: context.attributes.sessionId)) {
-                            Label("Done", systemImage: "checkmark")
-                                .font(.system(size: 13, weight: .bold))
-                                .frame(maxWidth: .infinity)
-                        }
-                        .tint(Color(red: 0.137, green: 0.502, blue: 0.361))
+                    Link(destination: URL(string: "kairo://focus")!) {
+                        Label("Open Kairo", systemImage: "arrow.up.forward.app")
+                            .font(.system(size: 13, weight: .bold))
+                            .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
+                    .tint(skyInk)
                 }
             } compactLeading: {
                 Text("◔").font(.system(size: 15, weight: .bold)).foregroundStyle(sky)

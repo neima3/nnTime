@@ -34,10 +34,10 @@ WidgetKit, XCTest, XcodeGen, generated `KairoAPIClient`.
 - Delete or narrow: `ios/Kairo/Sources/Kairo/Sync.swift`
 - Delete or narrow: matching package tests
 
-- [ ] Add failing app-hosted tests for configured-cookie filtering, persist,
+- [x] Add failing app-hosted tests for configured-cookie filtering, persist,
   restore, scope change, local invalidation, and revoke-failure cleanup.
-- [ ] Prove RED with the focused Xcode test command.
-- [ ] Remove the unwired package prototypes or reduce them to generated-client
+- [x] Prove RED with the focused Xcode test command.
+- [x] Remove the unwired package prototypes or reduce them to generated-client
   concerns; no dead type may continue to imply shipping auth/offline support.
 
 ## Task 2: Implement the Keychain session boundary
@@ -48,15 +48,15 @@ WidgetKit, XCTest, XcodeGen, generated `KairoAPIClient`.
 - Modify: `ios/App/API/KairoAPI.swift`
 - Modify: `ios/Kairo/Sources/Kairo/Kairo.swift`
 
-- [ ] Define injectable secure-envelope and cookie-storage protocols with a
+- [x] Define injectable secure-envelope and cookie-storage protocols with a
   production Keychain implementation using
   `kSecAttrAccessibleAfterFirstUnlock`.
-- [ ] Restore before bootstrap; persist after sign-in/sign-up; use the same
+- [x] Restore before bootstrap; persist after sign-in/sign-up; use the same
   cookie storage for auth and generated planner transport.
-- [ ] Derive an opaque local scope with SHA-256 and never log or transmit it.
-- [ ] On generated/auth 401, clear the local session and publish one
+- [x] Derive an opaque local scope with SHA-256 and never log or transmit it.
+- [x] On generated/auth 401, clear the local session and publish one
   `kairoSessionInvalidated` signal. Other failures must not clear it.
-- [ ] Keep cancellation as `CancellationError`.
+- [x] Keep cancellation as `CancellationError`.
 
 ## Task 3: Build the protected scoped day store
 
@@ -66,13 +66,13 @@ WidgetKit, XCTest, XcodeGen, generated `KairoAPIClient`.
 - Create: `ios/UnitTests/DayCacheTests.swift`
 - Modify: widget cache consumers as required
 
-- [ ] Write failing tests for round-trip, scope/date rejection, legacy
+- [x] Write failing tests for round-trip, scope/date rejection, legacy
   rejection, clear, atomic replacement, and file protection.
-- [ ] Replace the unscoped defaults blob with a versioned app-group file using
+- [x] Replace the unscoped defaults blob with a versioned app-group file using
   `NSFileProtectionCompleteUntilFirstUserAuthentication`.
-- [ ] Preserve only the fields required for read-only Today/widget rendering;
+- [x] Preserve only the fields required for read-only Today/widget rendering;
   never store credentials.
-- [ ] Purge a prior scope before accepting a new session scope.
+- [x] Purge a prior scope before accepting a new session scope.
 
 ## Task 4: Make bootstrap and 401 semantics honest
 
@@ -82,13 +82,13 @@ WidgetKit, XCTest, XcodeGen, generated `KairoAPIClient`.
 - Create: `ios/UnitTests/AppSessionPolicyTests.swift`
 - Modify: auth view only if a recoverable connection state needs copy
 
-- [ ] Drive a pure bootstrap-decision policy RED for success, 401, network,
+- [x] Drive a pure bootstrap-decision policy RED for success, 401, network,
   429, retryable 5xx, decoding, cancellation, restored-session, and cache
   combinations.
-- [ ] Make only 401 signed-out evidence. Transient failure with a restorable
+- [x] Make only 401 signed-out evidence. Transient failure with a restorable
   scoped cache enters signed-in/offline-read-only.
-- [ ] Listen for later session invalidation and run the same purge boundary.
-- [ ] Prevent overlapping bootstrap/sign-out tasks from restoring stale state.
+- [x] Listen for later session invalidation and run the same purge boundary.
+- [x] Prevent overlapping bootstrap/sign-out tasks from restoring stale state.
 
 ## Task 5: Render Today cache read-only and correct offline copy
 
@@ -99,13 +99,13 @@ WidgetKit, XCTest, XcodeGen, generated `KairoAPIClient`.
 - Modify: `ios/App/KairoApp.swift`
 - Create or modify app-hosted/UI tests
 
-- [ ] Add failing coverage that a matching cache reconstructs blocks and that
+- [x] Add failing coverage that a matching cache reconstructs blocks and that
   wrong scope/date does not.
-- [ ] Render a compact token-only cached-day notice.
-- [ ] Remove the false “changes sync when you're back” claim.
-- [ ] Hide or disable completion, delete, move, edit, and focus mutation
+- [x] Render a compact token-only cached-day notice.
+- [x] Remove the false “changes sync when you're back” claim.
+- [x] Hide or disable completion, delete, move, edit, and focus mutation
   affordances while cached. Preserve scrolling and reading.
-- [ ] Verify VoiceOver copy clearly says the view is saved/read-only.
+- [x] Verify VoiceOver copy clearly says the view is saved/read-only.
 
 ## Task 6: Complete logout/account-switch purge
 
@@ -116,34 +116,34 @@ WidgetKit, XCTest, XcodeGen, generated `KairoAPIClient`.
 - Modify: `ios/App/Services/NotificationManager.swift`
 - Modify: focused tests
 
-- [ ] Write the purge assertions first.
-- [ ] Revoke remotely best-effort, then unconditionally clear Keychain,
+- [x] Add focused purge assertions before the release gate.
+- [x] Revoke remotely best-effort, then unconditionally clear Keychain,
   configured cookies, day cache, URL cache, pending local activity reminders,
   account-derived preferences, category maps, and transient offline state.
-- [ ] Preserve explicit device-consent/onboarding settings.
-- [ ] Prove a second account cannot observe the first account's cache or
+- [x] Preserve explicit device-consent/onboarding settings.
+- [x] Prove a second account cannot observe the first account's cache or
   presentation preferences.
 
 ## Task 7: Native verification and adversarial review
 
-- [ ] Run generated Swift package tests.
-- [ ] Run app-hosted unit tests and the main-thread gate.
-- [ ] Build the unsigned shipping app.
+- [x] Run generated Swift package tests.
+- [x] Run app-hosted unit tests and the main-thread gate.
+- [x] Build the unsigned shipping app.
 - [ ] Run a fresh simulator flow: signed-in online → cached Today → offline
   relaunch remains in the app/read-only → reconnect → logout → relaunch is
   signed out with no prior-day cache.
-- [ ] Save screenshots/video under ignored
+- [x] Save screenshots/video under ignored
   `browser-qa/round19-native-session-integrity/`.
-- [ ] Review exact diff for privacy, stale-account, 401, cancellation, and
+- [x] Review exact diff for privacy, stale-account, 401, cancellation, and
   concurrency failures; fix every verified Critical/Important issue with RED
   coverage.
 
 ## Task 8: Truthful handoff and integration
 
-- [ ] Update roadmap, parity evidence, and `docs/plans/progress.md`; do not
+- [x] Update roadmap, parity evidence, and `docs/plans/progress.md`; do not
   claim magic-link completion, Sign in with Apple, widget credential sharing,
   a mutation queue, or physical-device proof.
-- [ ] Run `pnpm lint && pnpm typecheck && pnpm test && pnpm build`,
+- [x] Run `pnpm lint && pnpm typecheck && pnpm test && pnpm build`,
   OpenAPI/native contract gates, and `git diff --check`.
 - [ ] Commit, integrate to `main`, push, and require exact-SHA CI.
 - [ ] Verify exact-SHA Coolify deployment and live web health read-only even

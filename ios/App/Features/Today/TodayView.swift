@@ -19,6 +19,7 @@ struct TodayView: View {
     @State private var peakDismissedDay = ""
     @State private var ritualDismissedDay = ""
     @State private var showTemplates = false
+    @State private var usingCachedDay = false
     /// 0 = today, ±n days.
     @State private var dayOffset = 0
 
@@ -32,13 +33,24 @@ struct TodayView: View {
                 if loading {
                     ProgressView().tint(.kIris)
                 } else if blocks.isEmpty {
-                    emptyState
+                    VStack(spacing: 14) {
+                        if usingCachedDay {
+                            cachedNotice
+                                .padding(.horizontal, 16)
+                        }
+                        emptyState
+                    }
                 } else {
                     ScrollViewReader { proxy in
                         ScrollView {
                             header
                                 .padding(.horizontal, 20)
                                 .padding(.top, 8)
+                            if usingCachedDay {
+                                cachedNotice
+                                    .padding(.horizontal, 16)
+                                    .padding(.top, 10)
+                            }
                             if let ritual = dayRitual {
                                 ritual
                                     .padding(.horizontal, 16)
@@ -52,6 +64,7 @@ struct TodayView: View {
                             TimelineCanvas(
                                 blocks: blocks,
                                 nowMin: nowMin,
+                                readOnly: usingCachedDay,
                                 onComplete: { block in Task { await toggle(block) } },
                                 onDelete: { block in Task { await remove(block) } },
                                 onFocus: { block in
@@ -84,7 +97,9 @@ struct TodayView: View {
                     }
                 }
 
-                fab
+                if !usingCachedDay {
+                    fab
+                }
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -99,7 +114,10 @@ struct TodayView: View {
                                 .foregroundStyle(Color.kInkSoft)
                         }
                         .accessibilityLabel("Previous day")
-                        if dayOffset == 0 && blocks.contains(where: { !$0.done }) {
+                        if !usingCachedDay,
+                           dayOffset == 0,
+                           blocks.contains(where: { !$0.done })
+                        {
                             Button { showReview = true } label: {
                                 Image(systemName: "checklist").font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.kIris)
                             }
@@ -136,7 +154,10 @@ struct TodayView: View {
                                 .foregroundStyle(Color.kInkSoft)
                         }
                         .accessibilityLabel("Search")
-                        if dayOffset == 0 && blocks.contains(where: { !$0.done }) {
+                        if !usingCachedDay,
+                           dayOffset == 0,
+                           blocks.contains(where: { !$0.done })
+                        {
                             Button { showPick = true } label: {
                                 Image(systemName: "dice").font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.kIris)
                             }
@@ -204,7 +225,7 @@ struct TodayView: View {
     /// Day Rituals (parity) — a morning kickoff on a sparse day, an evening
     /// shutdown when things are still open. Time-windowed, once per day.
     private var dayRitual: AnyView? {
-        guard dayOffset == 0 else { return nil }
+        guard dayOffset == 0, !usingCachedDay else { return nil }
         let today = KTime.dateString(Date(), zone: .current)
         guard ritualDismissedDay != today else { return nil }
         let hour = Calendar.current.component(.hour, from: Date())
@@ -259,7 +280,12 @@ struct TodayView: View {
     /// Peak-focus nudge (R4) — shown only today, inside the personal peak
     /// window, once per day. Fed by the stats focus-hours data.
     private var peakNudge: AnyView? {
-        guard dayOffset == 0, let peak = peakHour else { return nil }
+        guard dayOffset == 0,
+              !usingCachedDay,
+              let peak = peakHour
+        else {
+            return nil
+        }
         let today = KTime.dateString(Date(), zone: .current)
         guard peakDismissedDay != today else { return nil }
         let nowHour = Calendar.current.component(.hour, from: Date())
@@ -363,23 +389,55 @@ struct TodayView: View {
             Text("Your day is clear")
                 .font(.kDisplay(22))
                 .foregroundStyle(Color.kInk)
-            Text(loadError ?? "Nothing scheduled yet. Add your first activity and watch it take shape.")
+            Text(
+                usingCachedDay
+                    ? "This saved day has no scheduled activities."
+                    : loadError ?? "Nothing scheduled yet. Add your first activity and watch it take shape."
+            )
                 .font(.kBody(14.5))
                 .foregroundStyle(Color.kInkSoft)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
-            Button {
-                editorStart = 9 * 60
-                showEditor = true
-            } label: {
-                Label("Add activity", systemImage: "plus")
-                    .font(.kBody(15, weight: .semibold))
-                    .foregroundStyle(Color.kInkInverse)
-                    .padding(.horizontal, 22).padding(.vertical, 13)
-                    .background(Capsule().fill(Color.kIris))
+            if !usingCachedDay {
+                Button {
+                    editorStart = 9 * 60
+                    showEditor = true
+                } label: {
+                    Label("Add activity", systemImage: "plus")
+                        .font(.kBody(15, weight: .semibold))
+                        .foregroundStyle(Color.kInkInverse)
+                        .padding(.horizontal, 22).padding(.vertical, 13)
+                        .background(Capsule().fill(Color.kIris))
+                }
+                .kFloatShadow()
             }
-            .kFloatShadow()
         }
+    }
+
+    private var cachedNotice: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "lock.doc")
+                .font(.system(size: 14, weight: .semibold))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Saved day · read-only")
+                    .font(.kBody(13, weight: .bold))
+                Text(
+                    "Reconnect to refresh or make changes. Nothing here will be sent while offline."
+                )
+                .font(.kBody(12))
+            }
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(Color.kCatButterInk)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 15)
+                .fill(Color.kCatButter)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "Saved day, read-only. Reconnect to refresh or make changes."
+        )
     }
 
     private var fab: some View {
@@ -412,8 +470,13 @@ struct TodayView: View {
                 .map { $0.block(in: zone, category: app.category(for: $0.categoryId)) }
                 .sorted { $0.startMin < $1.startMin }
             loadError = nil
-            if dayOffset == 0 {
+            usingCachedDay = false
+            app.offlineReadOnly = false
+            if dayOffset == 0,
+               let scope = await KairoAPI.shared.sessionScope()
+            {
                 DayCache.write(
+                    scope: scope,
                     date: day.date,
                     zone: day.zone,
                     blocks: blocks.map {
@@ -427,10 +490,23 @@ struct TodayView: View {
                 WidgetCenter.shared.reloadAllTimelines()
             }
         } catch {
-            loadError = (error as? APIError)?.errorDescription
+            if let scope = app.sessionScope,
+               let cached = DayCache.read(
+                   scope: scope,
+                   date: dateStr
+               )
+            {
+                blocks = CachedDayAdapter.blocks(from: cached)
+                loadError = nil
+                usingCachedDay = true
+                app.offlineReadOnly = true
+            } else {
+                loadError = (error as? APIError)?.errorDescription
+                usingCachedDay = false
+            }
         }
         loading = false
-        if dayOffset == 0 {
+        if dayOffset == 0, !usingCachedDay {
             await loadPeak()
             await NotificationManager.reschedule(blocks: blocks, zone: app.timezone)
         }
@@ -515,6 +591,7 @@ struct ProgressRing: View {
 struct TimelineCanvas: View {
     let blocks: [DayBlock]
     let nowMin: Int
+    let readOnly: Bool
     let onComplete: (DayBlock) -> Void
     let onDelete: (DayBlock) -> Void
     let onFocus: (DayBlock) -> Void
@@ -572,6 +649,7 @@ struct TimelineCanvas: View {
                 BlockCard(
                     block: block,
                     nowMin: nowMin,
+                    readOnly: readOnly,
                     onComplete: { onComplete(block) },
                     onDelete: { onDelete(block) },
                     onFocus: { onFocus(block) },
@@ -596,6 +674,7 @@ struct TimelineCanvas: View {
 struct BlockCard: View {
     let block: DayBlock
     let nowMin: Int
+    let readOnly: Bool
     let onComplete: () -> Void
     let onDelete: () -> Void
     let onFocus: () -> Void
@@ -660,25 +739,34 @@ struct BlockCard: View {
 
             Spacer(minLength: 4)
 
-            Button(action: onComplete) {
-                ZStack {
-                    Circle()
-                        .fill(block.done ? Color.kSuccess : Color.clear)
-                        .overlay(
-                            Circle().stroke(
-                                block.done ? Color.clear : block.category.ink.opacity(0.5),
-                                lineWidth: 2
+            if !readOnly {
+                Button(action: onComplete) {
+                    ZStack {
+                        Circle()
+                            .fill(block.done ? Color.kSuccess : Color.clear)
+                            .overlay(
+                                Circle().stroke(
+                                    block.done ? Color.clear : block.category.ink.opacity(0.5),
+                                    lineWidth: 2
+                                )
                             )
-                        )
-                    if block.done {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(Color.kInkInverse)
+                        if block.done {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(Color.kInkInverse)
+                        }
                     }
+                    .frame(
+                        width: compact ? 26 : 30,
+                        height: compact ? 26 : 30
+                    )
                 }
-                .frame(width: compact ? 26 : 30, height: compact ? 26 : 30)
+                .accessibilityLabel(
+                    block.done
+                        ? "Mark \(block.title) not done"
+                        : "Complete \(block.title)"
+                )
             }
-            .accessibilityLabel(block.done ? "Mark \(block.title) not done" : "Complete \(block.title)")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, compact ? 5 : 10)
@@ -699,20 +787,26 @@ struct BlockCard: View {
         .scaleEffect(lifting ? 1.03 : 1)
         .zIndex(lifting ? 10 : 0)
         .animation(.spring(response: 0.3, dampingFraction: 0.75), value: lifting)
-        .onTapGesture { onOpen() }
+        .onTapGesture {
+            guard !readOnly else { return }
+            onOpen()
+        }
         .gesture(
             LongPressGesture(minimumDuration: 0.35)
                 .onEnded { _ in
+                    guard !readOnly else { return }
                     lifting = true
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 }
                 .sequenced(before: DragGesture())
                 .onChanged { value in
+                    guard !readOnly else { return }
                     if case .second(true, let drag?) = value {
                         dragOffset = drag.translation.height
                     }
                 }
                 .onEnded { value in
+                    guard !readOnly else { return }
                     if case .second(true, let drag?) = value {
                         let deltaMin = Int((drag.translation.height / 1.7).rounded())
                         onMove(deltaMin)
@@ -721,12 +815,54 @@ struct BlockCard: View {
                     lifting = false
                 }
         )
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(block.title), \(KTime.hhmm(block.startMin)) to \(KTime.hhmm(block.endMin)), \(block.category.rawValue), \(block.done ? "done" : "not done")")
-        .accessibilityAddTraits(.isButton)
-        .accessibilityHint("Double tap to edit")
-        .accessibilityAction(named: block.done ? "Mark not done" : "Complete") { onComplete() }
-        .accessibilityAction(named: "Focus on this") { onFocus() }
-        .accessibilityAction(named: "Delete") { onDelete() }
+        .modifier(
+            BlockAccessibilityModifier(
+                block: block,
+                readOnly: readOnly,
+                onComplete: onComplete,
+                onFocus: onFocus,
+                onDelete: onDelete
+            )
+        )
+    }
+}
+
+private struct BlockAccessibilityModifier: ViewModifier {
+    let block: DayBlock
+    let readOnly: Bool
+    let onComplete: () -> Void
+    let onFocus: () -> Void
+    let onDelete: () -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        let labelled = content
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(
+                "\(block.title), \(KTime.hhmm(block.startMin)) to \(KTime.hhmm(block.endMin)), \(block.category.rawValue), \(block.done ? "done" : "not done")"
+            )
+        if readOnly {
+            labelled.accessibilityHint(
+                "Saved activity. Reconnect to make changes."
+            )
+        } else {
+            labelled
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint("Double tap to edit")
+                .accessibilityAction(
+                    named:
+                        block.done
+                            ? "Mark not done"
+                            : "Complete"
+                ) {
+                    onComplete()
+                }
+                .accessibilityAction(named: "Focus on this") {
+                    onFocus()
+                }
+                .accessibilityAction(named: "Delete") {
+                    onDelete()
+                }
+        }
     }
 }

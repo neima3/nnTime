@@ -145,6 +145,20 @@ enum KairoPrefs {
 // in the web Settings did nothing to iOS reminders and vice versa.
 
 extension KairoPrefs {
+    static func clearAccountState() {
+        [
+            "kairo-theme",
+            "kairo-reduced-stim",
+            "kairo-high-contrast",
+            "kairo-dyslexia-font",
+            "kairo-larger-text",
+            "kairo-hour-cycle",
+            "kairo-quiet-enabled",
+            "kairo-quiet-start",
+            "kairo-quiet-end",
+        ].forEach { store.removeObject(forKey: $0) }
+    }
+
     /// Adopt the server's view of the shared prefs. Called after every settings
     /// read; the local copies stay as the offline/launch cache.
     static func adopt(

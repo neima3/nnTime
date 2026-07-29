@@ -301,7 +301,8 @@ describe("generated iOS client adoption", () => {
   });
 
   it("documents the current Swift package test count", () => {
-    expect(packageReadme).toContain("44 tests across 8 suites.");
+    expect(packageReadme).toContain("45 tests across 7 suites.");
+    expect(packageReadme).not.toContain("44 tests across 8 suites.");
     expect(packageReadme).not.toContain("40 tests across 8 suites.");
   });
 

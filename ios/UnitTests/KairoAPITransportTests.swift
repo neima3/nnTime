@@ -393,6 +393,82 @@ final class KairoAPITransportTests: XCTestCase {
         }
     }
 
+    func testPlanner401InvalidatesSessionAndPublishesOnce() async throws {
+        let baseURL = URL(string: "https://time.neima.me")!
+        let storage = HTTPCookieStorage.sharedCookieStorage(
+            forGroupContainerIdentifier:
+                "KairoAPIUnauthorizedTests.\(UUID())"
+        )
+        storage.setCookie(
+            try Self.cookie(
+                name: "better-auth.session_token",
+                domain: "time.neima.me",
+                path: "/"
+            )
+        )
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpCookieStorage = storage
+        let vault = MemorySessionEnvelopeStore()
+        let controller = NativeSessionController(
+            baseURL: baseURL,
+            cookieStorage: storage,
+            envelopeStore: vault
+        )
+        _ = try await controller.persist()
+        let invalidated = expectation(
+            description: "session invalidated"
+        )
+        invalidated.expectedFulfillmentCount = 1
+        let observer = NotificationCenter.default.addObserver(
+            forName: .kairoSessionInvalidated,
+            object: nil,
+            queue: nil
+        ) { _ in
+            invalidated.fulfill()
+        }
+        defer {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        let api = KairoAPI(
+            baseURL: baseURL,
+            plannerTransport: PlannerMockTransport(
+                recorder: PlannerRequestRecorder()
+            ) { _ in
+                .init(
+                    status: .unauthorized,
+                    body: Self.errorEnvelope(
+                        code: "UNAUTHORIZED",
+                        message: "Session expired"
+                    )
+                )
+            },
+            session: URLSession(configuration: configuration),
+            sessionController: controller,
+            timezoneIdentifierProvider: { "UTC" },
+            idempotencyKeyProvider: {
+                "019fa64f-32f2-7001-8296-34373d7c90a0"
+            }
+        )
+
+        do {
+            _ = try await api.settings()
+            XCTFail("Expected unauthorized")
+        } catch let error as APIError {
+            XCTAssertEqual(error.statusCode, 401)
+        }
+        await fulfillment(of: [invalidated], timeout: 1)
+
+        let scope = await api.sessionScope()
+        let envelope = await vault.savedEnvelope()
+        XCTAssertNil(scope)
+        XCTAssertNil(envelope)
+        XCTAssertFalse(
+            (storage.cookies ?? []).contains {
+                $0.name == "better-auth.session_token"
+            }
+        )
+    }
+
     func testMalformedGeneratedResponseMapsWrappedDecodingErrorToDecoding() async {
         let api = KairoAPI(
             baseURL: URL(string: "http://127.0.0.1:3456")!,
@@ -510,6 +586,90 @@ final class KairoAPITransportTests: XCTestCase {
                 "better-auth.session_token|other.neima.me|/",
                 "better-auth.session_token|time.neima.me|/other",
             ]
+        )
+    }
+
+    func testSignInPersistsTheConfiguredSessionEnvelope() async throws {
+        let storage = HTTPCookieStorage.sharedCookieStorage(
+            forGroupContainerIdentifier: "KairoAPISignInTests.\(UUID())"
+        )
+        storage.setCookie(
+            try Self.cookie(
+                name: "better-auth.session_token",
+                domain: "time.neima.me",
+                path: "/"
+            )
+        )
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpCookieStorage = storage
+        configuration.httpShouldSetCookies = true
+        configuration.protocolClasses = [SuccessfulAuthURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let vault = MemorySessionEnvelopeStore()
+        let controller = NativeSessionController(
+            baseURL: URL(string: "https://time.neima.me")!,
+            cookieStorage: storage,
+            envelopeStore: vault
+        )
+        let api = KairoAPI(
+            baseURL: URL(string: "https://time.neima.me")!,
+            session: session,
+            sessionController: controller
+        )
+
+        try await api.signIn(
+            email: "synthetic@example.test",
+            password: "not-a-real-secret"
+        )
+
+        let saved = await vault.savedEnvelope()
+        XCTAssertEqual(
+            saved?.cookies.map(\.name),
+            ["better-auth.session_token"]
+        )
+        let scope = await api.sessionScope()
+        XCTAssertEqual(scope?.count, 64)
+    }
+
+    func testSignOutPurgesLocalSessionWhenRevocationFails() async throws {
+        let storage = HTTPCookieStorage.sharedCookieStorage(
+            forGroupContainerIdentifier: "KairoAPISignOutTests.\(UUID())"
+        )
+        storage.setCookie(
+            try Self.cookie(
+                name: "better-auth.session_token",
+                domain: "time.neima.me",
+                path: "/"
+            )
+        )
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.httpCookieStorage = storage
+        configuration.httpShouldSetCookies = true
+        configuration.protocolClasses = [FailingAuthURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let vault = MemorySessionEnvelopeStore()
+        let controller = NativeSessionController(
+            baseURL: URL(string: "https://time.neima.me")!,
+            cookieStorage: storage,
+            envelopeStore: vault
+        )
+        _ = try await controller.persist()
+        let api = KairoAPI(
+            baseURL: URL(string: "https://time.neima.me")!,
+            session: session,
+            sessionController: controller
+        )
+
+        await api.signOut()
+
+        let scope = await api.sessionScope()
+        XCTAssertNil(scope)
+        let saved = await vault.savedEnvelope()
+        XCTAssertNil(saved)
+        XCTAssertFalse(
+            (storage.cookies ?? []).contains {
+                $0.name == "better-auth.session_token"
+            }
         )
     }
 
@@ -859,6 +1019,27 @@ private final class SuccessfulAuthURLProtocol: URLProtocol {
         )
         client?.urlProtocol(self, didLoad: Data("{}".utf8))
         client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
+private final class FailingAuthURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(
+        for request: URLRequest
+    ) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        client?.urlProtocol(
+            self,
+            didFailWithError: URLError(.notConnectedToInternet)
+        )
     }
 
     override func stopLoading() {}

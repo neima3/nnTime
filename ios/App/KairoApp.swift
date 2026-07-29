@@ -39,9 +39,11 @@ struct KairoApp: App {
 // HealthKit framework link shifted startup timing.
 @Observable @MainActor
 final class AppState {
-    enum Auth { case unknown, signedOut, signedIn }
+    enum Auth { case unknown, signedOut, signedIn, connectionRequired }
 
     var auth: Auth = .unknown
+    var sessionScope: String?
+    var offlineReadOnly = false
     var timezone: TimeZone = .current
     var theme: KairoPrefs.Theme = KairoPrefs.theme
     var reducedStimulation: Bool = KairoPrefs.reducedStimulation
@@ -132,19 +134,138 @@ final class AppState {
     var categoryMap: [String: KairoCategory] = [:]
     /// semantic key → categoryId, for creating activities with the right color.
     var categoryIdByKey: [String: String] = [:]
+    private var authGeneration = 0
 
     func bootstrap() async {
+        authGeneration += 1
+        let generation = authGeneration
+#if DEBUG
+        if ProcessInfo.processInfo.arguments.contains(
+            "-kairoOfflineFixture"
+        ) {
+            installOfflineFixture()
+            return
+        }
+#endif
         // The local cache may predate a change made on the web, so apply what we
         // have first (no flash of the wrong surfaces), then reconcile.
         applyContrastOverride()
+        var restoredScope: String?
+        do {
+            restoredScope = try await KairoAPI.shared.restoreSession()
+        } catch {
+            restoredScope = nil
+        }
+        guard generation == authGeneration else { return }
+        let cached = matchingCache(scope: restoredScope)
         do {
             let settings = try await KairoAPI.shared.settings()
+            guard generation == authGeneration else { return }
+            if restoredScope == nil {
+                restoredScope =
+                    try? await KairoAPI.shared
+                        .persistCurrentSession().scope
+            }
+            guard generation == authGeneration else { return }
             timezone = TimeZone(identifier: settings.timezone) ?? .current
-            await adoptSharedPrefs()
+            adopt(settings)
             await loadCategories()
+            guard generation == authGeneration else { return }
+            sessionScope = restoredScope
+            offlineReadOnly = false
             auth = .signedIn
         } catch {
+            guard generation == authGeneration else { return }
+            await apply(
+                AppSessionPolicy.decide(
+                    scope: restoredScope,
+                    hasMatchingCache: cached != nil,
+                    failure: AppSessionFailure.classify(error)
+                ),
+                cached: cached
+            )
+        }
+    }
+
+#if DEBUG
+    private func installOfflineFixture() {
+        let scope = "synthetic-offline-account"
+        let date = KTime.dateString(Date(), zone: timezone)
+        DayCache.write(
+            scope: scope,
+            date: date,
+            zone: timezone.identifier,
+            blocks: [
+                CachedBlock(
+                    title: "Protected focus block",
+                    emoji: "🧠",
+                    startMin: 9 * 60,
+                    durationMin: 45,
+                    done: false,
+                    category: "lilac",
+                    activityId: "synthetic-activity",
+                    revision: 1
+                ),
+                CachedBlock(
+                    title: "Gentle reset",
+                    emoji: "🌿",
+                    startMin: 10 * 60,
+                    durationMin: 20,
+                    done: true,
+                    category: "sage",
+                    activityId: "synthetic-reset",
+                    revision: 1
+                ),
+            ]
+        )
+        sessionScope = scope
+        offlineReadOnly = true
+        auth = .signedIn
+    }
+#endif
+
+    private func matchingCache(
+        scope: String?
+    ) -> DayCache.Snapshot? {
+        guard
+            let scope,
+            let snapshot = DayCache.readLatest(),
+            snapshot.scope == scope,
+            let zone = TimeZone(identifier: snapshot.zone),
+            snapshot.date == KTime.dateString(Date(), zone: zone)
+        else {
+            return nil
+        }
+        return snapshot
+    }
+
+    private func apply(
+        _ decision: AppSessionDecision,
+        cached: DayCache.Snapshot?
+    ) async {
+        switch decision {
+        case let .signedInOnline(scope):
+            sessionScope = scope
+            offlineReadOnly = false
+            auth = .signedIn
+        case let .signedInOffline(scope):
+            sessionScope = scope
+            offlineReadOnly = true
+            if let cached,
+               let zone = TimeZone(identifier: cached.zone)
+            {
+                timezone = zone
+            }
+            auth = .signedIn
+        case .signedOut:
+            await purgeLocalState()
             auth = .signedOut
+        case let .connectionRequired(scope):
+            sessionScope = scope
+            offlineReadOnly = false
+            auth = .connectionRequired
+        case .unchanged:
+            break
         }
     }
 
@@ -154,6 +275,10 @@ final class AppState {
         guard let settings = try? await KairoAPI.shared.settings() else {
             return
         }
+        adopt(settings)
+    }
+
+    private func adopt(_ settings: UserSettings) {
         let prefs = settings.notificationPrefs ?? [:]
         KairoPrefs.adopt(
             notificationPrefs: prefs.foundationObject,
@@ -194,8 +319,42 @@ final class AppState {
     }
 
     func signOut() async {
+        authGeneration += 1
         await KairoAPI.shared.signOut()
+        await purgeLocalState()
         auth = .signedOut
+    }
+
+    func handleSessionInvalidation() async {
+        authGeneration += 1
+        await KairoAPI.shared.invalidateSession()
+        await purgeLocalState()
+        auth = .signedOut
+    }
+
+    func prepareForAccountSwitch(newScope: String) async {
+        authGeneration += 1
+        await purgeLocalState()
+        sessionScope = newScope
+    }
+
+    private func purgeLocalState() async {
+        DayCache.clear()
+        URLCache.shared.removeAllCachedResponses()
+        await NotificationManager.cancelActivityReminders()
+        KairoPrefs.clearAccountState()
+        sessionScope = nil
+        offlineReadOnly = false
+        timezone = .current
+        theme = KairoPrefs.theme
+        reducedStimulation = KairoPrefs.reducedStimulation
+        highContrast = KairoPrefs.highContrast
+        dyslexiaFont = KairoPrefs.dyslexiaFont
+        largerText = KairoPrefs.largerText
+        categoryMap = [:]
+        categoryIdByKey = [:]
+        applyContrastOverride()
+        a11yGeneration += 1
     }
 }
 
@@ -219,9 +378,71 @@ struct RootView: View {
                 SignInView()
             case .signedIn:
                 MainTabs()
+            case .connectionRequired:
+                ConnectionRequiredView()
             }
         }
         .task { await app.bootstrap() }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: .kairoSessionInvalidated
+            )
+        ) { _ in
+            Task { await app.handleSessionInvalidation() }
+        }
+    }
+}
+
+private struct ConnectionRequiredView: View {
+    @Environment(AppState.self) private var app
+
+    var body: some View {
+        ZStack {
+            Color.kCanvas.ignoresSafeArea()
+            VStack(spacing: 18) {
+                Image(systemName: "wifi.exclamationmark")
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundStyle(Color.kIris)
+                    .frame(width: 58, height: 58)
+                    .background(
+                        RoundedRectangle(
+                            cornerRadius: 18,
+                            style: .continuous
+                        )
+                        .fill(Color.kIrisSoft)
+                    )
+                VStack(spacing: 7) {
+                    Text("Kairo needs a connection")
+                        .font(.kDisplay(24, relativeTo: .title))
+                        .foregroundStyle(Color.kInk)
+                    Text(
+                        "We couldn't safely restore this planner yet. Reconnect and try again—your account has not been signed out."
+                    )
+                    .font(.kBody(14.5))
+                    .foregroundStyle(Color.kInkSoft)
+                    .multilineTextAlignment(.center)
+                }
+                Button {
+                    Task { await app.bootstrap() }
+                } label: {
+                    Text("Try again")
+                        .font(.kBody(15, weight: .semibold))
+                        .foregroundStyle(Color.kInkInverse)
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 13)
+                        .background(Capsule().fill(Color.kIris))
+                }
+                Button("Use another account") {
+                    Task { await app.signOut() }
+                }
+                .font(.kBody(14, weight: .semibold))
+                .foregroundStyle(Color.kInkSoft)
+            }
+            .padding(28)
+            .frame(maxWidth: 420)
+            .kCard(radius: 28)
+            .padding(20)
+        }
     }
 }
 
@@ -233,6 +454,7 @@ extension Notification.Name {
 }
 
 struct MainTabs: View {
+    @Environment(AppState.self) private var app
     @State private var selection = 0
     @State private var showOnboarding = !KairoPrefs.hasOnboarded
         && !ProcessInfo.processInfo.arguments.contains("-kairoSkipOnboarding")
@@ -281,7 +503,11 @@ struct MainTabs: View {
             if !net.isOnline {
                 HStack(spacing: 7) {
                     Image(systemName: "wifi.slash").font(.system(size: 12, weight: .semibold))
-                    Text("Offline — your day is cached; changes sync when you're back.")
+                    Text(
+                        app.offlineReadOnly
+                            ? "Offline — showing a saved, read-only day."
+                            : "Offline — reconnect to refresh your day."
+                    )
                         .font(.kBody(12, weight: .semibold))
                         .lineLimit(2)
                 }

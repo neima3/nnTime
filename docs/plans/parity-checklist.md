@@ -117,8 +117,8 @@ energy-pattern learning, and related rows — see table.
 | G08 | Per-task notification granularity | G | both | — | excluded | 0 | Research doc marks this a user-requested gap not yet available in Tiimo itself ("N/A feature gap"). |
 | H01 | Home Screen widgets | H | ios | 8A | planned | 1 | — |
 | H02 | Lock Screen widgets | H | ios | 8A | planned | 1 | — |
-| H03 | Interactive widgets | H | ios | 8A | planned | 1 | Complete-from-widget. |
-| H04 | Live Activities / Dynamic Island | H | ios | 8A | planned | 1 | — |
+| H03 | Interactive widgets | H | ios | 8A | partial | 0.5 | Read-only next-up and day-strip widgets ship. Complete-from-widget is intentionally withheld until the extension receives a secure authenticated session bridge; the former control could fail remotely while optimistically changing only the cache. |
+| H04 | Live Activities / Dynamic Island | H | ios | 8A | partial | 0.5 | Read-only countdown surfaces ship. Mutation buttons now open the authenticated app until the extension has a secure session bridge. |
 | H05 | Apple Watch app | H | ios | — | deferred | 0 | "watchOS glance = stretch" named deferred in the roadmap (8A) and in the deferred list. |
 | H06 | Watch complications | H | ios | — | excluded | 0 | Research doc marks this a reported gap of Tiimo itself, not a feature to replicate. |
 | I01 | 3,000+ color options | I | both | 5B | partial | 0.5 | Same design decision as B05 (6 semantic categories, not a freeform palette). |
