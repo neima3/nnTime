@@ -47,6 +47,8 @@ security:
   - cookieAuth: []
 
 tags:
+  - name: Auth
+    description: Public native authentication discovery and one-time Apple credential exchange.
   - name: Day
     description: Read-model endpoints for rendering a planning day.
   - name: Activities
@@ -78,6 +80,79 @@ tags:
 # Paths (relative to the server URL, which already includes /api/v1)
 # ---------------------------------------------------------------------------
 paths:
+  # ---- Native authentication (ADR-003) ------------------------------------
+  /auth/capabilities:
+    get:
+      tags: [Auth]
+      summary: Discover configured native sign-in methods
+      operationId: getAuthCapabilities
+      security: []
+      responses:
+        '200':
+          description: Availability only; no provider configuration or secrets.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: 'public, no-store' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthCapabilities' }
+
+  /auth/apple/challenge:
+    post:
+      tags: [Auth]
+      summary: Issue a one-time Sign in with Apple challenge
+      description: |
+        Returns independent state and nonce values that expire after five
+        minutes. `sign_in` is public. `link` additionally requires the current
+        Better Auth cookie and binds the challenge to that user.
+      operationId: createAppleAuthChallenge
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AppleChallengeRequest' }
+      responses:
+        '201':
+          description: One-time challenge issued.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppleChallenge' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
+  /auth/apple/exchange:
+    post:
+      tags: [Auth]
+      summary: Exchange a one-time Apple credential for sign-in or linking
+      description: |
+        Atomically consumes the server challenge before Apple ID-token
+        verification. A successful sign-in sets the Better Auth session
+        cookie. `link` requires the current session and never changes it.
+      operationId: exchangeAppleCredential
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AppleExchangeRequest' }
+      responses:
+        '200':
+          description: Signed in or linked.
+          headers:
+            Set-Cookie:
+              description: Better Auth session cookie on sign-in.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AppleExchangeResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+
   # ---- Day (ADR-001) -------------------------------------------------------
   /day/{date}:
     get:
@@ -1152,8 +1227,87 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorEnvelope' }
 
+    RateLimited:
+      description: Shared-store request limit exceeded.
+      headers:
+        Retry-After:
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+    Unavailable:
+      description: The requested provider is not completely configured.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
   schemas:
     # ---- Shared primitives & enums ----------------------------------------
+    AuthCapabilities:
+      type: object
+      additionalProperties: false
+      required: [magicLink, apple]
+      properties:
+        magicLink: { type: boolean }
+        apple: { type: boolean }
+
+    AppleAuthIntent:
+      type: string
+      enum: [sign_in, link]
+
+    AppleChallengeRequest:
+      type: object
+      additionalProperties: false
+      required: [intent]
+      properties:
+        intent: { $ref: '#/components/schemas/AppleAuthIntent' }
+
+    AppleChallenge:
+      type: object
+      additionalProperties: false
+      required: [state, nonce, expiresAt]
+      properties:
+        state:
+          type: string
+          minLength: 1
+          description: Opaque one-time state. Never log or persist on the client.
+        nonce:
+          type: string
+          minLength: 1
+          description: Raw nonce; Apple receives its SHA-256 digest.
+        expiresAt: { type: string, format: date-time }
+
+    AppleExchangeRequest:
+      type: object
+      additionalProperties: false
+      required: [intent, state, nonce, idToken]
+      properties:
+        intent: { $ref: '#/components/schemas/AppleAuthIntent' }
+        state: { type: string, minLength: 1, maxLength: 512 }
+        nonce: { type: string, minLength: 1, maxLength: 512 }
+        idToken:
+          type: string
+          minLength: 1
+          maxLength: 16384
+          description: Apple identity token. Never log or persist.
+
+    AppleExchangeResponse:
+      type: object
+      description: |
+        Better Auth result. Sign-in returns a user and session token while
+        explicit linking returns `status: true`; the native client relies on
+        the HttpOnly cookie rather than persisting the token field.
+      additionalProperties: true
+      properties:
+        redirect: { type: boolean }
+        token: { type: string }
+        url: { type: [string, 'null'] }
+        status: { type: boolean }
+        user:
+          type: object
+          additionalProperties: true
+
     HourCycle:
       type: string
       enum: [h12, h24]
