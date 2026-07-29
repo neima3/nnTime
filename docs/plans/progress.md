@@ -42,6 +42,18 @@ Roadmap:
   notice and absence of mutation controls. Web gates pass with 83 files / 861
   tests, lint, typecheck, production build, OpenAPI sync/adoption, and release
   preflight.
+- **Release state.** Shipped implementation
+  `2bb94134d51783849c456914d7a91567ba123d54`. GitHub Actions run
+  `30449105180` passed build/test, production-mode browser E2E, generated/native
+  contracts, 101 shipping-app tests, the main-thread gate, and the unsigned
+  shipping build. Coolify deployment `dpxaqtw9fehx781lwac4rho5` finished on
+  that exact SHA at `2026-07-29T11:52:25Z`. The first scheduler tick
+  overlapping cutover failed as expected; the next tick at 11:53 UTC and three
+  consecutive follow-up executions succeeded. Live health returned 200 with
+  migration, database, AI, and scheduler checks all `ok` and 58-second
+  scheduler lag. The live landing page passed desktop browser smoke and its
+  CSP, HSTS, frame, MIME, referrer, permissions, and cross-origin headers were
+  present.
 
 **Not claimed:** a production-account online→offline→logout lifecycle was not
 mutated for evidence; the simulator flow is synthetic. Native magic links,

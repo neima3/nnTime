@@ -145,8 +145,8 @@ WidgetKit, XCTest, XcodeGen, generated `KairoAPIClient`.
   a mutation queue, or physical-device proof.
 - [x] Run `pnpm lint && pnpm typecheck && pnpm test && pnpm build`,
   OpenAPI/native contract gates, and `git diff --check`.
-- [ ] Commit, integrate to `main`, push, and require exact-SHA CI.
-- [ ] Verify exact-SHA Coolify deployment and live web health read-only even
+- [x] Commit, integrate to `main`, push, and require exact-SHA CI.
+- [x] Verify exact-SHA Coolify deployment and live web health read-only even
   though this tranche changes native code.
 
 ## Definition of done
