@@ -15,4 +15,8 @@ final class NetworkMonitor {
         }
         monitor.start(queue: queue)
     }
+
+    static func didReconnect(from wasOnline: Bool, to isOnline: Bool) -> Bool {
+        !wasOnline && isOnline
+    }
 }

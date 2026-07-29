@@ -18,7 +18,10 @@ struct KairoApp: App {
                 .environment(appState)
                 .tint(.kIris)
                 .preferredColorScheme(appState.colorScheme)
-                .onChange(of: scenePhase) { _, phase in
+                .onChange(of: scenePhase, initial: true) { _, phase in
+                    if AppState.shouldSynchronize(for: phase) {
+                        Task { await appState.synchronize() }
+                    }
                     guard phase == .active,
                           KairoPrefs.sleepWindDownEnabled else { return }
                     Task {
@@ -47,6 +50,19 @@ final class AppState {
     var timezone: TimeZone = .current
     var theme: KairoPrefs.Theme = KairoPrefs.theme
     var reducedStimulation: Bool = KairoPrefs.reducedStimulation
+    private let syncCoordinator: NativeSyncCoordinator
+
+    var pendingSyncCount = 0
+    var syncConflicts: [NativeSyncConflict] = []
+    var isSyncing = false
+    var lastSuccessfulSyncAt: Date?
+
+    init(syncCoordinator: NativeSyncCoordinator? = nil) {
+        self.syncCoordinator = syncCoordinator ?? NativeSyncCoordinator(
+            store: NativeSyncStore(),
+            transport: KairoAPI.shared
+        )
+    }
 
     // MARK: Accessibility modes (I1)
     //
@@ -136,6 +152,115 @@ final class AppState {
     var categoryIdByKey: [String: String] = [:]
     private var authGeneration = 0
 
+    func activateSync(scope: String) async {
+        do {
+            try await syncCoordinator.activate(scope: scope)
+            await refreshSyncPresentation(scope: scope)
+        } catch {
+            clearSyncPresentation()
+        }
+    }
+
+    @discardableResult
+    func enqueueTaskCreate(
+        title: String,
+        bucket: String
+    ) async throws -> NativeSyncMutation {
+        let mutation = try await syncCoordinator.enqueueTaskCreate(
+            title: title,
+            bucket: bucket
+        )
+        await refreshSyncPresentationForCurrentScope()
+        return mutation
+    }
+
+    @discardableResult
+    func enqueueActivityStatus(
+        activityID: String,
+        status: ActivityStatus,
+        occurredAt: Date,
+        occurrenceKey: String
+    ) async throws -> NativeSyncMutation {
+        let mutation = try await syncCoordinator.enqueueActivityStatus(
+            activityID: activityID,
+            status: status,
+            occurredAt: occurredAt,
+            occurrenceKey: occurrenceKey
+        )
+        await refreshSyncPresentationForCurrentScope()
+        return mutation
+    }
+
+    func synchronize(explicitRetry: Bool = false) async {
+        guard let scope = sessionScope else { return }
+        guard !isSyncing else { return }
+        isSyncing = true
+        defer { isSyncing = false }
+        do {
+            let result = try await syncCoordinator.synchronize(
+                scope: scope,
+                explicitRetry: explicitRetry
+            )
+            guard sessionScope == scope else { return }
+            await refreshSyncPresentation(scope: scope)
+            if result.refreshRequired {
+                NotificationCenter.default.post(name: .kairoSyncCompleted, object: nil)
+            }
+        } catch {
+            guard sessionScope == scope else { return }
+            if AppSessionFailure.classify(error) == .unauthorized {
+                await handleSessionInvalidation()
+            } else {
+                await refreshSyncPresentation(scope: scope)
+            }
+        }
+    }
+
+    func acknowledgeSyncConflict(id: UUID) async {
+        guard let scope = sessionScope else { return }
+        do {
+            try await syncCoordinator.acknowledgeConflict(scope: scope, id: id)
+            await refreshSyncPresentation(scope: scope)
+        } catch {
+            await refreshSyncPresentation(scope: scope)
+        }
+    }
+
+    func purgeSyncState() async {
+        _ = try? await syncCoordinator.purge()
+        clearSyncPresentation()
+    }
+
+    static func shouldSynchronize(for phase: ScenePhase) -> Bool {
+        phase == .active
+    }
+
+    private func refreshSyncPresentation(scope: String) async {
+        guard let snapshot = try? await syncCoordinator.snapshot(scope: scope)
+        else {
+            clearSyncPresentation()
+            return
+        }
+        pendingSyncCount = snapshot.pendingCount
+        syncConflicts = snapshot.conflicts
+        lastSuccessfulSyncAt = snapshot.lastSuccessfulSyncAt
+    }
+
+    private func refreshSyncPresentationForCurrentScope() async {
+        guard let sessionScope else {
+            clearSyncPresentation()
+            return
+        }
+        await refreshSyncPresentation(scope: sessionScope)
+    }
+
+    private func clearSyncPresentation() {
+        pendingSyncCount = 0
+        syncConflicts = []
+        isSyncing = false
+        lastSuccessfulSyncAt = nil
+    }
+
     func bootstrap() async {
         authGeneration += 1
         let generation = authGeneration
@@ -190,6 +315,12 @@ final class AppState {
             sessionScope = restoredScope
             offlineReadOnly = false
             auth = .signedIn
+            if let restoredScope {
+                await activateSync(scope: restoredScope)
+                await synchronize()
+            } else {
+                clearSyncPresentation()
+            }
         } catch {
             guard generation == authGeneration else { return }
             await apply(
@@ -264,6 +395,12 @@ final class AppState {
             sessionScope = scope
             offlineReadOnly = false
             auth = .signedIn
+            if let scope {
+                await activateSync(scope: scope)
+                await synchronize()
+            } else {
+                clearSyncPresentation()
+            }
         case let .signedInOffline(scope):
             sessionScope = scope
             offlineReadOnly = true
@@ -273,6 +410,8 @@ final class AppState {
                 timezone = zone
             }
             auth = .signedIn
+            await activateSync(scope: scope)
+            await synchronize()
         case .signedOut:
             await purgeLocalState()
             auth = .signedOut
@@ -280,6 +419,11 @@ final class AppState {
             sessionScope = scope
             offlineReadOnly = false
             auth = .connectionRequired
+            if let scope {
+                await activateSync(scope: scope)
+            } else {
+                clearSyncPresentation()
+            }
         case .unchanged:
             break
         }
@@ -366,6 +510,7 @@ final class AppState {
     }
 
     private func purgeLocalState() async {
+        await purgeSyncState()
         DayCache.clear()
         URLCache.shared.removeAllCachedResponses()
         await NotificationManager.cancelActivityReminders()
@@ -640,6 +785,8 @@ extension Notification.Name {
     static let kairoStartFocus = Notification.Name("kairoStartFocus")
     /// Posted after a bulk change (onboarding) so Today reloads.
     static let kairoDayChanged = Notification.Name("kairoDayChanged")
+    /// Posted after replay or cursor advancement requires server data to reload.
+    static let kairoSyncCompleted = Notification.Name("kairoSyncCompleted")
 }
 
 struct MainTabs: View {
@@ -708,6 +855,11 @@ struct MainTabs: View {
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: net.isOnline)
+        .onChange(of: net.isOnline) { wasOnline, isOnline in
+            guard NetworkMonitor.didReconnect(from: wasOnline, to: isOnline)
+            else { return }
+            Task { await app.synchronize() }
+        }
     }
 }
 
