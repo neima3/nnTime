@@ -964,6 +964,14 @@ struct BlockCard: View {
         return " · \(block.checklist.filter(\.done).count)/\(block.checklist.count) steps"
     }
 
+    private var fullMetadata: String {
+        "\(KTime.hhmm(block.startMin)) – \(KTime.hhmm(block.endMin)) · \(KTime.duration(block.durationMin))\(stepsSuffix)"
+    }
+
+    private var compactMetadata: String {
+        "\(KTime.hhmm(block.startMin)) – \(KTime.hhmm(block.endMin))"
+    }
+
     var body: some View {
         HStack(spacing: 10) {
             Text(block.emoji)
@@ -980,10 +988,14 @@ struct BlockCard: View {
                     if block.recurring {
                         Image(systemName: "repeat").font(.system(size: 9, weight: .bold))
                     }
-                    Text("\(KTime.hhmm(block.startMin)) – \(KTime.hhmm(block.endMin)) · \(KTime.duration(block.durationMin))\(stepsSuffix)")
-                        .font(.kMono(11, weight: .medium))
+                    ViewThatFits(in: .horizontal) {
+                        Text(fullMetadata)
+                            .fixedSize(horizontal: true, vertical: false)
+                        Text(compactMetadata)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                    .font(.kMono(11, weight: .medium))
                 }
-                .opacity(0.7)
                 .lineLimit(1)
                 if stepRows > 0 {
                     VStack(alignment: .leading, spacing: 1) {
@@ -992,7 +1004,6 @@ struct BlockCard: View {
                             Text("\(step.done ? "✓" : "○") \(step.label)")
                                 .font(.kBody(11, weight: .medium))
                                 .strikethrough(step.done)
-                                .opacity(0.65)
                                 .lineLimit(1)
                         }
                     }
@@ -1043,13 +1054,16 @@ struct BlockCard: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: compact ? .center : .top)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(block.category.fill)
+                .fill(
+                    block.category.fill.opacity(
+                        block.done ? 0.82 : isPast ? 0.72 : 1
+                    )
+                )
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(isCurrent ? Color.kNow : Color.clear, lineWidth: 2)
         )
-        .opacity(block.done ? 0.7 : isPast ? 0.55 : 1)
         .saturation(isPast ? 0.5 : 1)
         .compositingGroup()
         .kCardShadow()

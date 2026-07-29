@@ -185,9 +185,16 @@ final class KairoRound21SyncTour: XCTestCase {
 
         let retry = app.buttons["Retry syncing Inbox capture"]
         let dismiss = app.buttons["Dismiss Inbox capture conflict"]
+        let composer = app.textFields["Get it out of your head…"]
         XCTAssertTrue(retry.waitForExistence(timeout: 12))
         XCTAssertTrue(retry.isHittable)
         XCTAssertTrue(dismiss.isHittable)
+        XCTAssertTrue(composer.isHittable)
+        XCTAssertGreaterThanOrEqual(
+            composer.frame.minY,
+            max(retry.frame.maxY, dismiss.frame.maxY),
+            "The conflict notice must reserve space above the Inbox composer"
+        )
         assertPortraitWidth(app)
         assertMinimumTarget(retry)
         assertMinimumTarget(dismiss)

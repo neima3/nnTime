@@ -332,7 +332,7 @@ struct SyncConflictNotice: View {
                         .foregroundStyle(Color.kInk)
                     Text(presentation.message)
                         .font(.kBody(13))
-                        .foregroundStyle(Color.kInkSoft)
+                        .foregroundStyle(Color.kCatRoseInk)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .accessibilityElement(children: .combine)

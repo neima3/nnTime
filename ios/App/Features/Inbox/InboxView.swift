@@ -212,6 +212,8 @@ struct InboxView: View {
             ZStack {
                 Color.kCanvas.ignoresSafeArea()
                 VStack(spacing: 0) {
+                    SyncStatusNotices(surface: .inbox)
+
                     composer
                         .padding(.horizontal, 20)
                         .padding(.top, 6)
@@ -346,9 +348,6 @@ struct InboxView: View {
                     }
                 )
             }
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            SyncStatusNotices(surface: .inbox)
         }
         .task { await load() }
         .onReceive(
