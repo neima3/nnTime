@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum SyncConflictSurface {
     case today
@@ -33,20 +34,29 @@ struct SyncConflictPresentation: Equatable, Identifiable {
         }
         id = conflict.id
         operation = conflict.operation
-        title = "Server version kept"
         canRetry = conflict.retryMutation != nil
 
         switch conflict.operation {
         case .taskCreate:
             operationLabel = "Inbox capture"
+            title = "Inbox capture not saved"
             message = canRetry
-                ? "Your Inbox capture couldn’t be saved. Retry sync, or dismiss this notice."
-                : "This older Inbox capture can’t be retried. Dismiss this notice when you’re ready."
+                ? "Kairo didn’t save this capture on the server. Retry, or dismiss to remove this saved recovery copy."
+                : "Kairo didn’t save this capture on the server. This older recovery copy can’t be retried. Dismiss to remove it."
         case .activityStatus:
             operationLabel = "Activity status change"
-            message = canRetry
-                ? "Your activity status change couldn’t be applied. Retry sync, or dismiss this notice."
-                : "This older activity status change can’t be retried. Dismiss this notice when you’re ready."
+            switch conflict.reason {
+            case .activityMissing:
+                title = "Activity unavailable"
+                message = canRetry
+                    ? "This activity is no longer available, so the status change wasn’t applied. Retry, or dismiss to remove this saved recovery copy."
+                    : "This activity is no longer available, so the status change wasn’t applied. This older recovery copy can’t be retried. Dismiss to remove it."
+            case .clientError, .none:
+                title = "Status change not applied"
+                message = canRetry
+                    ? "Kairo didn’t apply this status change. Retry, or dismiss to remove this saved recovery copy."
+                    : "Kairo didn’t apply this status change. This older recovery copy can’t be retried. Dismiss to remove it."
+            }
         }
 
         retryAccessibilityLabel = canRetry
@@ -59,15 +69,25 @@ struct SyncConflictPresentation: Equatable, Identifiable {
 @Observable @MainActor
 final class SyncConflictNoticeModel {
     private(set) var isRetrying = false
+    private(set) var retryFailureMessage: String?
+    private(set) var retryAnnouncementGeneration = 0
 
+    @discardableResult
     func retry(
         conflictID: UUID,
-        retry: (UUID) async -> Void
-    ) async {
-        guard !isRetrying else { return }
+        retry: (UUID) async -> SyncConflictRetryOutcome
+    ) async -> SyncConflictRetryOutcome {
+        guard !isRetrying else { return .cancelled }
         isRetrying = true
+        retryFailureMessage = nil
         defer { isRetrying = false }
-        await retry(conflictID)
+        let outcome = await retry(conflictID)
+        if outcome == .failed {
+            retryFailureMessage =
+                SyncAccessibilityAnnouncementPolicy.retryFailure.message
+            retryAnnouncementGeneration += 1
+        }
+        return outcome
     }
 
     func dismiss(
@@ -75,6 +95,104 @@ final class SyncConflictNoticeModel {
         acknowledge: (UUID) async -> Void
     ) async {
         await acknowledge(conflictID)
+    }
+}
+
+@Observable @MainActor
+final class SyncConflictCarouselModel {
+    private var orderedIDs: [UUID] = []
+    private(set) var selectedID: UUID?
+
+    var count: Int { orderedIDs.count }
+
+    var position: Int? {
+        guard
+            let selectedID,
+            let index = orderedIDs.firstIndex(of: selectedID)
+        else {
+            return nil
+        }
+        return index + 1
+    }
+
+    func update(ids: [UUID]) {
+        let oldIDs = orderedIDs
+        let oldSelection = selectedID
+        orderedIDs = ids
+
+        guard !ids.isEmpty else {
+            selectedID = nil
+            return
+        }
+        if let oldSelection, ids.contains(oldSelection) {
+            selectedID = oldSelection
+            return
+        }
+        guard
+            let oldSelection,
+            let oldIndex = oldIDs.firstIndex(of: oldSelection)
+        else {
+            selectedID = ids.first
+            return
+        }
+
+        if let successor = oldIDs
+            .suffix(from: oldIndex + 1)
+            .first(where: ids.contains)
+        {
+            selectedID = successor
+            return
+        }
+        selectedID =
+            oldIDs.prefix(upTo: oldIndex).reversed()
+                .first(where: ids.contains)
+                ?? ids.first
+    }
+
+    func next() {
+        move(by: 1)
+    }
+
+    func previous() {
+        move(by: -1)
+    }
+
+    private func move(by offset: Int) {
+        guard !orderedIDs.isEmpty else { return }
+        let current = selectedID.flatMap(orderedIDs.firstIndex) ?? 0
+        let next = (current + offset + orderedIDs.count)
+            % orderedIDs.count
+        selectedID = orderedIDs[next]
+    }
+}
+
+enum SyncConflictActionLayout: Equatable {
+    case horizontal
+    case vertical
+}
+
+enum SyncConflictActionLayoutPolicy {
+    static let candidates: [SyncConflictActionLayout] = [
+        .horizontal,
+        .vertical,
+    ]
+    static let minimumTarget: CGFloat = 44
+}
+
+struct SyncAccessibilityAnnouncement: Equatable {
+    let message: String
+}
+
+enum SyncAccessibilityAnnouncementPolicy {
+    static let retryFailure = SyncAccessibilityAnnouncement(
+        message:
+            "Couldn’t retry this change. Your recovery copy is still saved here."
+    )
+
+    static func replaySuccess(
+        _ presentation: SyncReplayConfirmationPresentation
+    ) -> SyncAccessibilityAnnouncement {
+        .init(message: presentation.accessibilityLabel)
     }
 }
 
@@ -120,7 +238,7 @@ struct SyncReplayConfirmationPresentation: Equatable {
 
 struct SyncConflictNotice: View {
     let presentation: SyncConflictPresentation
-    let onRetry: (UUID) async -> Void
+    let onRetry: (UUID) async -> SyncConflictRetryOutcome
     let onDismiss: (UUID) async -> Void
 
     @State private var model = SyncConflictNoticeModel()
@@ -157,65 +275,23 @@ struct SyncConflictNotice: View {
                 .accessibilityElement(children: .combine)
             }
 
-            HStack(spacing: 8) {
-                if let retryLabel =
-                    presentation.retryAccessibilityLabel
-                {
-                    Button {
-                        Task {
-                            await model.retry(
-                                conflictID: presentation.id,
-                                retry: onRetry
-                            )
-                        }
-                    } label: {
-                        HStack(spacing: 7) {
-                            if model.isRetrying {
-                                ProgressView()
-                                    .controlSize(.small)
-                                    .tint(.kCatRoseInk)
-                            }
-                            Text(model.isRetrying ? "Retrying…" : "Retry")
-                                .font(.kBody(13, weight: .bold))
-                        }
-                        .frame(minHeight: 44)
-                        .padding(.horizontal, 16)
-                        .background(
-                            Capsule()
-                                .fill(
-                                    Color.kSurfaceRaised.opacity(0.72)
-                                )
-                        )
-                    }
-                    .buttonStyle(.plain)
+            if let retryFailureMessage = model.retryFailureMessage {
+                Text(retryFailureMessage)
+                    .font(.kBody(12, weight: .semibold))
                     .foregroundStyle(Color.kCatRoseInk)
-                    .disabled(model.isRetrying)
+                    .fixedSize(horizontal: false, vertical: true)
                     .accessibilityLabel(
-                        model.isRetrying
-                            ? "Retrying \(presentation.operationLabel) sync"
-                            : retryLabel
+                        "Retry failed. \(retryFailureMessage)"
                     )
-                }
+            }
 
-                Button {
-                    Task {
-                        await model.dismiss(
-                            conflictID: presentation.id,
-                            acknowledge: onDismiss
-                        )
-                    }
-                } label: {
-                    Text("Dismiss")
-                        .font(.kBody(13, weight: .semibold))
-                        .frame(minHeight: 44)
-                        .padding(.horizontal, 14)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    actionButtons(expand: false)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(Color.kCatRoseInk)
-                .disabled(model.isRetrying)
-                .accessibilityLabel(
-                    presentation.dismissAccessibilityLabel
-                )
+                VStack(spacing: 8) {
+                    actionButtons(expand: true)
+                }
             }
         }
         .padding(14)
@@ -232,6 +308,80 @@ struct SyncConflictNotice: View {
                         lineWidth: 1
                     )
                 )
+        )
+        .onChange(of: model.retryAnnouncementGeneration) {
+            UIAccessibility.post(
+                notification: .announcement,
+                argument:
+                    SyncAccessibilityAnnouncementPolicy
+                        .retryFailure.message
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func actionButtons(expand: Bool) -> some View {
+        if let retryLabel = presentation.retryAccessibilityLabel {
+            Button {
+                Task {
+                    await model.retry(
+                        conflictID: presentation.id,
+                        retry: onRetry
+                    )
+                }
+            } label: {
+                HStack(spacing: 7) {
+                    if model.isRetrying {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(.kCatRoseInk)
+                    }
+                    Text(model.isRetrying ? "Retrying…" : "Retry")
+                        .font(.kBody(13, weight: .bold))
+                }
+                .frame(
+                    maxWidth: expand ? .infinity : nil,
+                    minHeight:
+                        SyncConflictActionLayoutPolicy.minimumTarget
+                )
+                .padding(.horizontal, 16)
+                .background(
+                    Capsule()
+                        .fill(Color.kSurfaceRaised.opacity(0.72))
+                )
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Color.kCatRoseInk)
+            .disabled(model.isRetrying)
+            .accessibilityLabel(
+                model.isRetrying
+                    ? "Retrying \(presentation.operationLabel) sync"
+                    : retryLabel
+            )
+        }
+
+        Button {
+            Task {
+                await model.dismiss(
+                    conflictID: presentation.id,
+                    acknowledge: onDismiss
+                )
+            }
+        } label: {
+            Text("Dismiss")
+                .font(.kBody(13, weight: .semibold))
+                .frame(
+                    maxWidth: expand ? .infinity : nil,
+                    minHeight:
+                        SyncConflictActionLayoutPolicy.minimumTarget
+                )
+                .padding(.horizontal, 14)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Color.kCatRoseInk)
+        .disabled(model.isRetrying)
+        .accessibilityLabel(
+            presentation.dismissAccessibilityLabel
         )
     }
 }
@@ -261,6 +411,14 @@ struct SyncReplayConfirmationNotice: View {
         )
         .accessibilityElement(children: .combine)
         .accessibilityLabel(presentation.accessibilityLabel)
+        .onAppear {
+            UIAccessibility.post(
+                notification: .announcement,
+                argument:
+                    SyncAccessibilityAnnouncementPolicy
+                        .replaySuccess(presentation).message
+            )
+        }
     }
 }
 
@@ -273,14 +431,23 @@ struct SyncStatusNotices: View {
     @State private var confirmation:
         SyncReplayConfirmationPresentation?
     @State private var confirmationTask: Task<Void, Never>?
+    @State private var carousel = SyncConflictCarouselModel()
 
-    private var conflict: SyncConflictPresentation? {
-        app.syncConflicts.lazy.compactMap {
+    private var conflicts: [SyncConflictPresentation] {
+        app.syncConflicts.compactMap {
             SyncConflictPresentation(
                 conflict: $0,
                 surface: surface
             )
-        }.first
+        }
+    }
+
+    private var conflict: SyncConflictPresentation? {
+        guard let selectedID = carousel.selectedID else {
+            return conflicts.first
+        }
+        return conflicts.first(where: { $0.id == selectedID })
+            ?? conflicts.first
     }
 
     private var reducesStimulation: Bool {
@@ -292,6 +459,9 @@ struct SyncStatusNotices: View {
             if conflict != nil || confirmation != nil {
                 VStack(spacing: 8) {
                     if let conflict {
+                        if conflicts.count > 1 {
+                            conflictNavigation
+                        }
                         SyncConflictNotice(
                             presentation: conflict,
                             onRetry: { id in
@@ -301,6 +471,7 @@ struct SyncStatusNotices: View {
                                 await app.acknowledgeSyncConflict(id: id)
                             }
                         )
+                        .id(conflict.id)
                     }
                     if let confirmation {
                         SyncReplayConfirmationNotice(
@@ -319,6 +490,12 @@ struct SyncStatusNotices: View {
             }
         }
         .onChange(
+            of: conflicts.map(\.id),
+            initial: true
+        ) { _, ids in
+            carousel.update(ids: ids)
+        }
+        .onChange(
             of: app.syncReplayConfirmationGeneration
         ) {
             guard
@@ -332,6 +509,40 @@ struct SyncStatusNotices: View {
             confirmationTask?.cancel()
             confirmationTask = nil
         }
+    }
+
+    private var conflictNavigation: some View {
+        HStack(spacing: 8) {
+            Text(
+                "\(carousel.position ?? 1) of \(carousel.count)"
+            )
+            .font(.kBody(11, weight: .bold))
+            .foregroundStyle(Color.kCatRoseInk)
+            .accessibilityLabel(
+                "Sync conflict \(carousel.position ?? 1) of \(carousel.count)"
+            )
+            Spacer()
+            Button {
+                carousel.previous()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Color.kCatRoseInk)
+            .accessibilityLabel("Previous sync conflict")
+
+            Button {
+                carousel.next()
+            } label: {
+                Image(systemName: "chevron.right")
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(Color.kCatRoseInk)
+            .accessibilityLabel("Next sync conflict")
+        }
+        .padding(.horizontal, 4)
     }
 
     private func showConfirmation() {

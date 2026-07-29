@@ -282,17 +282,17 @@ final class AppState {
         }
     }
 
-    func retrySyncConflict(id: UUID) async {
-        guard case .signedIn = auth else { return }
+    func retrySyncConflict(id: UUID) async -> SyncConflictRetryOutcome {
+        guard case .signedIn = auth else { return .cancelled }
         guard !syncStorageUnavailable, !syncSuspendedForAuthTransition else {
-            return
+            return .cancelled
         }
         guard
             let scope = sessionScope,
             syncConflicts.contains(where: { $0.id == id }),
             retryingSyncConflictIDs.insert(id).inserted
         else {
-            return
+            return .cancelled
         }
         defer { retryingSyncConflictIDs.remove(id) }
 
@@ -301,13 +301,13 @@ final class AppState {
                 scope: scope,
                 id: id
             )
-            guard sessionScope == scope else { return }
+            guard sessionScope == scope else { return .cancelled }
             await refreshSyncPresentation(scope: scope)
             guard
                 sessionScope == scope,
                 !syncConflicts.contains(where: { $0.id == id })
             else {
-                return
+                return sessionScope == scope ? .failed : .cancelled
             }
             lastReplayedOperations = [result.operation]
             syncReplayConfirmationGeneration += 1
@@ -315,12 +315,25 @@ final class AppState {
                 name: .kairoSyncCompleted,
                 object: nil
             )
+            return .succeeded
         } catch {
-            guard sessionScope == scope else { return }
+            guard sessionScope == scope else { return .cancelled }
+            if error is CancellationError {
+                return .cancelled
+            }
+            if let coordinatorError =
+                error as? NativeSyncCoordinatorError,
+               coordinatorError == .inactiveScope
+                    || coordinatorError == .conflictNotFound
+            {
+                return .cancelled
+            }
             if AppSessionFailure.classify(error) == .unauthorized {
                 await handleSessionInvalidation()
+                return .cancelled
             } else {
                 await refreshSyncPresentation(scope: scope)
+                return sessionScope == scope ? .failed : .cancelled
             }
         }
     }

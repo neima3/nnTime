@@ -18,10 +18,10 @@ final class SyncConflictPresentationTests: XCTestCase {
         )
 
         XCTAssertEqual(presentation.operationLabel, "Inbox capture")
-        XCTAssertEqual(presentation.title, "Server version kept")
+        XCTAssertEqual(presentation.title, "Inbox capture not saved")
         XCTAssertEqual(
             presentation.message,
-            "Your Inbox capture couldn’t be saved. Retry sync, or dismiss this notice."
+            "Kairo didn’t save this capture on the server. Retry, or dismiss to remove this saved recovery copy."
         )
         XCTAssertEqual(
             presentation.retryAccessibilityLabel,
@@ -49,9 +49,10 @@ final class SyncConflictPresentationTests: XCTestCase {
             presentation.operationLabel,
             "Activity status change"
         )
+        XCTAssertEqual(presentation.title, "Activity unavailable")
         XCTAssertEqual(
             presentation.message,
-            "Your activity status change couldn’t be applied. Retry sync, or dismiss this notice."
+            "This activity is no longer available, so the status change wasn’t applied. Retry, or dismiss to remove this saved recovery copy."
         )
     }
 
@@ -127,7 +128,7 @@ final class SyncConflictPresentationTests: XCTestCase {
         XCTAssertNil(presentation.retryAccessibilityLabel)
         XCTAssertEqual(
             presentation.message,
-            "This older Inbox capture can’t be retried. Dismiss this notice when you’re ready."
+            "Kairo didn’t save this capture on the server. This older recovery copy can’t be retried. Dismiss to remove it."
         )
         XCTAssertFalse(presentation.message.contains("Retry sync"))
         XCTAssertEqual(
@@ -152,7 +153,11 @@ final class SyncConflictPresentationTests: XCTestCase {
             presentation.retryAccessibilityLabel,
             "Retry syncing Activity status change"
         )
-        XCTAssertTrue(presentation.message.contains("Retry sync"))
+        XCTAssertEqual(presentation.title, "Status change not applied")
+        XCTAssertEqual(
+            presentation.message,
+            "Kairo didn’t apply this status change. Retry, or dismiss to remove this saved recovery copy."
+        )
     }
 
     func testRetryTargetsExactConflictWithoutAcknowledgingIt() async {
@@ -160,14 +165,103 @@ final class SyncConflictPresentationTests: XCTestCase {
         let recorder = SyncConflictActionRecorder()
         let conflictID = UUID()
 
-        await model.retry(conflictID: conflictID) { id in
+        let outcome = await model.retry(conflictID: conflictID) { id in
             await recorder.recordRetry(id)
+            return .succeeded
         }
 
         let values = await recorder.values
+        XCTAssertEqual(outcome, .succeeded)
         XCTAssertEqual(values.retriedIDs, [conflictID])
         XCTAssertEqual(values.acknowledgedIDs, [])
         XCTAssertFalse(model.isRetrying)
+    }
+
+    func testRetryFailureShowsPrivacySafeInlineStateAndAnnouncement() async {
+        let model = SyncConflictNoticeModel()
+
+        let outcome = await model.retry(conflictID: UUID()) { _ in
+            .failed
+        }
+
+        XCTAssertEqual(outcome, .failed)
+        XCTAssertEqual(
+            model.retryFailureMessage,
+            "Couldn’t retry this change. Your recovery copy is still saved here."
+        )
+        XCTAssertEqual(model.retryAnnouncementGeneration, 1)
+        XCTAssertEqual(
+            SyncAccessibilityAnnouncementPolicy.retryFailure.message,
+            model.retryFailureMessage
+        )
+    }
+
+    func testCancelledRetryDoesNotShowOrAnnounceFailure() async {
+        let model = SyncConflictNoticeModel()
+
+        let outcome = await model.retry(conflictID: UUID()) { _ in
+            .cancelled
+        }
+
+        XCTAssertEqual(outcome, .cancelled)
+        XCTAssertNil(model.retryFailureMessage)
+        XCTAssertEqual(model.retryAnnouncementGeneration, 0)
+    }
+
+    func testConflictCarouselReachesEveryConflictAndWraps() {
+        let ids = [UUID(), UUID(), UUID()]
+        let model = SyncConflictCarouselModel()
+
+        model.update(ids: ids)
+        XCTAssertEqual(model.selectedID, ids[0])
+        XCTAssertEqual(model.position, 1)
+        XCTAssertEqual(model.count, 3)
+
+        model.next()
+        XCTAssertEqual(model.selectedID, ids[1])
+        model.next()
+        XCTAssertEqual(model.selectedID, ids[2])
+        model.next()
+        XCTAssertEqual(model.selectedID, ids[0])
+        model.previous()
+        XCTAssertEqual(model.selectedID, ids[2])
+    }
+
+    func testConflictCarouselKeepsSelectionAcrossInsertion() {
+        let inserted = UUID()
+        let ids = [UUID(), UUID(), UUID()]
+        let model = SyncConflictCarouselModel()
+        model.update(ids: ids)
+        model.next()
+
+        model.update(ids: [inserted] + ids)
+
+        XCTAssertEqual(model.selectedID, ids[1])
+        XCTAssertEqual(model.position, 3)
+    }
+
+    func testConflictCarouselAdvancesAfterSelectedConflictDismissal() {
+        let ids = [UUID(), UUID(), UUID()]
+        let model = SyncConflictCarouselModel()
+        model.update(ids: ids)
+        model.next()
+
+        model.update(ids: [ids[0], ids[2]])
+
+        XCTAssertEqual(model.selectedID, ids[2])
+        XCTAssertEqual(model.position, 2)
+        XCTAssertEqual(model.count, 2)
+    }
+
+    func testConflictActionsAdaptFromHorizontalToVertical() {
+        XCTAssertEqual(
+            SyncConflictActionLayoutPolicy.candidates,
+            [.horizontal, .vertical]
+        )
+        XCTAssertEqual(
+            SyncConflictActionLayoutPolicy.minimumTarget,
+            44
+        )
     }
 
     func testDismissAcknowledgesExactConflictWithoutRetrying() async {
@@ -221,6 +315,12 @@ final class SyncConflictPresentationTests: XCTestCase {
             confirmation.accessibilityLabel,
             "Sync complete. Your activity status change is up to date."
         )
+        XCTAssertEqual(
+            SyncAccessibilityAnnouncementPolicy.replaySuccess(
+                confirmation
+            ).message,
+            confirmation.accessibilityLabel
+        )
     }
 
     func testAppPublishesMintStateOnlyAfterSuccessfulReplay() async throws {
@@ -260,7 +360,8 @@ final class SyncConflictPresentationTests: XCTestCase {
         let conflict = try XCTUnwrap(app.syncConflicts.first)
         XCTAssertEqual(app.syncReplayConfirmationGeneration, 0)
 
-        await app.retrySyncConflict(id: conflict.id)
+        let retryOutcome = await app.retrySyncConflict(id: conflict.id)
+        XCTAssertEqual(retryOutcome, .failed)
         XCTAssertEqual(app.syncConflicts, [conflict])
         XCTAssertEqual(app.syncReplayConfirmationGeneration, 0)
 
@@ -285,8 +386,9 @@ final class SyncConflictPresentationTests: XCTestCase {
 
         await app.synchronize()
         let conflict = try XCTUnwrap(app.syncConflicts.first)
-        await app.retrySyncConflict(id: conflict.id)
+        let retryOutcome = await app.retrySyncConflict(id: conflict.id)
 
+        XCTAssertEqual(retryOutcome, .succeeded)
         XCTAssertTrue(app.syncConflicts.isEmpty)
         XCTAssertEqual(app.syncReplayConfirmationGeneration, 1)
         XCTAssertEqual(app.lastReplayedOperations, [.taskCreate])
@@ -358,6 +460,45 @@ final class SyncConflictPresentationTests: XCTestCase {
         _ = try await duplicate
         let events = await transport.createEvents
         XCTAssertEqual(events.count, 2)
+    }
+
+    func testAccountSwitchCancellationDoesNotAnnounceRetryFailure()
+        async throws
+    {
+        let transport = SyncConflictPresentationTransport(
+            createStatuses: [422, nil],
+            suspendSuccessfulCreate: true
+        )
+        let (app, _) = try makeApp(transport: transport)
+        app.auth = .signedIn
+        app.sessionScope = "account-a"
+        try await app.activateSync(scope: "account-a")
+        _ = try await app.enqueueTaskCreate(
+            title: "Account A only",
+            bucket: "inbox"
+        )
+        await app.synchronize()
+        let conflictID = try XCTUnwrap(app.syncConflicts.first?.id)
+        let model = SyncConflictNoticeModel()
+
+        let retry = Task {
+            await model.retry(conflictID: conflictID) { id in
+                await app.retrySyncConflict(id: id)
+            }
+        }
+        await transport.waitUntilSuccessfulCreateStarts()
+        let accountSwitch = Task {
+            await app.prepareForAccountSwitch(newScope: "account-b")
+        }
+        await transport.waitUntilSuccessfulCreateIsCancelled()
+        await transport.resumeSuccessfulCreate()
+
+        let outcome = await retry.value
+        let switched = await accountSwitch.value
+        XCTAssertTrue(switched)
+        XCTAssertEqual(outcome, .cancelled)
+        XCTAssertNil(model.retryFailureMessage)
+        XCTAssertEqual(model.retryAnnouncementGeneration, 0)
     }
 
     func testLegacyConflictWithoutRetryPayloadStillDecodes() throws {
@@ -479,6 +620,9 @@ private actor SyncConflictPresentationTransport: NativeSyncTransport {
         [CheckedContinuation<Void, Never>] = []
     private var successfulCreateResume:
         CheckedContinuation<Void, Never>?
+    private var successfulCreateCancellationObserved = false
+    private var successfulCreateCancellationWaiters:
+        [CheckedContinuation<Void, Never>] = []
     private(set) var createEvents: [CreateEvent] = []
 
     init(
@@ -517,8 +661,14 @@ private actor SyncConflictPresentationTransport: NativeSyncTransport {
             let waiters = successfulCreateWaiters
             successfulCreateWaiters.removeAll()
             waiters.forEach { $0.resume() }
-            await withCheckedContinuation {
-                successfulCreateResume = $0
+            await withTaskCancellationHandler {
+                await withCheckedContinuation {
+                    successfulCreateResume = $0
+                }
+            } onCancel: {
+                Task {
+                    await self.observeSuccessfulCreateCancellation()
+                }
             }
         }
         return .init(
@@ -568,6 +718,20 @@ private actor SyncConflictPresentationTransport: NativeSyncTransport {
     func resumeSuccessfulCreate() {
         successfulCreateResume?.resume()
         successfulCreateResume = nil
+    }
+
+    func waitUntilSuccessfulCreateIsCancelled() async {
+        guard !successfulCreateCancellationObserved else { return }
+        await withCheckedContinuation {
+            successfulCreateCancellationWaiters.append($0)
+        }
+    }
+
+    private func observeSuccessfulCreateCancellation() {
+        successfulCreateCancellationObserved = true
+        let waiters = successfulCreateCancellationWaiters
+        successfulCreateCancellationWaiters.removeAll()
+        waiters.forEach { $0.resume() }
     }
 }
 

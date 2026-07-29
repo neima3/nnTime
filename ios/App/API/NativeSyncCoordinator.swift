@@ -32,6 +32,12 @@ struct NativeSyncConflictRetryResult: Equatable, Sendable {
     let operation: NativeSyncConflict.Operation
 }
 
+enum SyncConflictRetryOutcome: Equatable, Sendable {
+    case succeeded
+    case failed
+    case cancelled
+}
+
 struct NativeSyncPartialFailure: Error {
     let underlying: Error
     let refreshRequired: Bool
