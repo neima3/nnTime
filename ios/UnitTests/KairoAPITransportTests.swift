@@ -278,6 +278,67 @@ final class KairoAPITransportTests: XCTestCase {
         )
     }
 
+    func testNativeSyncTransportUsesGeneratedReadsAndCallerOwnedIdempotencyKeys() async throws {
+        let recorder = PlannerRequestRecorder()
+        let api = KairoAPI(
+            baseURL: URL(string: "http://127.0.0.1:3456")!,
+            plannerTransport: PlannerMockTransport(
+                recorder: recorder,
+                responder: { operation in
+                    Self.successResponse(operation)
+                }
+            ),
+            timezoneIdentifierProvider: { "America/Chicago" },
+            idempotencyKeyProvider: { "generated-online-key" }
+        )
+        let transport: any NativeSyncTransport = api
+        let replayKey = "019fa64f-32f2-7001-8296-34373d7c90a0"
+
+        let activity = try await transport.activity(id: "activity-1")
+        XCTAssertEqual(activity.revision, 2)
+
+        let changes = try await transport.changes(
+            cursor: "cursor-1",
+            limit: 50
+        )
+        XCTAssertEqual(changes.entries.map(\.id), ["42"])
+        XCTAssertEqual(changes.nextCursor, "cursor-42")
+
+        _ = try await transport.createTask(
+            title: "Replay-safe capture",
+            bucket: "inbox",
+            idempotencyKey: replayKey
+        )
+        _ = try await transport.setStatus(
+            activityId: "activity-1",
+            revision: activity.revision,
+            occurrenceKey: "2026-07-28T14:00:00Z",
+            status: .completed,
+            completedAt: "2026-07-28T14:25:00Z",
+            idempotencyKey: replayKey
+        )
+
+        let captures = await recorder.captures
+        XCTAssertEqual(
+            captures.map { "\($0.method) \($0.path)" },
+            [
+                "GET /activities/activity-1",
+                "GET /changes?cursor=cursor-1&limit=50",
+                "POST /tasks",
+                "PATCH /activities/activity-1?editScope=this",
+            ]
+        )
+        let mutations = captures.filter { $0.method != "GET" }
+        XCTAssertEqual(mutations.map { $0.headers["idempotency-key"] }, [
+            replayKey,
+            replayKey,
+        ])
+        XCTAssertEqual(
+            mutations.last?.headers["if-match"],
+            String(activity.revision)
+        )
+    }
+
     func testSettingsDecodesRFC3339TimestampsWithAndWithoutFractions() async throws {
         for timestamp in [
             "2026-07-28T16:02:47Z",
@@ -730,6 +791,8 @@ final class KairoAPITransportTests: XCTestCase {
             return .init(status: .ok, body: dayJSON)
         case "createActivitySeries":
             return .init(status: .created, body: activityJSON)
+        case "getActivitySeries":
+            return .init(status: .ok, body: activityJSON)
         case "updateActivitySeries":
             return .init(status: .ok, body: activityJSON)
         case "deleteActivitySeries", "deleteTask":
@@ -789,6 +852,17 @@ final class KairoAPITransportTests: XCTestCase {
             )
         case "updateFocusSession":
             return .init(status: .ok, body: focusJSON(state: "paused"))
+        case "getChanges":
+            return .init(
+                status: .ok,
+                body: """
+                {"items":[{
+                  "id":"42","entityType":"activity_series",
+                  "entityId":"activity-1","op":"upsert","revision":2,
+                  "occurredAt":"2026-07-28T14:00:00Z"
+                }],"nextCursor":"cursor-42"}
+                """
+            )
         default:
             XCTFail("Unexpected generated operation \(operation)")
             return .init(status: .internalServerError, body: "")

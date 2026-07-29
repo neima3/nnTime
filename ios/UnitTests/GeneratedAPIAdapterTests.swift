@@ -364,6 +364,51 @@ final class GeneratedAPIAdapterTests: XCTestCase {
         XCTAssertEqual(task.priority, "low")
     }
 
+    func testGeneratedActivitySeriesAndChangesOutputsAdaptForNativeSync() throws {
+        let generatedActivity = try decode(
+            Components.Schemas.ActivitySeries.self,
+            """
+            {
+              "id":"activity-1","userId":"user-1","tz":"America/New_York",
+              "dtstartLocal":"2026-07-28T13:00:00Z","title":"Read series",
+              "durationMin":25,"checklistTemplate":[],"priority":"none",
+              "source":"manual","revision":7,
+              "createdAt":"2026-07-28T12:00:00Z",
+              "updatedAt":"2026-07-28T12:00:00Z"
+            }
+            """
+        )
+        let activityOutput: Operations.getActivitySeries.Output = .ok(
+            .init(body: .json(generatedActivity))
+        )
+        let activity = try GeneratedAPIAdapters.activitySeries(activityOutput)
+
+        XCTAssertEqual(activity.id, "activity-1")
+        XCTAssertEqual(activity.revision, 7)
+
+        let generatedChanges = try decode(
+            Components.Schemas.ChangesResponse.self,
+            """
+            {
+              "items":[{
+                "id":"42","entityType":"activity_series",
+                "entityId":"activity-1","op":"upsert","revision":7,
+                "occurredAt":"2026-07-28T13:00:00Z"
+              }],
+              "nextCursor":"cursor-42"
+            }
+            """
+        )
+        let changesOutput: Operations.getChanges.Output = .ok(
+            .init(body: .json(generatedChanges))
+        )
+        let page = try GeneratedAPIAdapters.changes(changesOutput)
+
+        XCTAssertEqual(page.entries.map(\.id), ["42"])
+        XCTAssertEqual(page.entries.first?.operation, "upsert")
+        XCTAssertEqual(page.nextCursor, "cursor-42")
+    }
+
     func testMalformedGeneratedEnumAndUnexpectedOutputFailHonestly() throws {
         let malformed = """
         {

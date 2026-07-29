@@ -287,6 +287,65 @@ enum GeneratedAPIAdapters {
         )
     }
 
+    static func activitySeries(
+        _ output: Operations.getActivitySeries.Output
+    ) throws -> Activity {
+        switch output {
+        case let .ok(response):
+            return try activity(response.body.json)
+        case let .unauthorized(response):
+            throw try documentedError(
+                operation: Operations.getActivitySeries.id,
+                statusCode: 401,
+                envelope: response.body.json
+            )
+        case let .notFound(response):
+            throw try documentedError(
+                operation: Operations.getActivitySeries.id,
+                statusCode: 404,
+                envelope: response.body.json
+            )
+        case let .undocumented(statusCode, _):
+            throw GeneratedAPIAdapterError.undocumented(
+                operation: Operations.getActivitySeries.id,
+                statusCode: statusCode
+            )
+        }
+    }
+
+    static func changes(
+        _ output: Operations.getChanges.Output
+    ) throws -> ChangesPage {
+        switch output {
+        case let .ok(response):
+            let value = try response.body.json
+            return .init(
+                entries: value.items.map {
+                    .init(
+                        id: $0.id,
+                        entityType: $0.entityType,
+                        entityID: $0.entityId,
+                        operation: $0.op.rawValue,
+                        revision: Int($0.revision),
+                        occurredAt: $0.occurredAt
+                    )
+                },
+                nextCursor: value.nextCursor
+            )
+        case let .unauthorized(response):
+            throw try documentedError(
+                operation: Operations.getChanges.id,
+                statusCode: 401,
+                envelope: response.body.json
+            )
+        case let .undocumented(statusCode, _):
+            throw GeneratedAPIAdapterError.undocumented(
+                operation: Operations.getChanges.id,
+                statusCode: statusCode
+            )
+        }
+    }
+
     static func updatedActivity(
         _ output: Operations.updateActivitySeries.Output
     ) throws -> Activity {

@@ -43,3 +43,38 @@ struct NativeSyncConflict: Codable, Equatable, Sendable {
     var operation: String
     var recordedAt: Date
 }
+
+struct NativeSyncChangeEntry: Equatable, Sendable {
+    let id: String
+    let entityType: String
+    let entityID: String
+    let operation: String
+    let revision: Int
+    let occurredAt: Date
+}
+
+struct ChangesPage: Equatable, Sendable {
+    let entries: [NativeSyncChangeEntry]
+    let nextCursor: String?
+}
+
+protocol NativeSyncTransport: Sendable {
+    func createTask(
+        title: String,
+        bucket: String,
+        idempotencyKey: String?
+    ) async throws -> TaskItem
+
+    func activity(id: String) async throws -> Activity
+
+    func setStatus(
+        activityId: String,
+        revision: Int,
+        occurrenceKey: String?,
+        status: ActivityStatus,
+        completedAt: String?,
+        idempotencyKey: String?
+    ) async throws -> Activity
+
+    func changes(cursor: String?, limit: Int?) async throws -> ChangesPage
+}

@@ -106,7 +106,7 @@ enum UUIDv7Generator {
     }
 }
 
-actor KairoAPI {
+actor KairoAPI: NativeSyncTransport {
     static let shared = KairoAPI()
 
     nonisolated let baseURL: URL
@@ -441,6 +441,27 @@ actor KairoAPI {
         }
     }
 
+    func activity(id: String) async throws -> Activity {
+        try await plannerCall {
+            try GeneratedAPIAdapters.activitySeries(
+                await planner.getActivitySeries(path: .init(id: id))
+            )
+        }
+    }
+
+    func changes(
+        cursor: String?,
+        limit: Int?
+    ) async throws -> ChangesPage {
+        try await plannerCall {
+            try GeneratedAPIAdapters.changes(
+                await planner.getChanges(
+                    query: .init(cursor: cursor, limit: limit)
+                )
+            )
+        }
+    }
+
     func createActivity(
         tz: String,
         dtstartLocal: String,
@@ -483,7 +504,8 @@ actor KairoAPI {
         revision: Int,
         occurrenceKey: String?,
         status: ActivityStatus,
-        completedAt: String?
+        completedAt: String?,
+        idempotencyKey: String? = nil
     ) async throws -> Activity {
         try await updateActivity(
             activityId: activityId,
@@ -495,16 +517,18 @@ actor KairoAPI {
                 completedAt: try completedAt.map {
                     .value(try Self.date($0))
                 } ?? .null
-            )
+            ),
+            idempotencyKey: idempotencyKey
         )
     }
 
     func updateActivity(
         activityId: String,
         revision: Int,
-        update: ActivityUpdate
+        update: ActivityUpdate,
+        idempotencyKey: String? = nil
     ) async throws -> Activity {
-        let key = idempotencyKeyProvider()
+        let key = idempotencyKey ?? idempotencyKeyProvider()
         var update = update
         if update.editScope == nil {
             update.editScope = .all
@@ -598,8 +622,12 @@ actor KairoAPI {
         }
     }
 
-    func createTask(title: String, bucket: String) async throws -> TaskItem {
-        let key = idempotencyKeyProvider()
+    func createTask(
+        title: String,
+        bucket: String,
+        idempotencyKey: String? = nil
+    ) async throws -> TaskItem {
+        let key = idempotencyKey ?? idempotencyKeyProvider()
         return try await plannerCall {
             let output = try await planner.createTask(
                 headers: .init(Idempotency_hyphen_Key: key),

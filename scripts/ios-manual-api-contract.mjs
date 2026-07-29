@@ -14,6 +14,8 @@ export const REQUIRED_GENERATED_OPERATIONS = Object.freeze([
   "updateUserSettings",
   "listCategories",
   "getDay",
+  "getActivitySeries",
+  "getChanges",
   "createActivitySeries",
   "updateActivitySeries",
   "deleteActivitySeries",

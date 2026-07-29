@@ -28,6 +28,8 @@ const requiredOperations = [
   "updateUserSettings",
   "listCategories",
   "getDay",
+  "getActivitySeries",
+  "getChanges",
   "createActivitySeries",
   "updateActivitySeries",
   "deleteActivitySeries",
