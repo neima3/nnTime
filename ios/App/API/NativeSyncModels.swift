@@ -20,6 +20,7 @@ struct NativeSyncMutation: Codable, Equatable, Sendable {
     var id: UUID
     var createdAt: Date
     var nextAttemptAt: Date?
+    var attemptCount: Int? = nil
     var kind: Kind
 }
 
@@ -38,9 +39,20 @@ struct PendingActivityStatus: Codable, Equatable, Sendable {
 }
 
 struct NativeSyncConflict: Codable, Equatable, Sendable {
+    enum Operation: String, Codable, Equatable, Sendable {
+        case taskCreate
+        case activityStatus
+    }
+
+    enum Reason: String, Codable, Equatable, Sendable {
+        case activityMissing
+        case clientError
+    }
+
     var id: UUID
     var mutationID: UUID
-    var operation: String
+    var operation: Operation
+    var reason: Reason? = nil
     var recordedAt: Date
 }
 

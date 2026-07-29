@@ -53,7 +53,7 @@ final class NativeSyncStoreTests: XCTestCase {
         let conflict = NativeSyncConflict(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000003")!,
             mutationID: mutation.id,
-            operation: "activityStatus",
+            operation: .activityStatus,
             recordedAt: Date(timeIntervalSince1970: 1_700_000_700)
         )
         try store.write(
