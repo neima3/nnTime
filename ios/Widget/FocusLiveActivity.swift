@@ -55,11 +55,20 @@ struct FocusLiveActivity: Widget {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(skyInk)
+                .accessibilityLabel("Open Kairo focus")
+                .accessibilityHint("Adjust this focus session in Kairo")
             }
             .foregroundStyle(ink)
             .padding(14)
             .activityBackgroundTint(sky)
             .activitySystemActionForegroundColor(skyInk)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(
+                focusAccessibilityLabel(
+                    attributes: context.attributes,
+                    state: context.state
+                )
+            )
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -69,6 +78,10 @@ struct FocusLiveActivity: Widget {
                             .font(.system(size: 14, weight: .bold, design: .rounded))
                             .lineLimit(1)
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(
+                        "Focus session, \(context.attributes.title)"
+                    )
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     Group {
@@ -84,6 +97,12 @@ struct FocusLiveActivity: Widget {
                     .monospacedDigit()
                     .foregroundStyle(context.state.overtime ? now : .primary)
                     .frame(maxWidth: 70, alignment: .trailing)
+                    .accessibilityLabel(
+                        focusAccessibilityLabel(
+                            attributes: context.attributes,
+                            state: context.state
+                        )
+                    )
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     Link(destination: URL(string: "kairo://focus")!) {
@@ -93,6 +112,7 @@ struct FocusLiveActivity: Widget {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(skyInk)
+                    .accessibilityLabel("Open Kairo focus")
                 }
             } compactLeading: {
                 Text("◔").font(.system(size: 15, weight: .bold)).foregroundStyle(sky)
@@ -120,6 +140,21 @@ struct FocusLiveActivity: Widget {
 
     private func remaining(_ sec: Int) -> String {
         String(format: "%02d:%02d", max(0, sec) / 60, max(0, sec) % 60)
+    }
+
+    private func focusAccessibilityLabel(
+        attributes: FocusAttributes,
+        state: FocusAttributes.ContentState
+    ) -> String {
+        let status: String
+        if state.paused {
+            status = "paused, \(remaining(state.pausedRemainingSec)) remaining"
+        } else if state.overtime {
+            status = "past target"
+        } else {
+            status = "in progress"
+        }
+        return "Focus, \(attributes.title), \(status), \(attributes.targetMin) minute target"
     }
 }
 #endif

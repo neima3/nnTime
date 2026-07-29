@@ -614,7 +614,8 @@ struct TodayView: View {
                                     category: $0.category.rawValue,
                                     activityId: $0.id, revision: $0.revision,
                                     occurrenceKey: $0.occurrenceKey)
-                    }
+                    },
+                    hourCycle: KairoPrefs.hourCycle
                 )
                 WidgetCenter.shared.reloadAllTimelines()
             }

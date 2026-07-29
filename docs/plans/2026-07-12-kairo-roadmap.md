@@ -93,7 +93,7 @@ design work BEFORE the consuming subphase starts.
   - [x] 7F Repository release preflight + signed archive/export capability
         (TestFlight status is release-specific evidence, not implied here)
 - [ ] Phase 8 — iOS surfaces + launch → **85% iOS PARITY GATE**
-  - [ ] 8A Read-only widgets + Live Activity/Dynamic Island ship; authenticated
+  - [x] 8A Read-only widgets + Live Activity/Dynamic Island ship; authenticated
         extension mutations remain blocked on a secure session bridge
   - [ ] 8B Google sign-in (web+iOS) remains; Apple Reminders import decision
         executed
@@ -352,9 +352,12 @@ Apple upload acceptance and TestFlight processing are external, per-release
 states and require their own evidence; this phase checkbox never implies them.
 
 ## Phase 8 — iOS surfaces + hardening + launch → 85% iOS PARITY GATE
-8A **interactive** widgets (complete-from-widget), timeline + next-up widgets,
-Live Activity + Dynamic Island for focus; watchOS glance = stretch (separate
-parity row, scores 0 if deferred). 8B Google sign-in on web+iOS; execute the
+8A **read-only** timeline + next-up Home Screen and Lock Screen widgets plus
+Live Activity + Dynamic Island focus surfaces. All actions deep-link into the
+authenticated app; complete-from-widget remains intentionally withheld until
+the extension has a secure authenticated session bridge. watchOS glance =
+stretch (separate parity row, scores 0 if deferred). 8B Google sign-in on
+web+iOS; execute the
 Apple Reminders import decision recorded in 0.5 checklist (ship or justified
 exclusion); **Apple Health sync (HealthKit: write focus/mindful minutes,
 read sleep schedule to inform wind-down suggestions; explicit user opt-in)**. 8C ongoing hardening: repeated restore drill, Playwright E2E in CI,

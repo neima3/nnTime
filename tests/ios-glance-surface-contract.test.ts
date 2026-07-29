@@ -34,11 +34,18 @@ describe("iOS glance surface contract", () => {
       resolve(root, "ios/Widget/FocusLiveActivity.swift"),
       "utf8",
     );
+    const app = readFileSync(resolve(root, "ios/App/KairoApp.swift"), "utf8");
+    const today = readFileSync(
+      resolve(root, "ios/App/Features/Today/TodayView.swift"),
+      "utf8",
+    );
 
     const result = auditGlanceSurfaceContract(root, {
       project,
       widget: `${widget}\nstruct CompleteIntent: AppIntent {}`,
       liveActivity: `${liveActivity}\nlet session = URLSession.shared`,
+      app,
+      today,
     });
 
     expect(result.failures).toEqual(

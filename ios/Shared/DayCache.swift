@@ -31,6 +31,7 @@ struct DayCacheStore {
         let zone: String
         let blocks: [CachedBlock]
         let savedAt: Date
+        var hourCycle: String? = nil
     }
 
     static let version = 2
@@ -54,7 +55,8 @@ struct DayCacheStore {
         scope: String,
         date: String,
         zone: String,
-        blocks: [CachedBlock]
+        blocks: [CachedBlock],
+        hourCycle: String? = nil
     ) throws {
         guard !scope.isEmpty else {
             return
@@ -65,7 +67,8 @@ struct DayCacheStore {
             date: date,
             zone: zone,
             blocks: blocks,
-            savedAt: Date()
+            savedAt: Date(),
+            hourCycle: Self.normalizedHourCycle(hourCycle)
         )
         try write(snapshot)
     }
@@ -158,7 +161,8 @@ struct DayCacheStore {
             date: snapshot.date,
             zone: snapshot.zone,
             blocks: blocks,
-            savedAt: snapshot.savedAt
+            savedAt: snapshot.savedAt,
+            hourCycle: snapshot.hourCycle
         )
         try write(updated)
         return updated
@@ -196,6 +200,17 @@ struct DayCacheStore {
         }
         try fileManager.removeItem(at: fileURL)
     }
+
+    private static func normalizedHourCycle(
+        _ hourCycle: String?
+    ) -> String? {
+        switch hourCycle {
+        case "h12", "h24":
+            hourCycle
+        default:
+            nil
+        }
+    }
 }
 
 enum DayCache {
@@ -211,14 +226,16 @@ enum DayCache {
         scope: String,
         date: String,
         zone: String,
-        blocks: [CachedBlock]
+        blocks: [CachedBlock],
+        hourCycle: String? = nil
     ) {
         removeLegacyCache()
         try? store.write(
             scope: scope,
             date: date,
             zone: zone,
-            blocks: blocks
+            blocks: blocks,
+            hourCycle: hourCycle
         )
     }
 

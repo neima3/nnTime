@@ -90,7 +90,7 @@ energy-pattern learning, and related rows — see table.
 | D04 | Extend ("+1 minute") | D | both | 3A, 7E | planned | 1 | SHIPPED: extendFocusSession (+1/+5/+10 min); 6 tests passing. Roadmap 3A itemizes quick-extend controls (+1/+5/+10 min) on the live timer; 7E ports to iOS. |
 | D05 | Manual complete / drag-to-finish | D | both | 3A | planned | 1 | SHIPPED: transitionFocusSession → completed state. |
 | D06 | Checklist-during-focus | D | both | 1D, 3A, 7D | planned | 1 | Roadmap 3A itemizes live checklist display + check-off inside the running timer (per the Phase 0 focus design's Steps card); 7D ports to iOS. |
-| D07 | Widget / Live Activity / Dynamic Island timer | D | ios | 8A | planned | 1 | — |
+| D07 | Widget / Live Activity / Dynamic Island timer | D | ios | 8A | planned | 1 | SHIPPED (Round 22): the protected app-group day snapshot drives real Home/Lock widgets, while ActivityKit renders a focus countdown across Live Activity and Dynamic Island. All actions open the authenticated app. |
 | D08 | Ambient sounds / "Focus tunes" | D | both | 3C | planned | 1 | SHIPPED: AmbientSounds component (src/components/AmbientSounds.tsx) with 5 CC0 sounds; live-verified (screenshot browser-qa/3c-today-live.png). |
 | D09 | Hyperfocus support | D | both | 3B, 3C | planned | 1 | Matches Tiimo's own mechanism (break reminders + visible timer + mood insights), not a dedicated hyperfocus mode. |
 | D10 | Break prompts | D | both | 3B | planned | 1 | SHIPPED (Round 18): durable `notification_jobs` compute and deliver halfway + wrap-up prompts with stable deduplication, atomic claims, retry/expiry, cancellation, and source revalidation (`notification-policy.test.ts`, `notifications.integration.test.ts`, `notification-delivery.integration.test.ts`). |
@@ -115,8 +115,8 @@ energy-pattern learning, and related rows — see table.
 | G06 | Gentle/soft notification design | G | both | 3B | planned | 1 | SHIPPED: privacy-minimal, calm copy is generated centrally by `notification-policy.ts`; arbitrary activity notes and push endpoints never enter job payloads. |
 | G07 | Halfway/mid-task nudges | G | both | 3B | planned | 1 | SHIPPED (Round 18): recurrence- and override-aware halfway jobs are delivered through the same durable claim/retry state machine as start and wrap-up prompts. |
 | G08 | Per-task notification granularity | G | both | — | excluded | 0 | Research doc marks this a user-requested gap not yet available in Tiimo itself ("N/A feature gap"). |
-| H01 | Home Screen widgets | H | ios | 8A | planned | 1 | — |
-| H02 | Lock Screen widgets | H | ios | 8A | planned | 1 | — |
+| H01 | Home Screen widgets | H | ios | 8A | planned | 1 | SHIPPED (Round 22): small, medium, and large read-only WidgetKit families render timezone-safe current/next activity data with account 12/24-hour preference and Today deep links. |
+| H02 | Lock Screen widgets | H | ios | 8A | planned | 1 | SHIPPED (Round 22): accessory circular, rectangular, and inline families render the protected current/next snapshot with combined VoiceOver labels and Today deep links. |
 | H03 | Interactive widgets | H | ios | 8A | partial | 0.5 | Read-only next-up and day-strip widgets ship. Complete-from-widget is intentionally withheld until the extension receives a secure authenticated session bridge; the former control could fail remotely while optimistically changing only the cache. |
 | H04 | Live Activities / Dynamic Island | H | ios | 8A | partial | 0.5 | Read-only countdown surfaces ship. Mutation buttons now open the authenticated app until the extension has a secure session bridge. |
 | H05 | Apple Watch app | H | ios | — | deferred | 0 | "watchOS glance = stretch" named deferred in the roadmap (8A) and in the deferred list. |

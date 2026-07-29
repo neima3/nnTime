@@ -1,5 +1,9 @@
 import SwiftUI
 import UIKit
+import WidgetKit
+#if canImport(ActivityKit)
+import ActivityKit
+#endif
 
 @main
 struct KairoApp: App {
@@ -488,6 +492,10 @@ final class AppState {
             installOfflineFixture()
             return
         }
+        if Self.isRound22GlanceFixture {
+            await installRound22GlanceFixture()
+            return
+        }
         if let round21Fixture = Self.round21SyncFixture {
             await installRound21SyncFixture(round21Fixture)
             return
@@ -547,6 +555,134 @@ final class AppState {
     }
 
 #if DEBUG
+    private static var isRound22GlanceFixture: Bool {
+        ProcessInfo.processInfo.arguments.contains(
+            "-kairoRound22GlanceFixture"
+        ) || ProcessInfo.processInfo.environment[
+            "KAIRO_ROUND22_GLANCE_FIXTURE"
+        ] == "1"
+    }
+
+    func installRound22GlanceFixture(
+        forceLiveActivity: Bool = false
+    ) async {
+        let arguments = ProcessInfo.processInfo.arguments
+        let hourCycle: String
+        if let environmentHourCycle = ProcessInfo.processInfo.environment[
+            "KAIRO_ROUND22_HOUR_CYCLE"
+        ], ["h12", "h24"].contains(environmentHourCycle) {
+            hourCycle = environmentHourCycle
+        } else if let index = arguments.firstIndex(
+            of: "-kairoRound22GlanceFixture"
+        ), arguments.indices.contains(index + 1),
+           ["h12", "h24"].contains(arguments[index + 1])
+        {
+            hourCycle = arguments[index + 1]
+        } else {
+            hourCycle = "h24"
+        }
+        KairoPrefs.hourCycle = hourCycle
+        timezone = TimeZone(identifier: "America/New_York") ?? .current
+        let now = Date()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timezone
+        let components = calendar.dateComponents(
+            [.hour, .minute],
+            from: now
+        )
+        let nowMin =
+            (components.hour ?? 0) * 60 + (components.minute ?? 0)
+        let currentStart = max(0, nowMin - 12)
+        let completedStart = max(0, currentStart - 55)
+        let nextStart = min(1_425, nowMin + 42)
+        let scope = "synthetic-round22-glance"
+        let date = KTime.dateString(now, zone: timezone)
+
+        try? DayCache.purge()
+        DayCache.write(
+            scope: scope,
+            date: date,
+            zone: timezone.identifier,
+            blocks: [
+                CachedBlock(
+                    title: "Morning reset",
+                    emoji: "🌤",
+                    startMin: completedStart,
+                    durationMin: 35,
+                    done: true,
+                    category: "butter",
+                    activityId: "round22-complete",
+                    revision: 1
+                ),
+                CachedBlock(
+                    title: "Deep work ritual",
+                    emoji: "🧠",
+                    startMin: currentStart,
+                    durationMin: 45,
+                    done: false,
+                    category: "lilac",
+                    activityId: "round22-current",
+                    revision: 1
+                ),
+                CachedBlock(
+                    title: "Gentle planning",
+                    emoji: "🌿",
+                    startMin: nextStart,
+                    durationMin: 30,
+                    done: false,
+                    category: "mint",
+                    activityId: "round22-next",
+                    revision: 1
+                ),
+            ],
+            hourCycle: KairoPrefs.hourCycle
+        )
+        WidgetCenter.shared.reloadAllTimelines()
+        KairoPrefs.hasOnboarded = true
+        sessionScope = scope
+        offlineReadOnly = true
+        auth = .signedIn
+
+        if forceLiveActivity
+            || arguments.contains("-kairoRound22StartLiveActivity")
+            || ProcessInfo.processInfo.environment[
+                "KAIRO_ROUND22_START_LIVE_ACTIVITY"
+            ] == "1"
+        {
+            await installRound22LiveActivity()
+        }
+    }
+
+    private func installRound22LiveActivity() async {
+#if canImport(ActivityKit)
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+            return
+        }
+        for activity in ActivityKit.Activity<FocusAttributes>.activities {
+            await activity.end(nil, dismissalPolicy: .immediate)
+        }
+        let duration = 25
+        let state = FocusAttributes.ContentState(
+            endDate: Date().addingTimeInterval(
+                TimeInterval(duration * 60)
+            ),
+            paused: false,
+            pausedRemainingSec: duration * 60,
+            overtime: false
+        )
+        let attributes = FocusAttributes(
+            title: "Deep work ritual",
+            emoji: "🧠",
+            targetMin: duration,
+            sessionId: "round22-live-activity"
+        )
+        _ = try? ActivityKit.Activity<FocusAttributes>.request(
+            attributes: attributes,
+            content: ActivityContent(state: state, staleDate: nil)
+        )
+#endif
+    }
+
     private enum Round21SyncFixture: String {
         case today
         case inbox
@@ -611,7 +747,8 @@ final class AppState {
                     revision: 2,
                     occurrenceKey: availableOccurrence
                 ),
-            ]
+            ],
+            hourCycle: KairoPrefs.hourCycle
         )
 
         if resetsFixture || (try? store.read(scope: scope)) == nil {
@@ -797,7 +934,8 @@ final class AppState {
                     activityId: "synthetic-reset",
                     revision: 1
                 ),
-            ]
+            ],
+            hourCycle: KairoPrefs.hourCycle
         )
         sessionScope = scope
         offlineReadOnly = true
@@ -1099,7 +1237,19 @@ struct RootView: View {
             await app.bootstrap()
         }
         .onOpenURL { url in
-            Task { await routeAuthCallback(url) }
+            Task {
+#if DEBUG
+                if url.scheme == "kairo",
+                   url.host == "round22-glance-fixture"
+                {
+                    await app.installRound22GlanceFixture(
+                        forceLiveActivity: true
+                    )
+                    return
+                }
+#endif
+                await routeAuthCallback(url)
+            }
         }
         .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
             guard let url = activity.webpageURL else {

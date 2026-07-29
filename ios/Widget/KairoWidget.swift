@@ -12,12 +12,20 @@ struct NextUpEntry: TimelineEntry {
     /// Full day context for the medium strip.
     let blocks: [CachedBlock]
     let nowMin: Int
+    let hourCycle: String?
 }
 
 struct NextUpProvider: TimelineProvider {
     func placeholder(in context: Context) -> NextUpEntry {
         let sample = CachedBlock(title: "Morning reset", emoji: "🌤", startMin: 480, durationMin: 30, done: false, category: "butter")
-        return NextUpEntry(date: Date(), block: sample, isCurrent: false, blocks: [sample], nowMin: 470)
+        return NextUpEntry(
+            date: Date(),
+            block: sample,
+            isCurrent: false,
+            blocks: [sample],
+            nowMin: 470,
+            hourCycle: "h12"
+        )
     }
 
     func getSnapshot(in context: Context, completion: @escaping (NextUpEntry) -> Void) {
@@ -57,36 +65,26 @@ struct NextUpProvider: TimelineProvider {
         completion(Timeline(entries: entries, policy: .after(now.addingTimeInterval(3600))))
     }
 
-    private func dayKey(_ date: Date, calendar cal: Calendar) -> String {
-        let c = cal.dateComponents([.year, .month, .day], from: date)
-        return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
-    }
-
     private func entry(at date: Date) -> NextUpEntry {
-        guard let snap = DayCache.readLatest(), let zone = TimeZone(identifier: snap.zone) else {
-            return NextUpEntry(date: date, block: nil, isCurrent: false, blocks: [], nowMin: 0)
+        guard let snapshot = DayCache.readLatest() else {
+            return NextUpEntry(
+                date: date,
+                block: nil,
+                isCurrent: false,
+                blocks: [],
+                nowMin: 0,
+                hourCycle: nil
+            )
         }
-        var cal = Calendar(identifier: .gregorian)
-        cal.timeZone = zone
-
-        // T8: a snapshot from another day must not masquerade as today. After
-        // midnight (or days of not opening the app) the cache holds an old
-        // plan — the honest empty state beats confidently-wrong blocks.
-        guard dayKey(date, calendar: cal) == snap.date else {
-            return NextUpEntry(date: date, block: nil, isCurrent: false, blocks: [], nowMin: 0)
-        }
-
-        let comps = cal.dateComponents([.hour, .minute], from: date)
-        let nowMin = (comps.hour ?? 0) * 60 + (comps.minute ?? 0)
-
-        let sorted = snap.blocks.sorted { $0.startMin < $1.startMin }
-        if let current = sorted.first(where: { !$0.done && $0.startMin <= nowMin && nowMin < $0.endMin }) {
-            return NextUpEntry(date: date, block: current, isCurrent: true, blocks: sorted, nowMin: nowMin)
-        }
-        let next = sorted
-            .filter { !$0.done && $0.startMin > nowMin }
-            .min { $0.startMin < $1.startMin }
-        return NextUpEntry(date: date, block: next, isCurrent: false, blocks: sorted, nowMin: nowMin)
+        let state = WidgetSelection.state(snapshot: snapshot, at: date)
+        return NextUpEntry(
+            date: date,
+            block: state.selected,
+            isCurrent: state.isCurrent,
+            blocks: state.blocks,
+            nowMin: state.nowMin,
+            hourCycle: snapshot.hourCycle
+        )
     }
 }
 
@@ -129,7 +127,9 @@ struct NextUpWidgetView: View {
 
     // Large: date header + up to 5 upcoming rows + "+n more".
     private var largeList: some View {
-        let upcoming = entry.blocks.filter { $0.endMin > entry.nowMin }
+        let upcoming = entry.blocks.filter {
+            !$0.done && $0.endMin > entry.nowMin
+        }
         let shown = Array(upcoming.prefix(5))
         let more = upcoming.count - shown.count
         let paper = Color(red: 0.969, green: 0.957, blue: 0.933)
@@ -165,7 +165,7 @@ struct NextUpWidgetView: View {
                             .font(.system(size: 13.5, weight: .semibold, design: .rounded))
                             .lineLimit(1)
                         Spacer()
-                        Text(String(format: "%d:%02d", block.startMin / 60, block.startMin % 60))
+                        Text(clock(block.startMin))
                             .font(.system(size: 12, weight: .semibold, design: .monospaced))
                             .foregroundStyle(softColor)
                         if active {
@@ -182,6 +182,8 @@ struct NextUpWidgetView: View {
         .foregroundStyle(inkColor)
         .containerBackground(paper, for: .widget)
         .widgetURL(URL(string: "kairo://today"))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(dayAccessibilityLabel)
     }
 
     // Lock-screen accessories.
@@ -197,6 +199,12 @@ struct NextUpWidgetView: View {
             Text("◔").font(.system(size: 16, weight: .bold))
         }
         .widgetURL(URL(string: "kairo://today"))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            entry.blocks.isEmpty
+                ? "Today, nothing planned"
+                : "Today, \(done) of \(entry.blocks.count) activities complete"
+        )
     }
 
     private var accessoryRectangular: some View {
@@ -207,7 +215,7 @@ struct NextUpWidgetView: View {
                     Text(entry.isCurrent ? "Now" : "Up next")
                         .font(.system(size: 11, weight: .bold)).textCase(.uppercase)
                     Text(block.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
-                    Text(String(format: "%d:%02d", block.startMin / 60, block.startMin % 60))
+                    Text(clock(block.startMin))
                         .font(.system(size: 11, design: .monospaced))
                 }
             } else {
@@ -215,13 +223,17 @@ struct NextUpWidgetView: View {
             }
         }
         .widgetURL(URL(string: "kairo://today"))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(nextAccessibilityLabel)
     }
 
     private var accessoryInline: some View {
         if let block = entry.block {
-            Text("◔ \(String(format: "%d:%02d", block.startMin / 60, block.startMin % 60)) \(block.title)")
+            Text("◔ \(clock(block.startMin)) \(block.title)")
+                .accessibilityLabel(nextAccessibilityLabel)
         } else {
             Text("◔ Nothing planned")
+                .accessibilityLabel("Today, nothing planned")
         }
     }
 
@@ -260,7 +272,7 @@ struct NextUpWidgetView: View {
                             Text(block.title)
                                 .font(.system(size: 10.5, weight: .bold, design: .rounded))
                                 .lineLimit(1)
-                            Text(String(format: "%d:%02d", block.startMin / 60, block.startMin % 60))
+                            Text(clock(block.startMin))
                                 .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
                                 .opacity(0.7)
                         }
@@ -280,6 +292,8 @@ struct NextUpWidgetView: View {
         .foregroundStyle(inkColor)
         .containerBackground(paper, for: .widget)
         .widgetURL(URL(string: "kairo://today"))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(dayAccessibilityLabel)
     }
 
     private var smallCard: some View {
@@ -326,13 +340,41 @@ struct NextUpWidgetView: View {
             }
         }
         .widgetURL(URL(string: "kairo://today"))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(nextAccessibilityLabel)
     }
 
     private func timeLine(_ block: CachedBlock) -> String {
-        let h = block.startMin / 60, m = block.startMin % 60
-        let start = String(format: "%d:%02d", h, m)
-        if entry.isCurrent { return "until \(String(format: "%d:%02d", block.endMin / 60, block.endMin % 60))" }
-        return start
+        if entry.isCurrent {
+            return "until \(clock(block.endMin))"
+        }
+        return clock(block.startMin)
+    }
+
+    private func clock(_ minutes: Int) -> String {
+        WidgetClock.text(
+            minutes: minutes,
+            hourCycle: entry.hourCycle
+        )
+    }
+
+    private var nextAccessibilityLabel: String {
+        guard let block = entry.block else {
+            return "Today, nothing planned"
+        }
+        let position = entry.isCurrent ? "Now" : "Up next"
+        return "\(position), \(block.title), \(clock(block.startMin)) to \(clock(block.endMin))"
+    }
+
+    private var dayAccessibilityLabel: String {
+        guard !entry.blocks.isEmpty else {
+            return "Today, nothing planned"
+        }
+        let done = entry.blocks.filter(\.done).count
+        if entry.block != nil {
+            return "\(done) of \(entry.blocks.count) activities complete. \(nextAccessibilityLabel)"
+        }
+        return "\(done) of \(entry.blocks.count) activities complete. All done"
     }
 }
 

@@ -5,6 +5,8 @@ type ContractSources = {
   project: string;
   widget: string;
   liveActivity: string;
+  app: string;
+  today: string;
 };
 
 type ContractResult = {
@@ -53,12 +55,56 @@ export function auditGlanceSurfaceContract(
         resolve(root, "ios/Widget/FocusLiveActivity.swift"),
         "utf8",
       ),
+    app:
+      overrides.app ??
+      readFileSync(resolve(root, "ios/App/KairoApp.swift"), "utf8"),
+    today:
+      overrides.today ??
+      readFileSync(
+        resolve(root, "ios/App/Features/Today/TodayView.swift"),
+        "utf8",
+      ),
   };
   const failures: string[] = [];
   const extensionSource = `${sources.widget}\n${sources.liveActivity}`;
 
   for (const [pattern, failure] of forbiddenSourcePatterns) {
     if (pattern.test(extensionSource)) failures.push(failure);
+  }
+  if (/String\s*\(\s*format:\s*"%d:%02d"/.test(sources.widget)) {
+    failures.push("Widget time labels must use the shared clock formatter");
+  }
+  if (!sources.widget.includes("WidgetClock.text(")) {
+    failures.push("Widget families must adopt the shared clock formatter");
+  }
+  if (!sources.widget.includes("WidgetSelection.state(")) {
+    failures.push("Widget provider must adopt shared day selection");
+  }
+  if (!sources.widget.includes(".accessibilityLabel(")) {
+    failures.push("Widget families must provide accessibility labels");
+  }
+  if (!sources.liveActivity.includes(".accessibilityLabel(")) {
+    failures.push("Live Activity must provide accessibility labels");
+  }
+
+  const cacheWriters = `${sources.app}\n${sources.today}`;
+  const cacheWriteCount = (
+    cacheWriters.match(/DayCache\.write\s*\(/g) ?? []
+  ).length;
+  const hourCycleWriteCount = (
+    cacheWriters.match(/hourCycle:\s*KairoPrefs\.hourCycle/g) ?? []
+  ).length;
+  if (cacheWriteCount === 0 || hourCycleWriteCount !== cacheWriteCount) {
+    failures.push("Every app day-cache writer must persist the hour cycle");
+  }
+  if (!sources.app.includes("-kairoRound22GlanceFixture")) {
+    failures.push("Debug app must expose the Round 22 glance fixture");
+  }
+  if (!sources.app.includes("installRound22GlanceFixture")) {
+    failures.push("Round 22 fixture must install a synthetic shared snapshot");
+  }
+  if (!sources.app.includes("-kairoRound22StartLiveActivity")) {
+    failures.push("Round 22 fixture must expose deterministic Live Activity QA");
   }
 
   const widgetTarget = sources.project.match(

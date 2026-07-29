@@ -20,7 +20,8 @@ final class DayCacheTests: XCTestCase {
             scope: "account-a",
             date: "2026-07-29",
             zone: "America/New_York",
-            blocks: [Self.block(title: "Morning reset")]
+            blocks: [Self.block(title: "Morning reset")],
+            hourCycle: "h24"
         )
 
         let snapshot = store.read(
@@ -30,6 +31,37 @@ final class DayCacheTests: XCTestCase {
 
         XCTAssertEqual(snapshot?.scope, "account-a")
         XCTAssertEqual(snapshot?.blocks.map(\.title), ["Morning reset"])
+        XCTAssertEqual(snapshot?.hourCycle, "h24")
+    }
+
+    func testInvalidHourCycleIsNotPersisted() throws {
+        try store.write(
+            scope: "account-a",
+            date: "2026-07-29",
+            zone: "UTC",
+            blocks: [Self.block()],
+            hourCycle: "unexpected"
+        )
+
+        XCTAssertNil(store.readLatest()?.hourCycle)
+    }
+
+    func testExistingVersionTwoSnapshotWithoutHourCycleStillDecodes() throws {
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+        let existing = """
+        {"version":2,"scope":"account-a","date":"2026-07-29","zone":"UTC","blocks":[],"savedAt":0}
+        """
+        try XCTUnwrap(existing.data(using: .utf8)).write(
+            to: store.fileURL
+        )
+
+        let snapshot = store.readLatest()
+
+        XCTAssertEqual(snapshot?.scope, "account-a")
+        XCTAssertNil(snapshot?.hourCycle)
     }
 
     func testWrongScopeIsRejected() throws {
@@ -178,7 +210,8 @@ final class DayCacheTests: XCTestCase {
             date: "2026-07-29",
             zone: "UTC",
             blocks: [Self.block()],
-            savedAt: Date(timeIntervalSince1970: 100)
+            savedAt: Date(timeIntervalSince1970: 100),
+            hourCycle: "h24"
         )
         try store.write(original)
 
@@ -202,6 +235,7 @@ final class DayCacheTests: XCTestCase {
         )
 
         XCTAssertEqual(store.readLatest()?.blocks, original.blocks)
+        XCTAssertEqual(store.readLatest()?.hourCycle, "h24")
     }
 
     func testStatusUpdateRefusesMissingOrAmbiguousOccurrence() throws {
