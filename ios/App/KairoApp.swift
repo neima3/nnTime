@@ -182,13 +182,23 @@ final class AppState {
     @discardableResult
     func enqueueTaskCreate(
         title: String,
-        bucket: String
+        bucket: String,
+        scope expectedScope: String? = nil
     ) async throws -> NativeSyncMutation {
+        guard let scope = expectedScope ?? sessionScope,
+              sessionScope == scope
+        else {
+            throw NativeSyncCoordinatorError.inactiveScope
+        }
         let mutation = try await syncCoordinator.enqueueTaskCreate(
             title: title,
-            bucket: bucket
+            bucket: bucket,
+            scope: scope
         )
-        await refreshSyncPresentationForCurrentScope()
+        guard sessionScope == scope else {
+            throw NativeSyncCoordinatorError.inactiveScope
+        }
+        await refreshSyncPresentation(scope: scope)
         return mutation
     }
 
@@ -230,9 +240,22 @@ final class AppState {
             }
         } catch {
             guard sessionScope == scope else { return }
-            if AppSessionFailure.classify(error) == .unauthorized {
-                await handleSessionInvalidation()
+            let underlyingError: Error
+            if let partial = error as? NativeSyncPartialFailure {
+                underlyingError = partial.underlying
+                await refreshSyncPresentation(scope: scope)
+                if partial.refreshRequired {
+                    NotificationCenter.default.post(
+                        name: .kairoSyncCompleted,
+                        object: nil
+                    )
+                }
             } else {
+                underlyingError = error
+            }
+            if AppSessionFailure.classify(underlyingError) == .unauthorized {
+                await handleSessionInvalidation()
+            } else if !(error is NativeSyncPartialFailure) {
                 await refreshSyncPresentation(scope: scope)
             }
         }
@@ -904,7 +927,7 @@ struct MainTabs: View {
                 TodayView()
                     .tabItem { Label("Today", systemImage: "calendar.day.timeline.left") }
                     .tag(0)
-                InboxView(isOnline: net.isOnline)
+                InboxView(connectivity: net.status)
                     .tabItem { Label("Inbox", systemImage: "tray") }
                     .tag(1)
                 WeekView()
@@ -938,13 +961,13 @@ struct MainTabs: View {
                 .presentationDetents([.large])
             }
 
-            if !net.isOnline {
+            if net.isOffline {
                 HStack(spacing: 7) {
                     Image(systemName: "wifi.slash").font(.system(size: 12, weight: .semibold))
                     Text(
                         app.offlineReadOnly
-                            ? "Offline — showing a saved, read-only day."
-                            : "Offline — reconnect to refresh your day."
+                            ? "Offline — showing your saved planner. Safe changes sync automatically."
+                            : "Offline — saved changes sync automatically when you reconnect."
                     )
                         .font(.kBody(12, weight: .semibold))
                         .lineLimit(2)
@@ -956,9 +979,15 @@ struct MainTabs: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: net.isOnline)
-        .onChange(of: net.isOnline) { wasOnline, isOnline in
-            guard NetworkMonitor.didReconnect(from: wasOnline, to: isOnline)
+        .animation(
+            .spring(response: 0.4, dampingFraction: 0.85),
+            value: net.status
+        )
+        .onChange(of: net.status) { oldStatus, newStatus in
+            guard NetworkMonitor.didReconnect(
+                from: oldStatus,
+                to: newStatus
+            )
             else { return }
             Task { await app.synchronize() }
         }

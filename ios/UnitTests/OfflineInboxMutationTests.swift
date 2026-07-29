@@ -11,6 +11,7 @@ final class OfflineInboxMutationTests: XCTestCase {
 
         let outcome = await model.submit(
             isOnline: false,
+            isCurrent: { true },
             createOnline: { _ in
                 onlineCalls += 1
                 return makeInboxTask(title: "Unexpected")
@@ -30,6 +31,7 @@ final class OfflineInboxMutationTests: XCTestCase {
 
         let outcome = await model.submit(
             isOnline: false,
+            isCurrent: { true },
             createOnline: { _ in makeInboxTask(title: "Unexpected") },
             enqueueOffline: { title in
                 XCTAssertEqual(title, "Call the dentist")
@@ -50,6 +52,7 @@ final class OfflineInboxMutationTests: XCTestCase {
 
         let outcome = await model.submit(
             isOnline: false,
+            isCurrent: { true },
             createOnline: { _ in makeInboxTask(title: "Unexpected") },
             enqueueOffline: { _ in throw InboxTestError.storeUnavailable }
         )
@@ -69,6 +72,7 @@ final class OfflineInboxMutationTests: XCTestCase {
         let first = Task {
             await model.submit(
                 isOnline: false,
+                isCurrent: { true },
                 createOnline: { _ in makeInboxTask(title: "Unexpected") },
                 enqueueOffline: { _ in await gate.wait() }
             )
@@ -78,6 +82,7 @@ final class OfflineInboxMutationTests: XCTestCase {
 
         let duplicate = await model.submit(
             isOnline: false,
+            isCurrent: { true },
             createOnline: { _ in makeInboxTask(title: "Unexpected") },
             enqueueOffline: { _ in XCTFail("duplicate enqueue") }
         )
@@ -97,9 +102,10 @@ final class OfflineInboxMutationTests: XCTestCase {
         let submission = Task {
             await model.submit(
                 isOnline: true,
+                isCurrent: { true },
                 createOnline: { title in
                     XCTAssertEqual(title, "First thought")
-                    await gate.wait()
+                    _ = await gate.wait()
                     return makeInboxTask(title: title)
                 },
                 enqueueOffline: { _ in XCTFail("offline enqueue") }
@@ -123,6 +129,7 @@ final class OfflineInboxMutationTests: XCTestCase {
 
         let outcome = await model.submit(
             isOnline: true,
+            isCurrent: { true },
             createOnline: { _ in
                 throw APIError.unauthorized(
                     401,
@@ -152,6 +159,7 @@ final class OfflineInboxMutationTests: XCTestCase {
         data.adoptCreated(created)
 
         await data.load(
+            isCurrent: { true },
             fetch: { throw InboxTestError.storeUnavailable },
             onUnauthorized: {}
         )
@@ -166,6 +174,7 @@ final class OfflineInboxMutationTests: XCTestCase {
         var invalidated = false
 
         await data.load(
+            isCurrent: { true },
             fetch: {
                 throw APIError.unauthorized(
                     401,
@@ -189,8 +198,9 @@ final class OfflineInboxMutationTests: XCTestCase {
         let gate = InboxTaskFetchGate()
         let stale = Task {
             await data.load(
+                isCurrent: { true },
                 fetch: {
-                    await gate.wait()
+                    _ = await gate.wait()
                     return [makeInboxTask(title: "Stale")]
                 },
                 onUnauthorized: {}
@@ -203,6 +213,215 @@ final class OfflineInboxMutationTests: XCTestCase {
         await stale.value
 
         XCTAssertEqual(data.items.map(\.title), ["New"])
+    }
+
+    func testAccountSwitchBeforeOnlineCreateReturnsPreservesDraft() async {
+        let model = InboxCaptureSubmissionModel(draft: "Account A thought")
+        let gate = InboxSubmissionGate()
+        var isCurrent = true
+
+        let submission = Task {
+            await model.submit(
+                isOnline: true,
+                isCurrent: { isCurrent },
+                createOnline: { title in
+                    await gate.wait()
+                    return makeInboxTask(title: title)
+                },
+                enqueueOffline: { _ in XCTFail("offline enqueue") }
+            )
+        }
+        await gate.waitUntilEntered()
+        isCurrent = false
+        await gate.release()
+
+        let outcome = await submission.value
+        XCTAssertNil(outcome)
+        XCTAssertEqual(model.draft, "Account A thought")
+        XCTAssertNil(model.errorMessage)
+    }
+
+    func testAccountSwitchBeforeOfflineEnqueueReturnsPreservesDraft() async {
+        let model = InboxCaptureSubmissionModel(draft: "Account A offline")
+        let gate = InboxSubmissionGate()
+        var isCurrent = true
+
+        let submission = Task {
+            await model.submit(
+                isOnline: false,
+                isCurrent: { isCurrent },
+                createOnline: { _ in makeInboxTask(title: "Unexpected") },
+                enqueueOffline: { _ in await gate.wait() }
+            )
+        }
+        await gate.waitUntilEntered()
+        isCurrent = false
+        await gate.release()
+
+        let outcome = await submission.value
+        XCTAssertNil(outcome)
+        XCTAssertEqual(model.draft, "Account A offline")
+        XCTAssertNil(model.errorMessage)
+    }
+
+    func testStaleOnline401CannotInvalidateNewAccount() async {
+        let model = InboxCaptureSubmissionModel(draft: "Account A")
+        let gate = InboxSubmissionGate()
+        var isCurrent = true
+        var invalidated = false
+
+        let submission = Task {
+            await model.submit(
+                isOnline: true,
+                isCurrent: { isCurrent },
+                createOnline: { _ in
+                    await gate.wait()
+                    throw APIError.unauthorized(
+                        401,
+                        .init(
+                            code: "UNAUTHORIZED",
+                            message: "Expired",
+                            retryable: false,
+                            details: nil
+                        )
+                    )
+                },
+                enqueueOffline: { _ in XCTFail("offline enqueue") },
+                onFailure: { _ in invalidated = true }
+            )
+        }
+        await gate.waitUntilEntered()
+        isCurrent = false
+        await gate.release()
+
+        let outcome = await submission.value
+        XCTAssertNil(outcome)
+        XCTAssertFalse(invalidated)
+        XCTAssertNil(model.errorMessage)
+    }
+
+    func testCancelledSubmissionDoesNotClearDraftOrShowFailure() async {
+        let model = InboxCaptureSubmissionModel(draft: "Keep after cancel")
+        let gate = InboxSubmissionGate()
+
+        let submission = Task {
+            await model.submit(
+                isOnline: true,
+                isCurrent: { true },
+                createOnline: { _ in
+                    await gate.wait()
+                    try Task.checkCancellation()
+                    return makeInboxTask(title: "Unexpected")
+                },
+                enqueueOffline: { _ in XCTFail("offline enqueue") }
+            )
+        }
+        await gate.waitUntilEntered()
+        submission.cancel()
+        await gate.release()
+
+        let outcome = await submission.value
+        XCTAssertNil(outcome)
+        XCTAssertEqual(model.draft, "Keep after cancel")
+        XCTAssertNil(model.errorMessage)
+    }
+
+    func testStaleLoad401CannotInvalidateNewAccount() async {
+        let data = InboxDataModel()
+        let gate = InboxSubmissionGate()
+        var isCurrent = true
+        var invalidated = false
+
+        let load = Task {
+            await data.load(
+                isCurrent: { isCurrent },
+                fetch: {
+                    await gate.wait()
+                    throw APIError.unauthorized(
+                        401,
+                        .init(
+                            code: "UNAUTHORIZED",
+                            message: "Expired",
+                            retryable: false,
+                            details: nil
+                        )
+                    )
+                },
+                onUnauthorized: { invalidated = true }
+            )
+        }
+        await gate.waitUntilEntered()
+        isCurrent = false
+        await gate.release()
+        await load.value
+
+        XCTAssertFalse(invalidated)
+    }
+
+    func testDeleteSnapshotsRowsBeforeAwaitAndRemovesByCapturedID() async {
+        let data = InboxDataModel()
+        data.adoptCreated(makeInboxTask(id: "task-a", title: "A"))
+        data.adoptCreated(makeInboxTask(id: "task-b", title: "B"))
+        let gate = InboxSubmissionGate()
+        var deletedIDs: [String] = []
+        let selected = data.deletionSnapshot(
+            for: IndexSet(integer: 1)
+        )
+
+        let deletion = Task {
+            await data.delete(
+                items: selected,
+                isCurrent: { true },
+                delete: { item in
+                    deletedIDs.append(item.id)
+                    await gate.wait()
+                },
+                onUnauthorized: {}
+            )
+        }
+        await gate.waitUntilEntered()
+        await data.load(
+            isCurrent: { true },
+            fetch: { [makeInboxTask(id: "task-b", title: "B refreshed")] },
+            onUnauthorized: {}
+        )
+        await gate.release()
+        await deletion.value
+
+        XCTAssertEqual(deletedIDs, ["task-a"])
+        XCTAssertEqual(data.items.map(\.id), ["task-b"])
+        XCTAssertEqual(data.items.map(\.title), ["B refreshed"])
+    }
+
+    func testAccountSwitchDuringDeleteDoesNotMutateNewAccountRows() async {
+        let data = InboxDataModel()
+        data.adoptCreated(makeInboxTask(id: "task-a", title: "A"))
+        let gate = InboxSubmissionGate()
+        var isCurrent = true
+        let selected = data.deletionSnapshot(
+            for: IndexSet(integer: 0)
+        )
+
+        let deletion = Task {
+            await data.delete(
+                items: selected,
+                isCurrent: { isCurrent },
+                delete: { _ in await gate.wait() },
+                onUnauthorized: {}
+            )
+        }
+        await gate.waitUntilEntered()
+        isCurrent = false
+        data.reset()
+        await data.load(
+            isCurrent: { true },
+            fetch: { [makeInboxTask(id: "task-b", title: "B")] },
+            onUnauthorized: {}
+        )
+        await gate.release()
+        await deletion.value
+
+        XCTAssertEqual(data.items.map(\.id), ["task-b"])
     }
 
     func testSameScopeRelaunchPublishesTypedPendingCapture() async throws {
@@ -270,6 +489,28 @@ final class OfflineInboxMutationTests: XCTestCase {
                 $0.mutationID == first.id
             }
         )
+    }
+
+    func testExpectedScopeEnqueueCannotLandInSwitchedAccount() async throws {
+        let directory = temporaryDirectory()
+        let coordinator = NativeSyncCoordinator(
+            store: NativeSyncStore(directory: directory),
+            transport: InboxSyncTransport()
+        )
+        try await coordinator.activate(scope: "account-a")
+        try await coordinator.activate(scope: "account-b")
+
+        do {
+            _ = try await coordinator.enqueueTaskCreate(
+                title: "Belongs to A",
+                bucket: "inbox",
+                scope: "account-a"
+            )
+            XCTFail("Expected stale scope rejection")
+        } catch NativeSyncCoordinatorError.inactiveScope {}
+
+        let current = try await coordinator.snapshot(scope: "account-b")
+        XCTAssertTrue(current.pendingTaskCreates.isEmpty)
     }
 
     private func temporaryDirectory() -> URL {
@@ -395,13 +636,16 @@ private actor InboxSyncTransport: NativeSyncTransport {
     }
 }
 
-private func makeInboxTask(title: String) -> TaskItem {
+private func makeInboxTask(
+    id: String = "task-1",
+    title: String
+) -> TaskItem {
     try! JSONDecoder().decode(
         TaskItem.self,
         from: Data(
             """
             {
-              "id": "task-1",
+              "id": "\(id)",
               "title": "\(title)",
               "emoji": null,
               "bucket": "inbox",

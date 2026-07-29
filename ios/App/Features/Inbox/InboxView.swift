@@ -12,6 +12,7 @@ final class InboxCaptureSubmissionModel {
     var draft: String
     private(set) var isSaving = false
     private(set) var errorMessage: String?
+    private var activeOperationID: UUID?
 
     init(draft: String = "") {
         self.draft = draft
@@ -19,6 +20,7 @@ final class InboxCaptureSubmissionModel {
 
     func submit(
         isOnline: Bool,
+        isCurrent: () -> Bool,
         createOnline: (String) async throws -> TaskItem,
         enqueueOffline: (String) async throws -> Void,
         onFailure: (Error) async -> Void = { _ in }
@@ -27,11 +29,20 @@ final class InboxCaptureSubmissionModel {
         let title = originalDraft.trimmingCharacters(
             in: .whitespacesAndNewlines
         )
-        guard !title.isEmpty, !isSaving else { return nil }
+        guard
+            !title.isEmpty,
+            !isSaving,
+            !Task.isCancelled,
+            isCurrent()
+        else {
+            return nil
+        }
 
+        let operationID = UUID()
+        activeOperationID = operationID
         isSaving = true
         errorMessage = nil
-        defer { isSaving = false }
+        defer { finish(operationID) }
         do {
             let outcome: Outcome
             if isOnline {
@@ -40,16 +51,49 @@ final class InboxCaptureSubmissionModel {
                 try await enqueueOffline(title)
                 outcome = .queued
             }
+            guard
+                !Task.isCancelled,
+                activeOperationID == operationID,
+                isCurrent()
+            else {
+                return nil
+            }
             if draft == originalDraft {
                 draft = ""
             }
             return outcome
         } catch {
+            guard
+                !Task.isCancelled,
+                activeOperationID == operationID,
+                isCurrent()
+            else {
+                return nil
+            }
             await onFailure(error)
+            guard
+                !Task.isCancelled,
+                activeOperationID == operationID,
+                isCurrent()
+            else {
+                return nil
+            }
             errorMessage =
                 "Couldn’t save that thought yet. It’s still here so you can try again."
             return nil
         }
+    }
+
+    func invalidateOperation() {
+        activeOperationID = nil
+        isSaving = false
+        errorMessage = nil
+    }
+
+    private func finish(_ operationID: UUID) {
+        guard activeOperationID == operationID else { return }
+        activeOperationID = nil
+        isSaving = false
     }
 }
 
@@ -72,33 +116,86 @@ final class InboxDataModel {
     }
 
     func load(
+        isCurrent: () -> Bool,
         fetch: () async throws -> [TaskItem],
         onUnauthorized: () async -> Void
     ) async {
+        guard !Task.isCancelled, isCurrent() else { return }
         loadGeneration += 1
         let generation = loadGeneration
         do {
             let loaded = try await fetch()
-            guard generation == loadGeneration else { return }
+            guard
+                generation == loadGeneration,
+                !Task.isCancelled,
+                isCurrent()
+            else {
+                return
+            }
             items = loaded
         } catch {
-            guard generation == loadGeneration else { return }
+            guard
+                generation == loadGeneration,
+                !Task.isCancelled,
+                isCurrent()
+            else {
+                return
+            }
             if AppSessionFailure.classify(error) == .unauthorized {
                 await onUnauthorized()
             }
         }
-        if generation == loadGeneration {
+        if generation == loadGeneration, isCurrent() {
             loading = false
         }
+    }
+
+    func deletionSnapshot(for indexSet: IndexSet) -> [TaskItem] {
+        let snapshot = items
+        return indexSet.compactMap { index in
+            snapshot.indices.contains(index) ? snapshot[index] : nil
+        }
+    }
+
+    func delete(
+        items selected: [TaskItem],
+        isCurrent: () -> Bool,
+        delete: (TaskItem) async throws -> Void,
+        onUnauthorized: () async -> Void
+    ) async {
+        guard isCurrent() else { return }
+        let selectedIDs = Set(selected.map(\.id))
+
+        for item in selected {
+            guard !Task.isCancelled, isCurrent() else { return }
+            do {
+                try await delete(item)
+            } catch {
+                guard !Task.isCancelled, isCurrent() else { return }
+                if AppSessionFailure.classify(error) == .unauthorized {
+                    await onUnauthorized()
+                }
+                return
+            }
+        }
+        guard !Task.isCancelled, isCurrent() else { return }
+        remove(ids: selectedIDs)
+    }
+
+    func reset() {
+        loadGeneration += 1
+        items = []
+        loading = true
     }
 }
 
 struct InboxView: View {
     @Environment(AppState.self) private var app
-    let isOnline: Bool
+    let connectivity: NetworkMonitor.Status
 
     @State private var data = InboxDataModel()
     @State private var capture = InboxCaptureSubmissionModel()
+    @State private var submissionTask: Task<Void, Never>?
     @State private var scheduling: TaskItem?
     @State private var tending = false
     @FocusState private var composing: Bool
@@ -209,9 +306,7 @@ struct InboxView: View {
                                                 .tint(.kIris)
                                             }
                                     }
-                                    .onDelete { indexSet in
-                                        Task { await delete(indexSet) }
-                                    }
+                                    .onDelete(perform: beginDelete)
                                 } header: {
                                     if !pendingItems.isEmpty {
                                         Text("Inbox")
@@ -240,7 +335,7 @@ struct InboxView: View {
             .toolbarBackground(Color.kCanvas, for: .navigationBar)
             .sheet(isPresented: $tending, onDismiss: { Task { await load() } }) {
                 TendSheet(items: agedItems, onSchedule: { scheduling = $0; tending = false },
-                          onDelete: { item in Task { try? await KairoAPI.shared.deleteTask(id: item.id, revision: item.revision); await load() } })
+                          onDelete: { item in beginDelete(items: [item]) })
             }
             .sheet(item: $scheduling) { item in
                 EditorSheet(
@@ -248,10 +343,7 @@ struct InboxView: View {
                     startMin: nextQuarterHour(),
                     initialTitle: item.title,
                     onCreated: {
-                        Task {
-                            try? await KairoAPI.shared.deleteTask(id: item.id, revision: item.revision)
-                            await load()
-                        }
+                        beginDelete(items: [item])
                     }
                 )
             }
@@ -261,6 +353,20 @@ struct InboxView: View {
             NotificationCenter.default.publisher(for: .kairoSyncCompleted)
         ) { _ in
             Task { await load() }
+        }
+        .onChange(of: app.sessionScope) {
+            submissionTask?.cancel()
+            submissionTask = nil
+            capture.invalidateOperation()
+            data.reset()
+            scheduling = nil
+            tending = false
+            Task { await load() }
+        }
+        .onDisappear {
+            submissionTask?.cancel()
+            submissionTask = nil
+            capture.invalidateOperation()
         }
     }
 
@@ -276,11 +382,10 @@ struct InboxView: View {
                 )
                     .font(.kBody(15, weight: .medium))
                     .focused($composing)
-                    .disabled(capture.isSaving)
-                    .onSubmit { Task { await add() } }
+                    .onSubmit { beginAdd() }
                 if !capture.draft.isEmpty {
                     Button {
-                        Task { await add() }
+                        beginAdd()
                     } label: {
                         if capture.isSaving {
                             ProgressView()
@@ -392,7 +497,9 @@ struct InboxView: View {
     }
 
     private func load() async {
+        guard let scope = app.sessionScope else { return }
         await data.load(
+            isCurrent: { app.sessionScope == scope },
             fetch: { try await KairoAPI.shared.tasks(bucket: "inbox") },
             onUnauthorized: { await app.handleSessionInvalidation() }
         )
@@ -403,9 +510,11 @@ struct InboxView: View {
         await load()
     }
 
-    private func add() async {
+    private func add(scope: String) async {
+        guard !Task.isCancelled, app.sessionScope == scope else { return }
         let outcome = await capture.submit(
-            isOnline: isOnline,
+            isOnline: connectivity == .online,
+            isCurrent: { app.sessionScope == scope },
             createOnline: { title in
                 try await KairoAPI.shared.createTask(
                     title: title,
@@ -415,7 +524,8 @@ struct InboxView: View {
             enqueueOffline: { title in
                 _ = try await app.enqueueTaskCreate(
                     title: title,
-                    bucket: "inbox"
+                    bucket: "inbox",
+                    scope: scope
                 )
             },
             onFailure: { error in
@@ -424,7 +534,7 @@ struct InboxView: View {
                 }
             }
         )
-        guard let outcome else { return }
+        guard let outcome, app.sessionScope == scope else { return }
         switch outcome {
         case let .created(created):
             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
@@ -439,15 +549,40 @@ struct InboxView: View {
         }
     }
 
-    private func delete(_ indexSet: IndexSet) async {
-        for index in indexSet {
-            let item = data.items[index]
-            try? await KairoAPI.shared.deleteTask(id: item.id, revision: item.revision)
-        }
-        let deletedIDs = Set(indexSet.map { data.items[$0].id })
-        withAnimation {
-            data.remove(ids: deletedIDs)
-        }
+    private func beginAdd() {
+        guard !capture.isSaving, let scope = app.sessionScope else { return }
+        submissionTask?.cancel()
+        submissionTask = Task { await add(scope: scope) }
+    }
+
+    private func beginDelete(_ indexSet: IndexSet) {
+        guard let scope = app.sessionScope else { return }
+        let selected = data.deletionSnapshot(for: indexSet)
+        beginDelete(items: selected, scope: scope)
+    }
+
+    private func beginDelete(items: [TaskItem]) {
+        guard let scope = app.sessionScope else { return }
+        beginDelete(items: items, scope: scope)
+    }
+
+    private func beginDelete(items: [TaskItem], scope: String) {
+        Task { await delete(items: items, scope: scope) }
+    }
+
+    private func delete(items: [TaskItem], scope: String) async {
+        guard !Task.isCancelled, app.sessionScope == scope else { return }
+        await data.delete(
+            items: items,
+            isCurrent: { app.sessionScope == scope },
+            delete: { item in
+                try await KairoAPI.shared.deleteTask(
+                    id: item.id,
+                    revision: item.revision
+                )
+            },
+            onUnauthorized: { await app.handleSessionInvalidation() }
+        )
     }
 }
 

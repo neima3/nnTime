@@ -28,6 +28,11 @@ struct NativeSyncSynchronizationResult: Equatable, Sendable {
     var refreshRequired: Bool
 }
 
+struct NativeSyncPartialFailure: Error {
+    let underlying: Error
+    let refreshRequired: Bool
+}
+
 enum NativeSyncCoordinatorError: Error, Equatable {
     case inactiveScope
     case invalidOccurrenceKey
@@ -127,9 +132,15 @@ actor NativeSyncCoordinator {
     @discardableResult
     func enqueueTaskCreate(
         title: String,
-        bucket: String
+        bucket: String,
+        scope expectedScope: String? = nil
     ) throws -> NativeSyncMutation {
-        let scope = try requiredActiveScope()
+        let scope: String
+        if let expectedScope {
+            scope = try requiredActiveScope(matching: expectedScope)
+        } else {
+            scope = try requiredActiveScope()
+        }
         var document = try document(for: scope)
         let mutation = NativeSyncMutation(
             id: uuidProvider(),
@@ -282,18 +293,34 @@ actor NativeSyncCoordinator {
             }
         }
 
-        let feedAdvanced = try await drainChanges(scope: scope)
-        try markSuccessfulSync(scope: scope)
-        let didChangePresentation = try presentationChanged(
-            from: initialPresentationDocument,
-            scope: scope
-        )
-        return .init(
-            refreshRequired:
-                replaySucceeded
-                    || feedAdvanced
-                    || didChangePresentation
-        )
+        do {
+            let feedAdvanced = try await drainChanges(scope: scope)
+            try markSuccessfulSync(scope: scope)
+            let didChangePresentation = try presentationChanged(
+                from: initialPresentationDocument,
+                scope: scope
+            )
+            return .init(
+                refreshRequired:
+                    replaySucceeded
+                        || feedAdvanced
+                        || didChangePresentation
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            let didChangePresentation = try presentationChanged(
+                from: initialPresentationDocument,
+                scope: scope
+            )
+            let refreshRequired =
+                replaySucceeded || didChangePresentation
+            guard refreshRequired else { throw error }
+            throw NativeSyncPartialFailure(
+                underlying: error,
+                refreshRequired: true
+            )
+        }
     }
 
     private func presentationChanged(

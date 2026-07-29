@@ -618,6 +618,33 @@ final class NativeSyncCoordinatorTests: XCTestCase {
         XCTAssertEqual(try store.read(scope: "account-a")?.cursor, "first")
     }
 
+    func testReplaySuccessWrapsLaterFeedFailureWithRefreshRequirement() async throws {
+        let (coordinator, _, _) = try makeCoordinator(
+            taskOutcomes: [.success],
+            changeOutcomes: [.network]
+        )
+        try await coordinator.activate(scope: "account-a")
+        _ = try await coordinator.enqueueTaskCreate(
+            title: "Accepted",
+            bucket: "inbox"
+        )
+
+        do {
+            _ = try await coordinator.synchronize(scope: "account-a")
+            XCTFail("Expected partial synchronization failure")
+        } catch let failure as NativeSyncPartialFailure {
+            XCTAssertTrue(failure.refreshRequired)
+            guard let apiError = failure.underlying as? APIError,
+                  case .network = apiError
+            else {
+                return XCTFail("Expected underlying network error")
+            }
+        }
+
+        let snapshot = try await coordinator.snapshot(scope: "account-a")
+        XCTAssertEqual(snapshot.pendingCount, 0)
+    }
+
     func testConcurrentSynchronizationJoinsOneInFlightReplay() async throws {
         let (coordinator, _, transport) = try makeCoordinator(suspendTaskCreate: true)
         try await coordinator.activate(scope: "account-a")

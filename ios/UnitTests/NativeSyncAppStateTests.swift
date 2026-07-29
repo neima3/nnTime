@@ -180,6 +180,53 @@ final class NativeSyncAppStateTests: XCTestCase {
         XCTAssertEqual(notificationCount, 1)
     }
 
+    func testReplaySuccessStillPublishesCompletionWhenChangesFeedFails() async throws {
+        let transport = AppStateSyncTransport(changeOutcomes: [.network])
+        let (app, _) = try makeApp(transport: transport)
+        app.auth = .signedIn
+        app.sessionScope = "account-a"
+        try await app.activateSync(scope: "account-a")
+        _ = try await app.enqueueTaskCreate(
+            title: "Accepted before feed failure",
+            bucket: "inbox"
+        )
+        var notificationCount = 0
+        let observer = NotificationCenter.default.addObserver(
+            forName: .kairoSyncCompleted,
+            object: nil,
+            queue: nil
+        ) { _ in
+            notificationCount += 1
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+
+        await app.synchronize()
+
+        XCTAssertEqual(app.pendingSyncCount, 0)
+        XCTAssertTrue(app.pendingTaskCreates.isEmpty)
+        XCTAssertEqual(notificationCount, 1)
+        XCTAssertEqual(app.auth, .signedIn)
+    }
+
+    func testReplaySuccessThenChanges401StillUsesFullInvalidation() async throws {
+        let transport = AppStateSyncTransport(changeOutcomes: [.http(401)])
+        let (app, coordinator) = try makeApp(transport: transport)
+        app.auth = .signedIn
+        app.sessionScope = "account-a"
+        try await app.activateSync(scope: "account-a")
+        _ = try await app.enqueueTaskCreate(
+            title: "Accepted before auth failure",
+            bucket: "inbox"
+        )
+
+        await app.synchronize()
+
+        XCTAssertEqual(app.auth, .signedOut)
+        XCTAssertNil(app.sessionScope)
+        XCTAssertEqual(app.pendingSyncCount, 0)
+        await assertInactive(coordinator, scope: "account-a")
+    }
+
     func testCursorOnlyAdvancementPostsCompletionNotification() async throws {
         let transport = AppStateSyncTransport(
             changesPages: [
@@ -246,10 +293,29 @@ final class NativeSyncAppStateTests: XCTestCase {
     }
 
     func testReconnectTransitionOnlyTriggersForOfflineToOnline() {
-        XCTAssertFalse(NetworkMonitor.didReconnect(from: true, to: true))
-        XCTAssertFalse(NetworkMonitor.didReconnect(from: true, to: false))
-        XCTAssertFalse(NetworkMonitor.didReconnect(from: false, to: false))
-        XCTAssertTrue(NetworkMonitor.didReconnect(from: false, to: true))
+        XCTAssertFalse(
+            NetworkMonitor.didReconnect(from: .unknown, to: .online)
+        )
+        XCTAssertFalse(
+            NetworkMonitor.didReconnect(from: .online, to: .online)
+        )
+        XCTAssertFalse(
+            NetworkMonitor.didReconnect(from: .online, to: .offline)
+        )
+        XCTAssertFalse(
+            NetworkMonitor.didReconnect(from: .offline, to: .offline)
+        )
+        XCTAssertTrue(
+            NetworkMonitor.didReconnect(from: .offline, to: .online)
+        )
+    }
+
+    func testNetworkMonitorStartsUnresolvedWithoutOfflineBanner() {
+        let monitor = NetworkMonitor(startMonitoring: false)
+
+        XCTAssertEqual(monitor.status, .unknown)
+        XCTAssertFalse(monitor.isOnline)
+        XCTAssertFalse(monitor.isOffline)
     }
 
     func testForegroundSyncPolicyIsIndependentFromHealthKitSetting() {
@@ -389,7 +455,7 @@ final class NativeSyncAppStateTests: XCTestCase {
         if AppState.shouldSynchronize(for: .active) {
             await app.synchronize()
         }
-        if NetworkMonitor.didReconnect(from: false, to: true) {
+        if NetworkMonitor.didReconnect(from: .offline, to: .online) {
             await app.synchronize()
         }
 
