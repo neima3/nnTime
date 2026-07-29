@@ -260,10 +260,10 @@ export function AuthForm({
                       src="/brand/google-g.png"
                       alt=""
                       aria-hidden="true"
-                      width={200}
-                      height={204}
+                      width={40}
+                      height={40}
                       unoptimized
-                      className="h-[18px] w-auto shrink-0"
+                      className="size-7 shrink-0"
                     />
                     Continue with Google
                   </>

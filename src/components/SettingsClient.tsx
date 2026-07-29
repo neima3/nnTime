@@ -358,7 +358,11 @@ function applyTheme(theme: Settings["theme"]) {
   try { localStorage.setItem("kairo-theme", theme); } catch {}
 }
 
-export function SettingsClient() {
+export function SettingsClient({
+  initialLinkError = null,
+}: {
+  initialLinkError?: string | null;
+}) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [authed, setAuthed] = useState(true);
@@ -370,7 +374,7 @@ export function SettingsClient() {
   const [methodsLoadError, setMethodsLoadError] = useState<string | null>(null);
   const [methodsReloadKey, setMethodsReloadKey] = useState(0);
   const [linkingGoogle, setLinkingGoogle] = useState(false);
-  const [linkError, setLinkError] = useState<string | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(initialLinkError);
   const googleLinkLock = useRef(false);
 
   useEffect(() => {

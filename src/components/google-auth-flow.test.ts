@@ -76,7 +76,7 @@ describe("Google authentication web flow", () => {
     },
   );
 
-  it("uses the unmodified standard multicolor Google G branding asset", () => {
+  it("uses Google’s unmodified white-backed light square brand asset", () => {
     const asset = readFileSync(
       resolve(process.cwd(), "public/brand/google-g.png"),
     );
@@ -85,8 +85,17 @@ describe("Google authentication web flow", () => {
       Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
     );
     expect(createHash("sha256").update(asset).digest("hex")).toBe(
-      "d1ce9c2af0b10a7333abc99bc706f9a6a199e5b65bf3e3009624f076b8638e6a",
+      "33f5ab7c3d6b6af7c8cdd3e917e4475d9a2ffd407a7667a68747140b290bdeb8",
     );
+    const authFormSource = readFileSync(
+      resolve(process.cwd(), "src/components/AuthForm.tsx"),
+      "utf8",
+    );
+    expect(authFormSource).toContain('src="/brand/google-g.png"');
+    expect(authFormSource).toContain("width={40}");
+    expect(authFormSource).toContain("height={40}");
+    expect(authFormSource).not.toContain("bg-white");
+    expect(authFormSource).not.toContain("bg-surface-raised");
   });
 
   it("starts same-origin Google sign-in once and exposes pending state", async () => {
