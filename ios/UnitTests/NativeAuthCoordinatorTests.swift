@@ -18,6 +18,7 @@ final class NativeAuthCoordinatorTests: XCTestCase {
             },
             prepareForAccountSwitch: { _ in
                 await recorder.append("purge")
+                return true
             },
             bootstrap: {
                 await recorder.append("bootstrap")
@@ -49,6 +50,7 @@ final class NativeAuthCoordinatorTests: XCTestCase {
             },
             prepareForAccountSwitch: { scope in
                 await recorder.append("purge:\(scope)")
+                return true
             },
             bootstrap: {
                 await recorder.append("bootstrap")
@@ -76,6 +78,7 @@ final class NativeAuthCoordinatorTests: XCTestCase {
             },
             prepareForAccountSwitch: { _ in
                 await recorder.append("purge")
+                return true
             },
             bootstrap: {
                 await recorder.append("bootstrap")
@@ -99,7 +102,7 @@ final class NativeAuthCoordinatorTests: XCTestCase {
                 await recorder.append("redeem")
                 return .init(scope: "scope-a", replacedScope: nil)
             },
-            prepareForAccountSwitch: { _ in },
+            prepareForAccountSwitch: { _ in true },
             bootstrap: {}
         )
         let second = await coordinator.handle(
@@ -109,7 +112,7 @@ final class NativeAuthCoordinatorTests: XCTestCase {
                 await recorder.append("duplicate-redeem")
                 return .init(scope: "scope-a", replacedScope: nil)
             },
-            prepareForAccountSwitch: { _ in },
+            prepareForAccountSwitch: { _ in true },
             bootstrap: {}
         )
 
@@ -128,7 +131,7 @@ final class NativeAuthCoordinatorTests: XCTestCase {
             redeem: { _ in
                 throw APIError.authHTTP(400, "This link has expired.")
             },
-            prepareForAccountSwitch: { _ in },
+            prepareForAccountSwitch: { _ in true },
             bootstrap: {}
         )
 
@@ -152,6 +155,7 @@ final class NativeAuthCoordinatorTests: XCTestCase {
             },
             prepareForAccountSwitch: { scope in
                 await recorder.append("purge:\(scope)")
+                return true
             },
             bootstrap: {
                 await recorder.append("bootstrap")
@@ -163,6 +167,32 @@ final class NativeAuthCoordinatorTests: XCTestCase {
             values,
             ["redeem", "purge:scope-b", "bootstrap"]
         )
+    }
+
+    func testAccountSwitchPreparationFailureDoesNotBootstrapNewScope() async {
+        let coordinator = NativeAuthCoordinator()
+        let recorder = CoordinatorRecorder()
+
+        let outcome = await coordinator.handle(
+            URL(string: "kairo://auth?token=storage-failure")!,
+            currentScope: "scope-a",
+            redeem: { _ in
+                await recorder.append("redeem")
+                return .init(scope: "scope-b", replacedScope: "scope-a")
+            },
+            prepareForAccountSwitch: { scope in
+                await recorder.append("purge:\(scope)")
+                return false
+            },
+            bootstrap: {
+                await recorder.append("bootstrap")
+            }
+        )
+
+        let values = await recorder.values
+        XCTAssertEqual(outcome, .completed)
+        XCTAssertEqual(coordinator.phase, .idle)
+        XCTAssertEqual(values, ["redeem", "purge:scope-b"])
     }
 }
 

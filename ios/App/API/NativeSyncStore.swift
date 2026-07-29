@@ -78,6 +78,14 @@ struct NativeSyncStore {
         guard fileManager.fileExists(atPath: fileURL.path) else {
             return
         }
+        var isDirectory: ObjCBool = false
+        _ = fileManager.fileExists(
+            atPath: fileURL.path,
+            isDirectory: &isDirectory
+        )
+        guard !isDirectory.boolValue else {
+            throw StoreError.invalidDocument
+        }
         try fileManager.removeItem(at: fileURL)
     }
 }

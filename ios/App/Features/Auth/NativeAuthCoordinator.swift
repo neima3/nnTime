@@ -40,7 +40,7 @@ final class NativeAuthCoordinator {
         currentScope: String?,
         redeem: (String) async throws
             -> NativeSessionController.PersistResult,
-        prepareForAccountSwitch: (String) async -> Void,
+        prepareForAccountSwitch: (String) async -> Bool,
         bootstrap: () async -> Void
     ) async -> Outcome {
         guard let callback = AuthCallback.parse(url) else {
@@ -64,7 +64,11 @@ final class NativeAuthCoordinator {
             if session.replacedScope != nil
                 || currentScope.map({ $0 != session.scope }) == true
             {
-                await prepareForAccountSwitch(session.scope)
+                guard await prepareForAccountSwitch(session.scope) else {
+                    completedCallbacks.insert(callbackKey)
+                    phase = .idle
+                    return .completed
+                }
             }
             await bootstrap()
             completedCallbacks.insert(callbackKey)

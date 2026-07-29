@@ -51,17 +51,30 @@ final class AppState {
     var theme: KairoPrefs.Theme = KairoPrefs.theme
     var reducedStimulation: Bool = KairoPrefs.reducedStimulation
     private let syncCoordinator: NativeSyncCoordinator
+    private let signOutAction: @Sendable () async -> Void
+    private let invalidateSessionAction: @Sendable () async -> Void
 
     var pendingSyncCount = 0
     var syncConflicts: [NativeSyncConflict] = []
     var isSyncing = false
     var lastSuccessfulSyncAt: Date?
+    var syncStorageUnavailable = false
 
-    init(syncCoordinator: NativeSyncCoordinator? = nil) {
+    init(
+        syncCoordinator: NativeSyncCoordinator? = nil,
+        signOutAction: @escaping @Sendable () async -> Void = {
+            await KairoAPI.shared.signOut()
+        },
+        invalidateSessionAction: @escaping @Sendable () async -> Void = {
+            await KairoAPI.shared.invalidateSession()
+        }
+    ) {
         self.syncCoordinator = syncCoordinator ?? NativeSyncCoordinator(
             store: NativeSyncStore(),
             transport: KairoAPI.shared
         )
+        self.signOutAction = signOutAction
+        self.invalidateSessionAction = invalidateSessionAction
     }
 
     // MARK: Accessibility modes (I1)
@@ -152,13 +165,10 @@ final class AppState {
     var categoryIdByKey: [String: String] = [:]
     private var authGeneration = 0
 
-    func activateSync(scope: String) async {
-        do {
-            try await syncCoordinator.activate(scope: scope)
-            await refreshSyncPresentation(scope: scope)
-        } catch {
-            clearSyncPresentation()
-        }
+    func activateSync(scope: String) async throws {
+        try await syncCoordinator.activate(scope: scope)
+        try await publishSyncPresentation(scope: scope)
+        syncStorageUnavailable = false
     }
 
     @discardableResult
@@ -226,29 +236,34 @@ final class AppState {
         }
     }
 
-    func purgeSyncState() async {
-        _ = try? await syncCoordinator.purge()
+    func purgeSyncState() async throws {
+        try await syncCoordinator.purge()
         clearSyncPresentation()
+        syncStorageUnavailable = false
     }
 
     static func shouldSynchronize(for phase: ScenePhase) -> Bool {
         phase == .active
     }
 
-    private func refreshSyncPresentation(scope: String) async {
-        guard let snapshot = try? await syncCoordinator.snapshot(scope: scope)
-        else {
-            clearSyncPresentation()
-            return
-        }
+    private func publishSyncPresentation(scope: String) async throws {
+        let snapshot = try await syncCoordinator.snapshot(scope: scope)
         pendingSyncCount = snapshot.pendingCount
         syncConflicts = snapshot.conflicts
         lastSuccessfulSyncAt = snapshot.lastSuccessfulSyncAt
     }
 
+    private func refreshSyncPresentation(scope: String) async {
+        do {
+            try await publishSyncPresentation(scope: scope)
+            syncStorageUnavailable = false
+        } catch {
+            syncStorageUnavailable = true
+        }
+    }
+
     private func refreshSyncPresentationForCurrentScope() async {
         guard let sessionScope else {
-            clearSyncPresentation()
             return
         }
         await refreshSyncPresentation(scope: sessionScope)
@@ -259,6 +274,11 @@ final class AppState {
         syncConflicts = []
         isSyncing = false
         lastSuccessfulSyncAt = nil
+    }
+
+    private func enterSyncStorageFailure() {
+        syncStorageUnavailable = true
+        auth = .connectionRequired
     }
 
     func bootstrap() async {
@@ -312,14 +332,20 @@ final class AppState {
             adopt(settings)
             await loadCategories()
             guard generation == authGeneration else { return }
-            sessionScope = restoredScope
-            offlineReadOnly = false
-            auth = .signedIn
             if let restoredScope {
-                await activateSync(scope: restoredScope)
+                sessionScope = restoredScope
+                offlineReadOnly = false
+                do {
+                    try await activateSync(scope: restoredScope)
+                } catch {
+                    enterSyncStorageFailure()
+                    return
+                }
+                auth = .signedIn
                 await synchronize()
             } else {
                 clearSyncPresentation()
+                auth = .connectionRequired
             }
         } catch {
             guard generation == authGeneration else { return }
@@ -394,12 +420,18 @@ final class AppState {
         case let .signedInOnline(scope):
             sessionScope = scope
             offlineReadOnly = false
-            auth = .signedIn
             if let scope {
-                await activateSync(scope: scope)
+                do {
+                    try await activateSync(scope: scope)
+                } catch {
+                    enterSyncStorageFailure()
+                    return
+                }
+                auth = .signedIn
                 await synchronize()
             } else {
                 clearSyncPresentation()
+                auth = .connectionRequired
             }
         case let .signedInOffline(scope):
             sessionScope = scope
@@ -409,18 +441,31 @@ final class AppState {
             {
                 timezone = zone
             }
+            do {
+                try await activateSync(scope: scope)
+            } catch {
+                enterSyncStorageFailure()
+                return
+            }
             auth = .signedIn
-            await activateSync(scope: scope)
             await synchronize()
         case .signedOut:
-            await purgeLocalState()
-            auth = .signedOut
+            do {
+                try await purgeLocalState()
+                auth = .signedOut
+            } catch {
+                enterSyncStorageFailure()
+            }
         case let .connectionRequired(scope):
             sessionScope = scope
             offlineReadOnly = false
             auth = .connectionRequired
             if let scope {
-                await activateSync(scope: scope)
+                do {
+                    try await activateSync(scope: scope)
+                } catch {
+                    syncStorageUnavailable = true
+                }
             } else {
                 clearSyncPresentation()
             }
@@ -480,37 +525,57 @@ final class AppState {
 
     func signOut() async {
         authGeneration += 1
-        await KairoAPI.shared.signOut()
-        await purgeLocalState()
-        auth = .signedOut
+        await signOutAction()
+        do {
+            try await purgeLocalState()
+            auth = .signedOut
+        } catch {
+            enterSyncStorageFailure()
+        }
     }
 
     func handleSessionInvalidation() async {
         authGeneration += 1
-        await KairoAPI.shared.invalidateSession()
-        await purgeLocalState()
-        auth = .signedOut
+        await invalidateSessionAction()
+        do {
+            try await purgeLocalState()
+            auth = .signedOut
+        } catch {
+            enterSyncStorageFailure()
+        }
     }
 
-    func prepareForAccountSwitch(newScope: String) async {
+    @discardableResult
+    func prepareForAccountSwitch(newScope: String) async -> Bool {
         authGeneration += 1
-        await purgeLocalState()
-        sessionScope = newScope
+        do {
+            try await purgeLocalState()
+            sessionScope = newScope
+            return true
+        } catch {
+            enterSyncStorageFailure()
+            return false
+        }
     }
 
     func beginAuthCallback() {
         authGeneration += 1
     }
 
-    func finishAuthCallbackFailure() {
+    func finishAuthCallbackFailure() async {
         guard case .signedIn = auth else {
-            auth = .signedOut
+            do {
+                try await purgeLocalState()
+                auth = .signedOut
+            } catch {
+                enterSyncStorageFailure()
+            }
             return
         }
     }
 
-    private func purgeLocalState() async {
-        await purgeSyncState()
+    private func purgeLocalState() async throws {
+        try await purgeSyncState()
         DayCache.clear()
         URLCache.shared.removeAllCachedResponses()
         await NotificationManager.cancelActivityReminders()
@@ -653,7 +718,7 @@ struct RootView: View {
             }
         )
         if outcome == .failed {
-            app.finishAuthCallbackFailure()
+            await app.finishAuthCallbackFailure()
         }
     }
 
@@ -750,7 +815,9 @@ private struct ConnectionRequiredView: View {
                         .font(.kDisplay(24, relativeTo: .title))
                         .foregroundStyle(Color.kInk)
                     Text(
-                        "We couldn't safely restore this planner yet. Reconnect and try again—your account has not been signed out."
+                        app.syncStorageUnavailable
+                            ? "Kairo couldn't access protected on-device sync storage. Reconnect and try again before changing accounts."
+                            : "We couldn't safely restore this planner yet. Reconnect and try again—your account has not been signed out."
                     )
                     .font(.kBody(14.5))
                     .foregroundStyle(Color.kInkSoft)

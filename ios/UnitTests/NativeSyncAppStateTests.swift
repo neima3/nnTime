@@ -26,7 +26,7 @@ final class NativeSyncAppStateTests: XCTestCase {
             )
         )
 
-        await app.activateSync(scope: "account-a")
+        try await app.activateSync(scope: "account-a")
 
         XCTAssertEqual(app.pendingSyncCount, 1)
         XCTAssertTrue(app.syncConflicts.isEmpty)
@@ -36,7 +36,7 @@ final class NativeSyncAppStateTests: XCTestCase {
     func testLogoutPurgesCoordinatorAndPresentation() async throws {
         let (app, coordinator) = try makeApp()
         app.sessionScope = "account-a"
-        await app.activateSync(scope: "account-a")
+        try await app.activateSync(scope: "account-a")
         _ = try await app.enqueueTaskCreate(title: "Remove me", bucket: "inbox")
 
         await app.handleSessionInvalidation()
@@ -51,7 +51,7 @@ final class NativeSyncAppStateTests: XCTestCase {
     func testAccountSwitchPurgesOldCoordinatorPresentation() async throws {
         let (app, coordinator) = try makeApp()
         app.sessionScope = "account-a"
-        await app.activateSync(scope: "account-a")
+        try await app.activateSync(scope: "account-a")
         _ = try await app.enqueueTaskCreate(title: "Old account", bucket: "inbox")
 
         await app.prepareForAccountSwitch(newScope: "account-b")
@@ -67,7 +67,7 @@ final class NativeSyncAppStateTests: XCTestCase {
         let (app, coordinator) = try makeApp(transport: transport)
         app.auth = .signedIn
         app.sessionScope = "account-a"
-        await app.activateSync(scope: "account-a")
+        try await app.activateSync(scope: "account-a")
         _ = try await app.enqueueTaskCreate(title: "Expired", bucket: "inbox")
 
         await app.synchronize()
@@ -82,7 +82,7 @@ final class NativeSyncAppStateTests: XCTestCase {
         let transport = AppStateSyncTransport(taskOutcomes: [.http(422)])
         let (app, _) = try makeApp(transport: transport)
         app.sessionScope = "account-a"
-        await app.activateSync(scope: "account-a")
+        try await app.activateSync(scope: "account-a")
         _ = try await app.enqueueTaskCreate(title: "Conflict", bucket: "inbox")
 
         await app.synchronize()
@@ -96,7 +96,7 @@ final class NativeSyncAppStateTests: XCTestCase {
         let transport = AppStateSyncTransport(changeOutcomes: [.network])
         let (app, _) = try makeApp(transport: transport)
         app.sessionScope = "account-a"
-        await app.activateSync(scope: "account-a")
+        try await app.activateSync(scope: "account-a")
 
         await app.synchronize()
 
@@ -108,7 +108,7 @@ final class NativeSyncAppStateTests: XCTestCase {
     func testCompletionNotificationPostsOnlyWhenSynchronizationNeedsRefresh() async throws {
         let (app, _) = try makeApp()
         app.sessionScope = "account-a"
-        await app.activateSync(scope: "account-a")
+        try await app.activateSync(scope: "account-a")
         var notificationCount = 0
         let observer = NotificationCenter.default.addObserver(
             forName: .kairoSyncCompleted,
@@ -132,7 +132,7 @@ final class NativeSyncAppStateTests: XCTestCase {
         let transport = AppStateSyncTransport(suspendChanges: true)
         let (app, _) = try makeApp(transport: transport)
         app.sessionScope = "account-a"
-        await app.activateSync(scope: "account-a")
+        try await app.activateSync(scope: "account-a")
         _ = try await app.enqueueTaskCreate(title: "One refresh", bucket: "inbox")
         var notificationCount = 0
         let observer = NotificationCenter.default.addObserver(
@@ -166,6 +166,142 @@ final class NativeSyncAppStateTests: XCTestCase {
         XCTAssertFalse(AppState.shouldSynchronize(for: .background))
     }
 
+    func testActivationWriteFailureDoesNotClearExistingPresentation() async throws {
+        let parentFile = FileManager.default.temporaryDirectory.appending(
+            path: "KairoNativeSyncActivationWriteFailure-\(UUID())"
+        )
+        addTeardownBlock { try? FileManager.default.removeItem(at: parentFile) }
+        try Data().write(to: parentFile)
+        let app = AppState(
+            syncCoordinator: NativeSyncCoordinator(
+                store: NativeSyncStore(directory: parentFile),
+                transport: AppStateSyncTransport()
+            ),
+            signOutAction: {},
+            invalidateSessionAction: {}
+        )
+        app.sessionScope = "account-a"
+        app.pendingSyncCount = 3
+
+        do {
+            try await app.activateSync(scope: "account-a")
+            XCTFail("Expected protected sync-store activation to fail")
+        } catch {}
+
+        XCTAssertEqual(app.sessionScope, "account-a")
+        XCTAssertEqual(app.pendingSyncCount, 3)
+        XCTAssertFalse(app.syncStorageUnavailable)
+    }
+
+    func testActivationReadFailureDoesNotClearExistingPresentation() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(
+            path: "KairoNativeSyncActivationReadFailure-\(UUID())"
+        )
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let store = NativeSyncStore(directory: directory)
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+        try Data("not json".utf8).write(to: store.fileURL)
+        let app = AppState(
+            syncCoordinator: NativeSyncCoordinator(
+                store: store,
+                transport: AppStateSyncTransport()
+            ),
+            signOutAction: {},
+            invalidateSessionAction: {}
+        )
+        app.sessionScope = "account-a"
+        app.pendingSyncCount = 2
+
+        do {
+            try await app.activateSync(scope: "account-a")
+            XCTFail("Expected corrupt protected sync store to fail activation")
+        } catch {}
+
+        XCTAssertEqual(app.sessionScope, "account-a")
+        XCTAssertEqual(app.pendingSyncCount, 2)
+        XCTAssertFalse(app.syncStorageUnavailable)
+    }
+
+    func testSignOutPurgeFailureKeepsOldScopeAndPresentation() async throws {
+        let (app, _) = try await makePurgeFailureApp()
+
+        await app.signOut()
+
+        XCTAssertEqual(app.auth, .connectionRequired)
+        XCTAssertEqual(app.sessionScope, "account-a")
+        XCTAssertEqual(app.pendingSyncCount, 1)
+        XCTAssertTrue(app.syncStorageUnavailable)
+    }
+
+    func testStructured401PurgeFailureKeepsOldScopeAndPresentation() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(
+            path: "KairoNativeSync401PurgeFailure-\(UUID())"
+        )
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let store = NativeSyncStore(directory: directory)
+        let fileURL = store.fileURL
+        let transport = AppStateSyncTransport(
+            taskOutcomes: [.http(401)],
+            beforeTaskOutcome: {
+                try? FileManager.default.removeItem(at: fileURL)
+                try? FileManager.default.createDirectory(
+                    at: fileURL,
+                    withIntermediateDirectories: false
+                )
+                try? Data("blocker".utf8).write(
+                    to: fileURL.appending(path: "child")
+                )
+            }
+        )
+        let coordinator = NativeSyncCoordinator(store: store, transport: transport)
+        let app = AppState(
+            syncCoordinator: coordinator,
+            signOutAction: {},
+            invalidateSessionAction: {}
+        )
+        app.auth = .signedIn
+        app.sessionScope = "account-a"
+        try await app.activateSync(scope: "account-a")
+        _ = try await app.enqueueTaskCreate(title: "Keep me", bucket: "inbox")
+
+        await app.synchronize()
+
+        XCTAssertEqual(app.auth, .connectionRequired)
+        XCTAssertEqual(app.sessionScope, "account-a")
+        XCTAssertEqual(app.pendingSyncCount, 1)
+        XCTAssertTrue(app.syncStorageUnavailable)
+    }
+
+    func testAccountSwitchPurgeFailureDoesNotExposeNewScope() async throws {
+        let (app, coordinator) = try await makePurgeFailureApp()
+
+        await app.prepareForAccountSwitch(newScope: "account-b")
+
+        XCTAssertEqual(app.auth, .connectionRequired)
+        XCTAssertEqual(app.sessionScope, "account-a")
+        XCTAssertEqual(app.pendingSyncCount, 1)
+        XCTAssertTrue(app.syncStorageUnavailable)
+        await assertInactive(coordinator, scope: "account-b")
+    }
+
+    func testSuccessfulSignOutPurgesCoordinatorAndPresentation() async throws {
+        let (app, coordinator) = try makeApp()
+        app.sessionScope = "account-a"
+        try await app.activateSync(scope: "account-a")
+        _ = try await app.enqueueTaskCreate(title: "Remove me", bucket: "inbox")
+
+        await app.signOut()
+
+        XCTAssertEqual(app.auth, .signedOut)
+        XCTAssertNil(app.sessionScope)
+        XCTAssertEqual(app.pendingSyncCount, 0)
+        XCTAssertFalse(app.syncStorageUnavailable)
+        await assertInactive(coordinator, scope: "account-a")
+    }
+
     private func makeApp(
         transport: AppStateSyncTransport = AppStateSyncTransport()
     ) throws -> (AppState, NativeSyncCoordinator) {
@@ -177,7 +313,41 @@ final class NativeSyncAppStateTests: XCTestCase {
             store: NativeSyncStore(directory: directory),
             transport: transport
         )
-        return (AppState(syncCoordinator: coordinator), coordinator)
+        return (
+            AppState(
+                syncCoordinator: coordinator,
+                signOutAction: {},
+                invalidateSessionAction: {}
+            ),
+            coordinator
+        )
+    }
+
+    private func makePurgeFailureApp(
+        transport: AppStateSyncTransport = AppStateSyncTransport()
+    ) async throws -> (AppState, NativeSyncCoordinator) {
+        let directory = FileManager.default.temporaryDirectory.appending(
+            path: "KairoNativeSyncPurgeFailureAppStateTests-\(UUID())"
+        )
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let store = NativeSyncStore(directory: directory)
+        let coordinator = NativeSyncCoordinator(store: store, transport: transport)
+        let app = AppState(
+            syncCoordinator: coordinator,
+            signOutAction: {},
+            invalidateSessionAction: {}
+        )
+        app.auth = .signedIn
+        app.sessionScope = "account-a"
+        try await app.activateSync(scope: "account-a")
+        _ = try await app.enqueueTaskCreate(title: "Keep me", bucket: "inbox")
+        try FileManager.default.removeItem(at: store.fileURL)
+        try FileManager.default.createDirectory(
+            at: store.fileURL,
+            withIntermediateDirectories: false
+        )
+        try Data("blocker".utf8).write(to: store.fileURL.appending(path: "child"))
+        return (app, coordinator)
     }
 
     private func assertInactive(
@@ -194,6 +364,7 @@ final class NativeSyncAppStateTests: XCTestCase {
 private actor AppStateSyncTransport: NativeSyncTransport {
     private let taskOutcomes: [AppStateTransportOutcome]
     private let changeOutcomes: [AppStateTransportOutcome]
+    private let beforeTaskOutcome: @Sendable () -> Void
     private var nextTaskOutcome = 0
     private var nextChangeOutcome = 0
     private var suspendChanges = false
@@ -204,11 +375,13 @@ private actor AppStateSyncTransport: NativeSyncTransport {
     init(
         taskOutcomes: [AppStateTransportOutcome] = [],
         changeOutcomes: [AppStateTransportOutcome] = [],
-        suspendChanges: Bool = false
+        suspendChanges: Bool = false,
+        beforeTaskOutcome: @escaping @Sendable () -> Void = {}
     ) {
         self.taskOutcomes = taskOutcomes
         self.changeOutcomes = changeOutcomes
         self.suspendChanges = suspendChanges
+        self.beforeTaskOutcome = beforeTaskOutcome
     }
 
     func createTask(
@@ -219,6 +392,7 @@ private actor AppStateSyncTransport: NativeSyncTransport {
         if taskOutcomes.indices.contains(nextTaskOutcome) {
             let outcome = taskOutcomes[nextTaskOutcome]
             nextTaskOutcome += 1
+            beforeTaskOutcome()
             try outcome.resolve()
         }
         return .init(
