@@ -31,6 +31,13 @@ production-looking placeholder notification flow that wrote duplicate
   latest failure, and recovery from the ledger. Error storage redacts arbitrary
   credential URLs, quoted JSON secrets, authorization values, tokens, API keys,
   passwords, and email addresses.
+- **Cross-process migration safety.** The merged production build exposed nine
+  independent Next workers racing migration `0009`; seventeen workers logged a
+  duplicate `__migrations` primary-key failure even though the build exited
+  zero. The runner now holds a PostgreSQL advisory lock across its check, apply,
+  and record boundary. An eight-runner live-Postgres regression passes, and a
+  fresh-database production build applied migrations `0000`–`0009` exactly once
+  each with zero migration failures.
 - **Independent adversarial review.** Successive reviews found stale-owner
   fencing, batch-clock, recurrence, privacy, offset, retry-summary, pruning,
   sanitizer, in-flight lease, review-reschedule, sound/toggle, unbounded fan-out,
@@ -39,8 +46,8 @@ production-looking placeholder notification flow that wrote duplicate
   Critical or Important findings. Its only Minor note—the subscription ceiling
   was covered sequentially—was closed by registering twelve endpoints
   concurrently while asserting that only ten remain live.
-- **Local release proof.** ESLint, TypeScript, production build, and **82 files /
-  860 Vitest tests** passed after the final bounded-fan-out follow-up. OpenAPI
+- **Local release proof.** ESLint, TypeScript, production build, and **83 files /
+  861 Vitest tests** passed after the final migration-lock follow-up. OpenAPI
   sync and generated iOS adoption passed at **17 operations / 30 shipping Swift
   files**. The full production-mode Playwright suite passed **12/12** on a fresh
   migrated PostgreSQL database, including both offline replay flows.

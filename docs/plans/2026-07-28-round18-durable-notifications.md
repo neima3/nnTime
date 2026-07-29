@@ -842,7 +842,7 @@ every completed task in this plan. The remaining order is:
 2. native widget/App Group auth and conditional mutation;
 3. web email verification/revoke-all;
 4. Next.js/action/dependency remediation;
-5. migration-runner transaction/lock hardening;
+5. migration-runner per-file transaction hardening;
 6. calendar subscription reconciliation.
 
 - [x] **Step 6: Run final precommit verification and commit**

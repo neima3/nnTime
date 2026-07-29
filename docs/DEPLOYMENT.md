@@ -118,6 +118,11 @@ The Dockerfile does NOT run migrations (forward-only migrations run via
 - Migrations are forward-only, numbered (`drizzle/0000_initial.sql`, …).
 - Regenerate after schema changes: `pnpm db:generate`.
 - Apply to a DB: `pnpm db:migrate` (uses `DATABASE_URL`).
+- The in-process startup runner holds a database-scoped advisory lock while it
+  checks, applies, and records migrations. This is required because Next build
+  workers and horizontally scaled app processes do not share the module-level
+  promise. `migrate-on-startup.integration.test.ts` exercises eight concurrent
+  runners against one PostgreSQL database.
 - **Predeploy backup before EVERY production migration** (SEC-07): run the
   backup procedure below before applying any migration to prod. No exceptions.
 - **Breaking schema changes use expand/migrate/contract** across two deploys:
