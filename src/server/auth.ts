@@ -10,6 +10,17 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import db from "./db";
 import * as authSchema from "./auth-schema";
 import { sendEmail } from "./email";
+import {
+  accountSecurityOptions,
+  createAppleProviderOptions,
+  getAppleAuthConfig,
+  getTrustedOrigins,
+} from "./auth-capabilities";
+
+const appleConfig = getAppleAuthConfig(process.env);
+const appleProvider = appleConfig
+  ? await createAppleProviderOptions(appleConfig)
+  : null;
 
 async function deliverAuthEmail(
   kind: string,
@@ -43,13 +54,8 @@ export const auth = betterAuth({
     (process.env.NODE_ENV === "production"
       ? "https://time.neima.me"
       : "http://localhost:3000"),
-  trustedOrigins: [
-    process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
-    "http://localhost:3000",
-    "http://localhost:3456",
-    "https://time.neima.me",
-    "https://time-staging.neima.me",
-  ].filter(Boolean),
+  trustedOrigins: getTrustedOrigins(process.env),
+  socialProviders: appleProvider ? { apple: appleProvider } : undefined,
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
@@ -92,6 +98,7 @@ export const auth = betterAuth({
       maxAge: 5 * 60,
     },
   },
+  account: accountSecurityOptions,
   advanced: {
     crossSubDomainCookies: { enabled: false },
     defaultCookieAttributes: {
