@@ -54,6 +54,7 @@ struct NativeSyncConflict: Codable, Equatable, Sendable {
     var operation: Operation
     var reason: Reason? = nil
     var recordedAt: Date
+    var retryMutation: NativeSyncMutation? = nil
 }
 
 struct NativeSyncChangeEntry: Equatable, Sendable {

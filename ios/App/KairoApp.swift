@@ -66,6 +66,7 @@ final class AppState {
     var syncReplayConfirmationGeneration = 0
     var syncStorageUnavailable = false
     private var syncSuspendedForAuthTransition = false
+    private var retryingSyncConflictIDs: Set<UUID> = []
 
     init(
         syncCoordinator: NativeSyncCoordinator? = nil,
@@ -281,6 +282,49 @@ final class AppState {
         }
     }
 
+    func retrySyncConflict(id: UUID) async {
+        guard case .signedIn = auth else { return }
+        guard !syncStorageUnavailable, !syncSuspendedForAuthTransition else {
+            return
+        }
+        guard
+            let scope = sessionScope,
+            syncConflicts.contains(where: { $0.id == id }),
+            retryingSyncConflictIDs.insert(id).inserted
+        else {
+            return
+        }
+        defer { retryingSyncConflictIDs.remove(id) }
+
+        do {
+            let result = try await syncCoordinator.retryConflict(
+                scope: scope,
+                id: id
+            )
+            guard sessionScope == scope else { return }
+            await refreshSyncPresentation(scope: scope)
+            guard
+                sessionScope == scope,
+                !syncConflicts.contains(where: { $0.id == id })
+            else {
+                return
+            }
+            lastReplayedOperations = [result.operation]
+            syncReplayConfirmationGeneration += 1
+            NotificationCenter.default.post(
+                name: .kairoSyncCompleted,
+                object: nil
+            )
+        } catch {
+            guard sessionScope == scope else { return }
+            if AppSessionFailure.classify(error) == .unauthorized {
+                await handleSessionInvalidation()
+            } else {
+                await refreshSyncPresentation(scope: scope)
+            }
+        }
+    }
+
     func purgeSyncState() async throws {
         try await syncCoordinator.purge()
         clearSyncPresentation()
@@ -339,6 +383,7 @@ final class AppState {
         isSyncing = false
         lastSuccessfulSyncAt = nil
         lastReplayedOperations = []
+        retryingSyncConflictIDs = []
     }
 
     private var pendingOperationMap:

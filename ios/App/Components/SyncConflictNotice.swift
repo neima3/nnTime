@@ -55,12 +55,13 @@ final class SyncConflictNoticeModel {
     private(set) var isRetrying = false
 
     func retry(
-        synchronize: (Bool) async -> Void
+        conflictID: UUID,
+        retry: (UUID) async -> Void
     ) async {
         guard !isRetrying else { return }
         isRetrying = true
         defer { isRetrying = false }
-        await synchronize(true)
+        await retry(conflictID)
     }
 
     func dismiss(
@@ -113,7 +114,7 @@ struct SyncReplayConfirmationPresentation: Equatable {
 
 struct SyncConflictNotice: View {
     let presentation: SyncConflictPresentation
-    let onRetry: (Bool) async -> Void
+    let onRetry: (UUID) async -> Void
     let onDismiss: (UUID) async -> Void
 
     @State private var model = SyncConflictNoticeModel()
@@ -153,7 +154,10 @@ struct SyncConflictNotice: View {
             HStack(spacing: 8) {
                 Button {
                     Task {
-                        await model.retry(synchronize: onRetry)
+                        await model.retry(
+                            conflictID: presentation.id,
+                            retry: onRetry
+                        )
                     }
                 } label: {
                     HStack(spacing: 7) {
@@ -278,10 +282,8 @@ struct SyncStatusNotices: View {
                     if let conflict {
                         SyncConflictNotice(
                             presentation: conflict,
-                            onRetry: { explicitRetry in
-                                await app.synchronize(
-                                    explicitRetry: explicitRetry
-                                )
+                            onRetry: { id in
+                                await app.retrySyncConflict(id: id)
                             },
                             onDismiss: { id in
                                 await app.acknowledgeSyncConflict(id: id)

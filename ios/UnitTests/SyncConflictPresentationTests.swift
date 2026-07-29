@@ -106,16 +106,17 @@ final class SyncConflictPresentationTests: XCTestCase {
         }
     }
 
-    func testRetryRunsExplicitSynchronizationWithoutAcknowledgingConflict() async {
+    func testRetryTargetsExactConflictWithoutAcknowledgingIt() async {
         let model = SyncConflictNoticeModel()
         let recorder = SyncConflictActionRecorder()
+        let conflictID = UUID()
 
-        await model.retry { explicit in
-            await recorder.recordRetry(explicit: explicit)
+        await model.retry(conflictID: conflictID) { id in
+            await recorder.recordRetry(id)
         }
 
         let values = await recorder.values
-        XCTAssertEqual(values.retryFlags, [true])
+        XCTAssertEqual(values.retriedIDs, [conflictID])
         XCTAssertEqual(values.acknowledgedIDs, [])
         XCTAssertFalse(model.isRetrying)
     }
@@ -130,7 +131,7 @@ final class SyncConflictPresentationTests: XCTestCase {
         }
 
         let values = await recorder.values
-        XCTAssertEqual(values.retryFlags, [])
+        XCTAssertEqual(values.retriedIDs, [])
         XCTAssertEqual(values.acknowledgedIDs, [conflictID])
     }
 
@@ -195,15 +196,7 @@ final class SyncConflictPresentationTests: XCTestCase {
     func testTerminalConflictSurvivesRetryUntilExactDismiss() async throws {
         let (app, _) = try makeApp(
             transport: SyncConflictPresentationTransport(
-                createError: APIError.http(
-                    422,
-                    .init(
-                        code: "VALIDATION_ERROR",
-                        message: "raw server response",
-                        retryable: false,
-                        details: nil
-                    )
-                )
+                createStatuses: [422, 422]
             )
         )
         app.auth = .signedIn
@@ -218,12 +211,126 @@ final class SyncConflictPresentationTests: XCTestCase {
         let conflict = try XCTUnwrap(app.syncConflicts.first)
         XCTAssertEqual(app.syncReplayConfirmationGeneration, 0)
 
-        await app.synchronize(explicitRetry: true)
+        await app.retrySyncConflict(id: conflict.id)
         XCTAssertEqual(app.syncConflicts, [conflict])
         XCTAssertEqual(app.syncReplayConfirmationGeneration, 0)
 
         await app.acknowledgeSyncConflict(id: conflict.id)
         XCTAssertTrue(app.syncConflicts.isEmpty)
+    }
+
+    func testTargetedRetryReusesIdempotencyAndRemovesExactConflictOnSuccess()
+        async throws
+    {
+        let transport = SyncConflictPresentationTransport(
+            createStatuses: [422, nil]
+        )
+        let (app, _) = try makeApp(transport: transport)
+        app.auth = .signedIn
+        app.sessionScope = "account-a"
+        try await app.activateSync(scope: "account-a")
+        _ = try await app.enqueueTaskCreate(
+            title: "Synthetic retry",
+            bucket: "inbox"
+        )
+
+        await app.synchronize()
+        let conflict = try XCTUnwrap(app.syncConflicts.first)
+        await app.retrySyncConflict(id: conflict.id)
+
+        XCTAssertTrue(app.syncConflicts.isEmpty)
+        XCTAssertEqual(app.syncReplayConfirmationGeneration, 1)
+        XCTAssertEqual(app.lastReplayedOperations, [.taskCreate])
+        let events = await transport.createEvents
+        XCTAssertEqual(events.count, 2)
+        XCTAssertEqual(events[0].idempotencyKey, events[1].idempotencyKey)
+        XCTAssertEqual(events[0].title, "Synthetic retry")
+        XCTAssertEqual(events[1].title, "Synthetic retry")
+    }
+
+    func testTargetedRetryRejectsStaleScopeWithoutTransportCall() async throws {
+        let transport = SyncConflictPresentationTransport(
+            createStatuses: [422]
+        )
+        let (app, coordinator) = try makeApp(transport: transport)
+        app.auth = .signedIn
+        app.sessionScope = "account-a"
+        try await app.activateSync(scope: "account-a")
+        _ = try await app.enqueueTaskCreate(
+            title: "Account A",
+            bucket: "inbox"
+        )
+        await app.synchronize()
+        let conflictID = try XCTUnwrap(app.syncConflicts.first?.id)
+
+        try await coordinator.activate(scope: "account-b")
+
+        do {
+            _ = try await coordinator.retryConflict(
+                scope: "account-a",
+                id: conflictID
+            )
+            XCTFail("Expected stale scope rejection")
+        } catch let error as NativeSyncCoordinatorError {
+            XCTAssertEqual(error, .inactiveScope)
+        }
+        let events = await transport.createEvents
+        XCTAssertEqual(events.count, 1)
+    }
+
+    func testDuplicateConcurrentTargetedRetryReplaysOnce() async throws {
+        let transport = SyncConflictPresentationTransport(
+            createStatuses: [422, nil],
+            suspendSuccessfulCreate: true
+        )
+        let (app, coordinator) = try makeApp(transport: transport)
+        app.auth = .signedIn
+        app.sessionScope = "account-a"
+        try await app.activateSync(scope: "account-a")
+        _ = try await app.enqueueTaskCreate(
+            title: "Only once",
+            bucket: "inbox"
+        )
+        await app.synchronize()
+        let conflictID = try XCTUnwrap(app.syncConflicts.first?.id)
+
+        async let first = coordinator.retryConflict(
+            scope: "account-a",
+            id: conflictID
+        )
+        await transport.waitUntilSuccessfulCreateStarts()
+        async let duplicate = coordinator.retryConflict(
+            scope: "account-a",
+            id: conflictID
+        )
+        await transport.resumeSuccessfulCreate()
+
+        _ = try await first
+        _ = try await duplicate
+        let events = await transport.createEvents
+        XCTAssertEqual(events.count, 2)
+    }
+
+    func testLegacyConflictWithoutRetryPayloadStillDecodes() throws {
+        let legacyJSON = """
+        {
+          "id":"00000000-0000-0000-0000-000000000101",
+          "mutationID":"00000000-0000-0000-0000-000000000102",
+          "operation":"taskCreate",
+          "reason":"clientError",
+          "recordedAt":1000
+        }
+        """
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .secondsSince1970
+
+        let conflict = try decoder.decode(
+            NativeSyncConflict.self,
+            from: Data(legacyJSON.utf8)
+        )
+
+        XCTAssertNil(conflict.retryMutation)
+        XCTAssertEqual(conflict.operation, .taskCreate)
     }
 
     private func makeApp(
@@ -266,10 +373,27 @@ final class SyncConflictPresentationTests: XCTestCase {
 }
 
 private actor SyncConflictPresentationTransport: NativeSyncTransport {
-    let createError: APIError?
+    struct CreateEvent: Equatable {
+        let title: String
+        let idempotencyKey: String?
+    }
 
-    init(createError: APIError? = nil) {
-        self.createError = createError
+    private var createStatuses: [Int?]
+    private let suspendSuccessfulCreate: Bool
+    private var didSuspendSuccessfulCreate = false
+    private var successfulCreateStarted = false
+    private var successfulCreateWaiters:
+        [CheckedContinuation<Void, Never>] = []
+    private var successfulCreateResume:
+        CheckedContinuation<Void, Never>?
+    private(set) var createEvents: [CreateEvent] = []
+
+    init(
+        createStatuses: [Int?] = [],
+        suspendSuccessfulCreate: Bool = false
+    ) {
+        self.createStatuses = createStatuses
+        self.suspendSuccessfulCreate = suspendSuccessfulCreate
     }
 
     func createTask(
@@ -277,8 +401,32 @@ private actor SyncConflictPresentationTransport: NativeSyncTransport {
         bucket: String,
         idempotencyKey: String?
     ) async throws -> TaskItem {
-        if let createError {
-            throw createError
+        createEvents.append(
+            .init(title: title, idempotencyKey: idempotencyKey)
+        )
+        let status = createStatuses.isEmpty
+            ? nil
+            : createStatuses.removeFirst()
+        if let status {
+            throw APIError.http(
+                status,
+                .init(
+                    code: "VALIDATION_ERROR",
+                    message: "raw server response",
+                    retryable: false,
+                    details: nil
+                )
+            )
+        }
+        if suspendSuccessfulCreate, !didSuspendSuccessfulCreate {
+            didSuspendSuccessfulCreate = true
+            successfulCreateStarted = true
+            let waiters = successfulCreateWaiters
+            successfulCreateWaiters.removeAll()
+            waiters.forEach { $0.resume() }
+            await withCheckedContinuation {
+                successfulCreateResume = $0
+            }
         }
         return .init(
             id: "synthetic-task",
@@ -316,21 +464,33 @@ private actor SyncConflictPresentationTransport: NativeSyncTransport {
             checkpointCursor: nil
         )
     }
+
+    func waitUntilSuccessfulCreateStarts() async {
+        guard !successfulCreateStarted else { return }
+        await withCheckedContinuation {
+            successfulCreateWaiters.append($0)
+        }
+    }
+
+    func resumeSuccessfulCreate() {
+        successfulCreateResume?.resume()
+        successfulCreateResume = nil
+    }
 }
 
 private actor SyncConflictActionRecorder {
-    private var retryFlags: [Bool] = []
+    private var retriedIDs: [UUID] = []
     private var acknowledgedIDs: [UUID] = []
 
-    func recordRetry(explicit: Bool) {
-        retryFlags.append(explicit)
+    func recordRetry(_ id: UUID) {
+        retriedIDs.append(id)
     }
 
     func recordAcknowledgement(_ id: UUID) {
         acknowledgedIDs.append(id)
     }
 
-    var values: (retryFlags: [Bool], acknowledgedIDs: [UUID]) {
-        (retryFlags, acknowledgedIDs)
+    var values: (retriedIDs: [UUID], acknowledgedIDs: [UUID]) {
+        (retriedIDs, acknowledgedIDs)
     }
 }

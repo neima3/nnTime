@@ -28,6 +28,10 @@ struct NativeSyncSynchronizationResult: Equatable, Sendable {
     var refreshRequired: Bool
 }
 
+struct NativeSyncConflictRetryResult: Equatable, Sendable {
+    let operation: NativeSyncConflict.Operation
+}
+
 struct NativeSyncPartialFailure: Error {
     let underlying: Error
     let refreshRequired: Bool
@@ -37,12 +41,22 @@ enum NativeSyncCoordinatorError: Error, Equatable {
     case inactiveScope
     case invalidOccurrenceKey
     case invalidStatus
+    case conflictNotFound
+    case conflictRetryUnavailable
+    case conflictRetryInProgress
 }
 
 actor NativeSyncCoordinator {
     private struct InFlightSynchronization {
         let id: UUID
         let task: Task<NativeSyncSynchronizationResult, Error>
+    }
+
+    private struct InFlightConflictRetry {
+        let id: UUID
+        let scope: String
+        let conflictID: UUID
+        let task: Task<NativeSyncConflictRetryResult, Error>
     }
 
     private enum ReplayDisposition {
@@ -58,6 +72,7 @@ actor NativeSyncCoordinator {
     private let inFlightIDProvider: @Sendable () -> UUID
     private var activeScope: String?
     private var inFlight: InFlightSynchronization?
+    private var inFlightConflictRetry: InFlightConflictRetry?
 
     init(
         store: NativeSyncStore,
@@ -83,6 +98,7 @@ actor NativeSyncCoordinator {
         }
         if let activeScope, activeScope != scope {
             cancelInFlightSynchronization()
+            cancelInFlightConflictRetry()
             try store.purge()
         }
         activeScope = scope
@@ -224,17 +240,95 @@ actor NativeSyncCoordinator {
         try persist(document, for: scope)
     }
 
+    func retryConflict(
+        scope: String,
+        id conflictID: UUID
+    ) async throws -> NativeSyncConflictRetryResult {
+        _ = try requiredActiveScope(matching: scope)
+        if let inFlightConflictRetry {
+            guard
+                inFlightConflictRetry.scope == scope,
+                inFlightConflictRetry.conflictID == conflictID
+            else {
+                throw NativeSyncCoordinatorError.conflictRetryInProgress
+            }
+            return try await inFlightConflictRetry.task.value
+        }
+
+        let id = inFlightIDProvider()
+        let task = Task {
+            [weak self] () throws -> NativeSyncConflictRetryResult in
+            guard let self else {
+                throw CancellationError()
+            }
+            return try await self.performConflictRetry(
+                scope: scope,
+                conflictID: conflictID
+            )
+        }
+        inFlightConflictRetry = .init(
+            id: id,
+            scope: scope,
+            conflictID: conflictID,
+            task: task
+        )
+        do {
+            let result = try await task.value
+            clearInFlightConflictRetry(id: id)
+            return result
+        } catch {
+            clearInFlightConflictRetry(id: id)
+            throw error
+        }
+    }
+
     func purge() throws {
         cancelInFlightSynchronization()
+        cancelInFlightConflictRetry()
         try store.purge()
         activeScope = nil
     }
 
     func suspendSynchronization() async {
-        guard let inFlight else { return }
-        inFlight.task.cancel()
-        _ = await inFlight.task.result
-        clearInFlightSynchronization(id: inFlight.id)
+        let synchronization = inFlight
+        let conflictRetry = inFlightConflictRetry
+        synchronization?.task.cancel()
+        conflictRetry?.task.cancel()
+        if let synchronization {
+            _ = await synchronization.task.result
+            clearInFlightSynchronization(id: synchronization.id)
+        }
+        if let conflictRetry {
+            _ = await conflictRetry.task.result
+            clearInFlightConflictRetry(id: conflictRetry.id)
+        }
+    }
+
+    private func performConflictRetry(
+        scope: String,
+        conflictID: UUID
+    ) async throws -> NativeSyncConflictRetryResult {
+        let document = try document(for: scope)
+        guard
+            let conflict = document.conflicts.first(
+                where: { $0.id == conflictID }
+            )
+        else {
+            throw NativeSyncCoordinatorError.conflictNotFound
+        }
+        guard let mutation = conflict.retryMutation else {
+            throw NativeSyncCoordinatorError.conflictRetryUnavailable
+        }
+
+        try await replay(mutation, scope: scope)
+        try Task.checkCancellation()
+        _ = try requiredActiveScope(matching: scope)
+        try removeConflict(
+            id: conflictID,
+            mutationID: mutation.id,
+            from: scope
+        )
+        return .init(operation: conflict.operation)
     }
 
     private func performSynchronization(
@@ -465,8 +559,21 @@ actor NativeSyncCoordinator {
             mutationID: mutation.id,
             operation: operation(for: mutation),
             reason: reason,
-            recordedAt: clock()
+            recordedAt: clock(),
+            retryMutation: mutation
         ))
+        try persist(document, for: scope)
+    }
+
+    private func removeConflict(
+        id: UUID,
+        mutationID: UUID,
+        from scope: String
+    ) throws {
+        var document = try document(for: scope)
+        document.conflicts.removeAll {
+            $0.id == id && $0.mutationID == mutationID
+        }
         try persist(document, for: scope)
     }
 
@@ -546,10 +653,22 @@ actor NativeSyncCoordinator {
         inFlight = nil
     }
 
+    private func cancelInFlightConflictRetry() {
+        inFlightConflictRetry?.task.cancel()
+        inFlightConflictRetry = nil
+    }
+
     private func clearInFlightSynchronization(id: UUID) {
         guard inFlight?.id == id else {
             return
         }
         inFlight = nil
+    }
+
+    private func clearInFlightConflictRetry(id: UUID) {
+        guard inFlightConflictRetry?.id == id else {
+            return
+        }
+        inFlightConflictRetry = nil
     }
 }
