@@ -34,6 +34,7 @@ import { SignedOutCard, SkeletonRows } from "./EmptyState";
 import { PushReminders } from "./PushReminders";
 import { ConnectedSignInMethods } from "./google-auth-flow";
 import {
+  createSettingsMethodsController,
   linkGoogleFromSettings,
   loadSettingsConnectedProviders,
 } from "./google-auth-integration";
@@ -366,9 +367,10 @@ export function SettingsClient() {
   );
   const [googleAvailable, setGoogleAvailable] = useState(false);
   const [methodsLoading, setMethodsLoading] = useState(true);
+  const [methodsLoadError, setMethodsLoadError] = useState<string | null>(null);
+  const [methodsReloadKey, setMethodsReloadKey] = useState(0);
   const [linkingGoogle, setLinkingGoogle] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
-  const methodsLoadStarted = useRef(false);
   const googleLinkLock = useRef(false);
 
   useEffect(() => {
@@ -411,43 +413,54 @@ export function SettingsClient() {
     };
   }, []);
 
+  const settingsReady = settings !== null;
+
   useEffect(() => {
-    if (!authed || !settings || methodsLoadStarted.current) {
+    if (!authed || !settingsReady) {
       return;
     }
 
-    let cancelled = false;
-    methodsLoadStarted.current = true;
-    void Promise.all([
-      loadSettingsConnectedProviders({
-        authenticated: authed,
-        settingsReady: settings !== null,
-      }),
-      fetch("/api/v1/auth/capabilities")
-        .then((response) => (response.ok ? response.json() : null))
-        .then((capabilities) => capabilities?.google === true)
-        .catch(() => false),
-    ])
-      .then(([providers, available]) => {
-        if (cancelled || !providers) return;
-        setConnectedProviders(providers);
-        setGoogleAvailable(available);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setLinkError("Couldn’t load connected sign-in methods.");
+    const controller = createSettingsMethodsController({
+      load: async (signal) => {
+        const [providers, available] = await Promise.all([
+          loadSettingsConnectedProviders({
+            authenticated: authed,
+            settingsReady,
+          }),
+          fetch("/api/v1/auth/capabilities", { signal })
+            .then((response) => {
+              if (!response.ok) {
+                throw new Error("Capability request failed");
+              }
+              return response.json();
+            })
+            .then((capabilities) => capabilities?.google === true),
+        ]);
+        if (!providers) {
+          throw new Error("Settings are not ready");
         }
-      })
-      .finally(() => {
-        if (!cancelled) {
+        return { providers, googleAvailable: available };
+      },
+      onState: (state) => {
+        if (state.status === "loading") {
+          setMethodsLoading(true);
+          setMethodsLoadError(null);
+        } else if (state.status === "ready") {
+          setConnectedProviders(state.providers);
+          setGoogleAvailable(state.googleAvailable);
           setMethodsLoading(false);
+        } else {
+          setMethodsLoading(false);
+          setMethodsLoadError("Couldn’t load connected sign-in methods.");
         }
-      });
+      },
+    });
+    queueMicrotask(() => void controller.run());
 
     return () => {
-      cancelled = true;
+      controller.dispose();
     };
-  }, [authed, settings]);
+  }, [authed, methodsReloadKey, settingsReady]);
 
   const patch = useCallback(
     async (partial: Partial<Settings>) => {
@@ -602,6 +615,10 @@ export function SettingsClient() {
     });
   }, []);
 
+  const retryMethodsLoad = useCallback(() => {
+    setMethodsReloadKey((key) => key + 1);
+  }, []);
+
   if (!authed) {
     return (
       <SignedOutCard
@@ -633,7 +650,9 @@ export function SettingsClient() {
         loading={methodsLoading}
         linking={linkingGoogle}
         error={linkError}
+        loadError={methodsLoadError}
         onLinkGoogle={linkGoogle}
+        onRetry={retryMethodsLoad}
       />
 
       <Section icon={Palette} title="Appearance">

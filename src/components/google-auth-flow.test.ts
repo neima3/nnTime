@@ -1,4 +1,7 @@
 import { createElement } from "react";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -68,8 +71,23 @@ describe("Google authentication web flow", () => {
 
       expect(html).toContain("Continue with Google");
       expect(html).toContain('aria-label="Continue with Google"');
+      expect(html).toContain('src="/brand/google-g.png"');
+      expect(html).not.toContain("lucide-globe");
     },
   );
+
+  it("uses the unmodified standard multicolor Google G branding asset", () => {
+    const asset = readFileSync(
+      resolve(process.cwd(), "public/brand/google-g.png"),
+    );
+
+    expect(asset.subarray(0, 8)).toEqual(
+      Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    );
+    expect(createHash("sha256").update(asset).digest("hex")).toBe(
+      "d1ce9c2af0b10a7333abc99bc706f9a6a199e5b65bf3e3009624f076b8638e6a",
+    );
+  });
 
   it("starts same-origin Google sign-in once and exposes pending state", async () => {
     let resolveFlow: ((value: { error: null }) => void) | undefined;
@@ -241,5 +259,24 @@ describe("connected sign-in methods", () => {
     });
     resolveFlow?.({ error: null });
     await Promise.all([first, second]);
+  });
+
+  it("offers an accessible retry after connected-method loading fails", () => {
+    const html = renderToStaticMarkup(
+      createElement(ConnectedSignInMethods, {
+        googleAvailable: false,
+        connectedProviders: new Set<string>(),
+        loading: false,
+        linking: false,
+        error: null,
+        loadError: "Couldn’t load connected sign-in methods.",
+        onLinkGoogle: vi.fn(),
+        onRetry: vi.fn(),
+      }),
+    );
+
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("Couldn’t load connected sign-in methods.");
+    expect(html).toContain(">Try again<");
   });
 });

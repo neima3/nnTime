@@ -1,8 +1,11 @@
 import { Check, Link2, Loader2 } from "lucide-react";
+import {
+  acquireAuthRequest,
+  releaseAuthRequest,
+  type AuthRequestLock,
+} from "./auth-request-guard";
 
-type FlowLock = {
-  current: boolean;
-};
+type FlowLock = AuthRequestLock;
 
 type ProviderResult =
   | {
@@ -40,11 +43,10 @@ async function runGoogleAction({
   options: GoogleActionOptions;
   errorMessage: string;
 }): Promise<void> {
-  if (lock.current) {
+  if (!acquireAuthRequest(lock)) {
     return;
   }
 
-  lock.current = true;
   setError(null);
   setPending(true);
   try {
@@ -55,7 +57,7 @@ async function runGoogleAction({
   } catch {
     setError(errorMessage);
   } finally {
-    lock.current = false;
+    releaseAuthRequest(lock);
     setPending(false);
   }
 }
@@ -115,7 +117,9 @@ type ConnectedSignInMethodsProps = {
   loading: boolean;
   linking: boolean;
   error: string | null;
+  loadError?: string | null;
   onLinkGoogle: () => void;
+  onRetry?: () => void;
 };
 
 function ConnectedMethod({
@@ -153,7 +157,9 @@ export function ConnectedSignInMethods({
   loading,
   linking,
   error,
+  loadError = null,
   onLinkGoogle,
+  onRetry,
 }: ConnectedSignInMethodsProps) {
   const knownMethods = [
     connectedProviders.has("credential")
@@ -230,6 +236,23 @@ export function ConnectedSignInMethods({
           >
             {error}
           </p>
+        ) : null}
+        {loadError ? (
+          <div
+            role="alert"
+            className="flex items-center justify-between gap-4 bg-danger-soft px-5 py-3.5"
+          >
+            <p className="text-[13px] font-medium text-danger">{loadError}</p>
+            {onRetry ? (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="min-h-11 shrink-0 rounded-xl border border-danger px-3 text-[13px] font-semibold text-danger transition-colors hover:bg-surface focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+              >
+                Try again
+              </button>
+            ) : null}
+          </div>
         ) : null}
       </div>
     </section>

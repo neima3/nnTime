@@ -1,12 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { ArrowRight, Globe2, Loader2, Mail } from "lucide-react";
+import { ArrowRight, Loader2, Mail } from "lucide-react";
 import { signIn, signUp } from "@/lib/auth-client";
 import { detectTimezone } from "@/lib/timezone";
 import type { AuthCapabilities } from "@/server/auth-capabilities";
+import {
+  acquireAuthRequest,
+  releaseAuthRequest,
+} from "./auth-request-guard";
 import { signInWithGoogle } from "./google-auth-integration";
 
 type Mode = "sign-in" | "sign-up";
@@ -19,28 +24,36 @@ type Mode = "sign-in" | "sign-up";
 export function AuthForm({
   mode,
   capabilities,
+  initialError = null,
 }: {
   mode: Mode;
   capabilities: AuthCapabilities;
+  initialError?: string | null;
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
   const [info, setInfo] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-  const [magicPending, setMagicPending] = useState(false);
-  const [googlePending, setGooglePending] = useState(false);
-  const googleLock = useRef(false);
+  const [busyAction, setBusyAction] =
+    useState<"email" | "magic" | "google" | null>(null);
+  const authLock = useRef(false);
 
   const isSignUp = mode === "sign-up";
+  const authBusy = busyAction !== null;
+
+  function finishAuthRequest() {
+    releaseAuthRequest(authLock);
+    setBusyAction(null);
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!acquireAuthRequest(authLock)) return;
     setError(null);
     setInfo(null);
-    setPending(true);
+    setBusyAction("email");
     try {
       const res = isSignUp
         ? await signUp.email({
@@ -51,7 +64,7 @@ export function AuthForm({
         : await signIn.email({ email, password });
       if (res.error) {
         setError(res.error.message ?? "That didn't go through — check your email and password?");
-        setPending(false);
+        finishAuthRequest();
         return;
       }
       // Seed the planning timezone before Today first renders — settings are
@@ -65,7 +78,7 @@ export function AuthForm({
       router.refresh();
     } catch {
       setError("Couldn't reach the server — try again?");
-      setPending(false);
+      finishAuthRequest();
     }
   }
 
@@ -74,9 +87,10 @@ export function AuthForm({
       setError("Enter your email first.");
       return;
     }
+    if (!acquireAuthRequest(authLock)) return;
     setError(null);
     setInfo(null);
-    setMagicPending(true);
+    setBusyAction("magic");
     try {
       const res = await signIn.magicLink({
         email: email.trim(),
@@ -84,7 +98,6 @@ export function AuthForm({
       });
       if (res.error) {
         setError(res.error.message ?? "Couldn't send that link — try again?");
-        setMagicPending(false);
         return;
       }
       setInfo(
@@ -92,15 +105,16 @@ export function AuthForm({
       );
     } catch {
       setError("Couldn't reach the server — try again?");
+    } finally {
+      finishAuthRequest();
     }
-    setMagicPending(false);
   }
 
   function onGoogleSignIn() {
     void signInWithGoogle({
       mode,
-      lock: googleLock,
-      setPending: setGooglePending,
+      lock: authLock,
+      setPending: (pending) => setBusyAction(pending ? "google" : null),
       setError,
     });
   }
@@ -186,10 +200,10 @@ export function AuthForm({
 
             <button
               type="submit"
-              disabled={pending}
+              disabled={authBusy}
               className="flex w-full items-center justify-center gap-2 rounded-2xl bg-iris py-3 text-[15px] font-semibold text-ink-inverse shadow-card transition-all hover:bg-iris-deep disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {pending ? (
+              {busyAction === "email" ? (
                 <Loader2 size={18} className="animate-spin" />
               ) : (
                 <>
@@ -203,11 +217,11 @@ export function AuthForm({
           {!isSignUp && (
             <button
               type="button"
-              disabled={magicPending}
+              disabled={authBusy}
               onClick={() => void onMagicLink()}
               className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-surface py-3 text-[14px] font-semibold text-ink-soft transition-colors hover:bg-surface-sunken hover:text-ink disabled:opacity-70"
             >
-              {magicPending ? (
+              {busyAction === "magic" ? (
                 <Loader2 size={18} className="animate-spin" />
               ) : (
                 <>
@@ -230,19 +244,27 @@ export function AuthForm({
               <button
                 type="button"
                 aria-label="Continue with Google"
-                aria-busy={googlePending}
-                disabled={googlePending}
+                aria-busy={busyAction === "google"}
+                disabled={authBusy}
                 onClick={onGoogleSignIn}
-                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-border bg-surface px-4 text-[14px] font-semibold text-ink-soft transition-colors hover:bg-surface-sunken hover:text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-70"
+                className="flex min-h-11 w-full items-center justify-center gap-2.5 rounded-2xl border border-border bg-surface px-4 text-[14px] font-semibold text-ink-soft transition-colors hover:bg-surface-sunken hover:text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {googlePending ? (
+                {busyAction === "google" ? (
                   <>
                     <Loader2 size={18} className="animate-spin" aria-hidden="true" />
                     Connecting…
                   </>
                 ) : (
                   <>
-                    <Globe2 size={17} aria-hidden="true" />
+                    <Image
+                      src="/brand/google-g.png"
+                      alt=""
+                      aria-hidden="true"
+                      width={200}
+                      height={204}
+                      unoptimized
+                      className="h-[18px] w-auto shrink-0"
+                    />
                     Continue with Google
                   </>
                 )}
