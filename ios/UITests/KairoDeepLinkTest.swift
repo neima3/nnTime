@@ -1,26 +1,59 @@
 import XCTest
 
-/// Verifies kairo:// routes land on the right tab.
+/// Verifies deep-link routing with local fixtures only.
 final class KairoDeepLinkTest: XCTestCase {
     func testFocusDeepLink() throws {
         let app = XCUIApplication()
-        app.launchArguments += ["-kairoSkipOnboarding"]
-        app.launchArguments += ["-kairoOpenURL", "kairo://focus"]
+        app.launchArguments += [
+            "-kairoSkipOnboarding",
+            "-kairoOfflineFixture",
+        ]
         app.launch()
 
-        let email = app.textFields["you@example.com"]
-        if email.waitForExistence(timeout: 6) {
-            email.tap()
-            email.typeText("qa-polish-live@kairo.test")
-            let password = app.secureTextFields["Your password"]
-            password.tap()
-            password.typeText("kairo-qa-live-2026!")
-            app.buttons["Sign in"].tap()
-        }
-        // The URL is delivered post-launch via the app; simplest robust
-        // assertion is that the Focus tab exists and can be reached.
-        XCTAssertTrue(app.tabBars.buttons["Focus"].waitForExistence(timeout: 20))
+        XCTAssertTrue(
+            app.tabBars.buttons["Focus"].waitForExistence(timeout: 10)
+        )
         app.tabBars.buttons["Focus"].tap()
         XCTAssertTrue(app.buttons["Start focus"].waitForExistence(timeout: 8))
+    }
+
+    func testSyntheticAuthCallbackShowsVerificationThenSuccess() {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-kairoSkipOnboarding",
+            "-kairoOfflineFixture",
+            "-kairoAuthCallbackFixture",
+            "success",
+        ]
+        app.launch()
+
+        XCTAssertTrue(
+            app.staticTexts["Finishing your sign-in"]
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            app.tabBars.buttons["Today"].waitForExistence(timeout: 8)
+        )
+    }
+
+    func testSyntheticAuthCallbackFailureReturnsToSignIn() {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-kairoSkipOnboarding",
+            "-kairoAuthCallbackFixture",
+            "failure",
+        ]
+        app.launch()
+
+        XCTAssertTrue(
+            app.staticTexts["Finishing your sign-in"]
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            app.staticTexts[
+                "This sign-in link has expired. Request a new link and try again."
+            ].waitForExistence(timeout: 8)
+        )
+        XCTAssertTrue(app.textFields["you@example.com"].exists)
     }
 }

@@ -338,6 +338,17 @@ final class AppState {
         sessionScope = newScope
     }
 
+    func beginAuthCallback() {
+        authGeneration += 1
+    }
+
+    func finishAuthCallbackFailure() {
+        guard case .signedIn = auth else {
+            auth = .signedOut
+            return
+        }
+    }
+
     private func purgeLocalState() async {
         DayCache.clear()
         URLCache.shared.removeAllCachedResponses()
@@ -362,27 +373,51 @@ final class AppState {
 
 struct RootView: View {
     @Environment(AppState.self) private var app
+    @State private var authCoordinator = NativeAuthCoordinator()
 
     var body: some View {
         Group {
-            switch app.auth {
-            case .unknown:
-                ZStack {
-                    Color.kCanvas.ignoresSafeArea()
-                    VStack(spacing: 14) {
-                        KairoMark(size: 56)
-                        ProgressView().tint(.kIris)
+            if authCoordinator.phase == .verifying {
+                AuthVerificationView()
+            } else {
+                switch app.auth {
+                case .unknown:
+                    ZStack {
+                        Color.kCanvas.ignoresSafeArea()
+                        VStack(spacing: 14) {
+                            KairoMark(size: 56)
+                            ProgressView().tint(.kIris)
+                        }
                     }
+                case .signedOut:
+                    SignInView(
+                        externalError: authCoordinator.failureMessage
+                    )
+                case .signedIn:
+                    MainTabs()
+                case .connectionRequired:
+                    ConnectionRequiredView()
                 }
-            case .signedOut:
-                SignInView()
-            case .signedIn:
-                MainTabs()
-            case .connectionRequired:
-                ConnectionRequiredView()
             }
         }
-        .task { await app.bootstrap() }
+        .task {
+#if DEBUG
+            if let fixture = Self.authCallbackFixture {
+                await routeAuthCallback(fixture.url, fixture: fixture.kind)
+                return
+            }
+#endif
+            await app.bootstrap()
+        }
+        .onOpenURL { url in
+            Task { await routeAuthCallback(url) }
+        }
+        .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in
+            guard let url = activity.webpageURL else {
+                return
+            }
+            Task { await routeAuthCallback(url) }
+        }
         .onReceive(
             NotificationCenter.default.publisher(
                 for: .kairoSessionInvalidated
@@ -390,6 +425,144 @@ struct RootView: View {
         ) { _ in
             Task { await app.handleSessionInvalidation() }
         }
+        .alert(
+            "We couldn’t finish signing you in",
+            isPresented: Binding(
+                get: {
+                    authCoordinator.failureMessage != nil
+                        && app.isSignedIn
+                },
+                set: { presented in
+                    if !presented {
+                        authCoordinator.dismissFailure()
+                    }
+                }
+            )
+        ) {
+            Button("OK") {
+                authCoordinator.dismissFailure()
+            }
+        } message: {
+            Text(
+                authCoordinator.failureMessage
+                    ?? "Request a new link and try again."
+            )
+        }
+    }
+
+    @MainActor
+    private func routeAuthCallback(
+        _ url: URL,
+        fixture: AuthCallbackFixtureKind? = nil
+    ) async {
+        guard AuthCallback.parse(url) != nil else {
+            return
+        }
+        app.beginAuthCallback()
+        let outcome = await authCoordinator.handle(
+            url,
+            currentScope: app.sessionScope,
+            redeem: { token in
+#if DEBUG
+                if let fixture {
+                    try await Task.sleep(nanoseconds: 2_500_000_000)
+                    switch fixture {
+                    case .success:
+                        return .init(
+                            scope: "synthetic-callback-account",
+                            replacedScope: nil
+                        )
+                    case .failure:
+                        throw APIError.authHTTP(
+                            400,
+                            "This sign-in link has expired. Request a new link and try again."
+                        )
+                    }
+                }
+#endif
+                return try await KairoAPI.shared.redeemMagicLink(
+                    token: token
+                )
+            },
+            prepareForAccountSwitch: { scope in
+                await app.prepareForAccountSwitch(newScope: scope)
+            },
+            bootstrap: {
+                await app.bootstrap()
+            }
+        )
+        if outcome == .failed {
+            app.finishAuthCallbackFailure()
+        }
+    }
+
+#if DEBUG
+    private enum AuthCallbackFixtureKind: String {
+        case success
+        case failure
+    }
+
+    private struct AuthCallbackFixture {
+        let kind: AuthCallbackFixtureKind
+        let url: URL
+    }
+
+    private static var authCallbackFixture: AuthCallbackFixture? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard
+            let index = arguments.firstIndex(
+                of: "-kairoAuthCallbackFixture"
+            ),
+            arguments.indices.contains(index + 1),
+            let kind = AuthCallbackFixtureKind(
+                rawValue: arguments[index + 1]
+            )
+        else {
+            return nil
+        }
+        return .init(
+            kind: kind,
+            url: URL(string: "kairo://auth?token=synthetic-fixture")!
+        )
+    }
+#else
+    private typealias AuthCallbackFixtureKind = Never
+#endif
+}
+
+private extension AppState {
+    var isSignedIn: Bool {
+        if case .signedIn = auth {
+            return true
+        }
+        return false
+    }
+}
+
+private struct AuthVerificationView: View {
+    var body: some View {
+        ZStack {
+            Color.kCanvas.ignoresSafeArea()
+            VStack(spacing: 18) {
+                KairoMark(size: 56)
+                ProgressView()
+                    .tint(.kIris)
+                    .controlSize(.large)
+                VStack(spacing: 6) {
+                    Text("Finishing your sign-in")
+                        .font(.kDisplay(24, relativeTo: .title))
+                        .foregroundStyle(Color.kInk)
+                    Text("Securing your planner on this device…")
+                        .font(.kBody(14.5))
+                        .foregroundStyle(Color.kInkSoft)
+                }
+            }
+            .padding(28)
+            .frame(maxWidth: 420)
+            .kCard(radius: 28)
+            .padding(20)
+        }
+        .accessibilityIdentifier("auth.callback.verifying")
     }
 }
 

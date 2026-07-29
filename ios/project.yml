@@ -46,6 +46,10 @@ targets:
         com.apple.security.application-groups:
           - group.me.neima.kairo
         com.apple.developer.healthkit: true
+        com.apple.developer.associated-domains:
+          - applinks:time.neima.me
+        com.apple.developer.applesignin:
+          - Default
     dependencies:
       - target: KairoWidget
         embed: true

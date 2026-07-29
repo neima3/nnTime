@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SignInView: View {
     @Environment(AppState.self) private var app
+    var externalError: String?
     @State private var mode: Mode = .signIn
     @State private var name = ""
     @State private var email = ""
@@ -45,8 +46,8 @@ struct SignInView: View {
                         secureField("Password", text: $password,
                                     placeholder: mode == .signUp ? "At least 8 characters" : "Your password")
 
-                        if let error {
-                            Text(error)
+                        if let visibleError = error ?? externalError {
+                            Text(visibleError)
                                 .font(.kBody(13, weight: .medium))
                                 .foregroundStyle(Color.kDanger)
                                 .padding(.horizontal, 14).padding(.vertical, 10)
