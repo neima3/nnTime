@@ -5,6 +5,7 @@ import {
   expectedWidgetPrivacyContract,
   readRepositoryReleaseContract,
   validateBuiltAppReleaseContract,
+  validateProductionAuthCapabilityResponse,
   validateReleaseContract,
 } from "../scripts/ios-release-contract.mjs";
 import { resolve } from "node:path";
@@ -17,6 +18,12 @@ const validContract = {
   buildNumber: "731",
   appGroups: ["group.me.neima.kairo"],
   hasHealthKit: true,
+  associatedDomains: ["applinks:time.neima.me"],
+  signInWithApple: ["Default"],
+  aasaAppIDs: ["A45F46XD54.me.neima.kairo"],
+  aasaPaths: ["/auth/callback"],
+  authCapabilityFields: ["magicLink", "apple"],
+  openAPISynced: true,
   healthShareDescription:
     "Kairo reads recent sleep times to suggest a private wind-down reminder on this iPhone.",
   healthUpdateDescription:
@@ -57,6 +64,8 @@ const validBuiltArtifact = {
   widgetGetTaskAllow: false,
   appGroups: ["group.me.neima.kairo"],
   hasHealthKit: true,
+  associatedDomains: ["applinks:time.neima.me"],
+  signInWithApple: ["Default"],
   widgetAppGroups: ["group.me.neima.kairo"],
   widgetHasHealthKit: false,
   privacy: expectedPrivacyContract,
@@ -124,6 +133,52 @@ describe("iOS release contract", () => {
     );
   });
 
+  it("rejects missing native authentication release declarations", () => {
+    const failures = validateReleaseContract({
+      ...validContract,
+      associatedDomains: [],
+      signInWithApple: [],
+      aasaAppIDs: [],
+      aasaPaths: [],
+      authCapabilityFields: ["magicLink"],
+      openAPISynced: false,
+    });
+
+    expect(failures).toEqual(
+      expect.arrayContaining([
+        "Associated domain applinks:time.neima.me is missing",
+        "Sign in with Apple entitlement must include Default",
+        "AASA must include A45F46XD54.me.neima.kairo",
+        "AASA must route /auth/callback",
+        "AuthCapabilities must require magicLink and apple booleans",
+        "Generated iOS OpenAPI contract is out of sync with api/openapi.yaml",
+      ]),
+    );
+  });
+
+  it("validates the production capability response without leaking configuration", () => {
+    expect(
+      validateProductionAuthCapabilityResponse({
+        magicLink: true,
+        apple: true,
+      }),
+    ).toEqual([]);
+
+    expect(
+      validateProductionAuthCapabilityResponse({
+        magicLink: "configured",
+        apple: false,
+        clientId: "should-not-be-public",
+      }),
+    ).toEqual(
+      expect.arrayContaining([
+        "Production auth capabilities must expose boolean magicLink and apple fields",
+        "Production auth capabilities must expose availability only",
+        "Production native auth providers are not fully configured",
+      ]),
+    );
+  });
+
   it("rejects privacy drift with actionable diagnostics", () => {
     const failures = validateReleaseContract({
       ...validContract,
@@ -174,6 +229,8 @@ describe("iOS release contract", () => {
         healthShareDescription: "",
         widgetAppGroups: [],
         widgetPrivacy: undefined,
+        associatedDomains: [],
+        signInWithApple: [],
       },
       { buildNumber: "731", gitSha: "abc123" },
     );
@@ -186,6 +243,8 @@ describe("iOS release contract", () => {
         "Signed app is missing NSHealthShareUsageDescription",
         "Signed widget is missing group.me.neima.kairo",
         "Widget privacy manifest required-reason declarations do not match the approved contract",
+        "Signed app is missing applinks:time.neima.me",
+        "Signed app must include the Sign in with Apple entitlement",
       ]),
     );
   });

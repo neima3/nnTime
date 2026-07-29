@@ -79,8 +79,11 @@ design work BEFORE the consuming subphase starts.
 - [ ] Phase 7 — iOS app
   - [x] 7A Contract proof (Swift OpenAPI toolchain compiles in CI)
   - [ ] 7B Native auth on device — email/password cookie continuity,
-        Keychain restore, 401 handling, and logout purge shipped; Sign in with
-        Apple and native magic-link/deep-link completion remain
+        Keychain restore, 401 handling, logout purge, native magic-link
+        callback handling, Sign in with Apple, and explicit Apple account
+        linking are code-complete with simulator proof. REMAINS: configure
+        Resend/Apple in production and prove the full lifecycle on a physical
+        iPhone before checking this box.
   - [ ] 7C Data/sync — generated CRUD transport and protected scoped read-only
         Today cache shipped; native cursor sync, mutation replay, and conflict
         UI remain

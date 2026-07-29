@@ -1,5 +1,53 @@
 # Progress log
 
+## 2026-07-29 — Round 20: native auth completion code and simulator proof (Codex)
+
+Roadmap:
+`docs/plans/2026-07-29-round20-native-auth-completion.md`.
+
+- **Fail-closed provider discovery.** `/api/v1/auth/capabilities` exposes only
+  magic-link and Apple availability. Resend is enabled only by a non-empty
+  `RESEND_API_KEY`; Apple requires the complete five-variable server contract
+  and the exact native bundle ID. Apple account linking is explicit, OAuth
+  token storage remains encrypted, and implicit same-email linking is denied.
+- **One-time Apple exchange.** Server-issued state and nonce challenges are
+  intent-, user-, and expiry-bound, atomically consumed, replay-safe, and
+  exchanged through Better Auth without exposing provider configuration.
+- **Native transport and lifecycle.** Generated OpenAPI adapters now cover
+  capability discovery, Apple challenge/exchange, iOS magic-link requests, and
+  token-only callback redemption. Cookies survive successful exchange, 400s
+  preserve the session, structured 401s use the existing full purge boundary,
+  and cancellation remains cancellation.
+- **Safe callback routing.** Universal links and direct URLs use one coordinator
+  with token-hash duplicate suppression. Invalid callbacks are ignored; account
+  changes purge before bootstrap; failures remain actionable.
+- **Professional native UI.** The sign-in surface uses Kairo design tokens,
+  official Sign in with Apple controls, password as the primary path, and
+  magic link as a clear secondary path. Loading, success, cancellation,
+  duplicate, sent, expired, and retry states have deterministic fixtures.
+  Settings adds an explicit Connected accounts flow with account-switch and
+  privacy copy plus ready, linking, linked, expired, and retry states.
+- **Release contract hardened.** Repository and signed-artifact preflight now
+  verify the native bundle ID, Apple entitlement, associated domain, AASA app
+  ID/callback route, capability schema, and canonical/generated OpenAPI sync.
+  The deployment runbook documents Resend, all five Apple variables, multiline
+  private-key handling, Apple Services ID versus native App ID, live AASA and
+  capability probes, and the exact physical-device acceptance checklist.
+- **Local evidence.** At the end of implementation, 132 app-hosted unit tests
+  and nine deterministic auth-tour UI tests passed, as did a Release simulator
+  build. Inspected ignored evidence under
+  `browser-qa/round20-native-auth/` covers compact 390-point width, actual
+  accessibility XXXL Dynamic Type, light/dark Apple controls, error/magic-link
+  states, and ready/linked/expired account-linking states.
+
+**Not claimed:** Phase 7B remains unchecked. This round has not configured
+Resend or Apple production credentials, completed a real magic-link/Apple
+provider exchange, or proved install → sign-in → Keychain restore → 401 purge →
+link → logout on a physical iPhone. Simulator fixtures do not satisfy those
+release gates. Google sign-in, native cursor/mutation sync, secure extension
+credentials, TestFlight processing, integration, deployment, and live exact-SHA
+verification also remain open at this checkpoint.
+
 ## 2026-07-29 — Round 19: native session and offline integrity (Codex)
 
 Roadmap:

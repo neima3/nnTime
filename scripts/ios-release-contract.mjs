@@ -109,6 +109,28 @@ export function validateReleaseContract(contract) {
   if (contract.hasHealthKit !== true) {
     failures.push("HealthKit entitlement is missing");
   }
+  if (!contract.associatedDomains?.includes("applinks:time.neima.me")) {
+    failures.push("Associated domain applinks:time.neima.me is missing");
+  }
+  if (!contract.signInWithApple?.includes("Default")) {
+    failures.push("Sign in with Apple entitlement must include Default");
+  }
+  if (!contract.aasaAppIDs?.includes("A45F46XD54.me.neima.kairo")) {
+    failures.push("AASA must include A45F46XD54.me.neima.kairo");
+  }
+  if (!contract.aasaPaths?.includes("/auth/callback")) {
+    failures.push("AASA must route /auth/callback");
+  }
+  if (
+    !sameContract(contract.authCapabilityFields, ["magicLink", "apple"])
+  ) {
+    failures.push("AuthCapabilities must require magicLink and apple booleans");
+  }
+  if (contract.openAPISynced !== true) {
+    failures.push(
+      "Generated iOS OpenAPI contract is out of sync with api/openapi.yaml",
+    );
+  }
   if (!contract.healthShareDescription?.trim()) {
     failures.push("NSHealthShareUsageDescription is missing");
   }
@@ -153,6 +175,31 @@ export function validateReleaseContract(contract) {
     failures.push(
       "Widget privacy manifest required-reason declarations do not match the approved contract",
     );
+  }
+
+  return failures;
+}
+
+export function validateProductionAuthCapabilityResponse(response) {
+  const failures = [];
+  const keys =
+    response && typeof response === "object" && !Array.isArray(response)
+      ? Object.keys(response)
+      : [];
+
+  if (
+    typeof response?.magicLink !== "boolean" ||
+    typeof response?.apple !== "boolean"
+  ) {
+    failures.push(
+      "Production auth capabilities must expose boolean magicLink and apple fields",
+    );
+  }
+  if (!sameContract(keys, ["magicLink", "apple"])) {
+    failures.push("Production auth capabilities must expose availability only");
+  }
+  if (response?.magicLink !== true || response?.apple !== true) {
+    failures.push("Production native auth providers are not fully configured");
   }
 
   return failures;
@@ -280,6 +327,12 @@ export function validateBuiltAppReleaseContract(contract, expected = {}) {
   if (contract.hasHealthKit !== true) {
     failures.push("Signed app is missing the HealthKit entitlement");
   }
+  if (!contract.associatedDomains?.includes("applinks:time.neima.me")) {
+    failures.push("Signed app is missing applinks:time.neima.me");
+  }
+  if (!contract.signInWithApple?.includes("Default")) {
+    failures.push("Signed app must include the Sign in with Apple entitlement");
+  }
   if (!contract.widgetAppGroups?.includes("group.me.neima.kairo")) {
     failures.push("Signed widget is missing group.me.neima.kairo");
   }
@@ -394,6 +447,10 @@ export function readBuiltAppReleaseContract(appPath) {
       appEntitlements["com.apple.security.application-groups"] ?? [],
     hasHealthKit:
       appEntitlements["com.apple.developer.healthkit"] === true,
+    associatedDomains:
+      appEntitlements["com.apple.developer.associated-domains"] ?? [],
+    signInWithApple:
+      appEntitlements["com.apple.developer.applesignin"] ?? [],
     widgetAppGroups:
       widgetEntitlements["com.apple.security.application-groups"] ?? [],
     widgetHasHealthKit:
@@ -416,6 +473,26 @@ export function readRepositoryReleaseContract(
   const entitlements = readPlist(resolve(root, "ios/App/Kairo.entitlements"));
   const privacyPath = resolve(root, "ios/App/PrivacyInfo.xcprivacy");
   const widgetPrivacyPath = resolve(root, "ios/Widget/PrivacyInfo.xcprivacy");
+  const aasa = JSON.parse(
+    readFileSync(
+      resolve(root, "public/.well-known/apple-app-site-association"),
+      "utf8",
+    ),
+  );
+  const canonicalOpenAPI = readFileSync(
+    resolve(root, "api/openapi.yaml"),
+    "utf8",
+  );
+  const iosOpenAPI = readFileSync(
+    resolve(root, "ios/Kairo/Sources/Kairo/openapi.yaml"),
+    "utf8",
+  );
+  const openAPI = parseYaml(canonicalOpenAPI);
+  const authCapabilities = openAPI.components?.schemas?.AuthCapabilities;
+  const authCapabilityFields = (authCapabilities?.required ?? []).filter(
+    (field) => authCapabilities?.properties?.[field]?.type === "boolean",
+  );
+  const aasaDetails = aasa.applinks?.details ?? [];
   const privacy = existsSync(privacyPath)
     ? privacyContractFromPlist(readPlist(privacyPath))
     : undefined;
@@ -439,6 +516,16 @@ export function readRepositoryReleaseContract(
     ),
     appGroups: entitlements["com.apple.security.application-groups"] ?? [],
     hasHealthKit: entitlements["com.apple.developer.healthkit"] === true,
+    associatedDomains:
+      entitlements["com.apple.developer.associated-domains"] ?? [],
+    signInWithApple:
+      entitlements["com.apple.developer.applesignin"] ?? [],
+    aasaAppIDs: aasaDetails.flatMap((detail) => detail.appIDs ?? []),
+    aasaPaths: aasaDetails.flatMap((detail) =>
+      (detail.components ?? []).map((component) => component["/"]),
+    ),
+    authCapabilityFields,
+    openAPISynced: canonicalOpenAPI === iosOpenAPI,
     healthShareDescription: info.NSHealthShareUsageDescription,
     healthUpdateDescription: info.NSHealthUpdateUsageDescription,
     gitCommitValue: info.KairoGitCommit,
@@ -459,6 +546,9 @@ function runCli() {
   const rootIndex = process.argv.indexOf("--root");
   const appIndex = process.argv.indexOf("--app");
   const archiveIndex = process.argv.indexOf("--archive");
+  const authCapabilitiesFromStdin = process.argv.includes(
+    "--auth-capabilities-stdin",
+  );
   const expectedBuildIndex = process.argv.indexOf("--expected-build-number");
   const expectedGitIndex = process.argv.indexOf("--expected-git-sha");
   const expectedDateIndex = process.argv.indexOf("--expected-build-date");
@@ -467,7 +557,12 @@ function runCli() {
   let successMessage;
 
   try {
-    if (appIndex >= 0 || archiveIndex >= 0) {
+    if (authCapabilitiesFromStdin) {
+      const response = JSON.parse(readFileSync(0, "utf8"));
+      failures = validateProductionAuthCapabilityResponse(response);
+      successMessage =
+        "Kairo production native auth capabilities are fully configured.";
+    } else if (appIndex >= 0 || archiveIndex >= 0) {
       const appPath =
         appIndex >= 0
           ? resolve(process.argv[appIndex + 1])

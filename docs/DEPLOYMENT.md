@@ -90,6 +90,61 @@ Phase 1+ requires `DATABASE_URL`, `BETTER_AUTH_SECRET`, etc.
 | `TRUSTED_ORIGINS` | Optional comma-separated extra Origins allowed for cookie-auth API mutations (always allows `https://time.neima.me` + `http://localhost:3000`) |
 | `CRON_SECRET` | Bearer secret for `POST /api/v1/jobs/tick` (ADR-004 scheduler). Each tick records a scheduler run, materializes routines, computes deduplicated `notification_jobs`, atomically claims due work, and delivers or durably retries Web Push. Claims heartbeat during delivery; provider fan-out is capped at four concurrent requests and ten live subscriptions per account. The Origin/CSRF proxy guard skips this path because it uses bearer, not cookies. **The cron now exists — see below.** |
 | `ANTHROPIC_API_KEY` | Optional; AI co-planner (503 if missing on AI routes) |
+| `RESEND_API_KEY` | Enables password email and native magic-link delivery. `/api/v1/auth/capabilities` reports `magicLink: true` only when non-empty. |
+| `APPLE_CLIENT_ID` | Apple **Services ID** used by Better Auth for the web OAuth provider. It is not the native bundle ID. |
+| `APPLE_TEAM_ID` | Apple Developer team ID used to sign the server-generated client-secret JWT. |
+| `APPLE_KEY_ID` | Key ID for the Sign in with Apple `.p8` private key. |
+| `APPLE_PRIVATE_KEY` | Full `.p8` contents. Store as a Coolify secret; either real newlines or escaped `\n` are accepted. Never commit or print it. |
+| `APPLE_APP_BUNDLE_IDENTIFIER` | Native App ID/bundle ID. Must be exactly `me.neima.kairo` or Apple remains disabled. |
+
+### Native authentication release checklist
+
+Apple and magic link are fail-closed. `GET /api/v1/auth/capabilities` exposes
+only `{ "magicLink": boolean, "apple": boolean }`; Apple becomes available
+only when all five `APPLE_*` values above are present and the bundle identifier
+matches. Resend is independent.
+
+Apple Developer configuration must include:
+
+- App ID `me.neima.kairo` with Sign in with Apple and Associated Domains;
+- Services ID matching `APPLE_CLIENT_ID`, configured for the web callback used
+  by Better Auth at `https://time.neima.me`;
+- associated domain `applinks:time.neima.me`;
+- a key matching `APPLE_KEY_ID`, `APPLE_TEAM_ID`, and `APPLE_PRIVATE_KEY`.
+
+Before a release, run:
+
+```bash
+pnpm api:check-ios
+pnpm ios:release:preflight
+curl -fsS https://time.neima.me/.well-known/apple-app-site-association
+curl -fsS https://time.neima.me/api/v1/auth/capabilities \
+  | node scripts/ios-release-contract.mjs --auth-capabilities-stdin
+```
+
+The AASA response must be served directly as JSON over HTTPS, include
+`A45F46XD54.me.neima.kairo`, and route `/auth/callback`. The production
+capability response must contain exactly `magicLink` and `apple`, both boolean
+and both `true` for Phase 7B release readiness. A repository preflight proves
+the checked-in contract; it does not substitute for this live probe.
+
+Phase 7B may be completed only after all of this physical-iPhone evidence is
+recorded:
+
+1. fresh install and email/password sign-in;
+2. force-quit/relaunch with Keychain cookie restoration;
+3. expired/revoked 401 signs out and purges account-local data;
+4. magic link received on-device and opened through the associated domain;
+5. Sign in with Apple succeeds on first authorization and after relaunch;
+6. an existing password account explicitly links Apple from Settings without
+   changing account scope;
+7. logout purges session, cache, cookies, reminders, and account presentation
+   state; and
+8. cancellation, expired link/challenge, offline, and retry states remain
+   actionable without false sign-out.
+
+Use a synthetic/non-production planner account for mutable proof. Do not log
+tokens, cookies, magic-link URLs, Apple identity tokens, or private keys.
 
 ## Postgres provisioning (Phase 1A+)
 
