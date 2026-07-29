@@ -1,5 +1,55 @@
 # Progress log
 
+## 2026-07-29 — Round 22: secure iOS glance surfaces (Codex)
+
+Roadmap:
+`docs/plans/2026-07-29-round22-ios-glance-surfaces.md`.
+
+- **Real read-only glance surfaces.** Small, medium, large, accessory circular,
+  accessory rectangular, and accessory inline WidgetKit families now read only
+  the protected app-group day snapshot. Focus Live Activity and Dynamic Island
+  surfaces remain read-only. Every action opens the authenticated app through
+  `kairo://today` or `kairo://focus`; no extension transport, Keychain access,
+  `AppIntent`, or optimistic cache mutation was added.
+- **Deterministic presentation.** One shared clock/selection layer applies the
+  account's validated 12/24-hour preference, planner timezone, current-before-
+  next ordering, completed exclusion, and stale-day rejection across all
+  families. Version-2 caches remain decodable, status updates preserve the new
+  optional hour cycle, and every production cache writer now supplies it.
+- **Accessibility and polish.** Every family and Live Activity region has a
+  combined VoiceOver label and open-app hint. The final system-gallery review
+  found the hierarchy, spacing, contrast, truncation, category language, and
+  interaction state professional in compact/expanded ActivityKit plus small
+  and medium WidgetKit presentations.
+- **Signed real-extension proof.** Xcode 26.4's CLI test runner stripped
+  `XCUIApplication` launch arguments/environment despite the documented API.
+  A debug-only fixture deep link now crosses that runner boundary without
+  affecting Release. The final signed iPhone 17 Pro simulator tour passed
+  **1/1** and proved fixture → compact/expanded Live Activity → real widget
+  gallery → medium install with shared data → widget tap → Today deep link.
+  The `.xcresult`, seven retained screenshots, manifest, video-bearing failed
+  diagnostic runs, and gate logs are ignored under
+  `browser-qa/round22-ios-glance-surfaces/20260729T224843Z/`.
+- **Full gates.** `pnpm lint`, `pnpm typecheck`, **93 web files / 917 tests**,
+  and the Next.js production build passed. OpenAPI sync/adoption passed
+  (**22 operations across 43 shipping Swift files**), SwiftPM passed **45/45**,
+  repository iOS release preflight passed, and a fresh disposable simulator
+  passed **290 app-hosted tests**, with one expected file-protection skip and
+  no Main Thread Checker violation. The unsigned generic iOS Simulator Release
+  build embedded `me.neima.kairo.widgets` as a WidgetKit extension; artifact
+  inspection found no `URLSession`, `KairoAPIClient`, or AppIntent symbol path.
+  Both disposable simulators were deleted after verification.
+- **Roadmap truth.** Phase **8A is complete**. Implementation commit
+  `39f827b` ships the reviewed tranche. Scripted parity remains web **89.74%**
+  and iOS **85.96%**; H03/H04 intentionally remain partial until a secure
+  authenticated extension session bridge exists.
+
+**Not claimed:** No Coolify deployment was triggered because this tranche is
+native-only. Phase 7B still requires production Resend/Apple configuration and
+a physical-iPhone lifecycle. Phase 8B (Google sign-in plus the Apple Reminders
+decision) is the next actionable roadmap slice. TestFlight processing and App
+Store launch remain release-specific external evidence.
+
 ## 2026-07-29 — Round 21: native offline sync and conflict recovery (Codex)
 
 Roadmap:
