@@ -34,6 +34,7 @@ struct PendingActivityStatus: Codable, Equatable, Sendable {
     var activityID: String
     var status: String
     var occurredAt: Date
+    var occurrenceKey: String
 }
 
 struct NativeSyncConflict: Codable, Equatable, Sendable {

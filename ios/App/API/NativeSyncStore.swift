@@ -1,8 +1,9 @@
 import Foundation
 
 struct NativeSyncStore {
-    enum StoreError: Error {
+    enum StoreError: Error, Equatable {
         case invalidDocument
+        case emptyScope
     }
 
     let fileURL: URL
@@ -33,27 +34,41 @@ struct NativeSyncStore {
             withIntermediateDirectories: true,
             attributes: [.protectionKey: protection]
         )
-        try JSONEncoder().encode(document).write(to: fileURL, options: [.atomic])
+        try JSONEncoder().encode(document).write(
+            to: fileURL,
+            options: [
+                .atomic,
+                .completeFileProtectionUntilFirstUserAuthentication,
+            ]
+        )
         try fileManager.setAttributes(
             [.protectionKey: protection],
             ofItemAtPath: fileURL.path
         )
     }
 
-    func read(scope: String) -> NativeSyncDocument? {
+    func read(scope: String) throws -> NativeSyncDocument? {
         guard !scope.isEmpty else {
+            throw StoreError.emptyScope
+        }
+        guard fileManager.fileExists(atPath: fileURL.path) else {
             return nil
         }
-        guard
-            let data = try? Data(contentsOf: fileURL),
-            let document = try? JSONDecoder().decode(
+        let data = try Data(contentsOf: fileURL)
+        let document: NativeSyncDocument
+        do {
+            document = try JSONDecoder().decode(
                 NativeSyncDocument.self,
                 from: data
-            ),
+            )
+        } catch {
+            throw StoreError.invalidDocument
+        }
+        guard
             document.version == NativeSyncDocument.currentVersion,
             document.scope == scope
         else {
-            try? purge()
+            try purge()
             return nil
         }
         return document

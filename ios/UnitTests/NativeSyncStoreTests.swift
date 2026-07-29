@@ -25,7 +25,7 @@ final class NativeSyncStoreTests: XCTestCase {
 
         try store.write(document)
 
-        XCTAssertEqual(store.read(scope: "account-a"), document)
+        XCTAssertEqual(try store.read(scope: "account-a"), document)
     }
 
     func testRoundTripPreservesPendingMutationCreationOrder() throws {
@@ -34,7 +34,7 @@ final class NativeSyncStoreTests: XCTestCase {
         try store.write(Self.document(mutations: [first, second]))
 
         XCTAssertEqual(
-            store.read(scope: "account-a")?.pendingMutations,
+            try store.read(scope: "account-a")?.pendingMutations,
             [first, second]
         )
     }
@@ -46,25 +46,35 @@ final class NativeSyncStoreTests: XCTestCase {
             key: "key-retry",
             nextAttemptAt: nextAttemptAt
         )
+        let status = Self.activityStatus(
+            activityID: "activity-3",
+            key: "key-status"
+        )
         let conflict = NativeSyncConflict(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000003")!,
             mutationID: mutation.id,
             operation: "activityStatus",
             recordedAt: Date(timeIntervalSince1970: 1_700_000_700)
         )
-        try store.write(Self.document(mutations: [mutation], conflicts: [conflict]))
+        try store.write(
+            Self.document(mutations: [mutation, status], conflicts: [conflict])
+        )
 
         let restored = try XCTUnwrap(store.read(scope: "account-a"))
         XCTAssertEqual(restored.pendingMutations.first?.nextAttemptAt, nextAttemptAt)
         XCTAssertEqual(restored.conflicts, [conflict])
+        XCTAssertEqual(
+            restored.pendingMutations.last?.activityStatus?.occurrenceKey,
+            "2026-07-29T09:00:00"
+        )
     }
 
     func testReadRequiresExactScopeAndRemovesMismatchedDocument() throws {
         try store.write(Self.document(scope: "account-a"))
 
-        XCTAssertNil(store.read(scope: "account-b"))
+        XCTAssertNil(try store.read(scope: "account-b"))
         XCTAssertFalse(FileManager.default.fileExists(atPath: store.fileURL.path))
-        XCTAssertNil(store.read(scope: "account-a"))
+        XCTAssertNil(try store.read(scope: "account-a"))
     }
 
     func testUnsupportedVersionIsRejectedAndRemoved() throws {
@@ -76,22 +86,45 @@ final class NativeSyncStoreTests: XCTestCase {
         unsupported.version = NativeSyncDocument.currentVersion + 1
         try JSONEncoder().encode(unsupported).write(to: store.fileURL)
 
-        XCTAssertNil(store.read(scope: "account-a"))
+        XCTAssertNil(try store.read(scope: "account-a"))
         XCTAssertFalse(FileManager.default.fileExists(atPath: store.fileURL.path))
+    }
+
+    func testCorruptDocumentIsPreservedAndReadThrows() throws {
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+        try Data("not json".utf8).write(to: store.fileURL)
+
+        XCTAssertThrowsError(try store.read(scope: "account-a"))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: store.fileURL.path))
+    }
+
+    func testEmptyScopeThrowsWithoutRemovingDocument() throws {
+        try store.write(Self.document())
+
+        XCTAssertThrowsError(try store.read(scope: ""))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: store.fileURL.path))
     }
 
     func testReplacementLeavesOnlyMostRecentDocumentAndAppliesProtection() throws {
         try store.write(Self.document(cursor: "old"))
         try store.write(Self.document(cursor: "new"))
 
-        XCTAssertEqual(store.read(scope: "account-a")?.cursor, "new")
+        XCTAssertEqual(try store.read(scope: "account-a")?.cursor, "new")
         let attributes = try FileManager.default.attributesOfItem(
             atPath: store.fileURL.path
         )
+#if targetEnvironment(simulator)
+        throw XCTSkip("The iOS Simulator does not expose file protection attributes.")
+#else
         XCTAssertEqual(store.protection, .completeUntilFirstUserAuthentication)
-        if let applied = attributes[.protectionKey] as? FileProtectionType {
-            XCTAssertEqual(applied, store.protection)
-        }
+        let applied = try XCTUnwrap(
+            attributes[.protectionKey] as? FileProtectionType
+        )
+        XCTAssertEqual(applied, store.protection)
+#endif
     }
 
     func testPurgeRemovesDocument() throws {
@@ -100,7 +133,7 @@ final class NativeSyncStoreTests: XCTestCase {
         try store.purge()
 
         XCTAssertFalse(FileManager.default.fileExists(atPath: store.fileURL.path))
-        XCTAssertNil(store.read(scope: "account-a"))
+        XCTAssertNil(try store.read(scope: "account-a"))
     }
 
     private static func document(
@@ -152,9 +185,19 @@ final class NativeSyncStoreTests: XCTestCase {
                     idempotencyKey: key,
                     activityID: activityID,
                     status: "completed",
-                    occurredAt: Date(timeIntervalSince1970: 1_700_000_003)
+                    occurredAt: Date(timeIntervalSince1970: 1_700_000_003),
+                    occurrenceKey: "2026-07-29T09:00:00"
                 )
             )
         )
+    }
+}
+
+private extension NativeSyncMutation {
+    var activityStatus: PendingActivityStatus? {
+        guard case let .activityStatus(status) = kind else {
+            return nil
+        }
+        return status
     }
 }
