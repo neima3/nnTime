@@ -27,6 +27,7 @@ final class SyncConflictPresentationTests: XCTestCase {
             presentation.retryAccessibilityLabel,
             "Retry syncing Inbox capture"
         )
+        XCTAssertTrue(presentation.canRetry)
         XCTAssertEqual(
             presentation.dismissAccessibilityLabel,
             "Dismiss Inbox capture conflict"
@@ -88,7 +89,10 @@ final class SyncConflictPresentationTests: XCTestCase {
                 operation == .taskCreate ? .inbox : .today
             let presentation = try XCTUnwrap(
                 SyncConflictPresentation(
-                    conflict: makeConflict(operation: operation),
+                    conflict: makeConflict(
+                        operation: operation,
+                        payloadTitle: "Call Dr. Private"
+                    ),
                     surface: surface
                 )
             )
@@ -98,12 +102,57 @@ final class SyncConflictPresentationTests: XCTestCase {
                 presentation.message,
                 presentation.retryAccessibilityLabel,
                 presentation.dismissAccessibilityLabel,
-            ].joined(separator: " ")
+            ].compactMap { $0 }.joined(separator: " ")
 
             for sensitiveValue in sensitiveValues {
                 XCTAssertFalse(renderedCopy.contains(sensitiveValue))
             }
         }
+    }
+
+    func testLegacyConflictHidesRetryAndUsesTruthfulDismissOnlyCopy()
+        throws
+    {
+        let presentation = try XCTUnwrap(
+            SyncConflictPresentation(
+                conflict: makeConflict(
+                    operation: .taskCreate,
+                    retryAvailable: false
+                ),
+                surface: .inbox
+            )
+        )
+
+        XCTAssertFalse(presentation.canRetry)
+        XCTAssertNil(presentation.retryAccessibilityLabel)
+        XCTAssertEqual(
+            presentation.message,
+            "This older Inbox capture can’t be retried. Dismiss this notice when you’re ready."
+        )
+        XCTAssertFalse(presentation.message.contains("Retry sync"))
+        XCTAssertEqual(
+            presentation.dismissAccessibilityLabel,
+            "Dismiss Inbox capture conflict"
+        )
+    }
+
+    func testCurrentConflictExposesFunctionalRetryPolicy() throws {
+        let presentation = try XCTUnwrap(
+            SyncConflictPresentation(
+                conflict: makeConflict(
+                    operation: .activityStatus,
+                    retryAvailable: true
+                ),
+                surface: .today
+            )
+        )
+
+        XCTAssertTrue(presentation.canRetry)
+        XCTAssertEqual(
+            presentation.retryAccessibilityLabel,
+            "Retry syncing Activity status change"
+        )
+        XCTAssertTrue(presentation.message.contains("Retry sync"))
     }
 
     func testRetryTargetsExactConflictWithoutAcknowledgingIt() async {
@@ -360,14 +409,58 @@ final class SyncConflictPresentationTests: XCTestCase {
         id: UUID = UUID(),
         mutationID: UUID = UUID(),
         operation: NativeSyncConflict.Operation,
-        reason: NativeSyncConflict.Reason? = .clientError
+        reason: NativeSyncConflict.Reason? = .clientError,
+        retryAvailable: Bool = true,
+        payloadTitle: String = "Synthetic payload"
     ) -> NativeSyncConflict {
         .init(
             id: id,
             mutationID: mutationID,
             operation: operation,
             reason: reason,
-            recordedAt: Date(timeIntervalSince1970: 1_000)
+            recordedAt: Date(timeIntervalSince1970: 1_000),
+            retryMutation:
+                retryAvailable
+                    ? makeMutation(
+                        id: mutationID,
+                        operation: operation,
+                        payloadTitle: payloadTitle
+                    )
+                    : nil
+        )
+    }
+
+    private func makeMutation(
+        id: UUID,
+        operation: NativeSyncConflict.Operation,
+        payloadTitle: String
+    ) -> NativeSyncMutation {
+        let kind: NativeSyncMutation.Kind
+        switch operation {
+        case .taskCreate:
+            kind = .taskCreate(
+                .init(
+                    idempotencyKey: "private-idempotency-key",
+                    title: payloadTitle,
+                    bucket: "inbox"
+                )
+            )
+        case .activityStatus:
+            kind = .activityStatus(
+                .init(
+                    idempotencyKey: "private-idempotency-key",
+                    activityID: "private-activity-id",
+                    status: ActivityStatus.completed.rawValue,
+                    occurredAt: Date(timeIntervalSince1970: 900),
+                    occurrenceKey: "private-occurrence-key"
+                )
+            )
+        }
+        return .init(
+            id: id,
+            createdAt: Date(timeIntervalSince1970: 900),
+            nextAttemptAt: nil,
+            kind: kind
         )
     }
 }

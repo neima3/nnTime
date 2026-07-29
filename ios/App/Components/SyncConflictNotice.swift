@@ -20,7 +20,8 @@ struct SyncConflictPresentation: Equatable, Identifiable {
     let operationLabel: String
     let title: String
     let message: String
-    let retryAccessibilityLabel: String
+    let canRetry: Bool
+    let retryAccessibilityLabel: String?
     let dismissAccessibilityLabel: String
 
     init?(
@@ -33,19 +34,24 @@ struct SyncConflictPresentation: Equatable, Identifiable {
         id = conflict.id
         operation = conflict.operation
         title = "Server version kept"
+        canRetry = conflict.retryMutation != nil
 
         switch conflict.operation {
         case .taskCreate:
             operationLabel = "Inbox capture"
-            message =
-                "Your Inbox capture couldn’t be saved. Retry sync, or dismiss this notice."
+            message = canRetry
+                ? "Your Inbox capture couldn’t be saved. Retry sync, or dismiss this notice."
+                : "This older Inbox capture can’t be retried. Dismiss this notice when you’re ready."
         case .activityStatus:
             operationLabel = "Activity status change"
-            message =
-                "Your activity status change couldn’t be applied. Retry sync, or dismiss this notice."
+            message = canRetry
+                ? "Your activity status change couldn’t be applied. Retry sync, or dismiss this notice."
+                : "This older activity status change can’t be retried. Dismiss this notice when you’re ready."
         }
 
-        retryAccessibilityLabel = "Retry syncing \(operationLabel)"
+        retryAccessibilityLabel = canRetry
+            ? "Retry syncing \(operationLabel)"
+            : nil
         dismissAccessibilityLabel = "Dismiss \(operationLabel) conflict"
     }
 }
@@ -152,38 +158,44 @@ struct SyncConflictNotice: View {
             }
 
             HStack(spacing: 8) {
-                Button {
-                    Task {
-                        await model.retry(
-                            conflictID: presentation.id,
-                            retry: onRetry
+                if let retryLabel =
+                    presentation.retryAccessibilityLabel
+                {
+                    Button {
+                        Task {
+                            await model.retry(
+                                conflictID: presentation.id,
+                                retry: onRetry
+                            )
+                        }
+                    } label: {
+                        HStack(spacing: 7) {
+                            if model.isRetrying {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .tint(.kCatRoseInk)
+                            }
+                            Text(model.isRetrying ? "Retrying…" : "Retry")
+                                .font(.kBody(13, weight: .bold))
+                        }
+                        .frame(minHeight: 44)
+                        .padding(.horizontal, 16)
+                        .background(
+                            Capsule()
+                                .fill(
+                                    Color.kSurfaceRaised.opacity(0.72)
+                                )
                         )
                     }
-                } label: {
-                    HStack(spacing: 7) {
-                        if model.isRetrying {
-                            ProgressView()
-                                .controlSize(.small)
-                                .tint(.kCatRoseInk)
-                        }
-                        Text(model.isRetrying ? "Retrying…" : "Retry")
-                            .font(.kBody(13, weight: .bold))
-                    }
-                    .frame(minHeight: 44)
-                    .padding(.horizontal, 16)
-                    .background(
-                        Capsule()
-                            .fill(Color.kSurfaceRaised.opacity(0.72))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.kCatRoseInk)
+                    .disabled(model.isRetrying)
+                    .accessibilityLabel(
+                        model.isRetrying
+                            ? "Retrying \(presentation.operationLabel) sync"
+                            : retryLabel
                     )
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(Color.kCatRoseInk)
-                .disabled(model.isRetrying)
-                .accessibilityLabel(
-                    model.isRetrying
-                        ? "Retrying \(presentation.operationLabel) sync"
-                        : presentation.retryAccessibilityLabel
-                )
 
                 Button {
                     Task {
