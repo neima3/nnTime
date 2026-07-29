@@ -123,10 +123,32 @@ final class OfflineTodayMutationTests: XCTestCase {
             TodayLoadPolicy.noticeMode(
                 mutationsLocked: false,
                 usingCachedDay: false,
-                hasVisiblePending: true
+                hasDurableVisiblePending: true,
+                hasSubmittingVisible: false
             ),
             .savedOnDevice
         )
+    }
+
+    func testSubmittingWithoutDurableWriteDoesNotClaimSavedOnDevice() {
+        XCTAssertEqual(
+            TodayLoadPolicy.noticeMode(
+                mutationsLocked: false,
+                usingCachedDay: false,
+                hasDurableVisiblePending: false,
+                hasSubmittingVisible: true
+            ),
+            .hidden
+        )
+    }
+
+    func testCurrentResponseDateMismatchRecoversToLockedUnavailableState() {
+        let state = TodayLoadPolicy.responseDateMismatchState()
+
+        XCTAssertTrue(state.blocks.isEmpty)
+        XCTAssertTrue(state.mutationsLocked)
+        XCTAssertFalse(state.usingCachedDay)
+        XCTAssertFalse(state.loading)
     }
 
     func testPendingOnlineRowOmitsCompletionAccessibilityAction() {

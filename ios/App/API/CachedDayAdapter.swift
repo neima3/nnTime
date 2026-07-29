@@ -141,6 +141,7 @@ struct TodayLoadPolicy {
         let blocks: [DayBlock]
         let usingCachedDay: Bool
         let mutationsLocked: Bool
+        let loading: Bool
     }
 
     static func shouldApply(
@@ -156,22 +157,28 @@ struct TodayLoadPolicy {
         .init(
             blocks: cachedBlocks ?? [],
             usingCachedDay: cachedBlocks != nil,
-            mutationsLocked: true
+            mutationsLocked: true,
+            loading: false
         )
     }
 
     static func noticeMode(
         mutationsLocked: Bool,
         usingCachedDay: Bool,
-        hasVisiblePending: Bool
+        hasDurableVisiblePending: Bool,
+        hasSubmittingVisible _: Bool
     ) -> NoticeMode {
-        if hasVisiblePending {
+        if hasDurableVisiblePending {
             return .savedOnDevice
         }
         if mutationsLocked {
             return usingCachedDay ? .savedDay : .dayUnavailable
         }
         return .hidden
+    }
+
+    static func responseDateMismatchState() -> FailureState {
+        failureState(cachedBlocks: nil)
     }
 }
 

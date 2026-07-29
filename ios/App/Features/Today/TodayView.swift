@@ -21,7 +21,7 @@ struct TodayView: View {
     @State private var showTemplates = false
     @State private var usingCachedDay = false
     @State private var mutationsLocked = false
-    @State private var inFlightOccurrences:
+    @State private var submittingOccurrences:
         Set<OfflineTodayOccurrenceIdentity> = []
     @State private var latestLoadID = UUID()
     @State private var cachedMutationFailure:
@@ -89,7 +89,7 @@ struct TodayView: View {
                                 },
                                 onOpen: { block in editingBlock = block },
                                 onMove: { block, newStart in Task { await move(block, to: newStart) } },
-                                pendingOccurrences: pendingOccurrences
+                                pendingOccurrences: disabledOccurrences
                             )
                             .padding(.horizontal, 16)
                             .padding(.bottom, 120)
@@ -432,7 +432,7 @@ struct TodayView: View {
         HStack(alignment: .top, spacing: 10) {
             Image(
                 systemName:
-                    pendingOccurrences.isEmpty
+                    durablePendingOccurrences.isEmpty
                         ? "lock.doc"
                         : "checkmark.icloud"
             )
@@ -453,9 +453,9 @@ struct TodayView: View {
                         ? "Couldn’t save that change. Try again when your connection returns."
                         : cachedMutationFailure == .cachePersistence
                             ? "Your protected change is waiting to sync, but this saved-day view could not update."
-                        : pendingOccurrences.isEmpty
+                        : durablePendingOccurrences.isEmpty
                             ? "You can complete activities here. Other changes need a connection."
-                            : "Your change is protected and will sync when you reconnect."
+                            : "Your change is protected and will sync automatically."
                 )
                 .font(.kBody(12))
             }
@@ -475,27 +475,46 @@ struct TodayView: View {
                 ? "Saved day. Change not saved. Try again when your connection returns."
                 : cachedMutationFailure == .cachePersistence
                     ? "Saved on this iPhone. Protected change pending sync. Saved day view could not update."
-                    : pendingOccurrences.isEmpty
+                    : durablePendingOccurrences.isEmpty
                         ? "Saved day. Completion is available. Other changes need a connection."
                         : "Saved on this iPhone. Change pending sync."
         )
     }
 
-    private var pendingOccurrences:
+    private var durablePendingOccurrences:
         Set<OfflineTodayOccurrenceIdentity>
     {
         CachedDayAdapter.visiblePendingOccurrences(
             app.pendingActivityStatuses,
-            inFlight: inFlightOccurrences,
+            inFlight: [],
             blocks: blocks
         )
+    }
+
+    private var visibleSubmittingOccurrences:
+        Set<OfflineTodayOccurrenceIdentity>
+    {
+        CachedDayAdapter.visiblePendingOccurrences(
+            [],
+            inFlight: submittingOccurrences,
+            blocks: blocks
+        )
+    }
+
+    private var disabledOccurrences:
+        Set<OfflineTodayOccurrenceIdentity>
+    {
+        durablePendingOccurrences.union(visibleSubmittingOccurrences)
     }
 
     private var noticeMode: TodayLoadPolicy.NoticeMode {
         TodayLoadPolicy.noticeMode(
             mutationsLocked: mutationsLocked,
             usingCachedDay: usingCachedDay,
-            hasVisiblePending: !pendingOccurrences.isEmpty
+            hasDurableVisiblePending:
+                !durablePendingOccurrences.isEmpty,
+            hasSubmittingVisible:
+                !visibleSubmittingOccurrences.isEmpty
         )
     }
 
@@ -532,12 +551,22 @@ struct TodayView: View {
             let day = try await KairoAPI.shared.day(dateStr)
             guard
                 latestLoadID == loadID,
-                dayOffset == requestedOffset,
-                TodayLoadPolicy.shouldApply(
-                    responseDate: day.date,
-                    requestedDate: dateStr
-                )
+                dayOffset == requestedOffset
             else {
+                return
+            }
+            guard TodayLoadPolicy.shouldApply(
+                responseDate: day.date,
+                requestedDate: dateStr
+            ) else {
+                let mismatch =
+                    TodayLoadPolicy.responseDateMismatchState()
+                blocks = mismatch.blocks
+                usingCachedDay = mismatch.usingCachedDay
+                mutationsLocked = mismatch.mutationsLocked
+                loadError = "This day could not be verified. Try again."
+                loading = mismatch.loading
+                app.offlineReadOnly = true
                 return
             }
             let zone = TimeZone(identifier: day.zone) ?? app.timezone
@@ -695,7 +724,7 @@ struct TodayView: View {
             let identity,
             OfflineTodayMutationPolicy.cachedDay.canBegin(
                 identity,
-                pending: pendingOccurrences
+                pending: disabledOccurrences
             )
         else {
             return
@@ -710,7 +739,7 @@ struct TodayView: View {
         } catch {
             return
         }
-        inFlightOccurrences.insert(identity)
+        submittingOccurrences.insert(identity)
         let mutation = OfflineTodayStatusMutation(
             enqueue: { activityID, status, occurredAt, key in
                 _ = try await app.enqueueActivityStatus(
@@ -738,7 +767,7 @@ struct TodayView: View {
                 block: block,
                 done: done
             ) { renderedDone in
-                inFlightOccurrences.remove(identity)
+                submittingOccurrences.remove(identity)
                 if renderedDone == done {
                     blocks = optimisticBlocks
                 } else {
@@ -757,11 +786,11 @@ struct TodayView: View {
         } catch let failure as OfflineTodayStatusMutation.Failure {
             cachedMutationFailure = failure.stage
             if failure.stage == .enqueue {
-                inFlightOccurrences.remove(identity)
+                submittingOccurrences.remove(identity)
             }
         } catch {
             cachedMutationFailure = .enqueue
-            inFlightOccurrences.remove(identity)
+            submittingOccurrences.remove(identity)
         }
     }
 }
