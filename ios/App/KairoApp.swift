@@ -53,8 +53,10 @@ final class AppState {
     private let syncCoordinator: NativeSyncCoordinator
     private let signOutAction: @Sendable () async -> Void
     private let invalidateSessionAction: @Sendable () async -> Void
+    private let dayCachePurge: @Sendable () throws -> Void
 
     var pendingSyncCount = 0
+    var pendingActivityStatuses: [NativeSyncPendingActivityStatus] = []
     var syncConflicts: [NativeSyncConflict] = []
     var isSyncing = false
     var lastSuccessfulSyncAt: Date?
@@ -68,6 +70,9 @@ final class AppState {
         },
         invalidateSessionAction: @escaping @Sendable () async -> Void = {
             await KairoAPI.shared.invalidateSession()
+        },
+        dayCachePurge: @escaping @Sendable () throws -> Void = {
+            try DayCache.purge()
         }
     ) {
         self.syncCoordinator = syncCoordinator ?? NativeSyncCoordinator(
@@ -76,6 +81,7 @@ final class AppState {
         )
         self.signOutAction = signOutAction
         self.invalidateSessionAction = invalidateSessionAction
+        self.dayCachePurge = dayCachePurge
     }
 
     // MARK: Accessibility modes (I1)
@@ -254,6 +260,7 @@ final class AppState {
     private func publishSyncPresentation(scope: String) async throws {
         let snapshot = try await syncCoordinator.snapshot(scope: scope)
         pendingSyncCount = snapshot.pendingCount
+        pendingActivityStatuses = snapshot.pendingActivityStatuses
         syncConflicts = snapshot.conflicts
         lastSuccessfulSyncAt = snapshot.lastSuccessfulSyncAt
     }
@@ -276,6 +283,7 @@ final class AppState {
 
     private func clearSyncPresentation() {
         pendingSyncCount = 0
+        pendingActivityStatuses = []
         syncConflicts = []
         isSyncing = false
         lastSuccessfulSyncAt = nil
@@ -595,8 +603,8 @@ final class AppState {
     }
 
     private func purgeLocalState() async throws {
+        try dayCachePurge()
         try await purgeSyncState()
-        DayCache.clear()
         URLCache.shared.removeAllCachedResponses()
         await NotificationManager.cancelActivityReminders()
         KairoPrefs.clearAccountState()

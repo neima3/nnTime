@@ -33,6 +33,55 @@ final class NativeSyncAppStateTests: XCTestCase {
         XCTAssertNil(app.lastSuccessfulSyncAt)
     }
 
+    func testActivationPublishesDurablePendingActivityStatus() async throws {
+        let (app, coordinator) = try makeApp()
+        try await coordinator.activate(scope: "account-a")
+        _ = try await coordinator.enqueueActivityStatus(
+            activityID: "activity-1",
+            status: .completed,
+            occurredAt: Date(),
+            occurrenceKey: "occurrence-1"
+        )
+
+        try await app.activateSync(scope: "account-a")
+
+        XCTAssertEqual(app.pendingActivityStatuses.count, 1)
+        XCTAssertEqual(
+            app.pendingActivityStatuses.first?.activityID,
+            "activity-1"
+        )
+    }
+
+    func testDayCachePurgeFailureFailsClosedBeforeSyncPurge() async throws {
+        let (baseApp, coordinator) = try makeApp()
+        let app = AppState(
+            syncCoordinator: coordinator,
+            signOutAction: {},
+            invalidateSessionAction: {},
+            dayCachePurge: { throw TestDayCachePurgeError.denied }
+        )
+        app.auth = .signedIn
+        app.sessionScope = "account-a"
+        try await app.activateSync(scope: "account-a")
+        _ = try await app.enqueueActivityStatus(
+            activityID: "activity-1",
+            status: .completed,
+            occurredAt: Date(),
+            occurrenceKey: "occurrence-1"
+        )
+        _ = baseApp
+
+        await app.signOut()
+
+        XCTAssertEqual(app.auth, .connectionRequired)
+        XCTAssertEqual(app.sessionScope, "account-a")
+        XCTAssertEqual(app.pendingActivityStatuses.count, 1)
+        let retained = try await coordinator.snapshot(
+            scope: "account-a"
+        )
+        XCTAssertEqual(retained.pendingCount, 1)
+    }
+
     func testLogoutPurgesCoordinatorAndPresentation() async throws {
         let (app, coordinator) = try makeApp()
         app.sessionScope = "account-a"
@@ -126,6 +175,44 @@ final class NativeSyncAppStateTests: XCTestCase {
         XCTAssertNotNil(app.lastSuccessfulSyncAt)
         _ = try await app.enqueueTaskCreate(title: "Refresh", bucket: "inbox")
         await app.synchronize()
+        await app.synchronize()
+
+        XCTAssertEqual(notificationCount, 1)
+    }
+
+    func testCursorOnlyAdvancementPostsCompletionNotification() async throws {
+        let transport = AppStateSyncTransport(
+            changesPages: [
+                .init(
+                    entries: [
+                        .init(
+                            id: "change-1",
+                            entityType: "activity",
+                            entityID: "activity-1",
+                            operation: "updated",
+                            revision: 2,
+                            occurredAt: Date()
+                        ),
+                    ],
+                    nextCursor: nil,
+                    checkpointCursor: "change-1"
+                ),
+            ]
+        )
+        let (app, _) = try makeApp(transport: transport)
+        app.auth = .signedIn
+        app.sessionScope = "account-a"
+        try await app.activateSync(scope: "account-a")
+        var notificationCount = 0
+        let observer = NotificationCenter.default.addObserver(
+            forName: .kairoSyncCompleted,
+            object: nil,
+            queue: nil
+        ) { _ in
+            notificationCount += 1
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+
         await app.synchronize()
 
         XCTAssertEqual(notificationCount, 1)
@@ -532,6 +619,7 @@ private actor AppStateSyncTransport: NativeSyncTransport {
     private let beforeTaskOutcome: @Sendable () -> Void
     private var nextTaskOutcome = 0
     private var nextChangeOutcome = 0
+    private var changesPages: [ChangesPage]
     private var suspendChanges = false
     private var suspendTaskCreate = false
     private var changesStarted = false
@@ -548,12 +636,14 @@ private actor AppStateSyncTransport: NativeSyncTransport {
     init(
         taskOutcomes: [AppStateTransportOutcome] = [],
         changeOutcomes: [AppStateTransportOutcome] = [],
+        changesPages: [ChangesPage] = [],
         suspendChanges: Bool = false,
         suspendTaskCreate: Bool = false,
         beforeTaskOutcome: @escaping @Sendable () -> Void = {}
     ) {
         self.taskOutcomes = taskOutcomes
         self.changeOutcomes = changeOutcomes
+        self.changesPages = changesPages
         self.suspendChanges = suspendChanges
         self.suspendTaskCreate = suspendTaskCreate
         self.beforeTaskOutcome = beforeTaskOutcome
@@ -625,7 +715,14 @@ private actor AppStateSyncTransport: NativeSyncTransport {
             nextChangeOutcome += 1
             try outcome.resolve()
         }
-        return .init(entries: [], nextCursor: nil, checkpointCursor: nil)
+        guard !changesPages.isEmpty else {
+            return .init(
+                entries: [],
+                nextCursor: nil,
+                checkpointCursor: nil
+            )
+        }
+        return changesPages.removeFirst()
     }
 
     func waitUntilChangesStarts() async {
@@ -664,6 +761,10 @@ private actor AppStateSyncTransport: NativeSyncTransport {
         taskCreateCancellationWaiters.removeAll()
         waiters.forEach { $0.resume() }
     }
+}
+
+private enum TestDayCachePurgeError: Error {
+    case denied
 }
 
 private enum AppStateTransportOutcome: Sendable {

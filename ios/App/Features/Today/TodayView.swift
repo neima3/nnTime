@@ -20,8 +20,10 @@ struct TodayView: View {
     @State private var ritualDismissedDay = ""
     @State private var showTemplates = false
     @State private var usingCachedDay = false
-    @State private var pendingOccurrences:
+    @State private var mutationsLocked = false
+    @State private var inFlightOccurrences:
         Set<OfflineTodayOccurrenceIdentity> = []
+    @State private var latestLoadID = UUID()
     @State private var cachedMutationFailure:
         OfflineTodayStatusMutation.Failure.Stage?
     /// 0 = today, ±n days.
@@ -38,7 +40,7 @@ struct TodayView: View {
                     ProgressView().tint(.kIris)
                 } else if blocks.isEmpty {
                     VStack(spacing: 14) {
-                        if usingCachedDay {
+                        if noticeMode != .hidden {
                             cachedNotice
                                 .padding(.horizontal, 16)
                         }
@@ -50,7 +52,7 @@ struct TodayView: View {
                             header
                                 .padding(.horizontal, 20)
                                 .padding(.top, 8)
-                            if usingCachedDay {
+                            if noticeMode != .hidden {
                                 cachedNotice
                                     .padding(.horizontal, 16)
                                     .padding(.top, 10)
@@ -68,7 +70,7 @@ struct TodayView: View {
                             TimelineCanvas(
                                 blocks: blocks,
                                 nowMin: nowMin,
-                                readOnly: usingCachedDay,
+                                readOnly: mutationsLocked,
                                 onComplete: { block in Task { await toggle(block) } },
                                 onDelete: { block in Task { await remove(block) } },
                                 onFocus: { block in
@@ -102,7 +104,7 @@ struct TodayView: View {
                     }
                 }
 
-                if !usingCachedDay {
+                if !mutationsLocked {
                     fab
                 }
             }
@@ -119,7 +121,7 @@ struct TodayView: View {
                                 .foregroundStyle(Color.kInkSoft)
                         }
                         .accessibilityLabel("Previous day")
-                        if !usingCachedDay,
+                        if !mutationsLocked,
                            dayOffset == 0,
                            blocks.contains(where: { !$0.done })
                         {
@@ -159,7 +161,7 @@ struct TodayView: View {
                                 .foregroundStyle(Color.kInkSoft)
                         }
                         .accessibilityLabel("Search")
-                        if !usingCachedDay,
+                        if !mutationsLocked,
                            dayOffset == 0,
                            blocks.contains(where: { !$0.done })
                         {
@@ -196,7 +198,10 @@ struct TodayView: View {
             .sheet(isPresented: $showTemplates, onDismiss: { Task { await load() } }) {
                 NavigationStack { TemplatesView() }
             }
-            .refreshable { await load() }
+            .refreshable {
+                await app.synchronize()
+                await load()
+            }
         }
         .task { await load() }
         .onReceive(tick) { _ in nowMin = KTime.nowMinutes(in: app.timezone) }
@@ -204,7 +209,6 @@ struct TodayView: View {
             Task { await load() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .kairoSyncCompleted)) { _ in
-            pendingOccurrences.removeAll()
             Task { await load() }
         }
     }
@@ -234,7 +238,7 @@ struct TodayView: View {
     /// Day Rituals (parity) — a morning kickoff on a sparse day, an evening
     /// shutdown when things are still open. Time-windowed, once per day.
     private var dayRitual: AnyView? {
-        guard dayOffset == 0, !usingCachedDay else { return nil }
+        guard dayOffset == 0, !mutationsLocked else { return nil }
         let today = KTime.dateString(Date(), zone: .current)
         guard ritualDismissedDay != today else { return nil }
         let hour = Calendar.current.component(.hour, from: Date())
@@ -290,7 +294,7 @@ struct TodayView: View {
     /// window, once per day. Fed by the stats focus-hours data.
     private var peakNudge: AnyView? {
         guard dayOffset == 0,
-              !usingCachedDay,
+              !mutationsLocked,
               let peak = peakHour
         else {
             return nil
@@ -399,15 +403,16 @@ struct TodayView: View {
                 .font(.kDisplay(22))
                 .foregroundStyle(Color.kInk)
             Text(
-                usingCachedDay
-                    ? "This saved day has no scheduled activities."
-                    : loadError ?? "Nothing scheduled yet. Add your first activity and watch it take shape."
+                loadError
+                    ?? (usingCachedDay
+                        ? "This saved day has no scheduled activities."
+                        : "Nothing scheduled yet. Add your first activity and watch it take shape.")
             )
                 .font(.kBody(14.5))
                 .foregroundStyle(Color.kInkSoft)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
-            if !usingCachedDay {
+            if !mutationsLocked {
                 Button {
                     editorStart = 9 * 60
                     showEditor = true
@@ -434,13 +439,17 @@ struct TodayView: View {
                 .font(.system(size: 14, weight: .semibold))
             VStack(alignment: .leading, spacing: 2) {
                 Text(
-                    pendingOccurrences.isEmpty
+                    noticeMode == .dayUnavailable
+                        ? "Day unavailable"
+                        : noticeMode == .savedDay
                         ? "Saved day"
                         : "Saved on this iPhone"
                 )
                     .font(.kBody(13, weight: .bold))
                 Text(
-                    cachedMutationFailure == .enqueue
+                    noticeMode == .dayUnavailable
+                        ? "Reconnect to load this day."
+                        : cachedMutationFailure == .enqueue
                         ? "Couldn’t save that change. Try again when your connection returns."
                         : cachedMutationFailure == .cachePersistence
                             ? "Your protected change is waiting to sync, but this saved-day view could not update."
@@ -460,13 +469,33 @@ struct TodayView: View {
         )
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            cachedMutationFailure == .enqueue
+            noticeMode == .dayUnavailable
+                ? "Day unavailable. Reconnect to load this day."
+                : cachedMutationFailure == .enqueue
                 ? "Saved day. Change not saved. Try again when your connection returns."
                 : cachedMutationFailure == .cachePersistence
                     ? "Saved on this iPhone. Protected change pending sync. Saved day view could not update."
                     : pendingOccurrences.isEmpty
                         ? "Saved day. Completion is available. Other changes need a connection."
                         : "Saved on this iPhone. Change pending sync."
+        )
+    }
+
+    private var pendingOccurrences:
+        Set<OfflineTodayOccurrenceIdentity>
+    {
+        CachedDayAdapter.visiblePendingOccurrences(
+            app.pendingActivityStatuses,
+            inFlight: inFlightOccurrences,
+            blocks: blocks
+        )
+    }
+
+    private var noticeMode: TodayLoadPolicy.NoticeMode {
+        TodayLoadPolicy.noticeMode(
+            mutationsLocked: mutationsLocked,
+            usingCachedDay: usingCachedDay,
+            hasVisiblePending: !pendingOccurrences.isEmpty
         )
     }
 
@@ -490,23 +519,44 @@ struct TodayView: View {
     // MARK: Data
 
     private func load() async {
-        nowMin = dayOffset == 0 ? KTime.nowMinutes(in: app.timezone) : -1
+        let requestedOffset = dayOffset
         let dateStr = KTime.dateString(viewedDate, zone: app.timezone)
+        let loadID = UUID()
+        latestLoadID = loadID
+        loading = true
+        nowMin = requestedOffset == 0
+            ? KTime.nowMinutes(in: app.timezone)
+            : -1
         date = dateStr
         do {
             let day = try await KairoAPI.shared.day(dateStr)
+            guard
+                latestLoadID == loadID,
+                dayOffset == requestedOffset,
+                TodayLoadPolicy.shouldApply(
+                    responseDate: day.date,
+                    requestedDate: dateStr
+                )
+            else {
+                return
+            }
             let zone = TimeZone(identifier: day.zone) ?? app.timezone
-            blocks = day.activities
+            let serverBlocks = day.activities
                 .map { $0.block(in: zone, category: app.category(for: $0.categoryId)) }
                 .sorted { $0.startMin < $1.startMin }
+            blocks = CachedDayAdapter.overlayPendingStatuses(
+                app.pendingActivityStatuses,
+                on: serverBlocks
+            )
             loadError = nil
             usingCachedDay = false
-            pendingOccurrences.removeAll()
+            mutationsLocked = false
             cachedMutationFailure = nil
             app.offlineReadOnly = false
-            if dayOffset == 0,
+            if requestedOffset == 0,
                let scope = await KairoAPI.shared.sessionScope()
             {
+                guard latestLoadID == loadID else { return }
                 DayCache.write(
                     scope: scope,
                     date: day.date,
@@ -522,23 +572,44 @@ struct TodayView: View {
                 WidgetCenter.shared.reloadAllTimelines()
             }
         } catch {
+            guard
+                latestLoadID == loadID,
+                dayOffset == requestedOffset
+            else {
+                return
+            }
             if let scope = app.sessionScope,
                let cached = DayCache.read(
                    scope: scope,
                    date: dateStr
                )
             {
-                blocks = CachedDayAdapter.blocks(from: cached)
+                let cachedBlocks = CachedDayAdapter.overlayPendingStatuses(
+                    app.pendingActivityStatuses,
+                    on: CachedDayAdapter.blocks(from: cached)
+                )
+                let failure = TodayLoadPolicy.failureState(
+                    cachedBlocks: cachedBlocks
+                )
+                blocks = failure.blocks
                 loadError = nil
-                usingCachedDay = true
+                usingCachedDay = failure.usingCachedDay
+                mutationsLocked = failure.mutationsLocked
                 app.offlineReadOnly = true
             } else {
+                let failure = TodayLoadPolicy.failureState(
+                    cachedBlocks: nil
+                )
+                blocks = failure.blocks
                 loadError = (error as? APIError)?.errorDescription
-                usingCachedDay = false
+                    ?? "This day isn’t available offline."
+                usingCachedDay = failure.usingCachedDay
+                mutationsLocked = failure.mutationsLocked
+                app.offlineReadOnly = true
             }
         }
         loading = false
-        if dayOffset == 0, !usingCachedDay {
+        if requestedOffset == 0, !mutationsLocked {
             await loadPeak()
             await NotificationManager.reschedule(blocks: blocks, zone: app.timezone)
         }
@@ -582,7 +653,7 @@ struct TodayView: View {
 
     private func toggle(_ block: DayBlock) async {
         let newDone = !block.done
-        if usingCachedDay {
+        if mutationsLocked {
             await toggleCached(block, done: newDone)
             return
         }
@@ -639,7 +710,7 @@ struct TodayView: View {
         } catch {
             return
         }
-        pendingOccurrences.insert(identity)
+        inFlightOccurrences.insert(identity)
         let mutation = OfflineTodayStatusMutation(
             enqueue: { activityID, status, occurredAt, key in
                 _ = try await app.enqueueActivityStatus(
@@ -667,6 +738,7 @@ struct TodayView: View {
                 block: block,
                 done: done
             ) { renderedDone in
+                inFlightOccurrences.remove(identity)
                 if renderedDone == done {
                     blocks = optimisticBlocks
                 } else {
@@ -676,7 +748,6 @@ struct TodayView: View {
                         in: blocks
                     )) ?? blocks
                 }
-                pendingOccurrences.insert(identity)
             }
             if done {
                 UINotificationFeedbackGenerator()
@@ -686,11 +757,11 @@ struct TodayView: View {
         } catch let failure as OfflineTodayStatusMutation.Failure {
             cachedMutationFailure = failure.stage
             if failure.stage == .enqueue {
-                pendingOccurrences.remove(identity)
+                inFlightOccurrences.remove(identity)
             }
         } catch {
             cachedMutationFailure = .enqueue
-            pendingOccurrences.remove(identity)
+            inFlightOccurrences.remove(identity)
         }
     }
 }
@@ -896,6 +967,8 @@ struct BlockCard: View {
                         width: compact ? 26 : 30,
                         height: compact ? 26 : 30
                     )
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
                 }
                 .accessibilityLabel(
                     block.done
@@ -964,7 +1037,8 @@ struct BlockCard: View {
                 pending: pending,
                 onComplete: onComplete,
                 onFocus: onFocus,
-                onDelete: onDelete
+                onDelete: onDelete,
+                onOpen: onOpen
             )
         )
     }
@@ -978,6 +1052,7 @@ private struct BlockAccessibilityModifier: ViewModifier {
     let onComplete: () -> Void
     let onFocus: () -> Void
     let onDelete: () -> Void
+    let onOpen: () -> Void
 
     @ViewBuilder
     func body(content: Content) -> some View {
@@ -988,38 +1063,43 @@ private struct BlockAccessibilityModifier: ViewModifier {
             )
         if readOnly {
             if allowsCompletion {
-                labelled
-                    .accessibilityAddTraits(.isButton)
-                    .accessibilityHint(
-                        pending
-                            ? "Saved on this iPhone and waiting to sync."
-                            : "Double tap to change completion. Other changes need a connection."
+                if pending {
+                    labelled.accessibilityHint(
+                        "Saved on this iPhone and waiting to sync. Completion is temporarily unavailable."
                     )
-                    .accessibilityAction(
-                        named:
-                            block.done
-                                ? "Mark not done"
-                                : "Complete"
-                    ) {
-                        guard !pending else { return }
-                        onComplete()
-                    }
+                } else {
+                    labelled
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityHint(
+                            "Double tap to change completion. Other changes need a connection."
+                        )
+                        .accessibilityAction {
+                            onComplete()
+                        }
+                        .accessibilityAction(
+                            named:
+                                block.done
+                                    ? "Mark not done"
+                                    : "Complete"
+                        ) {
+                            onComplete()
+                        }
+                }
             } else {
                 labelled.accessibilityHint(
                     "Saved activity. Completion is unavailable because this occurrence cannot be identified safely."
                 )
             }
         } else {
-            labelled
+            let interactive = labelled
                 .accessibilityAddTraits(.isButton)
-                .accessibilityHint("Double tap to edit")
-                .accessibilityAction(
-                    named:
-                        block.done
-                            ? "Mark not done"
-                            : "Complete"
-                ) {
-                    onComplete()
+                .accessibilityHint(
+                    pending
+                        ? "Double tap to edit. Completion is saved on this iPhone and temporarily unavailable."
+                        : "Double tap to edit"
+                )
+                .accessibilityAction {
+                    onOpen()
                 }
                 .accessibilityAction(named: "Focus on this") {
                     onFocus()
@@ -1027,6 +1107,22 @@ private struct BlockAccessibilityModifier: ViewModifier {
                 .accessibilityAction(named: "Delete") {
                     onDelete()
                 }
+            if TodayBlockActionPolicy.canExposeCompletionAction(
+                readOnly: false,
+                pending: pending,
+                offlineCompletionEligible: allowsCompletion
+            ) {
+                interactive.accessibilityAction(
+                    named:
+                        block.done
+                            ? "Mark not done"
+                            : "Complete"
+                ) {
+                    onComplete()
+                }
+            } else {
+                interactive
+            }
         }
     }
 }

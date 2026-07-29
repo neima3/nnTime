@@ -2,8 +2,16 @@ import Foundation
 
 struct NativeSyncPresentationSnapshot: Equatable, Sendable {
     var pendingCount: Int
+    var pendingActivityStatuses: [NativeSyncPendingActivityStatus]
     var conflicts: [NativeSyncConflict]
     var lastSuccessfulSyncAt: Date?
+}
+
+struct NativeSyncPendingActivityStatus: Equatable, Sendable {
+    let mutationID: UUID
+    let activityID: String
+    let occurrenceKey: String
+    let status: ActivityStatus
 }
 
 struct NativeSyncSynchronizationResult: Equatable, Sendable {
@@ -72,6 +80,23 @@ actor NativeSyncCoordinator {
         let document = try document(for: scope)
         return .init(
             pendingCount: document.pendingMutations.count,
+            pendingActivityStatuses:
+                document.pendingMutations.compactMap { mutation in
+                    guard
+                        case let .activityStatus(status) = mutation.kind,
+                        let desiredStatus = ActivityStatus(
+                            rawValue: status.status
+                        )
+                    else {
+                        return nil
+                    }
+                    return .init(
+                        mutationID: mutation.id,
+                        activityID: status.activityID,
+                        occurrenceKey: status.occurrenceKey,
+                        status: desiredStatus
+                    )
+                },
             conflicts: document.conflicts,
             lastSuccessfulSyncAt: document.lastSuccessfulSyncAt
         )
@@ -184,6 +209,7 @@ actor NativeSyncCoordinator {
         explicitRetry: Bool
     ) async throws -> NativeSyncSynchronizationResult {
         _ = try requiredActiveScope(matching: scope)
+        let initialPresentationDocument = try document(for: scope)
         var replaySucceeded = false
         var queueBlocked = false
 
@@ -222,13 +248,40 @@ actor NativeSyncCoordinator {
                 }
             }
             if queueBlocked {
-                return .init(refreshRequired: replaySucceeded)
+                let didChangePresentation = try presentationChanged(
+                    from: initialPresentationDocument,
+                    scope: scope
+                )
+                return .init(
+                    refreshRequired:
+                        replaySucceeded
+                            || didChangePresentation
+                )
             }
         }
 
         let feedAdvanced = try await drainChanges(scope: scope)
         try markSuccessfulSync(scope: scope)
-        return .init(refreshRequired: replaySucceeded || feedAdvanced)
+        let didChangePresentation = try presentationChanged(
+            from: initialPresentationDocument,
+            scope: scope
+        )
+        return .init(
+            refreshRequired:
+                replaySucceeded
+                    || feedAdvanced
+                    || didChangePresentation
+        )
+    }
+
+    private func presentationChanged(
+        from initial: NativeSyncDocument,
+        scope: String
+    ) throws -> Bool {
+        let current = try document(for: scope)
+        return initial.pendingMutations.map(\.id)
+            != current.pendingMutations.map(\.id)
+            || initial.conflicts.map(\.id) != current.conflicts.map(\.id)
     }
 
     private func replay(

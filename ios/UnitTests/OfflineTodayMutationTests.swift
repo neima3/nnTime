@@ -49,6 +49,103 @@ final class OfflineTodayMutationTests: XCTestCase {
         )
     }
 
+    func testPendingStatusOverlayUsesLatestDurableDesiredStatus() throws {
+        let block = Self.block()
+        let overlaid = CachedDayAdapter.overlayPendingStatuses(
+            [
+                .init(
+                    mutationID: UUID(),
+                    activityID: block.id,
+                    occurrenceKey: try XCTUnwrap(block.occurrenceKey),
+                    status: .completed
+                ),
+                .init(
+                    mutationID: UUID(),
+                    activityID: block.id,
+                    occurrenceKey: try XCTUnwrap(block.occurrenceKey),
+                    status: .pending
+                ),
+            ],
+            on: [block]
+        )
+
+        XCTAssertFalse(overlaid[0].done)
+    }
+
+    func testLoadResultsApplyOnlyToCurrentRequestedDate() {
+        XCTAssertTrue(
+            TodayLoadPolicy.shouldApply(
+                responseDate: "2026-07-29",
+                requestedDate: "2026-07-29"
+            )
+        )
+        XCTAssertFalse(
+            TodayLoadPolicy.shouldApply(
+                responseDate: "2026-07-29",
+                requestedDate: "2026-07-30"
+            )
+        )
+    }
+
+    func testUncachedFailureClearsStaleBlocksAndLocksMutations() {
+        let state = TodayLoadPolicy.failureState(cachedBlocks: nil)
+
+        XCTAssertTrue(state.blocks.isEmpty)
+        XCTAssertTrue(state.mutationsLocked)
+        XCTAssertFalse(state.usingCachedDay)
+    }
+
+    func testVisiblePendingOccurrencesExcludeAnotherDay() throws {
+        let today = Self.block(
+            activityID: "today",
+            occurrenceKey: "today-occurrence"
+        )
+        let statuses = [
+            NativeSyncPendingActivityStatus(
+                mutationID: UUID(),
+                activityID: "tomorrow",
+                occurrenceKey: "tomorrow-occurrence",
+                status: .completed
+            ),
+        ]
+
+        let visible = CachedDayAdapter.visiblePendingOccurrences(
+            statuses,
+            inFlight: [],
+            blocks: [today]
+        )
+
+        XCTAssertTrue(visible.isEmpty)
+    }
+
+    func testOnlineVisiblePendingRowStillShowsSavedOnDeviceNotice() {
+        XCTAssertEqual(
+            TodayLoadPolicy.noticeMode(
+                mutationsLocked: false,
+                usingCachedDay: false,
+                hasVisiblePending: true
+            ),
+            .savedOnDevice
+        )
+    }
+
+    func testPendingOnlineRowOmitsCompletionAccessibilityAction() {
+        XCTAssertFalse(
+            TodayBlockActionPolicy.canExposeCompletionAction(
+                readOnly: false,
+                pending: true,
+                offlineCompletionEligible: true
+            )
+        )
+        XCTAssertTrue(
+            TodayBlockActionPolicy.canExposeCompletionAction(
+                readOnly: false,
+                pending: false,
+                offlineCompletionEligible: true
+            )
+        )
+    }
+
     func testCompletionUpdateChangesOnlyCompositeIdentity() throws {
         let first = Self.block()
         let second = Self.block(

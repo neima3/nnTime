@@ -72,6 +72,117 @@ enum CachedDayAdapter {
         )
         return updated
     }
+
+    static func overlayPendingStatuses(
+        _ statuses: [NativeSyncPendingActivityStatus],
+        on blocks: [DayBlock]
+    ) -> [DayBlock] {
+        let desired = statuses.reduce(
+            into: [OfflineTodayOccurrenceIdentity: ActivityStatus]()
+        ) { result, pending in
+            guard let identity = OfflineTodayOccurrenceIdentity(
+                activityID: pending.activityID,
+                occurrenceKey: pending.occurrenceKey
+            ) else {
+                return
+            }
+            result[identity] = pending.status
+        }
+        return blocks.map { block in
+            guard
+                let identity = OfflineTodayOccurrenceIdentity(block: block),
+                let status = desired[identity]
+            else {
+                return block
+            }
+            return DayBlock(
+                id: block.id,
+                title: block.title,
+                emoji: block.emoji,
+                startMin: block.startMin,
+                durationMin: block.durationMin,
+                category: block.category,
+                done: status == .completed,
+                recurring: block.recurring,
+                revision: block.revision,
+                occurrenceKey: block.occurrenceKey,
+                checklist: block.checklist
+            )
+        }
+    }
+
+    static func visiblePendingOccurrences(
+        _ statuses: [NativeSyncPendingActivityStatus],
+        inFlight: Set<OfflineTodayOccurrenceIdentity>,
+        blocks: [DayBlock]
+    ) -> Set<OfflineTodayOccurrenceIdentity> {
+        let queued = Set(statuses.compactMap {
+            OfflineTodayOccurrenceIdentity(
+                activityID: $0.activityID,
+                occurrenceKey: $0.occurrenceKey
+            )
+        })
+        let visible = Set(blocks.compactMap {
+            OfflineTodayOccurrenceIdentity(block: $0)
+        })
+        return queued.union(inFlight).intersection(visible)
+    }
+}
+
+struct TodayLoadPolicy {
+    enum NoticeMode: Equatable {
+        case hidden
+        case dayUnavailable
+        case savedDay
+        case savedOnDevice
+    }
+
+    struct FailureState {
+        let blocks: [DayBlock]
+        let usingCachedDay: Bool
+        let mutationsLocked: Bool
+    }
+
+    static func shouldApply(
+        responseDate: String,
+        requestedDate: String
+    ) -> Bool {
+        responseDate == requestedDate
+    }
+
+    static func failureState(
+        cachedBlocks: [DayBlock]?
+    ) -> FailureState {
+        .init(
+            blocks: cachedBlocks ?? [],
+            usingCachedDay: cachedBlocks != nil,
+            mutationsLocked: true
+        )
+    }
+
+    static func noticeMode(
+        mutationsLocked: Bool,
+        usingCachedDay: Bool,
+        hasVisiblePending: Bool
+    ) -> NoticeMode {
+        if hasVisiblePending {
+            return .savedOnDevice
+        }
+        if mutationsLocked {
+            return usingCachedDay ? .savedDay : .dayUnavailable
+        }
+        return .hidden
+    }
+}
+
+struct TodayBlockActionPolicy {
+    static func canExposeCompletionAction(
+        readOnly: Bool,
+        pending: Bool,
+        offlineCompletionEligible: Bool
+    ) -> Bool {
+        !pending && (!readOnly || offlineCompletionEligible)
+    }
 }
 
 struct OfflineTodayOccurrenceIdentity: Hashable {

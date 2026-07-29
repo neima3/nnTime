@@ -15,6 +15,7 @@ final class NativeSyncCoordinatorTests: XCTestCase {
             snapshot,
             NativeSyncPresentationSnapshot(
                 pendingCount: 0,
+                pendingActivityStatuses: [],
                 conflicts: [],
                 lastSuccessfulSyncAt: nil
             )
@@ -41,6 +42,36 @@ final class NativeSyncCoordinatorTests: XCTestCase {
 
         let restored = try await relaunchedCoordinator.snapshot(scope: "account-a")
         XCTAssertEqual(restored.pendingCount, 1)
+    }
+
+    func testColdActivationRestoresTypedPendingActivityStatus() async throws {
+        let (first, store, transport) = try makeCoordinator()
+        try await first.activate(scope: "account-a")
+        let mutation = try await first.enqueueActivityStatus(
+            activityID: "activity-1",
+            status: .completed,
+            occurredAt: now,
+            occurrenceKey: "occurrence-1"
+        )
+        let relaunched = NativeSyncCoordinator(
+            store: store,
+            transport: transport
+        )
+
+        try await relaunched.activate(scope: "account-a")
+        let snapshot = try await relaunched.snapshot(scope: "account-a")
+
+        XCTAssertEqual(
+            snapshot.pendingActivityStatuses,
+            [
+                .init(
+                    mutationID: mutation.id,
+                    activityID: "activity-1",
+                    occurrenceKey: "occurrence-1",
+                    status: .completed
+                ),
+            ]
+        )
     }
 
     func testTaskCreateIsDurableBeforeReturnThenReplaysWithOriginalKey() async throws {
@@ -75,6 +106,7 @@ final class NativeSyncCoordinatorTests: XCTestCase {
         )
         let snapshot = try await coordinator.snapshot(scope: "account-a")
         XCTAssertEqual(snapshot.pendingCount, 0)
+        XCTAssertTrue(snapshot.pendingActivityStatuses.isEmpty)
         XCTAssertEqual(snapshot.lastSuccessfulSyncAt, now)
     }
 
@@ -260,11 +292,93 @@ final class NativeSyncCoordinatorTests: XCTestCase {
             occurrenceKey: "2026-07-29T12:00:00Z"
         )
 
-        _ = try await coordinator.synchronize(scope: "account-a")
+        let result = try await coordinator.synchronize(
+            scope: "account-a"
+        )
 
         let snapshot = try await coordinator.snapshot(scope: "account-a")
         XCTAssertEqual(snapshot.pendingCount, 0)
+        XCTAssertTrue(snapshot.pendingActivityStatuses.isEmpty)
+        XCTAssertTrue(result.refreshRequired)
         XCTAssertEqual(snapshot.conflicts.first?.reason, .activityMissing)
+    }
+
+    func testPartialReplayPublishesOnlyExactRemainingActivityStatus() async throws {
+        let (coordinator, _, _) = try makeCoordinator(
+            uuids: [
+                UUID(uuidString: "00000000-0000-0000-0000-000000000031")!,
+                UUID(uuidString: "00000000-0000-0000-0000-000000000032")!,
+            ],
+            activityRevisions: [1, 2],
+            statusOutcomes: [.success, .network]
+        )
+        try await coordinator.activate(scope: "account-a")
+        _ = try await coordinator.enqueueActivityStatus(
+            activityID: "activity-1",
+            status: .completed,
+            occurredAt: now,
+            occurrenceKey: "occurrence-1"
+        )
+        _ = try await coordinator.enqueueActivityStatus(
+            activityID: "activity-2",
+            status: .pending,
+            occurredAt: now,
+            occurrenceKey: "occurrence-2"
+        )
+
+        _ = try await coordinator.synchronize(scope: "account-a")
+        let snapshot = try await coordinator.snapshot(scope: "account-a")
+
+        XCTAssertEqual(
+            snapshot.pendingActivityStatuses.map(\.activityID),
+            ["activity-2"]
+        )
+        XCTAssertEqual(
+            snapshot.pendingActivityStatuses.map(\.status),
+            [.pending]
+        )
+    }
+
+    func testCursorOnlyRefreshRetainsExactPendingActivityStatus() async throws {
+        let (coordinator, _, _) = try makeCoordinator(
+            statusOutcomes: [.network],
+            changes: [
+                .init(
+                    entries: [
+                        .init(
+                            id: "change-1",
+                            entityType: "activity",
+                            entityID: "activity-2",
+                            operation: "updated",
+                            revision: 3,
+                            occurredAt: now
+                        ),
+                    ],
+                    nextCursor: nil,
+                    checkpointCursor: "change-1"
+                ),
+            ]
+        )
+        try await coordinator.activate(scope: "account-a")
+        _ = try await coordinator.enqueueActivityStatus(
+            activityID: "activity-1",
+            status: .completed,
+            occurredAt: now,
+            occurrenceKey: "occurrence-1"
+        )
+        _ = try await coordinator.synchronize(scope: "account-a")
+
+        let cursorOnly = try await coordinator.synchronize(
+            scope: "account-a"
+        )
+        let snapshot = try await coordinator.snapshot(scope: "account-a")
+
+        XCTAssertTrue(cursorOnly.refreshRequired)
+        XCTAssertEqual(snapshot.pendingActivityStatuses.count, 1)
+        XCTAssertEqual(
+            snapshot.pendingActivityStatuses.first?.activityID,
+            "activity-1"
+        )
     }
 
     func testRetryableFailuresPersistCappedBackoffAndExplicitRetryBypassesIt() async throws {

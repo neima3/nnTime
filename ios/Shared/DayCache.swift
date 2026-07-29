@@ -252,6 +252,11 @@ enum DayCache {
         removeLegacyCache()
     }
 
+    static func purge() throws {
+        try store.clear()
+        removeLegacyCache()
+    }
+
     private static var cacheDirectory: URL {
         if let group = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: suiteName
