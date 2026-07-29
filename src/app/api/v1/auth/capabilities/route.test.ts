@@ -16,6 +16,7 @@ describe("GET /api/v1/auth/capabilities", () => {
     mocks.getAuthCapabilities.mockReturnValue({
       magicLink: true,
       apple: false,
+      google: true,
     });
   });
 
@@ -26,6 +27,7 @@ describe("GET /api/v1/auth/capabilities", () => {
     expect(await response.json()).toEqual({
       magicLink: true,
       apple: false,
+      google: true,
     });
     expect(response.headers.get("cache-control")).toBe("public, no-store");
     expect(mocks.getAuthCapabilities).toHaveBeenCalledWith(process.env);

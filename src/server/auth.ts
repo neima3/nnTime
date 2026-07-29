@@ -14,6 +14,7 @@ import {
   accountSecurityOptions,
   createAppleProviderOptions,
   getAppleAuthConfig,
+  getGoogleProviderOptions,
   getTrustedOrigins,
 } from "./auth-capabilities";
 import { buildMagicLinkDeliveryUrl } from "./native-magic-link";
@@ -22,6 +23,14 @@ const appleConfig = getAppleAuthConfig(process.env);
 const appleProvider = appleConfig
   ? await createAppleProviderOptions(appleConfig)
   : null;
+const googleProvider = getGoogleProviderOptions(process.env);
+const socialProviders =
+  appleProvider || googleProvider
+    ? {
+        ...(appleProvider ? { apple: appleProvider } : {}),
+        ...(googleProvider ? { google: googleProvider } : {}),
+      }
+    : undefined;
 
 async function deliverAuthEmail(
   kind: string,
@@ -55,7 +64,7 @@ export const auth = betterAuth({
       ? "https://time.neima.me"
       : "http://localhost:3000"),
   trustedOrigins: getTrustedOrigins(process.env),
-  socialProviders: appleProvider ? { apple: appleProvider } : undefined,
+  socialProviders,
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,

@@ -7,6 +7,7 @@ type Environment = Readonly<Record<string, string | undefined>>;
 export type AuthCapabilities = Readonly<{
   magicLink: boolean;
   apple: boolean;
+  google: boolean;
 }>;
 
 export type AppleAuthConfig = Readonly<{
@@ -21,6 +22,18 @@ export type AppleProfile = Readonly<{
   sub: string;
   email?: string | null;
   name?: string | null;
+}>;
+
+export type GoogleAuthConfig = Readonly<{
+  clientIds: readonly [web: string, ios: string];
+  clientSecret: string;
+}>;
+
+export type GoogleProviderOptions = Readonly<{
+  clientId: [web: string, ios: string];
+  clientSecret: string;
+  scope: [];
+  prompt: "select_account";
 }>;
 
 export const accountSecurityOptions = Object.freeze({
@@ -66,12 +79,46 @@ export function getAppleAuthConfig(
   };
 }
 
+export function getGoogleAuthConfig(
+  environment: Environment,
+): GoogleAuthConfig | null {
+  const webClientId = configured(environment.GOOGLE_WEB_CLIENT_ID);
+  const iosClientId = configured(environment.GOOGLE_IOS_CLIENT_ID);
+  const clientSecret = configured(environment.GOOGLE_CLIENT_SECRET);
+
+  if (!webClientId || !iosClientId || !clientSecret) {
+    return null;
+  }
+
+  return Object.freeze({
+    clientIds: Object.freeze([webClientId, iosClientId] as const),
+    clientSecret,
+  });
+}
+
+export function getGoogleProviderOptions(
+  environment: Environment,
+): GoogleProviderOptions | null {
+  const config = getGoogleAuthConfig(environment);
+  if (!config) {
+    return null;
+  }
+
+  return {
+    clientId: [...config.clientIds],
+    clientSecret: config.clientSecret,
+    scope: [],
+    prompt: "select_account",
+  };
+}
+
 export function getAuthCapabilities(
   environment: Environment,
 ): AuthCapabilities {
   return Object.freeze({
     magicLink: configured(environment.RESEND_API_KEY) !== null,
     apple: getAppleAuthConfig(environment) !== null,
+    google: getGoogleAuthConfig(environment) !== null,
   });
 }
 

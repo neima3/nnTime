@@ -4,7 +4,7 @@
  * Settings personalization — PATCH /api/v1/settings (10× Phase 11).
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Accessibility,
   Bell,
@@ -14,6 +14,7 @@ import {
   User,
 } from "lucide-react";
 import { invalidateSettingsCache } from "@/lib/settings-cache";
+import { authClient } from "@/lib/auth-client";
 import { publishHourCycle } from "@/lib/use-hour-cycle";
 import { toHourCycle } from "@/lib/time-format";
 import {
@@ -32,6 +33,11 @@ import {
 } from "@/lib/quiet-hours";
 import { SignedOutCard, SkeletonRows } from "./EmptyState";
 import { PushReminders } from "./PushReminders";
+import {
+  ConnectedSignInMethods,
+  loadConnectedProviders,
+  startGoogleLink,
+} from "./google-auth-flow";
 
 type Settings = {
   timezone: string;
@@ -356,6 +362,15 @@ export function SettingsClient() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [authed, setAuthed] = useState(true);
+  const [connectedProviders, setConnectedProviders] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [googleAvailable, setGoogleAvailable] = useState(false);
+  const [methodsLoading, setMethodsLoading] = useState(true);
+  const [linkingGoogle, setLinkingGoogle] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  const methodsLoadStarted = useRef(false);
+  const googleLinkLock = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -396,6 +411,41 @@ export function SettingsClient() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!authed || !settings || methodsLoadStarted.current) {
+      return;
+    }
+
+    let cancelled = false;
+    methodsLoadStarted.current = true;
+    void Promise.all([
+      loadConnectedProviders(() => authClient.listAccounts()),
+      fetch("/api/v1/auth/capabilities")
+        .then((response) => (response.ok ? response.json() : null))
+        .then((capabilities) => capabilities?.google === true)
+        .catch(() => false),
+    ])
+      .then(([providers, available]) => {
+        if (cancelled) return;
+        setConnectedProviders(providers);
+        setGoogleAvailable(available);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLinkError("Couldn’t load connected sign-in methods.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setMethodsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authed, settings]);
 
   const patch = useCallback(
     async (partial: Partial<Settings>) => {
@@ -542,6 +592,15 @@ export function SettingsClient() {
     window.location.href = "/";
   }, [deleteConfirm]);
 
+  const linkGoogle = useCallback(() => {
+    void startGoogleLink({
+      invoke: (options) => authClient.linkSocial(options),
+      lock: googleLinkLock,
+      setPending: setLinkingGoogle,
+      setError: setLinkError,
+    });
+  }, []);
+
   if (!authed) {
     return (
       <SignedOutCard
@@ -566,6 +625,15 @@ export function SettingsClient() {
           {status}
         </p>
       )}
+
+      <ConnectedSignInMethods
+        googleAvailable={googleAvailable}
+        connectedProviders={connectedProviders}
+        loading={methodsLoading}
+        linking={linkingGoogle}
+        error={linkError}
+        onLinkGoogle={linkGoogle}
+      />
 
       <Section icon={Palette} title="Appearance">
         <Row

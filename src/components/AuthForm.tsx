@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { ArrowRight, Loader2, Mail } from "lucide-react";
+import { useRef, useState } from "react";
+import { ArrowRight, Globe2, Loader2, Mail } from "lucide-react";
 import { signIn, signUp } from "@/lib/auth-client";
 import { detectTimezone } from "@/lib/timezone";
+import type { AuthCapabilities } from "@/server/auth-capabilities";
+import { startGoogleSignIn } from "./google-auth-flow";
 
 type Mode = "sign-in" | "sign-up";
 
@@ -14,7 +16,13 @@ type Mode = "sign-in" | "sign-up";
  * Without Resend: reset/magic still accept and return generic success
  * (no account enumeration); server logs the URL in non-production.
  */
-export function AuthForm({ mode }: { mode: Mode }) {
+export function AuthForm({
+  mode,
+  capabilities,
+}: {
+  mode: Mode;
+  capabilities: AuthCapabilities;
+}) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -23,6 +31,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [info, setInfo] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [magicPending, setMagicPending] = useState(false);
+  const [googlePending, setGooglePending] = useState(false);
+  const googleLock = useRef(false);
 
   const isSignUp = mode === "sign-up";
 
@@ -84,6 +94,16 @@ export function AuthForm({ mode }: { mode: Mode }) {
       setError("Couldn't reach the server — try again?");
     }
     setMagicPending(false);
+  }
+
+  function onGoogleSignIn() {
+    void startGoogleSignIn({
+      mode,
+      invoke: (options) => signIn.social(options),
+      lock: googleLock,
+      setPending: setGooglePending,
+      setError,
+    });
   }
 
   return (
@@ -198,6 +218,38 @@ export function AuthForm({ mode }: { mode: Mode }) {
               )}
             </button>
           )}
+
+          {capabilities.google && (
+            <>
+              <div className="my-4 flex items-center gap-3" aria-hidden="true">
+                <span className="h-px flex-1 bg-border" />
+                <span className="text-[12px] font-medium text-ink-faint">
+                  or continue with
+                </span>
+                <span className="h-px flex-1 bg-border" />
+              </div>
+              <button
+                type="button"
+                aria-label="Continue with Google"
+                aria-busy={googlePending}
+                disabled={googlePending}
+                onClick={onGoogleSignIn}
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl border border-border bg-surface px-4 text-[14px] font-semibold text-ink-soft transition-colors hover:bg-surface-sunken hover:text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {googlePending ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+                    Connecting…
+                  </>
+                ) : (
+                  <>
+                    <Globe2 size={17} aria-hidden="true" />
+                    Continue with Google
+                  </>
+                )}
+              </button>
+            </>
+          )}
         </div>
 
         <p className="mt-5 text-center text-[14px] text-ink-soft">
@@ -236,4 +288,3 @@ function Field({
     </label>
   );
 }
-

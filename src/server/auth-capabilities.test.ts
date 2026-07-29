@@ -8,6 +8,8 @@ import {
   createAppleProviderOptions,
   getAppleAuthConfig,
   getAuthCapabilities,
+  getGoogleAuthConfig,
+  getGoogleProviderOptions,
   getTrustedOrigins,
   mapAppleProfile,
 } from "./auth-capabilities";
@@ -20,20 +22,29 @@ const completeAppleEnv = {
   APPLE_APP_BUNDLE_IDENTIFIER: APPLE_NATIVE_BUNDLE_ID,
 };
 
+const completeGoogleEnv = {
+  GOOGLE_WEB_CLIENT_ID: "google-web-client.apps.googleusercontent.com",
+  GOOGLE_IOS_CLIENT_ID: "google-ios-client.apps.googleusercontent.com",
+  GOOGLE_CLIENT_SECRET: "google-client-secret",
+};
+
 describe("native auth capability configuration", () => {
   it("exposes only completely configured delivery methods", () => {
     expect(getAuthCapabilities({})).toEqual({
       magicLink: false,
       apple: false,
+      google: false,
     });
     expect(
       getAuthCapabilities({
         RESEND_API_KEY: "re_live",
         ...completeAppleEnv,
+        ...completeGoogleEnv,
       }),
     ).toEqual({
       magicLink: true,
       apple: true,
+      google: true,
     });
   });
 
@@ -47,6 +58,7 @@ describe("native auth capability configuration", () => {
     ).toEqual({
       magicLink: false,
       apple: false,
+      google: false,
     });
     expect(
       getAppleAuthConfig({
@@ -54,6 +66,64 @@ describe("native auth capability configuration", () => {
         APPLE_TEAM_ID: "",
       }),
     ).toBeNull();
+  });
+
+  it.each([
+    ["web client ID", { GOOGLE_WEB_CLIENT_ID: " " }],
+    ["iOS client ID", { GOOGLE_IOS_CLIENT_ID: "\n" }],
+    ["client secret", { GOOGLE_CLIENT_SECRET: "" }],
+  ])("fails Google closed when the %s is blank", (_label, override) => {
+    const environment = { ...completeGoogleEnv, ...override };
+
+    expect(getGoogleAuthConfig(environment)).toBeNull();
+    expect(getGoogleProviderOptions(environment)).toBeNull();
+    expect(getAuthCapabilities(environment)).toEqual({
+      magicLink: false,
+      apple: false,
+      google: false,
+    });
+  });
+
+  it.each([
+    [{ GOOGLE_WEB_CLIENT_ID: completeGoogleEnv.GOOGLE_WEB_CLIENT_ID }],
+    [{ GOOGLE_IOS_CLIENT_ID: completeGoogleEnv.GOOGLE_IOS_CLIENT_ID }],
+    [{ GOOGLE_CLIENT_SECRET: completeGoogleEnv.GOOGLE_CLIENT_SECRET }],
+    [
+      {
+        GOOGLE_WEB_CLIENT_ID: completeGoogleEnv.GOOGLE_WEB_CLIENT_ID,
+        GOOGLE_IOS_CLIENT_ID: completeGoogleEnv.GOOGLE_IOS_CLIENT_ID,
+      },
+    ],
+  ])("fails Google closed for partial configuration %#", (environment) => {
+    expect(getGoogleAuthConfig(environment)).toBeNull();
+    expect(getGoogleProviderOptions(environment)).toBeNull();
+  });
+
+  it("builds an immutable dual-audience Google provider with identity-only defaults", () => {
+    const config = getGoogleAuthConfig({
+      GOOGLE_WEB_CLIENT_ID: `  ${completeGoogleEnv.GOOGLE_WEB_CLIENT_ID} `,
+      GOOGLE_IOS_CLIENT_ID: ` ${completeGoogleEnv.GOOGLE_IOS_CLIENT_ID}\n`,
+      GOOGLE_CLIENT_SECRET: ` ${completeGoogleEnv.GOOGLE_CLIENT_SECRET} `,
+    });
+
+    expect(config).toEqual({
+      clientIds: [
+        "google-web-client.apps.googleusercontent.com",
+        "google-ios-client.apps.googleusercontent.com",
+      ],
+      clientSecret: "google-client-secret",
+    });
+    expect(Object.isFrozen(config)).toBe(true);
+    expect(Object.isFrozen(config?.clientIds)).toBe(true);
+    expect(getGoogleProviderOptions(completeGoogleEnv)).toEqual({
+      clientId: [
+        "google-web-client.apps.googleusercontent.com",
+        "google-ios-client.apps.googleusercontent.com",
+      ],
+      clientSecret: "google-client-secret",
+      scope: [],
+      prompt: "select_account",
+    });
   });
 
   it("normalizes multiline private keys and pins the native audience", () => {
