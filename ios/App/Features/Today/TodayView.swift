@@ -203,6 +203,9 @@ struct TodayView: View {
                 await load()
             }
         }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            SyncStatusNotices(surface: .today)
+        }
         .task { await load() }
         .onReceive(tick) { _ in nowMin = KTime.nowMinutes(in: app.timezone) }
         .onReceive(NotificationCenter.default.publisher(for: .kairoDayChanged)) { _ in

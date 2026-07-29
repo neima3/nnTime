@@ -347,6 +347,9 @@ struct InboxView: View {
                 )
             }
         }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            SyncStatusNotices(surface: .inbox)
+        }
         .task { await load() }
         .onReceive(
             NotificationCenter.default.publisher(for: .kairoSyncCompleted)

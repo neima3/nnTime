@@ -62,6 +62,8 @@ final class AppState {
     var syncConflicts: [NativeSyncConflict] = []
     var isSyncing = false
     var lastSuccessfulSyncAt: Date?
+    var lastReplayedOperations: [NativeSyncConflict.Operation] = []
+    var syncReplayConfirmationGeneration = 0
     var syncStorageUnavailable = false
     private var syncSuspendedForAuthTransition = false
 
@@ -229,6 +231,7 @@ final class AppState {
         }
         guard let scope = sessionScope else { return }
         guard !isSyncing else { return }
+        let pendingBefore = pendingOperationMap
         isSyncing = true
         defer { isSyncing = false }
         do {
@@ -239,6 +242,7 @@ final class AppState {
             guard sessionScope == scope else { return }
             await refreshSyncPresentation(scope: scope)
             guard sessionScope == scope else { return }
+            publishReplayConfirmation(from: pendingBefore)
             if result.refreshRequired {
                 NotificationCenter.default.post(name: .kairoSyncCompleted, object: nil)
             }
@@ -249,6 +253,7 @@ final class AppState {
                 underlyingError = partial.underlying
                 await refreshSyncPresentation(scope: scope)
                 guard sessionScope == scope else { return }
+                publishReplayConfirmation(from: pendingBefore)
                 if partial.refreshRequired {
                     NotificationCenter.default.post(
                         name: .kairoSyncCompleted,
@@ -333,6 +338,34 @@ final class AppState {
         syncConflicts = []
         isSyncing = false
         lastSuccessfulSyncAt = nil
+        lastReplayedOperations = []
+    }
+
+    private var pendingOperationMap:
+        [UUID: NativeSyncConflict.Operation]
+    {
+        var operations = Dictionary(
+            uniqueKeysWithValues: pendingTaskCreates.map {
+                ($0.mutationID, NativeSyncConflict.Operation.taskCreate)
+            }
+        )
+        for status in pendingActivityStatuses {
+            operations[status.mutationID] = .activityStatus
+        }
+        return operations
+    }
+
+    private func publishReplayConfirmation(
+        from pendingBefore: [UUID: NativeSyncConflict.Operation]
+    ) {
+        let operations = SyncReplayConfirmationPolicy.operations(
+            before: pendingBefore,
+            afterPendingIDs: Set(pendingOperationMap.keys),
+            conflicts: syncConflicts
+        )
+        guard !operations.isEmpty else { return }
+        lastReplayedOperations = operations
+        syncReplayConfirmationGeneration += 1
     }
 
     private func enterSyncStorageFailure() {
