@@ -294,6 +294,10 @@ final class SyncReplayConfirmationModel {
         presentation = nil
         return true
     }
+
+    func clearForDisappearance() {
+        _ = clear(ifGeneration: expirationGeneration)
+    }
 }
 
 struct SyncConflictNotice: View {
@@ -568,6 +572,7 @@ struct SyncStatusNotices: View {
         .onDisappear {
             confirmationTask?.cancel()
             confirmationTask = nil
+            confirmationModel.clearForDisappearance()
         }
     }
 

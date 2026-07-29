@@ -388,6 +388,32 @@ final class SyncConflictPresentationTests: XCTestCase {
         XCTAssertNil(model.presentation)
     }
 
+    func testDisappearanceClearsReplayConfirmationAndFencesItsStaleExpiry() {
+        let model = SyncReplayConfirmationModel()
+        var announcementCount = 0
+
+        let disappearedGeneration = model.show(
+            operation: .taskCreate,
+            announce: { _ in announcementCount += 1 }
+        )
+        model.clearForDisappearance()
+
+        XCTAssertNil(model.presentation)
+        XCTAssertEqual(announcementCount, 1)
+
+        let returnedGeneration = model.show(
+            operation: .taskCreate,
+            announce: { _ in announcementCount += 1 }
+        )
+
+        XCTAssertEqual(returnedGeneration, 2)
+        XCTAssertEqual(announcementCount, 2)
+        XCTAssertFalse(
+            model.clear(ifGeneration: disappearedGeneration)
+        )
+        XCTAssertNotNil(model.presentation)
+    }
+
     func testAppPublishesMintStateOnlyAfterSuccessfulReplay() async throws {
         let (app, _) = try makeApp(
             transport: SyncConflictPresentationTransport()
