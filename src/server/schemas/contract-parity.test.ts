@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { requestSchemaRegistry, responseSchemaRegistry } from "./index";
+import { changesResponse } from "./change";
 
 const SPEC_PATH = resolve(process.cwd(), "api/openapi.yaml");
 
@@ -107,6 +108,30 @@ describe("ADR-002: OpenAPI ↔ zod parity (CI drift gate)", () => {
     const paths = spec.paths ?? {};
     expect(paths["/changes"]).toBeDefined();
     expect(paths["/changes"]?.get).toBeDefined();
+  });
+
+  it("requires the authoritative changes checkpoint in zod and OpenAPI", () => {
+    const response = {
+      items: [],
+      nextCursor: null,
+      checkpointCursor: "12",
+    };
+    expect(changesResponse.safeParse(response).success).toBe(true);
+    expect(
+      changesResponse.safeParse({
+        items: [],
+        nextCursor: null,
+      }).success,
+    ).toBe(false);
+
+    const schema = spec.components?.schemas?.ChangesResponse as
+      | {
+          required?: string[];
+          properties?: Record<string, unknown>;
+        }
+      | undefined;
+    expect(schema?.required).toContain("checkpointCursor");
+    expect(schema?.properties).toHaveProperty("checkpointCursor");
   });
 
   it("the batch endpoint exists (ADR-002 ordered operations)", () => {

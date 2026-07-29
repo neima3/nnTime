@@ -34,6 +34,11 @@ export const changesResponse = z.object({
   items: z.array(changeLogEntry),
   /** Null when the feed is exhausted; pass back as ?cursor= otherwise. */
   nextCursor: z.string().nullable(),
+  /**
+   * Authoritative durable checkpoint. This may move backward when a server
+   * restore invalidates a cursor previously issued to the client.
+   */
+  checkpointCursor: z.string(),
 });
 
 export type ChangeLogEntry = z.infer<typeof changeLogEntry>;
