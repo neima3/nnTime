@@ -576,6 +576,10 @@ final class AppState {
         authGeneration += 1
     }
 
+    func cancelAuthCallbackTransition() {
+        syncSuspendedForAuthTransition = false
+    }
+
     func finishAuthCallbackFailure() async {
         guard case .signedIn = auth else {
             do {
@@ -700,10 +704,12 @@ struct RootView: View {
         guard AuthCallback.parse(url) != nil else {
             return
         }
-        await app.beginAuthCallback()
         let outcome = await authCoordinator.handle(
             url,
             currentScope: app.sessionScope,
+            prepareForAuthentication: {
+                await app.beginAuthCallback()
+            },
             redeem: { token in
 #if DEBUG
                 if let fixture {
@@ -735,6 +741,8 @@ struct RootView: View {
         )
         if outcome == .failed {
             await app.finishAuthCallbackFailure()
+        } else if outcome == .cancelled {
+            app.cancelAuthCallbackTransition()
         }
     }
 

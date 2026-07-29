@@ -16,6 +16,7 @@ final class NativeAuthCoordinator {
         case duplicate
         case completed
         case blocked
+        case cancelled
         case failed
     }
 
@@ -39,6 +40,7 @@ final class NativeAuthCoordinator {
     func handle(
         _ url: URL,
         currentScope: String?,
+        prepareForAuthentication: () async -> Void = {},
         redeem: (String) async throws
             -> NativeSessionController.PersistResult,
         prepareForAccountSwitch: (String) async -> Bool,
@@ -60,6 +62,7 @@ final class NativeAuthCoordinator {
         phase = .verifying
 
         do {
+            await prepareForAuthentication()
             let session: NativeSessionController.PersistResult =
                 try await redeem(callback.token)
             if session.replacedScope != nil
@@ -76,7 +79,7 @@ final class NativeAuthCoordinator {
             return .completed
         } catch is CancellationError {
             phase = .idle
-            return .ignored
+            return .cancelled
         } catch {
             phase = .failed(Self.message(for: error))
             return .failed

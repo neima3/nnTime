@@ -339,6 +339,68 @@ final class NativeSyncAppStateTests: XCTestCase {
         XCTAssertEqual(callsAfterBlockedRetry, 1)
     }
 
+    func testCompletedDuplicateLeavesLaterSynchronizationAvailable() async throws {
+        let transport = AppStateSyncTransport()
+        let (app, _) = try makeApp(transport: transport)
+        app.auth = .signedIn
+        app.sessionScope = "account-a"
+        try await app.activateSync(scope: "account-a")
+        _ = try await app.enqueueTaskCreate(title: "Keep me", bucket: "inbox")
+        let authCoordinator = NativeAuthCoordinator()
+        let url = URL(string: "kairo://auth?token=completed-duplicate")!
+
+        _ = await authCoordinator.handle(
+            url,
+            currentScope: nil,
+            prepareForAuthentication: {},
+            redeem: { _ in .init(scope: "account-a", replacedScope: nil) },
+            prepareForAccountSwitch: { _ in true },
+            bootstrap: {}
+        )
+        let duplicate = await authCoordinator.handle(
+            url,
+            currentScope: nil,
+            prepareForAuthentication: {
+                await app.beginAuthCallback()
+            },
+            redeem: { _ in .init(scope: "account-a", replacedScope: nil) },
+            prepareForAccountSwitch: { _ in true },
+            bootstrap: {}
+        )
+
+        XCTAssertEqual(duplicate, .duplicate)
+        await app.synchronize()
+        let callCount = await transport.callCount
+        XCTAssertEqual(callCount, 2)
+    }
+
+    func testCancelledAuthCallbackResumesLaterSynchronization() async throws {
+        let transport = AppStateSyncTransport()
+        let (app, _) = try makeApp(transport: transport)
+        app.auth = .signedIn
+        app.sessionScope = "account-a"
+        try await app.activateSync(scope: "account-a")
+        _ = try await app.enqueueTaskCreate(title: "Keep me", bucket: "inbox")
+        let authCoordinator = NativeAuthCoordinator()
+
+        let outcome = await authCoordinator.handle(
+            URL(string: "kairo://auth?token=cancelled-transition")!,
+            currentScope: "account-a",
+            prepareForAuthentication: {
+                await app.beginAuthCallback()
+            },
+            redeem: { _ in throw CancellationError() },
+            prepareForAccountSwitch: { _ in true },
+            bootstrap: {}
+        )
+
+        XCTAssertEqual(outcome, .cancelled)
+        app.cancelAuthCallbackTransition()
+        await app.synchronize()
+        let callCount = await transport.callCount
+        XCTAssertEqual(callCount, 2)
+    }
+
     func testSuccessfulSignOutPurgesCoordinatorAndPresentation() async throws {
         let (app, coordinator) = try makeApp()
         app.sessionScope = "account-a"

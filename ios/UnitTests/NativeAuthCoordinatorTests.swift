@@ -122,6 +122,43 @@ final class NativeAuthCoordinatorTests: XCTestCase {
         XCTAssertEqual(values, ["redeem"])
     }
 
+    func testCompletedDuplicateDoesNotRunPreRedeemFreeze() async {
+        let coordinator = NativeAuthCoordinator()
+        let recorder = CoordinatorRecorder()
+        let url = URL(string: "kairo://auth?token=completed-duplicate")!
+
+        _ = await coordinator.handle(
+            url,
+            currentScope: nil,
+            prepareForAuthentication: {
+                await recorder.append("freeze")
+            },
+            redeem: { _ in
+                await recorder.append("redeem")
+                return .init(scope: "scope-a", replacedScope: nil)
+            },
+            prepareForAccountSwitch: { _ in true },
+            bootstrap: {}
+        )
+        let duplicate = await coordinator.handle(
+            url,
+            currentScope: nil,
+            prepareForAuthentication: {
+                await recorder.append("duplicate-freeze")
+            },
+            redeem: { _ in
+                await recorder.append("duplicate-redeem")
+                return .init(scope: "scope-a", replacedScope: nil)
+            },
+            prepareForAccountSwitch: { _ in true },
+            bootstrap: {}
+        )
+
+        let values = await recorder.values
+        XCTAssertEqual(duplicate, .duplicate)
+        XCTAssertEqual(values, ["freeze", "redeem"])
+    }
+
     func testFailureReturnsActionableSignedOutPresentation() async {
         let coordinator = NativeAuthCoordinator()
 
