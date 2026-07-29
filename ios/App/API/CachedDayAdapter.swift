@@ -157,6 +157,13 @@ struct TodayLoadPolicy {
         responseDate == requestedDate
     }
 
+    static func isCurrentScope(
+        requested: String,
+        current: String?
+    ) -> Bool {
+        requested == current
+    }
+
     static func failureState(
         cachedBlocks: [DayBlock]?
     ) -> FailureState {

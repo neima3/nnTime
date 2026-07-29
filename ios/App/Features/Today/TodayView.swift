@@ -541,6 +541,10 @@ struct TodayView: View {
     // MARK: Data
 
     private func load() async {
+        guard let requestedScope = app.sessionScope else {
+            loading = false
+            return
+        }
         let requestedOffset = dayOffset
         let dateStr = KTime.dateString(viewedDate, zone: app.timezone)
         let loadID = UUID()
@@ -554,7 +558,11 @@ struct TodayView: View {
             let day = try await KairoAPI.shared.day(dateStr)
             guard
                 latestLoadID == loadID,
-                dayOffset == requestedOffset
+                dayOffset == requestedOffset,
+                TodayLoadPolicy.isCurrentScope(
+                    requested: requestedScope,
+                    current: app.sessionScope
+                )
             else {
                 return
             }
@@ -585,12 +593,19 @@ struct TodayView: View {
             mutationsLocked = false
             cachedMutationFailure = nil
             app.offlineReadOnly = false
-            if requestedOffset == 0,
-               let scope = await KairoAPI.shared.sessionScope()
-            {
-                guard latestLoadID == loadID else { return }
+            if requestedOffset == 0 {
+                guard
+                    latestLoadID == loadID,
+                    TodayLoadPolicy.isCurrentScope(
+                        requested: requestedScope,
+                        current: app.sessionScope
+                    ),
+                    await KairoAPI.shared.sessionScope() == requestedScope
+                else {
+                    return
+                }
                 DayCache.write(
-                    scope: scope,
+                    scope: requestedScope,
                     date: day.date,
                     zone: day.zone,
                     blocks: blocks.map {
@@ -606,13 +621,16 @@ struct TodayView: View {
         } catch {
             guard
                 latestLoadID == loadID,
-                dayOffset == requestedOffset
+                dayOffset == requestedOffset,
+                TodayLoadPolicy.isCurrentScope(
+                    requested: requestedScope,
+                    current: app.sessionScope
+                )
             else {
                 return
             }
-            if let scope = app.sessionScope,
-               let cached = DayCache.read(
-                   scope: scope,
+            if let cached = DayCache.read(
+                   scope: requestedScope,
                    date: dateStr
                )
             {
@@ -640,18 +658,37 @@ struct TodayView: View {
                 app.offlineReadOnly = true
             }
         }
+        guard TodayLoadPolicy.isCurrentScope(
+            requested: requestedScope,
+            current: app.sessionScope
+        ) else {
+            return
+        }
         loading = false
         if requestedOffset == 0, !mutationsLocked {
-            await loadPeak()
+            await loadPeak(scope: requestedScope)
+            guard TodayLoadPolicy.isCurrentScope(
+                requested: requestedScope,
+                current: app.sessionScope
+            ) else {
+                return
+            }
             await NotificationManager.reschedule(blocks: blocks, zone: app.timezone)
         }
     }
 
     /// Pull the peak-focus hour from stats (only worth showing today).
-    private func loadPeak() async {
+    private func loadPeak(scope: String) async {
         peakDismissedDay = UserDefaults.standard.string(forKey: "kairo.peakNudgeDismissed") ?? ""
         ritualDismissedDay = UserDefaults.standard.string(forKey: "kairo.ritualDismissed") ?? ""
-        guard let stats = try? await KairoAPI.shared.stats(),
+        let stats = try? await KairoAPI.shared.stats()
+        guard TodayLoadPolicy.isCurrentScope(
+            requested: scope,
+            current: app.sessionScope
+        ) else {
+            return
+        }
+        guard let stats,
               let hours = stats.focusHours,
               Insights.focusSessionCount(hours.hours) >= Insights.peakMinSessions else {
             peakHour = nil
@@ -764,7 +801,8 @@ struct TodayView: View {
                     activityID: activityID,
                     status: status,
                     occurredAt: occurredAt,
-                    occurrenceKey: key
+                    occurrenceKey: key,
+                    scope: scope
                 )
             },
             persist: { scope, date, activityID, key, done in
@@ -785,6 +823,9 @@ struct TodayView: View {
                 block: block,
                 done: done
             ) { renderedDone in
+                guard app.sessionScope == scope else {
+                    return
+                }
                 submittingOccurrences.remove(identity)
                 let disposition = renderDisposition()
                 guard disposition != .differentVisibleDay else {
@@ -802,25 +843,34 @@ struct TodayView: View {
                     )) ?? blocks
                 }
             }
-            if done,
+            if app.sessionScope == scope,
+               done,
                renderDisposition() != .differentVisibleDay
             {
                 UINotificationFeedbackGenerator()
                     .notificationOccurred(.success)
             }
-            WidgetCenter.shared.reloadAllTimelines()
+            if app.sessionScope == scope {
+                WidgetCenter.shared.reloadAllTimelines()
+            }
         } catch let failure as OfflineTodayStatusMutation.Failure {
-            if renderDisposition() != .differentVisibleDay {
+            if app.sessionScope == scope,
+               renderDisposition() != .differentVisibleDay
+            {
                 cachedMutationFailure = failure.stage
             }
-            if failure.stage == .enqueue {
+            if app.sessionScope == scope,
+               failure.stage == .enqueue
+            {
                 submittingOccurrences.remove(identity)
             }
         } catch {
-            if renderDisposition() != .differentVisibleDay {
+            if app.sessionScope == scope,
+               renderDisposition() != .differentVisibleDay
+            {
                 cachedMutationFailure = .enqueue
+                submittingOccurrences.remove(identity)
             }
-            submittingOccurrences.remove(identity)
         }
     }
 }

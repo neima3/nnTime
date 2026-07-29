@@ -111,6 +111,30 @@ final class NativeSyncAppStateTests: XCTestCase {
         await assertInactive(coordinator, scope: "account-a")
     }
 
+    func testStaleActivityStatusEnqueueCannotEnterNewAccountQueue() async throws {
+        let (app, coordinator) = try makeApp()
+        app.sessionScope = "account-a"
+        try await app.activateSync(scope: "account-a")
+
+        await app.prepareForAccountSwitch(newScope: "account-b")
+        try await app.activateSync(scope: "account-b")
+
+        do {
+            _ = try await app.enqueueActivityStatus(
+                activityID: "private-activity-a",
+                status: .completed,
+                occurredAt: Date(),
+                occurrenceKey: "private-occurrence-a",
+                scope: "account-a"
+            )
+            XCTFail("Expected the stale account scope to be rejected")
+        } catch NativeSyncCoordinatorError.inactiveScope {}
+
+        let current = try await coordinator.snapshot(scope: "account-b")
+        XCTAssertEqual(current.pendingCount, 0)
+        XCTAssertTrue(current.pendingActivityStatuses.isEmpty)
+    }
+
     func testStructured401UsesExistingFullSessionInvalidationBoundary() async throws {
         let transport = AppStateSyncTransport(taskOutcomes: [.http(401)])
         let (app, coordinator) = try makeApp(transport: transport)

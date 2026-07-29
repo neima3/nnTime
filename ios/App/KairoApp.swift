@@ -229,15 +229,25 @@ final class AppState {
         activityID: String,
         status: ActivityStatus,
         occurredAt: Date,
-        occurrenceKey: String
+        occurrenceKey: String,
+        scope expectedScope: String? = nil
     ) async throws -> NativeSyncMutation {
+        guard let scope = expectedScope ?? sessionScope,
+              sessionScope == scope
+        else {
+            throw NativeSyncCoordinatorError.inactiveScope
+        }
         let mutation = try await syncCoordinator.enqueueActivityStatus(
             activityID: activityID,
             status: status,
             occurredAt: occurredAt,
-            occurrenceKey: occurrenceKey
+            occurrenceKey: occurrenceKey,
+            scope: scope
         )
-        await refreshSyncPresentationForCurrentScope()
+        guard sessionScope == scope else {
+            throw NativeSyncCoordinatorError.inactiveScope
+        }
+        await refreshSyncPresentation(scope: scope)
         return mutation
     }
 

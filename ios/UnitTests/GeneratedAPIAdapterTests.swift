@@ -395,7 +395,8 @@ final class GeneratedAPIAdapterTests: XCTestCase {
                 "entityId":"activity-1","op":"upsert","revision":7,
                 "occurredAt":"2026-07-28T13:00:00Z"
               }],
-              "nextCursor":"cursor-42"
+              "nextCursor":"cursor-42",
+              "checkpointCursor":"42"
             }
             """
         )
@@ -407,10 +408,10 @@ final class GeneratedAPIAdapterTests: XCTestCase {
         XCTAssertEqual(page.entries.map(\.id), ["42"])
         XCTAssertEqual(page.entries.first?.operation, "upsert")
         XCTAssertEqual(page.nextCursor, "cursor-42")
-        XCTAssertEqual(page.checkpointCursor, "cursor-42")
+        XCTAssertEqual(page.checkpointCursor, "42")
     }
 
-    func testChangesCheckpointAdvancesOrPreservesTheRequestedCursor() throws {
+    func testChangesCheckpointAdvancesOrRewindsFromServerAuthority() throws {
         let exhaustedChanges = try decode(
             Components.Schemas.ChangesResponse.self,
             """
@@ -420,35 +421,30 @@ final class GeneratedAPIAdapterTests: XCTestCase {
                 "entityId":"activity-1","op":"upsert","revision":8,
                 "occurredAt":"2026-07-28T14:00:00Z"
               }],
-              "nextCursor":null
+              "nextCursor":null,
+              "checkpointCursor":"43"
             }
             """
         )
         let exhaustedOutput: Operations.getChanges.Output = .ok(
             .init(body: .json(exhaustedChanges))
         )
-        let exhausted = try GeneratedAPIAdapters.changes(
-            exhaustedOutput,
-            requestCursor: "42"
-        )
+        let exhausted = try GeneratedAPIAdapters.changes(exhaustedOutput)
 
         XCTAssertNil(exhausted.nextCursor)
         XCTAssertEqual(exhausted.checkpointCursor, "43")
 
         let emptyChanges = try decode(
             Components.Schemas.ChangesResponse.self,
-            #"{"items":[],"nextCursor":null}"#
+            #"{"items":[],"nextCursor":null,"checkpointCursor":"12"}"#
         )
         let emptyOutput: Operations.getChanges.Output = .ok(
             .init(body: .json(emptyChanges))
         )
-        let empty = try GeneratedAPIAdapters.changes(
-            emptyOutput,
-            requestCursor: "43"
-        )
+        let empty = try GeneratedAPIAdapters.changes(emptyOutput)
 
         XCTAssertNil(empty.nextCursor)
-        XCTAssertEqual(empty.checkpointCursor, "43")
+        XCTAssertEqual(empty.checkpointCursor, "12")
     }
 
     func testMalformedGeneratedEnumAndUnexpectedOutputFailHonestly() throws {

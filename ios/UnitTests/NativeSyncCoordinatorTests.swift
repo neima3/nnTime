@@ -340,7 +340,7 @@ final class NativeSyncCoordinatorTests: XCTestCase {
         )
     }
 
-    func testCursorOnlyRefreshRetainsExactPendingActivityStatus() async throws {
+    func testChangeFeedRefreshDuringBackoffRetainsExactPendingActivityStatus() async throws {
         let (coordinator, _, _) = try makeCoordinator(
             statusOutcomes: [.network],
             changes: [
@@ -367,14 +367,12 @@ final class NativeSyncCoordinatorTests: XCTestCase {
             occurredAt: now,
             occurrenceKey: "occurrence-1"
         )
-        _ = try await coordinator.synchronize(scope: "account-a")
-
-        let cursorOnly = try await coordinator.synchronize(
+        let feedRefresh = try await coordinator.synchronize(
             scope: "account-a"
         )
         let snapshot = try await coordinator.snapshot(scope: "account-a")
 
-        XCTAssertTrue(cursorOnly.refreshRequired)
+        XCTAssertTrue(feedRefresh.refreshRequired)
         XCTAssertEqual(snapshot.pendingActivityStatuses.count, 1)
         XCTAssertEqual(
             snapshot.pendingActivityStatuses.first?.activityID,
@@ -406,6 +404,53 @@ final class NativeSyncCoordinatorTests: XCTestCase {
         let replayed = try await coordinator.snapshot(scope: "account-a")
         XCTAssertEqual(explicitEvents.filter(\.isTaskCreate).count, 2)
         XCTAssertEqual(replayed.pendingCount, 0)
+    }
+
+    func testRetryBackoffStillDrainsIndependentChangesFeed() async throws {
+        let (coordinator, store, transport) = try makeCoordinator(
+            taskOutcomes: [.network],
+            changes: [
+                .init(
+                    entries: [],
+                    nextCursor: nil,
+                    checkpointCursor: "remote-change-7"
+                ),
+            ]
+        )
+        try await coordinator.activate(scope: "account-a")
+        _ = try await coordinator.enqueueTaskCreate(
+            title: "Retry later",
+            bucket: "inbox"
+        )
+
+        _ = try await coordinator.synchronize(scope: "account-a")
+        let firstEvents = await transport.events
+        XCTAssertEqual(
+            firstEvents,
+            [
+                .taskCreate("Retry later", "inbox", "key-1"),
+                .changes(nil),
+            ]
+        )
+        XCTAssertEqual(
+            try store.read(scope: "account-a")?.cursor,
+            "remote-change-7"
+        )
+
+        _ = try await coordinator.synchronize(scope: "account-a")
+        let automaticEvents = await transport.events
+        XCTAssertEqual(
+            automaticEvents.filter(\.isTaskCreate).count,
+            1
+        )
+        XCTAssertEqual(
+            automaticEvents.filter(\.isChanges).count,
+            2
+        )
+        XCTAssertEqual(
+            automaticEvents.last?.changesCursor,
+            "remote-change-7"
+        )
     }
 
     func test429And5xxFailuresRemainPendingWithRetryDelay() async throws {
@@ -596,6 +641,27 @@ final class NativeSyncCoordinatorTests: XCTestCase {
             [nil, "next-0", "next-1", "next-2", "next-3", "next-4", "next-5", "next-6", "next-7", "next-8"]
         )
         XCTAssertEqual(try store.read(scope: "account-a")?.cursor, "checkpoint-9")
+    }
+
+    func testServerCheckpointCanRewindAnInvalidPersistedCursor() async throws {
+        let (coordinator, store, _) = try makeCoordinator(
+            changes: [
+                .init(
+                    entries: [],
+                    nextCursor: nil,
+                    checkpointCursor: "12"
+                ),
+            ]
+        )
+        try await coordinator.activate(scope: "account-a")
+        var document = try XCTUnwrap(store.read(scope: "account-a"))
+        document.cursor = "999"
+        try store.write(document)
+
+        let result = try await coordinator.synchronize(scope: "account-a")
+
+        XCTAssertTrue(result.refreshRequired)
+        XCTAssertEqual(try store.read(scope: "account-a")?.cursor, "12")
     }
 
     func testFailedChangesPageDoesNotAdvanceItsCursor() async throws {

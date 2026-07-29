@@ -314,8 +314,7 @@ enum GeneratedAPIAdapters {
     }
 
     static func changes(
-        _ output: Operations.getChanges.Output,
-        requestCursor: String? = nil
+        _ output: Operations.getChanges.Output
     ) throws -> ChangesPage {
         switch output {
         case let .ok(response):
@@ -333,9 +332,7 @@ enum GeneratedAPIAdapters {
             return .init(
                 entries: entries,
                 nextCursor: value.nextCursor,
-                checkpointCursor: value.nextCursor
-                    ?? entries.last?.id
-                    ?? requestCursor
+                checkpointCursor: value.checkpointCursor
             )
         case let .unauthorized(response):
             throw try documentedError(

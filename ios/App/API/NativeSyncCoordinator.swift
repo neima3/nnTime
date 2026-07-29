@@ -184,14 +184,20 @@ actor NativeSyncCoordinator {
         activityID: String,
         status: ActivityStatus,
         occurredAt: Date,
-        occurrenceKey: String
+        occurrenceKey: String,
+        scope expectedScope: String? = nil
     ) throws -> NativeSyncMutation {
         guard !occurrenceKey.trimmingCharacters(in: .whitespacesAndNewlines)
             .isEmpty
         else {
             throw NativeSyncCoordinatorError.invalidOccurrenceKey
         }
-        let scope = try requiredActiveScope()
+        let scope: String
+        if let expectedScope {
+            scope = try requiredActiveScope(matching: expectedScope)
+        } else {
+            scope = try requiredActiveScope()
+        }
         var document = try document(for: scope)
         let mutation = NativeSyncMutation(
             id: uuidProvider(),
@@ -381,15 +387,7 @@ actor NativeSyncCoordinator {
                 }
             }
             if queueBlocked {
-                let didChangePresentation = try presentationChanged(
-                    from: initialPresentationDocument,
-                    scope: scope
-                )
-                return .init(
-                    refreshRequired:
-                        replaySucceeded
-                            || didChangePresentation
-                )
+                break
             }
         }
 

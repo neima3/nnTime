@@ -658,7 +658,17 @@ export async function getChanges(
   const items = hasMore ? result.slice(0, limit) : result;
   const lastItem = items[items.length - 1];
   const nextCursor = hasMore && lastItem ? String(lastItem.id) : null;
-  return { items, nextCursor };
+  let checkpointCursor = lastItem ? String(lastItem.id) : null;
+  if (!checkpointCursor) {
+    const checkpointRows = await db.execute(
+      sql`SELECT COALESCE(MAX(id), 0) AS checkpoint_cursor FROM change_log WHERE user_id = ${userId}`,
+    );
+    const checkpoint = (
+      (checkpointRows as unknown as Record<string, unknown>[]) ?? []
+    )[0]?.checkpoint_cursor;
+    checkpointCursor = String(checkpoint ?? 0);
+  }
+  return { items, nextCursor, checkpointCursor };
 }
 
 /* -------------------------------------------------------------------------- */

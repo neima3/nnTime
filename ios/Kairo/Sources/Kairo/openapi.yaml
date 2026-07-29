@@ -2224,7 +2224,7 @@ components:
     ChangesResponse:
       type: object
       description: A page of the incremental sync feed (ADR-002).
-      required: [items, nextCursor]
+      required: [items, nextCursor, checkpointCursor]
       properties:
         items:
           type: array
@@ -2232,6 +2232,12 @@ components:
         nextCursor:
           type: [string, 'null']
           description: Opaque cursor for the next page; `null` when exhausted.
+        checkpointCursor:
+          type: string
+          description: |
+            Authoritative current server checkpoint. Clients persist this
+            independently from `nextCursor` and may rewind to it after a
+            server restore invalidates a previously issued cursor.
 
     # ---- Search (H3) -------------------------------------------------------
     SearchHit:

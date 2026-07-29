@@ -216,4 +216,28 @@ describe("ADR-002: tombstones + change log", () => {
     const bChanges = await getChanges(userB, 0, 1000, { db: env!.db });
     expect(bChanges.items.every((c) => c.userId === userB)).toBe(true);
   });
+
+  itDb("returns the authoritative checkpoint when a restored cursor is too high", async () => {
+    const created = await createTask(
+      userA,
+      { bucket: "inbox", title: "checkpoint source" },
+      { db: env!.db },
+    );
+    const current = await getChanges(userA, 0, 1000, { db: env!.db });
+    const checkpoint = current.checkpointCursor;
+    expect(
+      current.items.some((entry) => entry.entityId === created.id),
+    ).toBe(true);
+
+    const recovered = await getChanges(
+      userA,
+      Number.MAX_SAFE_INTEGER,
+      1000,
+      { db: env!.db },
+    );
+
+    expect(recovered.items).toEqual([]);
+    expect(recovered.nextCursor).toBeNull();
+    expect(recovered.checkpointCursor).toBe(checkpoint);
+  });
 });

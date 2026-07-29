@@ -166,6 +166,27 @@ final class OfflineTodayMutationTests: XCTestCase {
         )
     }
 
+    func testTodayResponseCannotApplyAcrossAccountSwitch() {
+        XCTAssertTrue(
+            TodayLoadPolicy.isCurrentScope(
+                requested: "account-a",
+                current: "account-a"
+            )
+        )
+        XCTAssertFalse(
+            TodayLoadPolicy.isCurrentScope(
+                requested: "account-a",
+                current: "account-b"
+            )
+        )
+        XCTAssertFalse(
+            TodayLoadPolicy.isCurrentScope(
+                requested: "account-a",
+                current: nil
+            )
+        )
+    }
+
     func testSuspendedEnqueueCannotRenderAfterSameDayRefresh() {
         let captured = UUID()
 
