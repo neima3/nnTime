@@ -314,23 +314,28 @@ enum GeneratedAPIAdapters {
     }
 
     static func changes(
-        _ output: Operations.getChanges.Output
+        _ output: Operations.getChanges.Output,
+        requestCursor: String? = nil
     ) throws -> ChangesPage {
         switch output {
         case let .ok(response):
             let value = try response.body.json
+            let entries = value.items.map {
+                NativeSyncChangeEntry(
+                    id: $0.id,
+                    entityType: $0.entityType,
+                    entityID: $0.entityId,
+                    operation: $0.op.rawValue,
+                    revision: Int($0.revision),
+                    occurredAt: $0.occurredAt
+                )
+            }
             return .init(
-                entries: value.items.map {
-                    .init(
-                        id: $0.id,
-                        entityType: $0.entityType,
-                        entityID: $0.entityId,
-                        operation: $0.op.rawValue,
-                        revision: Int($0.revision),
-                        occurredAt: $0.occurredAt
-                    )
-                },
-                nextCursor: value.nextCursor
+                entries: entries,
+                nextCursor: value.nextCursor,
+                checkpointCursor: value.nextCursor
+                    ?? entries.last?.id
+                    ?? requestCursor
             )
         case let .unauthorized(response):
             throw try documentedError(

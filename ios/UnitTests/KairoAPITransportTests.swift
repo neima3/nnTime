@@ -303,6 +303,7 @@ final class KairoAPITransportTests: XCTestCase {
         )
         XCTAssertEqual(changes.entries.map(\.id), ["42"])
         XCTAssertEqual(changes.nextCursor, "cursor-42")
+        XCTAssertEqual(changes.checkpointCursor, "cursor-42")
 
         _ = try await transport.createTask(
             title: "Replay-safe capture",

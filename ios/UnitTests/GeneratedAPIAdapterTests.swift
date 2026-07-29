@@ -407,6 +407,48 @@ final class GeneratedAPIAdapterTests: XCTestCase {
         XCTAssertEqual(page.entries.map(\.id), ["42"])
         XCTAssertEqual(page.entries.first?.operation, "upsert")
         XCTAssertEqual(page.nextCursor, "cursor-42")
+        XCTAssertEqual(page.checkpointCursor, "cursor-42")
+    }
+
+    func testChangesCheckpointAdvancesOrPreservesTheRequestedCursor() throws {
+        let exhaustedChanges = try decode(
+            Components.Schemas.ChangesResponse.self,
+            """
+            {
+              "items":[{
+                "id":"43","entityType":"activity_series",
+                "entityId":"activity-1","op":"upsert","revision":8,
+                "occurredAt":"2026-07-28T14:00:00Z"
+              }],
+              "nextCursor":null
+            }
+            """
+        )
+        let exhaustedOutput: Operations.getChanges.Output = .ok(
+            .init(body: .json(exhaustedChanges))
+        )
+        let exhausted = try GeneratedAPIAdapters.changes(
+            exhaustedOutput,
+            requestCursor: "42"
+        )
+
+        XCTAssertNil(exhausted.nextCursor)
+        XCTAssertEqual(exhausted.checkpointCursor, "43")
+
+        let emptyChanges = try decode(
+            Components.Schemas.ChangesResponse.self,
+            #"{"items":[],"nextCursor":null}"#
+        )
+        let emptyOutput: Operations.getChanges.Output = .ok(
+            .init(body: .json(emptyChanges))
+        )
+        let empty = try GeneratedAPIAdapters.changes(
+            emptyOutput,
+            requestCursor: "43"
+        )
+
+        XCTAssertNil(empty.nextCursor)
+        XCTAssertEqual(empty.checkpointCursor, "43")
     }
 
     func testMalformedGeneratedEnumAndUnexpectedOutputFailHonestly() throws {

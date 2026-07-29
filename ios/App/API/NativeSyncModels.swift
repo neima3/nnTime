@@ -56,6 +56,7 @@ struct NativeSyncChangeEntry: Equatable, Sendable {
 struct ChangesPage: Equatable, Sendable {
     let entries: [NativeSyncChangeEntry]
     let nextCursor: String?
+    let checkpointCursor: String?
 }
 
 protocol NativeSyncTransport: Sendable {

@@ -457,7 +457,8 @@ actor KairoAPI: NativeSyncTransport {
             try GeneratedAPIAdapters.changes(
                 await planner.getChanges(
                     query: .init(cursor: cursor, limit: limit)
-                )
+                ),
+                requestCursor: cursor
             )
         }
     }
