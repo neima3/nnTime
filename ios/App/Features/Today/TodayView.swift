@@ -729,6 +729,19 @@ struct TodayView: View {
         else {
             return
         }
+        let capturedLoadID = latestLoadID
+        let capturedDate = date
+        let capturedOffset = dayOffset
+        func canApplyToVisibleDay() -> Bool {
+            TodayLoadPolicy.canApplyMutationRender(
+                capturedLoadID: capturedLoadID,
+                currentLoadID: latestLoadID,
+                capturedDate: capturedDate,
+                currentDate: date,
+                capturedOffset: capturedOffset,
+                currentOffset: dayOffset
+            )
+        }
         let optimisticBlocks: [DayBlock]
         do {
             optimisticBlocks = try CachedDayAdapter.settingCompletion(
@@ -763,11 +776,14 @@ struct TodayView: View {
         do {
             try await mutation.perform(
                 scope: scope,
-                date: date,
+                date: capturedDate,
                 block: block,
                 done: done
             ) { renderedDone in
                 submittingOccurrences.remove(identity)
+                guard canApplyToVisibleDay() else {
+                    return
+                }
                 if renderedDone == done {
                     blocks = optimisticBlocks
                 } else {
@@ -778,18 +794,22 @@ struct TodayView: View {
                     )) ?? blocks
                 }
             }
-            if done {
+            if done, canApplyToVisibleDay() {
                 UINotificationFeedbackGenerator()
                     .notificationOccurred(.success)
             }
             WidgetCenter.shared.reloadAllTimelines()
         } catch let failure as OfflineTodayStatusMutation.Failure {
-            cachedMutationFailure = failure.stage
+            if canApplyToVisibleDay() {
+                cachedMutationFailure = failure.stage
+            }
             if failure.stage == .enqueue {
                 submittingOccurrences.remove(identity)
             }
         } catch {
-            cachedMutationFailure = .enqueue
+            if canApplyToVisibleDay() {
+                cachedMutationFailure = .enqueue
+            }
             submittingOccurrences.remove(identity)
         }
     }

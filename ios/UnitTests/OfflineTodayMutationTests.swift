@@ -151,6 +151,46 @@ final class OfflineTodayMutationTests: XCTestCase {
         XCTAssertFalse(state.loading)
     }
 
+    func testSuspendedEnqueueCannotRenderAfterDaySwitch() {
+        let captured = UUID()
+
+        XCTAssertFalse(
+            TodayLoadPolicy.canApplyMutationRender(
+                capturedLoadID: captured,
+                currentLoadID: UUID(),
+                capturedDate: "2026-07-29",
+                currentDate: "2026-07-30",
+                capturedOffset: 0,
+                currentOffset: 1
+            )
+        )
+    }
+
+    func testSuspendedEnqueueCannotRenderAfterSameDayRefresh() {
+        let captured = UUID()
+
+        XCTAssertFalse(
+            TodayLoadPolicy.canApplyMutationRender(
+                capturedLoadID: captured,
+                currentLoadID: UUID(),
+                capturedDate: "2026-07-29",
+                currentDate: "2026-07-29",
+                capturedOffset: 0,
+                currentOffset: 0
+            )
+        )
+        XCTAssertTrue(
+            TodayLoadPolicy.canApplyMutationRender(
+                capturedLoadID: captured,
+                currentLoadID: captured,
+                capturedDate: "2026-07-29",
+                currentDate: "2026-07-29",
+                capturedOffset: 0,
+                currentOffset: 0
+            )
+        )
+    }
+
     func testPendingOnlineRowOmitsCompletionAccessibilityAction() {
         XCTAssertFalse(
             TodayBlockActionPolicy.canExposeCompletionAction(

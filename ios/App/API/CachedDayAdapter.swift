@@ -180,6 +180,19 @@ struct TodayLoadPolicy {
     static func responseDateMismatchState() -> FailureState {
         failureState(cachedBlocks: nil)
     }
+
+    static func canApplyMutationRender(
+        capturedLoadID: UUID,
+        currentLoadID: UUID,
+        capturedDate: String,
+        currentDate: String,
+        capturedOffset: Int,
+        currentOffset: Int
+    ) -> Bool {
+        capturedLoadID == currentLoadID
+            && capturedDate == currentDate
+            && capturedOffset == currentOffset
+    }
 }
 
 struct TodayBlockActionPolicy {
