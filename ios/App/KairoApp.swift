@@ -141,6 +141,22 @@ final class AppState {
         let generation = authGeneration
 #if DEBUG
         if ProcessInfo.processInfo.arguments.contains(
+            "-kairoSignedOutFixture"
+        ) {
+            let arguments = ProcessInfo.processInfo.arguments
+            if let index = arguments.firstIndex(
+                of: "-kairoThemeFixture"
+            ), arguments.indices.contains(index + 1),
+               let fixtureTheme = KairoPrefs.Theme(
+                   rawValue: arguments[index + 1]
+               )
+            {
+                theme = fixtureTheme
+            }
+            auth = .signedOut
+            return
+        }
+        if ProcessInfo.processInfo.arguments.contains(
             "-kairoOfflineFixture"
         ) {
             installOfflineFixture()
