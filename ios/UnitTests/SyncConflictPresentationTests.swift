@@ -179,8 +179,9 @@ final class SyncConflictPresentationTests: XCTestCase {
 
     func testRetryFailureShowsPrivacySafeInlineStateAndAnnouncement() async {
         let model = SyncConflictNoticeModel()
+        let conflictID = UUID()
 
-        let outcome = await model.retry(conflictID: UUID()) { _ in
+        let outcome = await model.retry(conflictID: conflictID) { _ in
             .failed
         }
 
@@ -190,6 +191,7 @@ final class SyncConflictPresentationTests: XCTestCase {
             "Couldn’t retry this change. Your recovery copy is still saved here."
         )
         XCTAssertEqual(model.retryAnnouncementGeneration, 1)
+        XCTAssertEqual(model.retryFailureConflictID, conflictID)
         XCTAssertEqual(
             SyncAccessibilityAnnouncementPolicy.retryFailure.message,
             model.retryFailureMessage
@@ -251,6 +253,46 @@ final class SyncConflictPresentationTests: XCTestCase {
         XCTAssertEqual(model.selectedID, ids[2])
         XCTAssertEqual(model.position, 2)
         XCTAssertEqual(model.count, 2)
+    }
+
+    func testInteractionBlocksNavigationDuringRetryAndKeepsFailureAttached()
+        async
+    {
+        let ids = [UUID(), UUID()]
+        let interaction = SyncConflictInteractionModel()
+        interaction.update(ids: ids)
+        let gate = SyncConflictRetryOutcomeGate()
+
+        let retry = Task {
+            await interaction.notice.retry(
+                conflictID: ids[0]
+            ) { _ in
+                await gate.wait()
+                return .failed
+            }
+        }
+        await gate.waitUntilEntered()
+
+        interaction.next()
+        interaction.previous()
+        XCTAssertEqual(interaction.carousel.selectedID, ids[0])
+        XCTAssertTrue(interaction.notice.isRetrying)
+
+        await gate.release()
+        let outcome = await retry.value
+        XCTAssertEqual(outcome, .failed)
+        XCTAssertEqual(
+            interaction.notice.retryFailureConflictID,
+            ids[0]
+        )
+        XCTAssertEqual(
+            interaction.notice.retryFailureMessage,
+            "Couldn’t retry this change. Your recovery copy is still saved here."
+        )
+        XCTAssertEqual(
+            interaction.notice.retryAnnouncementGeneration,
+            1
+        )
     }
 
     func testConflictActionsAdaptFromHorizontalToVertical() {
@@ -321,6 +363,29 @@ final class SyncConflictPresentationTests: XCTestCase {
             ).message,
             confirmation.accessibilityLabel
         )
+    }
+
+    func testConsecutiveReplaySuccessesRequestTwoAnnouncementsAndResetExpiry() {
+        let model = SyncReplayConfirmationModel()
+        var announcements: [String] = []
+
+        let firstGeneration = model.show(
+            operation: .taskCreate,
+            announce: { announcements.append($0.message) }
+        )
+        let secondGeneration = model.show(
+            operation: .taskCreate,
+            announce: { announcements.append($0.message) }
+        )
+
+        XCTAssertEqual(firstGeneration, 1)
+        XCTAssertEqual(secondGeneration, 2)
+        XCTAssertEqual(model.expirationGeneration, 2)
+        XCTAssertEqual(announcements.count, 2)
+        XCTAssertFalse(model.clear(ifGeneration: firstGeneration))
+        XCTAssertNotNil(model.presentation)
+        XCTAssertTrue(model.clear(ifGeneration: secondGeneration))
+        XCTAssertNil(model.presentation)
     }
 
     func testAppPublishesMintStateOnlyAfterSuccessfulReplay() async throws {
@@ -749,5 +814,34 @@ private actor SyncConflictActionRecorder {
 
     var values: (retriedIDs: [UUID], acknowledgedIDs: [UUID]) {
         (retriedIDs, acknowledgedIDs)
+    }
+}
+
+private actor SyncConflictRetryOutcomeGate {
+    private var entered = false
+    private var enteredWaiters:
+        [CheckedContinuation<Void, Never>] = []
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        entered = true
+        let waiters = enteredWaiters
+        enteredWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+        await withCheckedContinuation {
+            continuation = $0
+        }
+    }
+
+    func waitUntilEntered() async {
+        guard !entered else { return }
+        await withCheckedContinuation {
+            enteredWaiters.append($0)
+        }
+    }
+
+    func release() {
+        continuation?.resume()
+        continuation = nil
     }
 }

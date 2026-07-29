@@ -69,6 +69,8 @@ struct SyncConflictPresentation: Equatable, Identifiable {
 @Observable @MainActor
 final class SyncConflictNoticeModel {
     private(set) var isRetrying = false
+    private(set) var retryingConflictID: UUID?
+    private(set) var retryFailureConflictID: UUID?
     private(set) var retryFailureMessage: String?
     private(set) var retryAnnouncementGeneration = 0
 
@@ -79,10 +81,16 @@ final class SyncConflictNoticeModel {
     ) async -> SyncConflictRetryOutcome {
         guard !isRetrying else { return .cancelled }
         isRetrying = true
+        retryingConflictID = conflictID
+        retryFailureConflictID = nil
         retryFailureMessage = nil
-        defer { isRetrying = false }
+        defer {
+            isRetrying = false
+            retryingConflictID = nil
+        }
         let outcome = await retry(conflictID)
         if outcome == .failed {
+            retryFailureConflictID = conflictID
             retryFailureMessage =
                 SyncAccessibilityAnnouncementPolicy.retryFailure.message
             retryAnnouncementGeneration += 1
@@ -95,6 +103,26 @@ final class SyncConflictNoticeModel {
         acknowledge: (UUID) async -> Void
     ) async {
         await acknowledge(conflictID)
+    }
+}
+
+@Observable @MainActor
+final class SyncConflictInteractionModel {
+    let notice = SyncConflictNoticeModel()
+    let carousel = SyncConflictCarouselModel()
+
+    func update(ids: [UUID]) {
+        carousel.update(ids: ids)
+    }
+
+    func next() {
+        guard !notice.isRetrying else { return }
+        carousel.next()
+    }
+
+    func previous() {
+        guard !notice.isRetrying else { return }
+        carousel.previous()
     }
 }
 
@@ -236,12 +264,43 @@ struct SyncReplayConfirmationPresentation: Equatable {
     }
 }
 
+@Observable @MainActor
+final class SyncReplayConfirmationModel {
+    private(set) var presentation:
+        SyncReplayConfirmationPresentation?
+    private(set) var expirationGeneration = 0
+
+    @discardableResult
+    func show(
+        operation: NativeSyncConflict.Operation,
+        announce: (SyncAccessibilityAnnouncement) -> Void
+    ) -> Int {
+        let next = SyncReplayConfirmationPresentation(
+            operation: operation
+        )
+        presentation = next
+        expirationGeneration += 1
+        announce(
+            SyncAccessibilityAnnouncementPolicy.replaySuccess(next)
+        )
+        return expirationGeneration
+    }
+
+    @discardableResult
+    func clear(ifGeneration generation: Int) -> Bool {
+        guard generation == expirationGeneration else {
+            return false
+        }
+        presentation = nil
+        return true
+    }
+}
+
 struct SyncConflictNotice: View {
     let presentation: SyncConflictPresentation
+    let model: SyncConflictNoticeModel
     let onRetry: (UUID) async -> SyncConflictRetryOutcome
     let onDismiss: (UUID) async -> Void
-
-    @State private var model = SyncConflictNoticeModel()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -275,7 +334,10 @@ struct SyncConflictNotice: View {
                 .accessibilityElement(children: .combine)
             }
 
-            if let retryFailureMessage = model.retryFailureMessage {
+            if
+                model.retryFailureConflictID == presentation.id,
+                let retryFailureMessage = model.retryFailureMessage
+            {
                 Text(retryFailureMessage)
                     .font(.kBody(12, weight: .semibold))
                     .foregroundStyle(Color.kCatRoseInk)
@@ -411,14 +473,6 @@ struct SyncReplayConfirmationNotice: View {
         )
         .accessibilityElement(children: .combine)
         .accessibilityLabel(presentation.accessibilityLabel)
-        .onAppear {
-            UIAccessibility.post(
-                notification: .announcement,
-                argument:
-                    SyncAccessibilityAnnouncementPolicy
-                        .replaySuccess(presentation).message
-            )
-        }
     }
 }
 
@@ -428,10 +482,11 @@ struct SyncStatusNotices: View {
 
     let surface: SyncConflictSurface
 
-    @State private var confirmation:
-        SyncReplayConfirmationPresentation?
     @State private var confirmationTask: Task<Void, Never>?
-    @State private var carousel = SyncConflictCarouselModel()
+    @State private var confirmationModel =
+        SyncReplayConfirmationModel()
+    @State private var interaction =
+        SyncConflictInteractionModel()
 
     private var conflicts: [SyncConflictPresentation] {
         app.syncConflicts.compactMap {
@@ -443,7 +498,7 @@ struct SyncStatusNotices: View {
     }
 
     private var conflict: SyncConflictPresentation? {
-        guard let selectedID = carousel.selectedID else {
+        guard let selectedID = interaction.carousel.selectedID else {
             return conflicts.first
         }
         return conflicts.first(where: { $0.id == selectedID })
@@ -456,7 +511,9 @@ struct SyncStatusNotices: View {
 
     var body: some View {
         Group {
-            if conflict != nil || confirmation != nil {
+            if conflict != nil
+                || confirmationModel.presentation != nil
+            {
                 VStack(spacing: 8) {
                     if let conflict {
                         if conflicts.count > 1 {
@@ -464,6 +521,7 @@ struct SyncStatusNotices: View {
                         }
                         SyncConflictNotice(
                             presentation: conflict,
+                            model: interaction.notice,
                             onRetry: { id in
                                 await app.retrySyncConflict(id: id)
                             },
@@ -473,7 +531,9 @@ struct SyncStatusNotices: View {
                         )
                         .id(conflict.id)
                     }
-                    if let confirmation {
+                    if let confirmation =
+                        confirmationModel.presentation
+                    {
                         SyncReplayConfirmationNotice(
                             presentation: confirmation
                         )
@@ -493,7 +553,7 @@ struct SyncStatusNotices: View {
             of: conflicts.map(\.id),
             initial: true
         ) { _, ids in
-            carousel.update(ids: ids)
+            interaction.update(ids: ids)
         }
         .onChange(
             of: app.syncReplayConfirmationGeneration
@@ -514,32 +574,34 @@ struct SyncStatusNotices: View {
     private var conflictNavigation: some View {
         HStack(spacing: 8) {
             Text(
-                "\(carousel.position ?? 1) of \(carousel.count)"
+                "\(interaction.carousel.position ?? 1) of \(interaction.carousel.count)"
             )
             .font(.kBody(11, weight: .bold))
             .foregroundStyle(Color.kCatRoseInk)
             .accessibilityLabel(
-                "Sync conflict \(carousel.position ?? 1) of \(carousel.count)"
+                "Sync conflict \(interaction.carousel.position ?? 1) of \(interaction.carousel.count)"
             )
             Spacer()
             Button {
-                carousel.previous()
+                interaction.previous()
             } label: {
                 Image(systemName: "chevron.left")
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
             .foregroundStyle(Color.kCatRoseInk)
+            .disabled(interaction.notice.isRetrying)
             .accessibilityLabel("Previous sync conflict")
 
             Button {
-                carousel.next()
+                interaction.next()
             } label: {
                 Image(systemName: "chevron.right")
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.plain)
             .foregroundStyle(Color.kCatRoseInk)
+            .disabled(interaction.notice.isRetrying)
             .accessibilityLabel("Next sync conflict")
         }
         .padding(.horizontal, 4)
@@ -547,23 +609,29 @@ struct SyncStatusNotices: View {
 
     private func showConfirmation() {
         confirmationTask?.cancel()
-        let next = SyncReplayConfirmationPresentation(
-            operation: surface.operation
-        )
-        withAnimation(
+        let generation = withAnimation(
             reducesStimulation
                 ? nil
                 : .spring(response: 0.35, dampingFraction: 0.86)
         ) {
-            confirmation = next
+            confirmationModel.show(
+                operation: surface.operation
+            ) { announcement in
+                UIAccessibility.post(
+                    notification: .announcement,
+                    argument: announcement.message
+                )
+            }
         }
         confirmationTask = Task {
             try? await Task.sleep(for: .seconds(3))
             guard !Task.isCancelled else { return }
-            withAnimation(
+            _ = withAnimation(
                 reducesStimulation ? nil : .easeOut(duration: 0.2)
             ) {
-                confirmation = nil
+                confirmationModel.clear(
+                    ifGeneration: generation
+                )
             }
         }
     }
