@@ -326,6 +326,65 @@ final class OfflineInboxMutationTests: XCTestCase {
         XCTAssertNil(model.errorMessage)
     }
 
+    func testOnlineCommitThatReturnsAfterDisappearStillFinalizesDraft() async {
+        let model = InboxCaptureSubmissionModel(draft: "Committed online")
+        let gate = InboxSubmissionGate()
+        var committed = false
+
+        let submission = Task {
+            await model.submit(
+                isOnline: true,
+                isCurrent: { true },
+                createOnline: { title in
+                    committed = true
+                    await gate.wait()
+                    return makeInboxTask(title: title)
+                },
+                enqueueOffline: { _ in XCTFail("offline enqueue") }
+            )
+        }
+        await gate.waitUntilEntered()
+        submission.cancel()
+        await gate.release()
+
+        let outcome = await submission.value
+        XCTAssertTrue(committed)
+        guard case .created = outcome else {
+            return XCTFail("Committed create must finalize")
+        }
+        XCTAssertEqual(model.draft, "")
+        XCTAssertNil(model.errorMessage)
+    }
+
+    func testOfflineCommitThatReturnsAfterDisappearStillFinalizesDraft() async {
+        let model = InboxCaptureSubmissionModel(draft: "Committed offline")
+        let gate = InboxSubmissionGate()
+        var committed = false
+
+        let submission = Task {
+            await model.submit(
+                isOnline: false,
+                isCurrent: { true },
+                createOnline: { _ in makeInboxTask(title: "Unexpected") },
+                enqueueOffline: { _ in
+                    committed = true
+                    await gate.wait()
+                }
+            )
+        }
+        await gate.waitUntilEntered()
+        submission.cancel()
+        await gate.release()
+
+        let outcome = await submission.value
+        XCTAssertTrue(committed)
+        guard case .queued = outcome else {
+            return XCTFail("Committed enqueue must finalize")
+        }
+        XCTAssertEqual(model.draft, "")
+        XCTAssertNil(model.errorMessage)
+    }
+
     func testStaleLoad401CannotInvalidateNewAccount() async {
         let data = InboxDataModel()
         let gate = InboxSubmissionGate()

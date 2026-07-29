@@ -54,6 +54,7 @@ final class AppState {
     private let signOutAction: @Sendable () async -> Void
     private let invalidateSessionAction: @Sendable () async -> Void
     private let dayCachePurge: @Sendable () throws -> Void
+    private let syncSnapshotBarrier: @Sendable () async -> Void
 
     var pendingSyncCount = 0
     var pendingTaskCreates: [NativeSyncPendingTaskCreate] = []
@@ -74,7 +75,8 @@ final class AppState {
         },
         dayCachePurge: @escaping @Sendable () throws -> Void = {
             try DayCache.purge()
-        }
+        },
+        syncSnapshotBarrier: @escaping @Sendable () async -> Void = {}
     ) {
         self.syncCoordinator = syncCoordinator ?? NativeSyncCoordinator(
             store: NativeSyncStore(),
@@ -83,6 +85,7 @@ final class AppState {
         self.signOutAction = signOutAction
         self.invalidateSessionAction = invalidateSessionAction
         self.dayCachePurge = dayCachePurge
+        self.syncSnapshotBarrier = syncSnapshotBarrier
     }
 
     // MARK: Accessibility modes (I1)
@@ -235,6 +238,7 @@ final class AppState {
             )
             guard sessionScope == scope else { return }
             await refreshSyncPresentation(scope: scope)
+            guard sessionScope == scope else { return }
             if result.refreshRequired {
                 NotificationCenter.default.post(name: .kairoSyncCompleted, object: nil)
             }
@@ -244,6 +248,7 @@ final class AppState {
             if let partial = error as? NativeSyncPartialFailure {
                 underlyingError = partial.underlying
                 await refreshSyncPresentation(scope: scope)
+                guard sessionScope == scope else { return }
                 if partial.refreshRequired {
                     NotificationCenter.default.post(
                         name: .kairoSyncCompleted,
@@ -282,7 +287,15 @@ final class AppState {
     }
 
     private func publishSyncPresentation(scope: String) async throws {
+        let capturedSessionScope = sessionScope
         let snapshot = try await syncCoordinator.snapshot(scope: scope)
+        await syncSnapshotBarrier()
+        guard
+            sessionScope == capturedSessionScope,
+            capturedSessionScope == nil || capturedSessionScope == scope
+        else {
+            throw NativeSyncCoordinatorError.inactiveScope
+        }
         pendingSyncCount = snapshot.pendingCount
         pendingTaskCreates = snapshot.pendingTaskCreates
         pendingActivityStatuses = snapshot.pendingActivityStatuses
@@ -291,10 +304,17 @@ final class AppState {
     }
 
     private func refreshSyncPresentation(scope: String) async {
+        let capturedSessionScope = sessionScope
         do {
             try await publishSyncPresentation(scope: scope)
             syncStorageUnavailable = false
         } catch {
+            guard
+                sessionScope == capturedSessionScope,
+                capturedSessionScope == nil || capturedSessionScope == scope
+            else {
+                return
+            }
             syncStorageUnavailable = true
         }
     }

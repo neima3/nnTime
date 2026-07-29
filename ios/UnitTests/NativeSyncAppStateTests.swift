@@ -227,6 +227,86 @@ final class NativeSyncAppStateTests: XCTestCase {
         await assertInactive(coordinator, scope: "account-a")
     }
 
+    func testAccountSwitchDuringSnapshotCannotPublishOldPendingTitles() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(
+            path: "KairoSnapshotScopeFence-\(UUID())"
+        )
+        addTeardownBlock { try? FileManager.default.removeItem(at: directory) }
+        let coordinator = NativeSyncCoordinator(
+            store: NativeSyncStore(directory: directory),
+            transport: AppStateSyncTransport()
+        )
+        try await coordinator.activate(scope: "account-a")
+        _ = try await coordinator.enqueueTaskCreate(
+            title: "Private account A title",
+            bucket: "inbox"
+        )
+        let gate = AppStateSnapshotGate()
+        let app = AppState(
+            syncCoordinator: coordinator,
+            signOutAction: {},
+            invalidateSessionAction: {},
+            syncSnapshotBarrier: { await gate.waitIfSuspended() }
+        )
+        app.auth = .signedIn
+        app.sessionScope = "account-a"
+        await gate.suspendNext()
+
+        let activation = Task {
+            try? await app.activateSync(scope: "account-a")
+        }
+        await gate.waitUntilEntered()
+        let switched = await app.prepareForAccountSwitch(newScope: "account-b")
+        XCTAssertTrue(switched)
+        await gate.release()
+        await activation.value
+
+        XCTAssertEqual(app.sessionScope, "account-b")
+        XCTAssertTrue(app.pendingTaskCreates.isEmpty)
+        XCTAssertFalse(app.syncStorageUnavailable)
+    }
+
+    func testAccountSwitchDuringPartialRefreshBlocksNotificationAndWrapped401() async throws {
+        let transport = AppStateSyncTransport(
+            changeOutcomes: [.http(401)]
+        )
+        let gate = AppStateSnapshotGate()
+        let (app, _) = try makeApp(
+            transport: transport,
+            syncSnapshotBarrier: { await gate.waitIfSuspended() }
+        )
+        app.auth = .signedIn
+        app.sessionScope = "account-a"
+        try await app.activateSync(scope: "account-a")
+        _ = try await app.enqueueTaskCreate(
+            title: "Accepted before stale refresh",
+            bucket: "inbox"
+        )
+        await gate.suspendNext()
+        var notificationCount = 0
+        let observer = NotificationCenter.default.addObserver(
+            forName: .kairoSyncCompleted,
+            object: nil,
+            queue: nil
+        ) { _ in
+            notificationCount += 1
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+
+        let synchronization = Task { await app.synchronize() }
+        await gate.waitUntilEntered()
+        let switched = await app.prepareForAccountSwitch(newScope: "account-b")
+        XCTAssertTrue(switched)
+        await gate.release()
+        await synchronization.value
+
+        XCTAssertEqual(app.sessionScope, "account-b")
+        XCTAssertEqual(app.auth, .signedIn)
+        XCTAssertEqual(notificationCount, 0)
+        XCTAssertTrue(app.pendingTaskCreates.isEmpty)
+        XCTAssertFalse(app.syncStorageUnavailable)
+    }
+
     func testCursorOnlyAdvancementPostsCompletionNotification() async throws {
         let transport = AppStateSyncTransport(
             changesPages: [
@@ -292,8 +372,8 @@ final class NativeSyncAppStateTests: XCTestCase {
         XCTAssertEqual(notificationCount, 1)
     }
 
-    func testReconnectTransitionOnlyTriggersForOfflineToOnline() {
-        XCTAssertFalse(
+    func testOnlineTransitionTriggersFromUnknownOrOffline() {
+        XCTAssertTrue(
             NetworkMonitor.didReconnect(from: .unknown, to: .online)
         )
         XCTAssertFalse(
@@ -308,6 +388,25 @@ final class NativeSyncAppStateTests: XCTestCase {
         XCTAssertTrue(
             NetworkMonitor.didReconnect(from: .offline, to: .online)
         )
+    }
+
+    func testUnknownToOnlineResolutionSynchronizesColdLaunchCapture() async throws {
+        let transport = AppStateSyncTransport()
+        let (app, _) = try makeApp(transport: transport)
+        app.auth = .signedIn
+        app.sessionScope = "account-a"
+        try await app.activateSync(scope: "account-a")
+        _ = try await app.enqueueTaskCreate(
+            title: "Captured while reachability resolves",
+            bucket: "inbox"
+        )
+
+        if NetworkMonitor.didReconnect(from: .unknown, to: .online) {
+            await app.synchronize()
+        }
+
+        XCTAssertEqual(app.pendingSyncCount, 0)
+        XCTAssertTrue(app.pendingTaskCreates.isEmpty)
     }
 
     func testNetworkMonitorStartsUnresolvedWithoutOfflineBanner() {
@@ -621,7 +720,8 @@ final class NativeSyncAppStateTests: XCTestCase {
     }
 
     private func makeApp(
-        transport: AppStateSyncTransport = AppStateSyncTransport()
+        transport: AppStateSyncTransport = AppStateSyncTransport(),
+        syncSnapshotBarrier: @escaping @Sendable () async -> Void = {}
     ) throws -> (AppState, NativeSyncCoordinator) {
         let directory = FileManager.default.temporaryDirectory.appending(
             path: "KairoNativeSyncAppStateTests-\(UUID())"
@@ -635,7 +735,8 @@ final class NativeSyncAppStateTests: XCTestCase {
             AppState(
                 syncCoordinator: coordinator,
                 signOutAction: {},
-                invalidateSessionAction: {}
+                invalidateSessionAction: {},
+                syncSnapshotBarrier: syncSnapshotBarrier
             ),
             coordinator
         )
@@ -856,6 +957,38 @@ private enum AppStateTransportOutcome: Sendable {
 }
 
 private struct AppStateNetworkError: Error {}
+
+private actor AppStateSnapshotGate {
+    private var shouldSuspend = false
+    private var entered = false
+    private var enteredWaiters: [CheckedContinuation<Void, Never>] = []
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func suspendNext() {
+        shouldSuspend = true
+        entered = false
+    }
+
+    func waitIfSuspended() async {
+        guard shouldSuspend else { return }
+        shouldSuspend = false
+        entered = true
+        let waiters = enteredWaiters
+        enteredWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+        await withCheckedContinuation { continuation = $0 }
+    }
+
+    func waitUntilEntered() async {
+        if entered { return }
+        await withCheckedContinuation { enteredWaiters.append($0) }
+    }
+
+    func release() {
+        continuation?.resume()
+        continuation = nil
+    }
+}
 
 private actor AppStateAuthCallbackGate {
     private var entered = false

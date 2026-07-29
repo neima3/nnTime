@@ -31,6 +31,6 @@ final class NetworkMonitor {
     }
 
     static func didReconnect(from old: Status, to new: Status) -> Bool {
-        old == .offline && new == .online
+        new == .online && old != .online
     }
 }

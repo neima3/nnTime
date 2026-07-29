@@ -52,7 +52,6 @@ final class InboxCaptureSubmissionModel {
                 outcome = .queued
             }
             guard
-                !Task.isCancelled,
                 activeOperationID == operationID,
                 isCurrent()
             else {
@@ -362,11 +361,6 @@ struct InboxView: View {
             scheduling = nil
             tending = false
             Task { await load() }
-        }
-        .onDisappear {
-            submissionTask?.cancel()
-            submissionTask = nil
-            capture.invalidateOperation()
         }
     }
 
