@@ -2,16 +2,113 @@ import SwiftUI
 
 // MARK: - Inbox: brain dump. No dates, no deadlines, nothing ever turns red.
 
+@Observable @MainActor
+final class InboxCaptureSubmissionModel {
+    enum Outcome {
+        case created(TaskItem)
+        case queued
+    }
+
+    var draft: String
+    private(set) var isSaving = false
+    private(set) var errorMessage: String?
+
+    init(draft: String = "") {
+        self.draft = draft
+    }
+
+    func submit(
+        isOnline: Bool,
+        createOnline: (String) async throws -> TaskItem,
+        enqueueOffline: (String) async throws -> Void,
+        onFailure: (Error) async -> Void = { _ in }
+    ) async -> Outcome? {
+        let originalDraft = draft
+        let title = originalDraft.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard !title.isEmpty, !isSaving else { return nil }
+
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+        do {
+            let outcome: Outcome
+            if isOnline {
+                outcome = .created(try await createOnline(title))
+            } else {
+                try await enqueueOffline(title)
+                outcome = .queued
+            }
+            if draft == originalDraft {
+                draft = ""
+            }
+            return outcome
+        } catch {
+            await onFailure(error)
+            errorMessage =
+                "Couldn’t save that thought yet. It’s still here so you can try again."
+            return nil
+        }
+    }
+}
+
+@Observable @MainActor
+final class InboxDataModel {
+    private(set) var items: [TaskItem] = []
+    private(set) var loading = true
+    private var loadGeneration = 0
+
+    func adoptCreated(_ item: TaskItem) {
+        loadGeneration += 1
+        items.removeAll { $0.id == item.id }
+        items.insert(item, at: 0)
+        loading = false
+    }
+
+    func remove(ids: Set<String>) {
+        loadGeneration += 1
+        items.removeAll { ids.contains($0.id) }
+    }
+
+    func load(
+        fetch: () async throws -> [TaskItem],
+        onUnauthorized: () async -> Void
+    ) async {
+        loadGeneration += 1
+        let generation = loadGeneration
+        do {
+            let loaded = try await fetch()
+            guard generation == loadGeneration else { return }
+            items = loaded
+        } catch {
+            guard generation == loadGeneration else { return }
+            if AppSessionFailure.classify(error) == .unauthorized {
+                await onUnauthorized()
+            }
+        }
+        if generation == loadGeneration {
+            loading = false
+        }
+    }
+}
+
 struct InboxView: View {
-    @State private var items: [TaskItem] = []
-    @State private var draft = ""
-    @State private var loading = true
+    @Environment(AppState.self) private var app
+    let isOnline: Bool
+
+    @State private var data = InboxDataModel()
+    @State private var capture = InboxCaptureSubmissionModel()
     @State private var scheduling: TaskItem?
     @State private var tending = false
     @FocusState private var composing: Bool
 
+    private var pendingItems: [NativeSyncPendingTaskCreate] {
+        app.pendingTaskCreates.filter { $0.bucket == "inbox" }
+    }
+
     private var agedItems: [TaskItem] {
-        items.filter { (Calendar.current.dateComponents([.day], from: $0.createdAt ?? Date(), to: Date()).day ?? 0) >= 7 }
+        data.items.filter { (Calendar.current.dateComponents([.day], from: $0.createdAt ?? Date(), to: Date()).day ?? 0) >= 7 }
     }
 
     var body: some View {
@@ -38,45 +135,97 @@ struct InboxView: View {
                         .padding(.horizontal, 20).padding(.top, 10)
                     }
 
-                    if loading {
+                    if data.loading && pendingItems.isEmpty {
                         Spacer()
                         ProgressView().tint(.kIris)
                         Spacer()
-                    } else if items.isEmpty {
-                        Spacer()
-                        VStack(spacing: 10) {
-                            Text("🌿").font(.system(size: 40))
-                            Text("Inbox is empty")
-                                .font(.kDisplay(20))
-                                .foregroundStyle(Color.kInk)
-                            Text("Dump a thought above — head stays clear.")
-                                .font(.kBody(14))
-                                .foregroundStyle(Color.kInkSoft)
+                    } else if data.items.isEmpty && pendingItems.isEmpty {
+                        ScrollView {
+                            VStack(spacing: 10) {
+                                Text("🌿").font(.system(size: 40))
+                                Text("Inbox is empty")
+                                    .font(.kDisplay(20))
+                                    .foregroundStyle(Color.kInk)
+                                Text("Dump a thought above — head stays clear.")
+                                    .font(.kBody(14))
+                                    .foregroundStyle(Color.kInkSoft)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 360)
                         }
-                        Spacer()
+                        .refreshable { await refresh() }
                     } else {
                         List {
-                            ForEach(items) { item in
-                                row(item)
-                                    .listRowBackground(Color.clear)
-                                    .listRowSeparator(.hidden)
-                                    .listRowInsets(EdgeInsets(top: 5, leading: 20, bottom: 5, trailing: 20))
-                                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                                        Button {
-                                            scheduling = item
-                                        } label: {
-                                            Label("Schedule", systemImage: "calendar.badge.plus")
-                                        }
-                                        .tint(.kIris)
+                            if !pendingItems.isEmpty {
+                                Section {
+                                    ForEach(pendingItems) { item in
+                                        pendingRow(item)
+                                            .listRowBackground(Color.clear)
+                                            .listRowSeparator(.hidden)
+                                            .listRowInsets(
+                                                EdgeInsets(
+                                                    top: 5,
+                                                    leading: 20,
+                                                    bottom: 5,
+                                                    trailing: 20
+                                                )
+                                            )
                                     }
+                                } header: {
+                                    Text("Saved locally")
+                                        .font(.kBody(11, weight: .bold))
+                                        .foregroundStyle(Color.kCatButterInk)
+                                        .textCase(nil)
+                                        .accessibilityAddTraits(.isHeader)
+                                }
                             }
-                            .onDelete { indexSet in
-                                Task { await delete(indexSet) }
+
+                            if !data.items.isEmpty {
+                                Section {
+                                    ForEach(data.items) { item in
+                                        row(item)
+                                            .listRowBackground(Color.clear)
+                                            .listRowSeparator(.hidden)
+                                            .listRowInsets(
+                                                EdgeInsets(
+                                                    top: 5,
+                                                    leading: 20,
+                                                    bottom: 5,
+                                                    trailing: 20
+                                                )
+                                            )
+                                            .swipeActions(
+                                                edge: .leading,
+                                                allowsFullSwipe: true
+                                            ) {
+                                                Button {
+                                                    scheduling = item
+                                                } label: {
+                                                    Label(
+                                                        "Schedule",
+                                                        systemImage:
+                                                            "calendar.badge.plus"
+                                                    )
+                                                }
+                                                .tint(.kIris)
+                                            }
+                                    }
+                                    .onDelete { indexSet in
+                                        Task { await delete(indexSet) }
+                                    }
+                                } header: {
+                                    if !pendingItems.isEmpty {
+                                        Text("Inbox")
+                                            .font(.kBody(11, weight: .bold))
+                                            .foregroundStyle(Color.kInkFaint)
+                                            .textCase(nil)
+                                            .accessibilityAddTraits(.isHeader)
+                                    }
+                                }
                             }
                         }
                         .listStyle(.plain)
                         .scrollContentBackground(.hidden)
-                        .refreshable { await load() }
+                        .refreshable { await refresh() }
                     }
                 }
             }
@@ -108,26 +257,61 @@ struct InboxView: View {
             }
         }
         .task { await load() }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .kairoSyncCompleted)
+        ) { _ in
+            Task { await load() }
+        }
     }
 
     private var composer: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "plus")
-                .foregroundStyle(Color.kInkFaint)
-            TextField("Get it out of your head…", text: $draft)
-                .font(.kBody(15, weight: .medium))
-                .focused($composing)
-                .onSubmit { Task { await add() } }
-            if !draft.isEmpty {
-                Button {
-                    Task { await add() }
-                } label: {
-                    Text("Add")
-                        .font(.kBody(13, weight: .bold))
-                        .foregroundStyle(Color.kInkInverse)
-                        .padding(.horizontal, 12).padding(.vertical, 6)
-                        .background(Capsule().fill(Color.kIris))
+        @Bindable var capture = capture
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                Image(systemName: "plus")
+                    .foregroundStyle(Color.kInkFaint)
+                TextField(
+                    "Get it out of your head…",
+                    text: $capture.draft
+                )
+                    .font(.kBody(15, weight: .medium))
+                    .focused($composing)
+                    .disabled(capture.isSaving)
+                    .onSubmit { Task { await add() } }
+                if !capture.draft.isEmpty {
+                    Button {
+                        Task { await add() }
+                    } label: {
+                        if capture.isSaving {
+                            ProgressView()
+                                .tint(.kInkInverse)
+                                .frame(minWidth: 24)
+                        } else {
+                            Text("Add")
+                                .font(.kBody(13, weight: .bold))
+                        }
+                    }
+                    .foregroundStyle(Color.kInkInverse)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .padding(.horizontal, 4)
+                    .background(Capsule().fill(Color.kIris))
+                    .disabled(
+                        capture.isSaving
+                            || capture.draft.trimmingCharacters(
+                                in: .whitespacesAndNewlines
+                            ).isEmpty
+                    )
+                    .accessibilityLabel(
+                        capture.isSaving ? "Saving thought" : "Add thought"
+                    )
                 }
+            }
+            if let errorMessage = capture.errorMessage {
+                Text(errorMessage)
+                    .font(.kBody(12, weight: .semibold))
+                    .foregroundStyle(Color.kCatRoseInk)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel("Save failed. \(errorMessage)")
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 13)
@@ -158,6 +342,44 @@ struct InboxView: View {
         .kCard(radius: 16)
     }
 
+    private func pendingRow(_ item: NativeSyncPendingTaskCreate) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "iphone")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Color.kCatButterInk)
+                .frame(width: 40, height: 40)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.kCatButter)
+                )
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.title)
+                    .font(.kBody(15, weight: .semibold))
+                    .foregroundStyle(Color.kInk)
+                Text("Saved on this iPhone")
+                    .font(.kBody(11, weight: .bold))
+                    .foregroundStyle(Color.kCatButterInk)
+            }
+            Spacer()
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.kCatButter.opacity(0.32))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(
+                            Color.kCatButterInk.opacity(0.24),
+                            lineWidth: 1
+                        )
+                )
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "\(item.title). Pending sync. Saved on this iPhone."
+        )
+    }
+
     private func ageDays(_ item: TaskItem) -> Int? {
         guard let created = item.createdAt else { return nil }
         return Calendar.current.dateComponents([.day], from: created, to: Date()).day
@@ -170,33 +392,62 @@ struct InboxView: View {
     }
 
     private func load() async {
-        do {
-            items = try await KairoAPI.shared.tasks(bucket: "inbox")
-        } catch {}
-        loading = false
+        await data.load(
+            fetch: { try await KairoAPI.shared.tasks(bucket: "inbox") },
+            onUnauthorized: { await app.handleSessionInvalidation() }
+        )
+    }
+
+    private func refresh() async {
+        await app.synchronize()
+        await load()
     }
 
     private func add() async {
-        let title = draft.trimmingCharacters(in: .whitespaces)
-        guard !title.isEmpty else { return }
-        draft = ""
-        do {
-            let created = try await KairoAPI.shared.createTask(title: title, bucket: "inbox")
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                items.insert(created, at: 0)
+        let outcome = await capture.submit(
+            isOnline: isOnline,
+            createOnline: { title in
+                try await KairoAPI.shared.createTask(
+                    title: title,
+                    bucket: "inbox"
+                )
+            },
+            enqueueOffline: { title in
+                _ = try await app.enqueueTaskCreate(
+                    title: title,
+                    bucket: "inbox"
+                )
+            },
+            onFailure: { error in
+                if AppSessionFailure.classify(error) == .unauthorized {
+                    await app.handleSessionInvalidation()
+                }
             }
+        )
+        guard let outcome else { return }
+        switch outcome {
+        case let .created(created):
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                data.adoptCreated(created)
+            }
+            await load()
+        case .queued:
+            break
+        }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        } catch {
-            draft = title
         }
     }
 
     private func delete(_ indexSet: IndexSet) async {
         for index in indexSet {
-            let item = items[index]
+            let item = data.items[index]
             try? await KairoAPI.shared.deleteTask(id: item.id, revision: item.revision)
         }
-        withAnimation { items.remove(atOffsets: indexSet) }
+        let deletedIDs = Set(indexSet.map { data.items[$0].id })
+        withAnimation {
+            data.remove(ids: deletedIDs)
+        }
     }
 }
 

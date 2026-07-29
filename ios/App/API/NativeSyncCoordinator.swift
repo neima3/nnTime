@@ -2,9 +2,19 @@ import Foundation
 
 struct NativeSyncPresentationSnapshot: Equatable, Sendable {
     var pendingCount: Int
+    var pendingTaskCreates: [NativeSyncPendingTaskCreate]
     var pendingActivityStatuses: [NativeSyncPendingActivityStatus]
     var conflicts: [NativeSyncConflict]
     var lastSuccessfulSyncAt: Date?
+}
+
+struct NativeSyncPendingTaskCreate: Equatable, Identifiable, Sendable {
+    let mutationID: UUID
+    let title: String
+    let bucket: String
+    let createdAt: Date
+
+    var id: UUID { mutationID }
 }
 
 struct NativeSyncPendingActivityStatus: Equatable, Sendable {
@@ -80,6 +90,18 @@ actor NativeSyncCoordinator {
         let document = try document(for: scope)
         return .init(
             pendingCount: document.pendingMutations.count,
+            pendingTaskCreates:
+                document.pendingMutations.compactMap { mutation in
+                    guard case let .taskCreate(task) = mutation.kind else {
+                        return nil
+                    }
+                    return .init(
+                        mutationID: mutation.id,
+                        title: task.title,
+                        bucket: task.bucket,
+                        createdAt: mutation.createdAt
+                    )
+                },
             pendingActivityStatuses:
                 document.pendingMutations.compactMap { mutation in
                     guard

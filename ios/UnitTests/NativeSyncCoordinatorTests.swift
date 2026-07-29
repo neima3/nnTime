@@ -15,6 +15,7 @@ final class NativeSyncCoordinatorTests: XCTestCase {
             snapshot,
             NativeSyncPresentationSnapshot(
                 pendingCount: 0,
+                pendingTaskCreates: [],
                 pendingActivityStatuses: [],
                 conflicts: [],
                 lastSuccessfulSyncAt: nil

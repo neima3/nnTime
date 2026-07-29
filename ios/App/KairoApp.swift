@@ -56,6 +56,7 @@ final class AppState {
     private let dayCachePurge: @Sendable () throws -> Void
 
     var pendingSyncCount = 0
+    var pendingTaskCreates: [NativeSyncPendingTaskCreate] = []
     var pendingActivityStatuses: [NativeSyncPendingActivityStatus] = []
     var syncConflicts: [NativeSyncConflict] = []
     var isSyncing = false
@@ -260,6 +261,7 @@ final class AppState {
     private func publishSyncPresentation(scope: String) async throws {
         let snapshot = try await syncCoordinator.snapshot(scope: scope)
         pendingSyncCount = snapshot.pendingCount
+        pendingTaskCreates = snapshot.pendingTaskCreates
         pendingActivityStatuses = snapshot.pendingActivityStatuses
         syncConflicts = snapshot.conflicts
         lastSuccessfulSyncAt = snapshot.lastSuccessfulSyncAt
@@ -283,6 +285,7 @@ final class AppState {
 
     private func clearSyncPresentation() {
         pendingSyncCount = 0
+        pendingTaskCreates = []
         pendingActivityStatuses = []
         syncConflicts = []
         isSyncing = false
@@ -901,7 +904,7 @@ struct MainTabs: View {
                 TodayView()
                     .tabItem { Label("Today", systemImage: "calendar.day.timeline.left") }
                     .tag(0)
-                InboxView()
+                InboxView(isOnline: net.isOnline)
                     .tabItem { Label("Inbox", systemImage: "tray") }
                     .tag(1)
                 WeekView()
