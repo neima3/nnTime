@@ -53,8 +53,17 @@ Resend or Apple production credentials, completed a real magic-link/Apple
 provider exchange, or proved install → sign-in → Keychain restore → 401 purge →
 link → logout on a physical iPhone. Simulator fixtures do not satisfy those
 release gates. Google sign-in, native cursor/mutation sync, secure extension
-credentials, TestFlight processing, integration, deployment, and live exact-SHA
-verification also remain open at this checkpoint.
+credentials, and TestFlight processing remain open.
+
+**Release completion:** Independent review cleared the final session-preservation,
+CSRF/origin-isolation, cookie-persistence, and rate-limit findings with no
+remaining Critical or Important issues. Commit `7466ee6` was fast-forwarded to
+`main`; Coolify deployment `grke2cnwkaydn0lig8vjekmo` finished for that exact
+SHA. Live `/api/health` reported migrations, database, AI, and scheduler healthy;
+the AASA contract and callback route were present. Real-browser callback QA
+passed at 1440×1000 and 390×844 with both continuation links visible and no
+horizontal overflow. `/api/v1/auth/capabilities` truthfully returned both
+providers disabled, so live credential and physical-device gates remain open.
 
 ## 2026-07-29 — Round 19: native session and offline integrity (Codex)
 
