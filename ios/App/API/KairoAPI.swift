@@ -222,45 +222,26 @@ actor KairoAPI {
         )
         request.httpBody = try JSONEncoder().encode(body)
 
+        let data = try await authData(for: request)
+        if T.self == EmptyResponse.self {
+            return EmptyResponse() as! T
+        }
         do {
-            let (data, response) = try await authSession.data(for: request)
-            guard let http = response as? HTTPURLResponse else {
-                throw APIError.authHTTP(0, nil)
-            }
-            switch http.statusCode {
-            case 200 ... 299:
-                break
-            case 401:
-                await invalidateAndNotify()
-                throw APIError.authUnauthorized(nil)
-            default:
-                throw APIError.authHTTP(
-                    http.statusCode,
-                    Self.authErrorMessage(data)
-                )
-            }
-            if T.self == EmptyResponse.self {
-                return EmptyResponse() as! T
-            }
-            do {
-                return try JSONDecoder().decode(T.self, from: data)
-            } catch {
-                throw APIError.decoding(error)
-            }
-        } catch let error as APIError {
-            throw error
+            return try JSONDecoder().decode(T.self, from: data)
         } catch {
-            if Self.isCancellation(error) {
-                throw CancellationError()
-            }
-            throw APIError.network(error)
+            throw APIError.decoding(error)
         }
     }
 
     private static func authErrorMessage(_ data: Data) -> String? {
-        (try? JSONSerialization.jsonObject(with: data) as? [String: Any])
-            .flatMap { $0["error"] as? [String: Any] }
-            .flatMap { $0["message"] as? String }
+        guard
+            let object = try? JSONSerialization.jsonObject(with: data)
+                as? [String: Any]
+        else {
+            return nil
+        }
+        return (object["error"] as? [String: Any])?["message"] as? String
+            ?? object["message"] as? String
     }
 
     @discardableResult
@@ -301,6 +282,97 @@ actor KairoAPI {
             as: EmptyResponse.self
         )
         await sessionController.invalidate()
+    }
+
+    func authCapabilities() async throws -> NativeAuthCapabilities {
+        try await plannerCall {
+            try GeneratedAPIAdapters.authCapabilities(
+                await planner.getAuthCapabilities()
+            )
+        }
+    }
+
+    func appleChallenge(
+        intent: NativeAppleIntent
+    ) async throws -> NativeAppleChallenge {
+        try await plannerCall {
+            try GeneratedAPIAdapters.appleChallenge(
+                await planner.createAppleAuthChallenge(
+                    body: .json(.init(intent: intent.generated))
+                )
+            )
+        }
+    }
+
+    @discardableResult
+    func exchangeAppleCredential(
+        intent: NativeAppleIntent,
+        challenge: NativeAppleChallenge,
+        idToken: String
+    ) async throws -> NativeSessionController.PersistResult? {
+        try await plannerCall {
+            try GeneratedAPIAdapters.appleExchange(
+                await planner.exchangeAppleCredential(
+                    body: .json(.init(
+                        intent: intent.generated,
+                        state: challenge.state,
+                        nonce: challenge.nonce,
+                        idToken: idToken
+                    ))
+                )
+            )
+        }
+        guard intent == .signIn else {
+            return nil
+        }
+        return try await sessionController.persist()
+    }
+
+    func requestMagicLink(email: String) async throws {
+        _ = try await authData(
+            for: Self.magicLinkRequest(baseURL: baseURL, email: email)
+        )
+    }
+
+    nonisolated static func magicLinkRequest(
+        baseURL: URL,
+        email: String
+    ) throws -> URLRequest {
+        let url = ["api", "auth", "sign-in", "magic-link"].reduce(baseURL) {
+            $0.appending(path: $1)
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(
+            "application/json",
+            forHTTPHeaderField: "Content-Type"
+        )
+        request.httpBody = try JSONEncoder().encode(
+            MagicLinkRequest(
+                email: email,
+                metadata: .init(platform: "ios")
+            )
+        )
+        return request
+    }
+
+    @discardableResult
+    func redeemMagicLink(
+        token: String
+    ) async throws -> NativeSessionController.PersistResult {
+        var components = URLComponents(
+            url: ["api", "auth", "magic-link", "verify"].reduce(baseURL) {
+                $0.appending(path: $1)
+            },
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "token", value: token),
+        ]
+        var request = URLRequest(url: components.url!)
+        request.httpMethod = "GET"
+        _ = try await authData(for: request)
+        return try await sessionController.persist()
     }
 
     func restoreSession() async throws -> String? {
@@ -674,6 +746,36 @@ actor KairoAPI {
         }
     }
 
+    private func authData(
+        for request: URLRequest
+    ) async throws -> Data {
+        do {
+            let (data, response) = try await authSession.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                throw APIError.authHTTP(0, nil)
+            }
+            switch http.statusCode {
+            case 200 ... 299:
+                return data
+            case 401:
+                await invalidateAndNotify()
+                throw APIError.authUnauthorized(Self.authErrorMessage(data))
+            default:
+                throw APIError.authHTTP(
+                    http.statusCode,
+                    Self.authErrorMessage(data)
+                )
+            }
+        } catch let error as APIError {
+            throw error
+        } catch {
+            if Self.isCancellation(error) {
+                throw CancellationError()
+            }
+            throw APIError.network(error)
+        }
+    }
+
     private func invalidateAndNotify() async {
         guard await sessionController.invalidate() else {
             return
@@ -793,6 +895,24 @@ actor KairoAPI {
     }
 }
 
+private extension NativeAppleIntent {
+    var generated: Components.Schemas.AppleAuthIntent {
+        switch self {
+        case .signIn: .sign_in
+        case .link: .link
+        }
+    }
+}
+
 struct EmptyResponse: Decodable {
     init() {}
+}
+
+private struct MagicLinkRequest: Encodable {
+    struct Metadata: Encodable {
+        let platform: String
+    }
+
+    let email: String
+    let metadata: Metadata
 }

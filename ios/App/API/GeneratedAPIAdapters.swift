@@ -28,6 +28,105 @@ enum GeneratedAPIAdapterError: Error, Equatable {
 }
 
 enum GeneratedAPIAdapters {
+    static func authCapabilities(
+        _ output: Operations.getAuthCapabilities.Output
+    ) throws -> NativeAuthCapabilities {
+        switch output {
+        case let .ok(response):
+            let value = try response.body.json
+            return .init(
+                magicLink: value.magicLink,
+                apple: value.apple
+            )
+        case let .undocumented(statusCode, _):
+            throw GeneratedAPIAdapterError.undocumented(
+                operation: Operations.getAuthCapabilities.id,
+                statusCode: statusCode
+            )
+        }
+    }
+
+    static func appleChallenge(
+        _ output: Operations.createAppleAuthChallenge.Output
+    ) throws -> NativeAppleChallenge {
+        switch output {
+        case let .created(response):
+            let value = try response.body.json
+            return .init(
+                state: value.state,
+                nonce: value.nonce,
+                expiresAt: value.expiresAt
+            )
+        case let .badRequest(response):
+            throw try documentedError(
+                operation: Operations.createAppleAuthChallenge.id,
+                statusCode: 400,
+                envelope: response.body.json
+            )
+        case let .unauthorized(response):
+            throw try documentedError(
+                operation: Operations.createAppleAuthChallenge.id,
+                statusCode: 401,
+                envelope: response.body.json
+            )
+        case let .tooManyRequests(response):
+            throw try documentedError(
+                operation: Operations.createAppleAuthChallenge.id,
+                statusCode: 429,
+                envelope: response.body.json
+            )
+        case let .serviceUnavailable(response):
+            throw try documentedError(
+                operation: Operations.createAppleAuthChallenge.id,
+                statusCode: 503,
+                envelope: response.body.json
+            )
+        case let .undocumented(statusCode, _):
+            throw GeneratedAPIAdapterError.undocumented(
+                operation: Operations.createAppleAuthChallenge.id,
+                statusCode: statusCode
+            )
+        }
+    }
+
+    static func appleExchange(
+        _ output: Operations.exchangeAppleCredential.Output
+    ) throws {
+        switch output {
+        case .ok:
+            return
+        case let .badRequest(response):
+            throw try documentedError(
+                operation: Operations.exchangeAppleCredential.id,
+                statusCode: 400,
+                envelope: response.body.json
+            )
+        case let .unauthorized(response):
+            throw try documentedError(
+                operation: Operations.exchangeAppleCredential.id,
+                statusCode: 401,
+                envelope: response.body.json
+            )
+        case let .conflict(response):
+            throw try documentedError(
+                operation: Operations.exchangeAppleCredential.id,
+                statusCode: 409,
+                envelope: response.body.json
+            )
+        case let .serviceUnavailable(response):
+            throw try documentedError(
+                operation: Operations.exchangeAppleCredential.id,
+                statusCode: 503,
+                envelope: response.body.json
+            )
+        case let .undocumented(statusCode, _):
+            throw GeneratedAPIAdapterError.undocumented(
+                operation: Operations.exchangeAppleCredential.id,
+                statusCode: statusCode
+            )
+        }
+    }
+
     static func day(
         _ output: Operations.getDay.Output
     ) throws -> DayResponse {
