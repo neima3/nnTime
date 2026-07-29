@@ -59,7 +59,8 @@ final class NativeAuthCoordinator {
         phase = .verifying
 
         do {
-            let session = try await redeem(callback.token)
+            let session: NativeSessionController.PersistResult =
+                try await redeem(callback.token)
             if session.replacedScope != nil
                 || currentScope.map({ $0 != session.scope }) == true
             {

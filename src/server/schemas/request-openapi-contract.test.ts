@@ -81,6 +81,8 @@ const swiftContractTestSource = readFileSync(
 );
 
 const expectedRequestOperations = {
+  createAppleAuthChallenge: "AppleChallengeRequest",
+  exchangeAppleCredential: "AppleExchangeRequest",
   createActivitySeries: "ActivitySeriesCreateRequest",
   updateActivitySeries: "ActivitySeriesUpdateRequest",
   overrideActivityOccurrence: "ActivityOccurrencePatchRequest",

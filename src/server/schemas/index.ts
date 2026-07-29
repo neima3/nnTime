@@ -28,6 +28,7 @@ export * from "./change";
 export * from "./day";
 export * from "./search";
 export * from "./stats";
+export * from "./native-auth";
 
 // Re-import the schema objects (named exports from above) to build the registry.
 import { errorEnvelope } from "./envelope";
@@ -76,6 +77,13 @@ import {
   moodCheckinResponse,
   statsResponse,
 } from "./stats";
+import {
+  appleChallengeRequest,
+  appleChallengeResponse,
+  appleExchangeRequest,
+  appleExchangeResponse,
+  authCapabilitiesResponse,
+} from "./native-auth";
 
 /**
  * Registry of response/component schemas keyed by the OpenAPI component name.
@@ -109,6 +117,9 @@ export const responseSchemaRegistry = {
   SearchResponse: searchResponse,
   StatsResponse: statsResponse,
   MoodCheckinResponse: moodCheckinResponse,
+  AuthCapabilities: authCapabilitiesResponse,
+  AppleChallenge: appleChallengeResponse,
+  AppleExchangeResponse: appleExchangeResponse,
 } as const;
 
 /** Type alias for the component-name keys, for consumers/tests. */
@@ -139,6 +150,8 @@ export const requestSchemaRegistry = {
   FocusSessionPatchRequest: focusSessionPatchRequest,
   BatchRequest: batchRequest,
   MoodCheckinRequest: moodCheckinRequest,
+  AppleChallengeRequest: appleChallengeRequest,
+  AppleExchangeRequest: appleExchangeRequest,
 } as const;
 
 /** Type alias for request component-name keys. */

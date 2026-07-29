@@ -487,7 +487,8 @@ struct SignInView: View {
 
     @MainActor
     private func submitPassword() async {
-        let session = await model.authenticate(using: .password) {
+        let session: NativeSessionController.PersistResult? =
+            await model.authenticate(using: .password) {
             if mode == .signIn {
                 return try await KairoAPI.shared.signIn(
                     email: email,
@@ -519,10 +520,11 @@ struct SignInView: View {
         guard let challenge = appleChallenge else {
             return
         }
-        let session = await model.authenticate(using: .apple) {
+        let session: NativeSessionController.PersistResult? =
+            await model.authenticate(using: .apple) {
             let credential = try result.get()
             guard
-                let session =
+                let session: NativeSessionController.PersistResult =
                     try await KairoAPI.shared.exchangeAppleCredential(
                         intent: .signIn,
                         challenge: challenge,

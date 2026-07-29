@@ -21,6 +21,9 @@ const adoption = (await import(
 )) as AdoptionModule;
 
 const requiredOperations = [
+  "getAuthCapabilities",
+  "createAppleAuthChallenge",
+  "exchangeAppleCredential",
   "getUserSettings",
   "updateUserSettings",
   "listCategories",

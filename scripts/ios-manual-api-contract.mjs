@@ -7,6 +7,9 @@ import { parse as parseYaml } from "yaml";
 const FACADE_PATH = "ios/App/API/KairoAPI.swift";
 
 export const REQUIRED_GENERATED_OPERATIONS = Object.freeze([
+  "getAuthCapabilities",
+  "createAppleAuthChallenge",
+  "exchangeAppleCredential",
   "getUserSettings",
   "updateUserSettings",
   "listCategories",
@@ -566,11 +569,13 @@ function authRequestContract(source, endpointContract) {
   const hasClosedTransport =
     requestMatches.length === 1 &&
     hasFixedRequestSetup &&
-    sessionMatches.length === 1 &&
-    sessionMatches[0].member === "data" &&
-    /\bauthSession\s*\.\s*data\s*\(\s*for\s*:\s*request\s*\)/.test(
-      functionSource,
-    );
+    ((sessionMatches.length === 1 &&
+      sessionMatches[0].member === "data" &&
+      /\bauthSession\s*\.\s*data\s*\(\s*for\s*:\s*request\s*\)/.test(
+        functionSource,
+      )) ||
+      (sessionMatches.length === 0 &&
+        /\bauthData\s*\(\s*for\s*:\s*request\s*\)/.test(functionSource)));
 
   return {
     valid:
@@ -586,12 +591,97 @@ function authRequestContract(source, endpointContract) {
   };
 }
 
-function manualTransportOutsideRange(source, allowedRange) {
+function namedFunctionRange(source, name) {
+  return declarationRange(
+    maskCommentsAndStrings(source),
+    new RegExp(
+      `\\b(?:nonisolated\\s+)?(?:static\\s+)?(?:private\\s+)?func\\s+${escapedPattern(name)}(?:\\s*<[^>{}]*>)?\\s*\\(`,
+      "g",
+    ),
+  );
+}
+
+function extendedAuthTransportContract(source) {
+  const masked = maskCommentsAndStrings(source);
+  const authDataRange = namedFunctionRange(source, "authData");
+  const magicLinkRange = namedFunctionRange(source, "magicLinkRequest");
+  const redeemRange = namedFunctionRange(source, "redeemMagicLink");
+  const declaresExtendedBoundary =
+    authDataRange !== null || magicLinkRange !== null || redeemRange !== null;
+  if (!declaresExtendedBoundary) {
+    return { valid: true, ranges: [] };
+  }
+  if (!authDataRange || !magicLinkRange || !redeemRange) {
+    return { valid: false, ranges: [] };
+  }
+
+  const authData = masked.slice(authDataRange.start, authDataRange.end);
+  const authDataCalls = urlSessionAnalysis(source).calls.filter((call) =>
+    isInside(call.index, authDataRange),
+  );
+  const authDataValid =
+    /\bprivate\s+func\s+authData\s*\(\s*for\s+request\s*:\s*URLRequest\s*\)\s*async\s+throws\s*->\s*Data\s*\{/s.test(
+      authData,
+    ) &&
+    authDataCalls.length === 1 &&
+    authDataCalls[0].member === "data" &&
+    /\bauthSession\s*\.\s*data\s*\(\s*for\s*:\s*request\s*\)/.test(
+      authData,
+    );
+
+  const magicLink = source.slice(magicLinkRange.start, magicLinkRange.end);
+  const magicLinkMasked = masked.slice(
+    magicLinkRange.start,
+    magicLinkRange.end,
+  );
+  const magicLinkValid =
+    /\bnonisolated\s+static\s+func\s+magicLinkRequest\s*\(\s*baseURL\s*:\s*URL\s*,\s*email\s*:\s*String\s*\)\s*throws\s*->\s*URLRequest\s*\{/s.test(
+      magicLinkMasked,
+    ) &&
+    magicLink.includes(
+      '["api", "auth", "sign-in", "magic-link"].reduce(baseURL)',
+    ) &&
+    (magicLinkMasked.match(/\bURLRequest\s*\(/g) ?? []).length === 1 &&
+    /request\s*\.\s*httpMethod\s*=\s*"POST"/.test(magicLink) &&
+    /metadata\s*:\s*\.init\s*\(\s*platform\s*:\s*"ios"\s*\)/s.test(
+      magicLink,
+    );
+
+  const redeem = source.slice(redeemRange.start, redeemRange.end);
+  const redeemMasked = masked.slice(redeemRange.start, redeemRange.end);
+  const redeemValid =
+    /\bfunc\s+redeemMagicLink\s*\(\s*token\s*:\s*String\s*\)\s*async\s+throws\s*->\s*NativeSessionController\s*\.\s*PersistResult\s*\{/s.test(
+      redeemMasked,
+    ) &&
+    redeem.includes(
+      '["api", "auth", "magic-link", "verify"].reduce(baseURL)',
+    ) &&
+    /URLQueryItem\s*\(\s*name\s*:\s*"token"\s*,\s*value\s*:\s*token\s*\)/s.test(
+      redeem,
+    ) &&
+    (redeemMasked.match(/\bURLRequest\s*\(/g) ?? []).length === 1 &&
+    /request\s*\.\s*httpMethod\s*=\s*"GET"/.test(redeem) &&
+    /\bauthData\s*\(\s*for\s*:\s*request\s*\)/.test(redeemMasked);
+
+  return {
+    valid: authDataValid && magicLinkValid && redeemValid,
+    ranges:
+      authDataValid && magicLinkValid && redeemValid
+        ? [authDataRange, magicLinkRange, redeemRange]
+        : [],
+  };
+}
+
+function isInsideAny(index, ranges) {
+  return ranges.some((range) => isInside(index, range));
+}
+
+function manualTransportOutsideRanges(source, allowedRanges) {
   const masked = maskCommentsAndStrings(source);
   const sessionAnalysis = urlSessionAnalysis(source);
   const requestOffenses = [];
   for (const match of masked.matchAll(/\bURLRequest\s*\(/g)) {
-    if (!isInside(match.index, allowedRange)) {
+    if (!isInsideAny(match.index, allowedRanges)) {
       requestOffenses.push({ index: match.index, symbol: "URLRequest" });
     }
   }
@@ -600,7 +690,7 @@ function manualTransportOutsideRange(source, allowedRange) {
   for (const call of sessionAnalysis.calls) {
     if (
       !BENIGN_URL_SESSION_MEMBERS.has(call.member) &&
-      !isInside(call.index, allowedRange)
+      !isInsideAny(call.index, allowedRanges)
     ) {
       sessionOffenses.push(call);
     }
@@ -657,15 +747,24 @@ export function validateGeneratedClientAdoption({ sources, spec, project }) {
   const authContract = facade
     ? authRequestContract(facade.source, endpointContract)
     : { valid: false, range: null };
+  const extendedAuthContract = facade
+    ? extendedAuthTransportContract(facade.source)
+    : { valid: false, ranges: [] };
 
   for (const file of sources) {
     const path = normalizedPath(file.path);
     if (file.source.includes("/api/v1")) {
       failures.push(`${path} contains a handwritten /api/v1 path`);
     }
-    const manualTransport = manualTransportOutsideRange(
+    const allowedRanges =
+      path.endsWith(FACADE_PATH) &&
+      authContract.range &&
+      extendedAuthContract.valid
+        ? [authContract.range, ...extendedAuthContract.ranges]
+        : [];
+    const manualTransport = manualTransportOutsideRanges(
       file.source,
-      path.endsWith(FACADE_PATH) ? authContract.range : null,
+      allowedRanges,
     );
     if (manualTransport.request) {
       failures.push(
@@ -715,6 +814,10 @@ export function validateGeneratedClientAdoption({ sources, spec, project }) {
     } else if (!authContract.valid) {
       failures.push(
         "KairoAPI manual auth transport must use a closed AuthEndpoint-based authRequest boundary",
+      );
+    } else if (!extendedAuthContract.valid) {
+      failures.push(
+        "KairoAPI native magic-link transport must use the closed authData and callback-request boundaries",
       );
     }
   }

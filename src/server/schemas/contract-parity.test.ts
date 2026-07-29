@@ -65,6 +65,7 @@ describe("ADR-002: OpenAPI ↔ zod parity (CI drift gate)", () => {
     "PlannerEventType",
     "ChangeOp",
     "EditScope",
+    "AppleAuthIntent",
     "Revision",
   ]);
 

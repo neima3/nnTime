@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { errorResponse, handleErrors, parseBody } from "@/server/api-errors";
 import { getAuthCapabilities } from "@/server/auth-capabilities";
 import { requireSession } from "@/server/auth-session";
@@ -10,12 +9,7 @@ import {
   checkRateLimit,
   rateLimitedResponse,
 } from "@/server/ratelimit";
-
-const challengeBody = z
-  .object({
-    intent: z.enum(["sign_in", "link"]),
-  })
-  .strict();
+import { appleChallengeRequest } from "@/server/schemas";
 
 function requestIp(request: Request): string {
   return (
@@ -35,7 +29,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = await parseBody(request, challengeBody);
+    const body = await parseBody(request, appleChallengeRequest);
     if (body instanceof Response) return body;
 
     const ipLimit = await checkRateLimit(

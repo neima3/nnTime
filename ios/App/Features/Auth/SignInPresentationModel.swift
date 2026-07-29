@@ -72,7 +72,8 @@ final class SignInPresentationModel {
         }
         status = .loading(operation)
         do {
-            let session = try await action()
+            let session: NativeSessionController.PersistResult =
+                try await action()
             status = .signedIn
             return session
         } catch is CancellationError {

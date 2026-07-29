@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { auth } from "@/server/auth";
 import { errorResponse, handleErrors, parseBody } from "@/server/api-errors";
 import { getAuthCapabilities } from "@/server/auth-capabilities";
@@ -8,15 +7,7 @@ import {
   NativeAppleAuthError,
   postgresAppleChallengeStore,
 } from "@/server/native-apple-auth";
-
-const exchangeBody = z
-  .object({
-    intent: z.enum(["sign_in", "link"]),
-    state: z.string().min(1).max(512),
-    nonce: z.string().min(1).max(512),
-    idToken: z.string().min(1).max(16_384),
-  })
-  .strict();
+import { appleExchangeRequest } from "@/server/schemas";
 
 async function normalizeProviderResponse(
   response: Response,
@@ -60,7 +51,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = await parseBody(request, exchangeBody);
+    const body = await parseBody(request, appleExchangeRequest);
     if (body instanceof Response) return body;
 
     let userId: string | undefined;
