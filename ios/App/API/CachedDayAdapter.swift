@@ -130,6 +130,12 @@ enum CachedDayAdapter {
 }
 
 struct TodayLoadPolicy {
+    enum MutationRenderDisposition: Equatable {
+        case exactLoad
+        case sameVisibleDay
+        case differentVisibleDay
+    }
+
     enum NoticeMode: Equatable {
         case hidden
         case dayUnavailable
@@ -189,9 +195,33 @@ struct TodayLoadPolicy {
         capturedOffset: Int,
         currentOffset: Int
     ) -> Bool {
-        capturedLoadID == currentLoadID
-            && capturedDate == currentDate
-            && capturedOffset == currentOffset
+        mutationRenderDisposition(
+            capturedLoadID: capturedLoadID,
+            currentLoadID: currentLoadID,
+            capturedDate: capturedDate,
+            currentDate: currentDate,
+            capturedOffset: capturedOffset,
+            currentOffset: currentOffset
+        ) != .differentVisibleDay
+    }
+
+    static func mutationRenderDisposition(
+        capturedLoadID: UUID,
+        currentLoadID: UUID,
+        capturedDate: String,
+        currentDate: String,
+        capturedOffset: Int,
+        currentOffset: Int
+    ) -> MutationRenderDisposition {
+        guard
+            capturedDate == currentDate,
+            capturedOffset == currentOffset
+        else {
+            return .differentVisibleDay
+        }
+        return capturedLoadID == currentLoadID
+            ? .exactLoad
+            : .sameVisibleDay
     }
 }
 

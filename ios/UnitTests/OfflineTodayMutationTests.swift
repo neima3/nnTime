@@ -169,26 +169,93 @@ final class OfflineTodayMutationTests: XCTestCase {
     func testSuspendedEnqueueCannotRenderAfterSameDayRefresh() {
         let captured = UUID()
 
-        XCTAssertFalse(
-            TodayLoadPolicy.canApplyMutationRender(
+        XCTAssertEqual(
+            TodayLoadPolicy.mutationRenderDisposition(
                 capturedLoadID: captured,
                 currentLoadID: UUID(),
                 capturedDate: "2026-07-29",
                 currentDate: "2026-07-29",
                 capturedOffset: 0,
                 currentOffset: 0
-            )
+            ),
+            .sameVisibleDay
         )
-        XCTAssertTrue(
-            TodayLoadPolicy.canApplyMutationRender(
+        XCTAssertEqual(
+            TodayLoadPolicy.mutationRenderDisposition(
                 capturedLoadID: captured,
                 currentLoadID: captured,
                 capturedDate: "2026-07-29",
                 currentDate: "2026-07-29",
                 capturedOffset: 0,
                 currentOffset: 0
-            )
+            ),
+            .exactLoad
         )
+    }
+
+    func testSameDayRefreshAppliesDesiredStatusWithoutReplacingRefreshedContent() throws {
+        let original = Self.block()
+        let refreshedTarget = DayBlock(
+            id: original.id,
+            title: "Refreshed title",
+            emoji: "🌱",
+            startMin: original.startMin,
+            durationMin: 75,
+            category: .mint,
+            done: false,
+            recurring: original.recurring,
+            revision: 9,
+            occurrenceKey: original.occurrenceKey,
+            checklist: []
+        )
+        let unrelated = Self.block(
+            activityID: "activity-2",
+            occurrenceKey: "occurrence-2"
+        )
+
+        let rendered = try CachedDayAdapter.settingCompletion(
+            true,
+            for: original,
+            in: [refreshedTarget, unrelated]
+        )
+
+        XCTAssertTrue(rendered[0].done)
+        XCTAssertEqual(rendered[0].title, "Refreshed title")
+        XCTAssertEqual(rendered[0].durationMin, 75)
+        XCTAssertEqual(rendered[0].revision, 9)
+        XCTAssertEqual(rendered[1].title, unrelated.title)
+    }
+
+    func testSameDayRefreshRollbackRestoresOnlyMatchingStatus() throws {
+        let original = Self.block()
+        let refreshedTarget = DayBlock(
+            id: original.id,
+            title: "Server refreshed",
+            emoji: original.emoji,
+            startMin: original.startMin,
+            durationMin: 60,
+            category: original.category,
+            done: true,
+            recurring: original.recurring,
+            revision: 8,
+            occurrenceKey: original.occurrenceKey,
+            checklist: []
+        )
+        let unrelated = Self.block(
+            activityID: "activity-2",
+            occurrenceKey: "occurrence-2"
+        )
+
+        let rolledBack = try CachedDayAdapter.settingCompletion(
+            original.done,
+            for: original,
+            in: [refreshedTarget, unrelated]
+        )
+
+        XCTAssertFalse(rolledBack[0].done)
+        XCTAssertEqual(rolledBack[0].title, "Server refreshed")
+        XCTAssertEqual(rolledBack[0].revision, 8)
+        XCTAssertEqual(rolledBack[1].done, unrelated.done)
     }
 
     func testPendingOnlineRowOmitsCompletionAccessibilityAction() {
