@@ -33,7 +33,15 @@ Roadmap:
   The deployment runbook documents Resend, all five Apple variables, multiline
   private-key handling, Apple Services ID versus native App ID, live AASA and
   capability probes, and the exact physical-device acceptance checklist.
-- **Local evidence.** At the end of implementation, 132 app-hosted unit tests
+- **Independent review closed.** Invalid Apple provider credentials now return
+  a validation 400 instead of a Kairo-session 401, so failed linking preserves
+  the valid cookie and Keychain envelope. Link mutations enforce a
+  native-compatible, environment-isolated browser origin boundary; public
+  challenge throttling uses Coolify's trusted `X-Real-IP` contract instead of a
+  caller-prepended forwarding hop. A loopback HTTP listener now proves the real
+  generated OpenAPI/URLSession path accepts the Apple exchange cookie from
+  empty storage without test-side cookie injection.
+- **Local evidence.** At the end of implementation, 133 app-hosted unit tests
   and nine deterministic auth-tour UI tests passed, as did a Release simulator
   build. Inspected ignored evidence under
   `browser-qa/round20-native-auth/` covers compact 390-point width, actual

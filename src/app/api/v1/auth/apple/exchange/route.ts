@@ -8,6 +8,7 @@ import {
   postgresAppleChallengeStore,
 } from "@/server/native-apple-auth";
 import { appleExchangeRequest } from "@/server/schemas";
+import { enforceNativeMutationOrigin } from "@/server/native-mutation-origin";
 
 async function normalizeProviderResponse(
   response: Response,
@@ -37,7 +38,7 @@ async function normalizeProviderResponse(
   return errorResponse(
     "invalid_credential",
     "Apple could not verify this sign-in. Please try again.",
-    response.status === 401 ? 401 : 400,
+    400,
   );
 }
 
@@ -56,6 +57,8 @@ export async function POST(request: Request) {
 
     let userId: string | undefined;
     if (body.intent === "link") {
+      const originBlock = enforceNativeMutationOrigin(request);
+      if (originBlock) return originBlock;
       ({ userId } = await requireSession());
     }
 

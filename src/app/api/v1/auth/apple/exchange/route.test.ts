@@ -39,7 +39,10 @@ vi.mock("@/server/auth", () => ({
 import { POST } from "./route";
 import { NativeAppleAuthError } from "@/server/native-apple-auth";
 
-function request(body: unknown): Request {
+function request(
+  body: unknown,
+  headers: Record<string, string> = {},
+): Request {
   return new Request(
     "https://time.neima.me/api/v1/auth/apple/exchange",
     {
@@ -47,6 +50,7 @@ function request(body: unknown): Request {
       headers: {
         "content-type": "application/json",
         cookie: "kairo.session=current",
+        ...headers,
       },
       body: JSON.stringify(body),
     },
@@ -188,6 +192,45 @@ describe("POST /api/v1/auth/apple/exchange", () => {
         retryable: false,
       },
     });
+  });
+
+  it("maps invalid Apple link credentials to 400 without signaling session expiry", async () => {
+    mocks.linkSocialAccount.mockResolvedValueOnce(
+      Response.json(
+        {
+          code: "INVALID_TOKEN",
+          message: "invalid Apple identity token",
+        },
+        { status: 401 },
+      ),
+    );
+
+    const response = await POST(request({ ...body, intent: "link" }));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: {
+        code: "invalid_credential",
+        message: "Apple could not verify this sign-in. Please try again.",
+        retryable: false,
+      },
+    });
+  });
+
+  it("rejects cross-site browser linking before reading the session", async () => {
+    const response = await POST(
+      request(
+        { ...body, intent: "link" },
+        {
+          origin: "https://attacker.example",
+          "sec-fetch-site": "cross-site",
+        },
+      ),
+    );
+
+    expect(response.status).toBe(403);
+    expect(mocks.requireSession).not.toHaveBeenCalled();
+    expect(mocks.exchangeAppleCredential).not.toHaveBeenCalled();
   });
 
   it("rejects unknown fields without reflecting credentials", async () => {

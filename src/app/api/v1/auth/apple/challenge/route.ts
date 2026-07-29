@@ -10,13 +10,12 @@ import {
   rateLimitedResponse,
 } from "@/server/ratelimit";
 import { appleChallengeRequest } from "@/server/schemas";
+import { enforceNativeMutationOrigin } from "@/server/native-mutation-origin";
 
 function requestIp(request: Request): string {
-  return (
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip")?.trim() ||
-    "unknown"
-  );
+  // Coolify's trusted reverse proxy overwrites X-Real-IP. Never use the first
+  // X-Forwarded-For hop because clients can prepend arbitrary values.
+  return request.headers.get("x-real-ip")?.trim() || "unknown";
 }
 
 export async function POST(request: Request) {
@@ -40,6 +39,8 @@ export async function POST(request: Request) {
 
     let userId: string | undefined;
     if (body.intent === "link") {
+      const originBlock = enforceNativeMutationOrigin(request);
+      if (originBlock) return originBlock;
       ({ userId } = await requireSession());
       const userLimit = await checkRateLimit(
         `native-apple:challenge:link:user:${userId}`,

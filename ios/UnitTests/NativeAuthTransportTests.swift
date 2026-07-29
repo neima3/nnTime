@@ -1,6 +1,7 @@
 import Foundation
 import HTTPTypes
 import KairoAPIClient
+import Network
 import OpenAPIRuntime
 import XCTest
 @testable import Kairo
@@ -17,15 +18,16 @@ final class NativeAuthTransportTests: XCTestCase {
         storage.setCookie(try Self.sessionCookie(value: "session-a"))
         let vault = MemorySessionEnvelopeStore()
         let session = Self.session(storage: storage)
+        let controller = NativeSessionController(
+            baseURL: URL(string: "https://time.neima.me")!,
+            cookieStorage: storage,
+            envelopeStore: vault
+        )
         let api = KairoAPI(
             baseURL: URL(string: "https://time.neima.me")!,
             plannerTransport: NativeAuthPlannerTransport(recorder: recorder),
             session: session,
-            sessionController: NativeSessionController(
-                baseURL: URL(string: "https://time.neima.me")!,
-                cookieStorage: storage,
-                envelopeStore: vault
-            ),
+            sessionController: controller,
             timezoneIdentifierProvider: { "UTC" },
             idempotencyKeyProvider: { UUID().uuidString }
         )
@@ -46,7 +48,10 @@ final class NativeAuthTransportTests: XCTestCase {
         let savedSignInEnvelope = await vault.savedEnvelope()
         XCTAssertNotNil(savedSignInEnvelope)
         let signInScope = await api.sessionScope()
+        XCTAssertNotNil(signInScope)
 
+        let linkBaselineEnvelope = await vault.savedEnvelope()
+        let linkBaselineScope = await api.sessionScope()
         _ = try await api.appleChallenge(intent: .link)
         let linkResult = try await api.exchangeAppleCredential(
             intent: .link,
@@ -56,8 +61,8 @@ final class NativeAuthTransportTests: XCTestCase {
         XCTAssertNil(linkResult)
         let linkedEnvelope = await vault.savedEnvelope()
         let linkedScope = await api.sessionScope()
-        XCTAssertEqual(linkedEnvelope, savedSignInEnvelope)
-        XCTAssertEqual(linkedScope, signInScope)
+        XCTAssertEqual(linkedEnvelope, linkBaselineEnvelope)
+        XCTAssertEqual(linkedScope, linkBaselineScope)
 
         let captures = await recorder.captures
         XCTAssertEqual(captures.map(\.operationID), [
@@ -78,6 +83,44 @@ final class NativeAuthTransportTests: XCTestCase {
         XCTAssertEqual(
             try Self.jsonBody(captures[2].body)["idToken"] as? String,
             "identity-token"
+        )
+    }
+
+    func testRealGeneratedAppleSignInTransportPersistsResponseCookie() async throws {
+        let server = try await LocalAppleAuthHTTPServer.start()
+        defer { server.stop() }
+        let storage = Self.cookieStorage()
+        let vault = MemorySessionEnvelopeStore()
+        let session = KairoClient.makeSharedCookieSession(
+            cookieStorage: storage
+        )
+        let api = KairoAPI(
+            baseURL: server.baseURL,
+            session: session,
+            sessionController: NativeSessionController(
+                baseURL: server.baseURL,
+                cookieStorage: storage,
+                envelopeStore: vault
+            )
+        )
+
+        let challenge = try await api.appleChallenge(intent: .signIn)
+        let result = try await api.exchangeAppleCredential(
+            intent: .signIn,
+            challenge: challenge,
+            idToken: "identity-token"
+        )
+
+        XCTAssertEqual(result?.scope.count, 64)
+        let savedEnvelope = await vault.savedEnvelope()
+        let savedScope = await api.sessionScope()
+        XCTAssertNotNil(savedEnvelope)
+        XCTAssertNotNil(savedScope)
+        XCTAssertEqual(
+            (storage.cookies ?? []).first {
+                $0.name == "better-auth.session_token"
+            }?.value,
+            "apple-session"
         )
     }
 
@@ -237,7 +280,7 @@ final class NativeAuthTransportTests: XCTestCase {
         XCTAssertNil(sessionScope)
     }
 
-    func testAppleLinkUnauthorizedUsesNormalSessionInvalidation() async throws {
+    func testAppleLinkInvalidCredentialPreservesValidSession() async throws {
         let recorder = NativeAuthOperationRecorder()
         let storage = Self.cookieStorage()
         storage.setCookie(try Self.sessionCookie(value: "session-a"))
@@ -252,7 +295,7 @@ final class NativeAuthTransportTests: XCTestCase {
             baseURL: URL(string: "https://time.neima.me")!,
             plannerTransport: NativeAuthPlannerTransport(
                 recorder: recorder,
-                exchangeStatus: .unauthorized
+                exchangeStatus: .badRequest
             ),
             session: Self.session(storage: storage),
             sessionController: controller,
@@ -267,15 +310,15 @@ final class NativeAuthTransportTests: XCTestCase {
                 challenge: challenge,
                 idToken: "identity-token"
             )
-            XCTFail("Expected unauthorized")
+            XCTFail("Expected invalid credential")
         } catch let error as APIError {
-            XCTAssertEqual(error.statusCode, 401)
+            XCTAssertEqual(error.statusCode, 400)
         }
 
         let savedEnvelope = await vault.savedEnvelope()
         let sessionScope = await api.sessionScope()
-        XCTAssertNil(savedEnvelope)
-        XCTAssertNil(sessionScope)
+        XCTAssertNotNil(savedEnvelope)
+        XCTAssertNotNil(sessionScope)
     }
 
     private static func cookieStorage() -> HTTPCookieStorage {
@@ -313,6 +356,144 @@ final class NativeAuthTransportTests: XCTestCase {
             JSONSerialization.jsonObject(with: Data(body.utf8))
                 as? [String: Any]
         )
+    }
+}
+
+private final class LocalAppleAuthHTTPServer {
+    enum ServerError: Error {
+        case stoppedBeforeReady
+    }
+
+    private let listener: NWListener
+    private let queue = DispatchQueue(
+        label: "NativeAuthTransportTests.local-http"
+    )
+    private let lock = NSLock()
+    private var responseIndex = 0
+    private(set) var baseURL = URL(string: "http://127.0.0.1")!
+
+    private init(listener: NWListener) {
+        self.listener = listener
+    }
+
+    static func start() async throws -> LocalAppleAuthHTTPServer {
+        let server = LocalAppleAuthHTTPServer(
+            listener: try NWListener(using: .tcp, on: .any)
+        )
+        try await server.startListening()
+        return server
+    }
+
+    func stop() {
+        listener.cancel()
+    }
+
+    private func startListening() async throws {
+        try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<Void, Error>) in
+            let gate = ListenerContinuationGate(continuation)
+
+            listener.stateUpdateHandler = { [weak self] state in
+                guard let self else { return }
+                switch state {
+                case .ready:
+                    guard let port = self.listener.port else {
+                        gate.resume(.failure(ServerError.stoppedBeforeReady))
+                        return
+                    }
+                    self.baseURL = URL(
+                        string: "http://127.0.0.1:\(port.rawValue)"
+                    )!
+                    gate.resume(.success(()))
+                case let .failed(error):
+                    gate.resume(.failure(error))
+                case .cancelled:
+                    gate.resume(.failure(ServerError.stoppedBeforeReady))
+                default:
+                    break
+                }
+            }
+            listener.newConnectionHandler = { [weak self] connection in
+                self?.serve(connection)
+            }
+            listener.start(queue: queue)
+        }
+    }
+
+    private func serve(_ connection: NWConnection) {
+        connection.start(queue: queue)
+        connection.receive(
+            minimumIncompleteLength: 1,
+            maximumLength: 65_536
+        ) { [weak self] _, _, _, error in
+            guard let self, error == nil else {
+                connection.cancel()
+                return
+            }
+            let index = lock.withLock {
+                defer { self.responseIndex += 1 }
+                return self.responseIndex
+            }
+            let response = index == 0
+                ? Self.challengeResponse
+                : Self.exchangeResponse
+            connection.send(
+                content: Data(response.utf8),
+                completion: .contentProcessed { _ in
+                    connection.cancel()
+                }
+            )
+        }
+    }
+
+    private static let challengeResponse = httpResponse(
+        status: "201 Created",
+        body:
+            #"{"state":"state-1","nonce":"nonce-1","expiresAt":"2026-07-29T12:05:00Z"}"#
+    )
+
+    private static let exchangeResponse = httpResponse(
+        status: "200 OK",
+        body: #"{"redirect":false,"status":true}"#,
+        headers: [
+            "Set-Cookie":
+                "better-auth.session_token=apple-session; Path=/; HttpOnly; SameSite=Lax",
+        ]
+    )
+
+    private static func httpResponse(
+        status: String,
+        body: String,
+        headers: [String: String] = [:]
+    ) -> String {
+        let customHeaders = headers
+            .map { "\($0.key): \($0.value)\r\n" }
+            .joined()
+        return """
+        HTTP/1.1 \(status)\r
+        Content-Type: application/json\r
+        Content-Length: \(body.utf8.count)\r
+        Connection: close\r
+        \(customHeaders)\r
+        \(body)
+        """
+    }
+}
+
+private final class ListenerContinuationGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Error>?
+
+    init(_ continuation: CheckedContinuation<Void, Error>) {
+        self.continuation = continuation
+    }
+
+    func resume(_ result: Result<Void, Error>) {
+        lock.withLock {
+            guard let continuation else { return }
+            self.continuation = nil
+            continuation.resume(with: result)
+        }
     }
 }
 
@@ -361,6 +542,11 @@ private struct NativeAuthPlannerTransport: ClientTransport {
                 response = (
                     .unauthorized,
                     #"{"error":{"code":"unauthorized","message":"Sign in again","retryable":false}}"#
+                )
+            } else if exchangeStatus == .badRequest {
+                response = (
+                    .badRequest,
+                    #"{"error":{"code":"invalid_credential","message":"Apple could not verify this sign-in.","retryable":false}}"#
                 )
             } else {
                 response = (.ok, #"{"redirect":false,"status":true}"#)
