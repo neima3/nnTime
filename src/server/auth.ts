@@ -16,6 +16,7 @@ import {
   getAppleAuthConfig,
   getTrustedOrigins,
 } from "./auth-capabilities";
+import { buildMagicLinkDeliveryUrl } from "./native-magic-link";
 
 const appleConfig = getAppleAuthConfig(process.env);
 const appleProvider = appleConfig
@@ -37,8 +38,7 @@ async function deliverAuthEmail(
   const result = await sendEmail({ to: email, subject, text });
   if (!result.sent) {
     if (process.env.NODE_ENV !== "production") {
-       
-      console.log(`[auth] ${kind} for ${email}: ${url} (${result.reason})`);
+      console.log(`[auth] ${kind} email delivery skipped (${result.reason})`);
     }
   }
 }
@@ -85,8 +85,16 @@ export const auth = betterAuth({
   plugins: [
     magicLink({
       expiresIn: 60 * 15,
-      sendMagicLink: async ({ email, url }) => {
-        await deliverAuthEmail("magic", email, url);
+      sendMagicLink: async ({ email, url, token, metadata }) => {
+        await deliverAuthEmail(
+          "magic",
+          email,
+          buildMagicLinkDeliveryUrl({
+            token,
+            defaultUrl: url,
+            metadata,
+          }),
+        );
       },
     }),
   ],

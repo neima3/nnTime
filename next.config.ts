@@ -2,6 +2,17 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  async headers() {
+    return [
+      {
+        source: "/.well-known/apple-app-site-association",
+        headers: [
+          { key: "Content-Type", value: "application/json" },
+          { key: "Cache-Control", value: "public, no-cache" },
+        ],
+      },
+    ];
+  },
   // Ensure server-side packages are traced into the standalone build. The
   // dynamic pages that use server-only imports (db, auth, drizzle) need these
   // included explicitly because the tracer may not follow all import chains.

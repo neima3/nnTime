@@ -1,0 +1,17 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": [
+          "A45F46XD54.me.neima.kairo"
+        ],
+        "components": [
+          {
+            "/": "/auth/callback"
+          }
+        ]
+      }
+    ]
+  }
+}
