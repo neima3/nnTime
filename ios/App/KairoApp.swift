@@ -81,10 +81,26 @@ final class AppState {
         },
         syncSnapshotBarrier: @escaping @Sendable () async -> Void = {}
     ) {
-        self.syncCoordinator = syncCoordinator ?? NativeSyncCoordinator(
-            store: NativeSyncStore(),
-            transport: KairoAPI.shared
-        )
+#if DEBUG
+        if syncCoordinator == nil, Self.round21SyncFixture != nil {
+            self.syncCoordinator = NativeSyncCoordinator(
+                store: NativeSyncStore(),
+                transport: Round21SyncFixtureTransport()
+            )
+        } else {
+            self.syncCoordinator =
+                syncCoordinator ?? NativeSyncCoordinator(
+                    store: NativeSyncStore(),
+                    transport: KairoAPI.shared
+                )
+        }
+#else
+        self.syncCoordinator =
+            syncCoordinator ?? NativeSyncCoordinator(
+                store: NativeSyncStore(),
+                transport: KairoAPI.shared
+            )
+#endif
         self.signOutAction = signOutAction
         self.invalidateSessionAction = invalidateSessionAction
         self.dayCachePurge = dayCachePurge
@@ -226,6 +242,11 @@ final class AppState {
     }
 
     func synchronize(explicitRetry: Bool = false) async {
+#if DEBUG
+        if Self.round21SyncFixture != nil, !explicitRetry {
+            return
+        }
+#endif
         guard case .signedIn = auth else { return }
         guard !syncStorageUnavailable, !syncSuspendedForAuthTransition else {
             return
@@ -457,6 +478,10 @@ final class AppState {
             installOfflineFixture()
             return
         }
+        if let round21Fixture = Self.round21SyncFixture {
+            await installRound21SyncFixture(round21Fixture)
+            return
+        }
 #endif
         // The local cache may predate a change made on the web, so apply what we
         // have first (no flash of the wrong surfaces), then reconcile.
@@ -512,6 +537,228 @@ final class AppState {
     }
 
 #if DEBUG
+    private enum Round21SyncFixture: String {
+        case today
+        case inbox
+        case conflicts
+    }
+
+    private static var round21SyncFixture: Round21SyncFixture? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard
+            let index = arguments.firstIndex(
+                of: "-kairoRound21SyncFixture"
+            ),
+            arguments.indices.contains(index + 1)
+        else {
+            return nil
+        }
+        return Round21SyncFixture(rawValue: arguments[index + 1])
+    }
+
+    private func installRound21SyncFixture(
+        _ fixture: Round21SyncFixture
+    ) async {
+        let arguments = ProcessInfo.processInfo.arguments
+        let resetsFixture = arguments.contains(
+            "-kairoRound21ResetFixture"
+        )
+        let scope = "synthetic-round21-account"
+        let date = KTime.dateString(Date(), zone: timezone)
+        let pendingOccurrence = "\(date)T09:00:00.000Z"
+        let availableOccurrence = "\(date)T10:30:00.000Z"
+        let store = NativeSyncStore()
+
+        if resetsFixture {
+            try? store.purge()
+            try? DayCache.purge()
+        }
+
+        DayCache.write(
+            scope: scope,
+            date: date,
+            zone: timezone.identifier,
+            blocks: [
+                CachedBlock(
+                    title: "Morning focus",
+                    emoji: "🧠",
+                    startMin: 9 * 60,
+                    durationMin: 45,
+                    done: fixture == .today,
+                    category: "lilac",
+                    activityId: "round21-pending-activity",
+                    revision: 3,
+                    occurrenceKey: pendingOccurrence
+                ),
+                CachedBlock(
+                    title: "Gentle planning",
+                    emoji: "🌿",
+                    startMin: 10 * 60 + 30,
+                    durationMin: 30,
+                    done: false,
+                    category: "mint",
+                    activityId: "round21-available-activity",
+                    revision: 2,
+                    occurrenceKey: availableOccurrence
+                ),
+            ]
+        )
+
+        if resetsFixture || (try? store.read(scope: scope)) == nil {
+            try? store.write(
+                Self.round21SyncDocument(
+                    fixture: fixture,
+                    scope: scope,
+                    occurrenceKey: pendingOccurrence
+                )
+            )
+        }
+
+        reducedStimulation = arguments.contains(
+            "-kairoRound21ReducedStimulation"
+        )
+        sessionScope = scope
+        offlineReadOnly = true
+        do {
+            try await activateSync(scope: scope)
+            syncSuspendedForAuthTransition = false
+            auth = .signedIn
+        } catch {
+            enterSyncStorageFailure()
+        }
+    }
+
+    private static func round21SyncDocument(
+        fixture: Round21SyncFixture,
+        scope: String,
+        occurrenceKey: String
+    ) -> NativeSyncDocument {
+        let recordedAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let pendingStatus = NativeSyncMutation(
+            id: UUID(
+                uuidString: "21000000-0000-0000-0000-000000000001"
+            )!,
+            createdAt: recordedAt,
+            nextAttemptAt: nil,
+            kind: .activityStatus(
+                PendingActivityStatus(
+                    idempotencyKey: "round21-status-idempotency",
+                    activityID: "round21-pending-activity",
+                    status: ActivityStatus.completed.rawValue,
+                    occurredAt: recordedAt,
+                    occurrenceKey: occurrenceKey
+                )
+            )
+        )
+        let pendingInbox = NativeSyncMutation(
+            id: UUID(
+                uuidString: "21000000-0000-0000-0000-000000000002"
+            )!,
+            createdAt: recordedAt,
+            nextAttemptAt: nil,
+            kind: .taskCreate(
+                PendingTaskCreate(
+                    idempotencyKey: "round21-inbox-idempotency",
+                    title: "Pack a calm lunch",
+                    bucket: "inbox"
+                )
+            )
+        )
+
+        let retryMutation = NativeSyncMutation(
+            id: UUID(
+                uuidString: "21000000-0000-0000-0000-000000000010"
+            )!,
+            createdAt: recordedAt,
+            nextAttemptAt: nil,
+            kind: .taskCreate(
+                PendingTaskCreate(
+                    idempotencyKey: "round21-retry-idempotency",
+                    title: "Synthetic retry fixture",
+                    bucket: "inbox"
+                )
+            )
+        )
+        let secondRetryMutation = NativeSyncMutation(
+            id: UUID(
+                uuidString: "21000000-0000-0000-0000-000000000011"
+            )!,
+            createdAt: recordedAt,
+            nextAttemptAt: nil,
+            kind: .taskCreate(
+                PendingTaskCreate(
+                    idempotencyKey: "round21-retry-idempotency-2",
+                    title: "Synthetic retry fixture two",
+                    bucket: "inbox"
+                )
+            )
+        )
+
+        let conflicts: [NativeSyncConflict]
+        switch fixture {
+        case .conflicts:
+            conflicts = [
+                NativeSyncConflict(
+                    id: UUID(
+                        uuidString:
+                            "21000000-0000-0000-0000-000000000020"
+                    )!,
+                    mutationID: retryMutation.id,
+                    operation: .taskCreate,
+                    reason: .clientError,
+                    recordedAt: recordedAt,
+                    retryMutation: retryMutation
+                ),
+                NativeSyncConflict(
+                    id: UUID(
+                        uuidString:
+                            "21000000-0000-0000-0000-000000000021"
+                    )!,
+                    mutationID: UUID(
+                        uuidString:
+                            "21000000-0000-0000-0000-000000000012"
+                    )!,
+                    operation: .taskCreate,
+                    reason: .clientError,
+                    recordedAt: recordedAt,
+                    retryMutation: nil
+                ),
+                NativeSyncConflict(
+                    id: UUID(
+                        uuidString:
+                            "21000000-0000-0000-0000-000000000022"
+                    )!,
+                    mutationID: secondRetryMutation.id,
+                    operation: .taskCreate,
+                    reason: .clientError,
+                    recordedAt: recordedAt,
+                    retryMutation: secondRetryMutation
+                ),
+            ]
+        case .today, .inbox:
+            conflicts = []
+        }
+
+        let pending: [NativeSyncMutation]
+        switch fixture {
+        case .today:
+            pending = [pendingStatus]
+        case .inbox:
+            pending = [pendingInbox]
+        case .conflicts:
+            pending = []
+        }
+
+        return NativeSyncDocument(
+            version: NativeSyncDocument.currentVersion,
+            scope: scope,
+            cursor: "round21-synthetic-cursor",
+            pendingMutations: pending,
+            conflicts: conflicts,
+            lastSuccessfulSyncAt: nil
+        )
+    }
+
     private func installOfflineFixture() {
         let scope = "synthetic-offline-account"
         let date = KTime.dateString(Date(), zone: timezone)
@@ -759,6 +1006,47 @@ final class AppState {
         a11yGeneration += 1
     }
 }
+
+#if DEBUG
+private struct Round21SyncFixtureTransport:
+    NativeSyncTransport,
+    Sendable
+{
+    private var offlineError: APIError {
+        APIError.network(URLError(.notConnectedToInternet))
+    }
+
+    func createTask(
+        title _: String,
+        bucket _: String,
+        idempotencyKey _: String?
+    ) async throws -> TaskItem {
+        throw offlineError
+    }
+
+    func activity(id _: String) async throws -> Activity {
+        throw offlineError
+    }
+
+    func setStatus(
+        activityId _: String,
+        revision _: Int,
+        occurrenceKey _: String?,
+        status _: ActivityStatus,
+        completedAt _: String?,
+        idempotencyKey _: String?
+    ) async throws -> Activity {
+        throw offlineError
+    }
+
+    func changes(
+        cursor _: String?,
+        limit _: Int?
+    ) async throws -> ChangesPage {
+        throw offlineError
+    }
+}
+#endif
 
 // MARK: - Root: auth gate → tabs
 

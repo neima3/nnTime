@@ -363,7 +363,7 @@ struct SyncConflictNotice: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.kCatRose.opacity(0.72))
+                .fill(Color.kCatRose)
                 .overlay(
                     RoundedRectangle(
                         cornerRadius: 18,
@@ -442,6 +442,14 @@ struct SyncConflictNotice: View {
                         SyncConflictActionLayoutPolicy.minimumTarget
                 )
                 .padding(.horizontal, 14)
+                .background(
+                    Capsule()
+                        .stroke(
+                            Color.kCatRoseInk.opacity(0.28),
+                            lineWidth: 1
+                        )
+                )
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .foregroundStyle(Color.kCatRoseInk)
@@ -592,6 +600,11 @@ struct SyncStatusNotices: View {
             } label: {
                 Image(systemName: "chevron.left")
                     .frame(width: 44, height: 44)
+                    .background(
+                        Circle()
+                            .fill(Color.kCatRose.opacity(0.72))
+                    )
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .foregroundStyle(Color.kCatRoseInk)
@@ -603,6 +616,11 @@ struct SyncStatusNotices: View {
             } label: {
                 Image(systemName: "chevron.right")
                     .frame(width: 44, height: 44)
+                    .background(
+                        Circle()
+                            .fill(Color.kCatRose.opacity(0.72))
+                    )
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .foregroundStyle(Color.kCatRoseInk)
