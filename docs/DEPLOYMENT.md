@@ -96,13 +96,19 @@ Phase 1+ requires `DATABASE_URL`, `BETTER_AUTH_SECRET`, etc.
 | `APPLE_KEY_ID` | Key ID for the Sign in with Apple `.p8` private key. |
 | `APPLE_PRIVATE_KEY` | Full `.p8` contents. Store as a Coolify secret; either real newlines or escaped `\n` are accepted. Never commit or print it. |
 | `APPLE_APP_BUNDLE_IDENTIFIER` | Native App ID/bundle ID. Must be exactly `me.neima.kairo` or Apple remains disabled. |
+| `GOOGLE_WEB_CLIENT_ID` | Google OAuth 2.0 **Web application** client ID; this is also the native server-client audience. |
+| `GOOGLE_IOS_CLIENT_ID` | Google OAuth 2.0 **iOS** client ID for bundle ID `me.neima.kairo`. |
+| `GOOGLE_CLIENT_SECRET` | Secret for the Google Web application client. Store as a Coolify secret; never add it to an iOS build setting. |
 
 ### Native authentication release checklist
 
-Apple and magic link are fail-closed. `GET /api/v1/auth/capabilities` exposes
-only `{ "magicLink": boolean, "apple": boolean }`; Apple becomes available
-only when all five `APPLE_*` values above are present and the bundle identifier
-matches. Resend is independent.
+Apple, Google, and magic link are fail-closed. `GET
+/api/v1/auth/capabilities` exposes exactly `{ "magicLink": boolean, "apple":
+boolean, "google": boolean }`. Apple becomes available only when all five
+`APPLE_*` values above are present and the bundle identifier matches. Google
+becomes available only when `GOOGLE_WEB_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID`, and
+`GOOGLE_CLIENT_SECRET` are all non-blank. A partial Google configuration is
+disabled rather than guessed or exposed. Resend is independent.
 
 Apple Developer configuration must include:
 
@@ -124,9 +130,10 @@ curl -fsS https://time.neima.me/api/v1/auth/capabilities \
 
 The AASA response must be served directly as JSON over HTTPS, include
 `A45F46XD54.me.neima.kairo`, and route `/auth/callback`. The production
-capability response must contain exactly `magicLink` and `apple`, both boolean
-and both `true` for Phase 7B release readiness. A repository preflight proves
-the checked-in contract; it does not substitute for this live probe.
+capability response must contain exactly `magicLink`, `apple`, and `google`,
+all boolean. The providers being released must read `true`. A repository
+preflight proves the checked-in contract; it does not substitute for this live
+probe.
 
 Phase 7B may be completed only after all of this physical-iPhone evidence is
 recorded:
@@ -145,6 +152,65 @@ recorded:
 
 Use a synthetic/non-production planner account for mutable proof. Do not log
 tokens, cookies, magic-link URLs, Apple identity tokens, or private keys.
+
+### Google authentication activation
+
+Google identity is separate from the optional Google Calendar connection. The
+identity provider requests only basic identity for sign-in and account linkage;
+it does not grant calendar access.
+
+In one Google Cloud project, configure the OAuth consent screen and create:
+
+1. A **Web application** OAuth client. Add `https://time.neima.me` as an
+   authorized JavaScript origin and
+   `https://time.neima.me/api/auth/callback/google` as an authorized redirect
+   URI. For local testing, add `http://localhost:3000` and
+   `http://localhost:3000/api/auth/callback/google` separately; never substitute
+   localhost values in production.
+2. An **iOS** OAuth client whose bundle ID is exactly `me.neima.kairo`. Its
+   generated client ID becomes both `GOOGLE_IOS_CLIENT_ID` on the server and
+   `KAIRO_GOOGLE_IOS_CLIENT_ID` in the iOS public build settings.
+
+Use the Web application client ID for `GOOGLE_WEB_CLIENT_ID` and
+`KAIRO_GOOGLE_SERVER_CLIENT_ID`. Derive the URL scheme by reversing that iOS
+client ID (`<id>.apps.googleusercontent.com` becomes
+`com.googleusercontent.apps.<id>`) and set it as
+`KAIRO_GOOGLE_REVERSED_CLIENT_ID`. The repository release preflight rejects a
+distribution app with blank, placeholder, or mismatched identifiers.
+
+Mirror all three server values in the Coolify app and `.env.local`; apply all
+three together. The iOS identifiers are public configuration, but belong in
+ignored `ios/Signing.local.xcconfig` (or release build settings), not in source
+with environment-specific values. After changing Coolify variables, redeploy
+the exact pushed SHA even if no code changed.
+
+Activation is complete only after this checklist passes:
+
+1. `GET /api/v1/auth/capabilities` returns the exact three-field shape with
+   `google: true`;
+2. a real desktop and 390-point mobile browser complete Google sign-in, return
+   to `/app/today`, survive reload, and log out cleanly;
+3. an existing synthetic password account explicitly links the matching Google
+   account from Settings without changing planner scope;
+4. cancellation, wrong-email, already-linked, offline, and retry paths remain
+   actionable without signing out a valid session;
+5. a signed physical iPhone completes Google sign-in, force-quit/relaunch
+   Keychain restoration, explicit linking, revoked/expired 401 purge, and
+   logout purge; and
+6. no log, screenshot, or test artifact contains an ID token, access token,
+   cookie, client secret, or private OAuth redirect.
+
+**Current Round 23 state (2026-07-29):** the repository code, simulator
+transport/UI, and fail-closed release contract are implemented. A dedicated
+Google Cloud project exists (`Kairo`, project ID `kairo-nntime-2026`, account
+`neimarules@gmail.com`). The branding wizard contains the Kairo app name,
+external audience, support account `neimarules@gmail.com`, and developer
+contact `neima@nakhaee.us`, but setup stopped before accepting the Google API
+Services: User Data Policy agreement. Consent configuration is therefore not
+finalized, and no Web client, iOS client, or client secret exists. The
+checked-in iOS public settings and this worktree's local Google server variables
+remain blank; no Coolify variables were changed. Production browser OAuth and a
+signed physical-iPhone lifecycle remain unproven, so Phase 8B stays unchecked.
 
 ## Postgres provisioning (Phase 1A+)
 

@@ -95,8 +95,11 @@ design work BEFORE the consuming subphase starts.
 - [ ] Phase 8 — iOS surfaces + launch → **85% iOS PARITY GATE**
   - [x] 8A Read-only widgets + Live Activity/Dynamic Island ship; authenticated
         extension mutations remain blocked on a secure session bridge
-  - [ ] 8B Google sign-in (web+iOS) remains; Apple Reminders import decision
-        executed
+  - [ ] 8B Google sign-in (web+iOS) and the Apple Reminders exclusion are
+        code/documentation-complete. REMAINS: provision the three-value Google
+        server contract plus matching iOS public identifiers, then prove
+        live production web sign-in/linking and the signed physical-iPhone
+        lifecycle.
   - [x] 8C Ongoing hardening: repeated restore drill, E2E suite in CI, monitoring
   - [x] 8D Privacy/review-prep contract + scripted parity gate
         (App Store upload, processing, and launch are tracked per release)
@@ -114,8 +117,10 @@ minutes-from-midnight; timeline is fixed 07:00–23:00; shell has no To-do route
 1. **Parity baseline:** `docs/plans/parity-checklist.md` — one row per researched
    feature: stable ID, area, platform applicability (web/ios/both), planned
    phase, status, credit, acceptance evidence. Exclusions from the denominator
-   only for rows the research marks unverified/reported-gap or pure pricing
-   policy, each with a written reason. Partial credit = 0.5 only when its
+   only for rows the research marks unverified/reported-gap, pure pricing
+   policy, or a documented platform limitation whose only implementation would
+   violate a binding privacy/data-minimization contract; each needs a written
+   reason. Partial credit = 0.5 only when its
    acceptance criteria are written on the row. Every deferred feature stays in
    the denominator and scores 0 — no unweighted "15% loss budget."
    `node scripts/parity.mjs` must reproduce the web and iOS percentages.

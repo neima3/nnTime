@@ -23,9 +23,10 @@ Rules applied when building this table:
 - **status**: `planned` (a phase covers it fully), `partial` (a phase covers it
   partially — must have written acceptance criteria in the last column),
   `deferred` (deliberately not shipping; stays in the denominator, credit 0),
-  `excluded` (out of the denominator — only for rows the research doc itself
-  marks unverified/reported-gap/blog-content-not-in-app, or pure
-  pricing/business-policy rows; reason written).
+  `excluded` (out of the denominator — for rows the research doc itself marks
+  unverified/reported-gap/blog-content-not-in-app, pure pricing/business-policy
+  rows, or a documented platform limitation whose only implementation would
+  violate a binding privacy/data-minimization contract; reason written).
 - **credit**: planned = 1, partial = 0.5, deferred = 0, excluded = 0.
 
 ## Summary
@@ -34,25 +35,25 @@ _Computed by `node scripts/parity.mjs` — see report for the run that produced 
 
 | metric | value |
 |---|---|
-| Web parity | 88.46% (69.0 / 78 rows) |
-| iOS parity | 86.52% (77.0 / 89 rows) |
-| Combined parity | 86.52% (77.0 / 89 rows) |
+| Web parity | 89.74% (70.0 / 78 rows) |
+| iOS parity | 85.80% (75.5 / 88 rows) |
+| Combined parity | 85.80% (75.5 / 88 rows) |
 | Total inventory rows | 98 |
-| planned | 75 |
-| partial | 4 |
-| deferred | 10 |
-| excluded | 9 |
+| planned | 72 |
+| partial | 7 |
+| deferred | 9 |
+| excluded | 10 |
 
 **Both platform gates pass (≥85%).** The first draft scored iOS at 83.15%;
 rather than massaging credits, the roadmap was strengthened (2026-07-12):
 month view, quick-extend, and checklist-during-focus were itemized into iOS
 scope (7D/7E), a dedicated high-contrast mode was added to 5B, and Apple
-Health sync was added to 8B. Remaining partial rows (category colors, icon
-library on both platforms ×2 areas) are deliberate design decisions with
-written criteria. Remaining deferred (credit 0, in denominator): Apple Watch
-app, Apple Family Sharing, family-profile billing, family/shared profiles,
-Android, community template sharing, courses/community content, AI
-energy-pattern learning, and related rows — see table.
+Health sync was added to 8B. F02 is excluded because EventKit offers full
+Reminders access but no read-only Reminders authorization; requesting read/write
+access for a one-way import would violate Kairo's data-minimization contract.
+Google/Apple/Outlook calendar import remains a separate F01 capability and is
+not claimed as Reminders equivalence. Remaining partial and deferred rows retain
+their written criteria and zero-credit treatment in the table below.
 
 ## Checklist
 
@@ -103,7 +104,7 @@ energy-pattern learning, and related rows — see table.
 | E06 | AI priority grouping | E | both | 4 | planned | 1 | IMPLEMENTED (server-layer, not live-verified — needs ANTHROPIC_API_KEY): groupByPriority in src/server/services/ai.ts. |
 | E07 | Smart scheduling / energy-pattern learning | E | both | R9 | planned | 1 | SHIPPED (Round 9, 2026-07-26): computeEnergyPattern learns when HIGH-energy work actually completes (60-d window, scheduled hour from occurrenceKey in the planning zone, evidence-gated: ≥8 samples and best 3-h window ≥3 — below the gate the app says nothing). Surfaced as the "Your charged hours" card on web Stats AND iOS Insights (both render the same server-derived stats payload), and fed to Plan-my-day as a <learned> block so high-energy tasks get placed inside the charged window when a slot overlaps. Evidence: browser-qa/r9-charged-hours.png; stats.test.ts (6 pattern tests); prompt enrichment in ai.ts planMyDay. |
 | F01 | Calendar import | F | both | 5A | planned | 1 | IMPLEMENTED (server-layer, not live-verified — needs API key): src/server/services/calendar.ts — SSRF-safe ICS fetch + parser + token encryption. Google OAuth + ICS subscribe covers Apple/Google/Outlook-via-ICS import. |
-| F02 | Reminders (Apple) sync | F | ios | 8B | planned | 1 | Apple Reminders import decision executed at 8B. |
+| F02 | Reminders (Apple) sync | F | ios | — | excluded | 0 | EXCLUDED: Apple EventKit exposes full read/write Reminders access but no read-only Reminders permission. Kairo will not request broader mutation access for a one-way import; that would violate data minimization. Calendar import (F01) remains separate and is not claimed as equivalent. |
 | F03 | One-way sync only, by design | F | both | 5A | planned | 1 | SHIPPED: calendar import is read-only (source='calendar', read-only locked blocks). Kairo's calendar import is read-only/one-way by the same design choice. |
 | F04 | Per-device import step | F | both | 5A | planned | 1 | Superseded by account-level OAuth sync (server-side, not per-device) — same end-user outcome via a better mechanism. |
 | F05 | Imported events are "locked" | F | both | 2C, 5A | planned | 1 | — |
@@ -138,7 +139,7 @@ energy-pattern learning, and related rows — see table.
 | K03 | Mood tracking / check-ins | K | both | 5C | planned | 1 | SHIPPED: recordMoodCheckin + POST /api/v1/mood + StatsClient mood chips UI (Wave 2); live route 401 unauth. |
 | K04 | Apple Health sync (Tiimo Wellbeing) | K | ios | 8B, R11, R13 | partial | 0.5 | SHIPPED: independent device-local opt-ins for idempotent, write-only mindful minutes (R11) and a read-only sleep schedule that infers a private wind-down time from recent Sleep Analysis, then schedules one local suggestion without uploading or retaining Health samples (R13). A signed Release build with the HealthKit entitlement was installed and launched on a physical iPhone. REMAINS: on-device user-interaction proof of the Health permission sheets, a mindful sample, a real sleep query, and the local notification. |
 | K05 | Editorial "review techniques" (Winventory, Progress Check, Tiny Rewards) | K | both | — | excluded | 0 | Research doc explicitly labels this "Content, not confirmed as app UI" — blog content, not an in-app feature. |
-| L01 | Sign-up via Apple / Google / Email | L | both | 1C, 7B, 8B | planned | 1 | Email+password SHIPPED + live-verified 2026-07-13. Native magic-link callback, capability discovery, Sign in with Apple, and explicit Apple account linking are code-complete with simulator UI/transport proof in Round 20. REMAINS: Resend + Apple production credentials, physical-iPhone lifecycle proof, and Google (8B). |
+| L01 | Sign-up via Apple / Google / Email | L | both | 1C, 7B, 8B | planned | 1 | SHIPPED CODE: email/password is live-verified (2026-07-13); Round 20 added native magic-link, Apple sign-in/linking, Keychain session handling, and simulator proof; Round 23 added fail-closed Google web sign-in/linking plus GoogleSignIn-iOS 9.0.0 transport/UI with simulator unit and UI proof. REMAINS: complete Resend + Apple production credentials, all three Google server values (`GOOGLE_WEB_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`), matching public iOS build settings, live browser OAuth/linking, and the complete signed physical-iPhone lifecycle (sign-in, relaunch/Keychain restore, linking, 401 purge, logout). |
 | L02 | Cross-device sync | L | both | 1A/1B, 7C | planned | 1 | SHIPPED: `/api/v1/changes?cursor=` incremental feed plus native protected cursor checkpoints, invalid-cursor reset, ordered idempotent task/status replay, foreground/reconnect synchronization, and durable conflict recovery. Server feed was live-verified (401 without auth, works with session); native replay/conflict behavior is simulator-verified in Round 21. |
 | L03 | No account merging | L | both | — | excluded | 0 | Describes a Tiimo limitation (unsupported), not a buildable feature; matched by default since Kairo doesn't build merging either. |
 | L04 | Family/shared profile billing | L | ios | — | deferred | 0 | Rolls into the family/shared-profiles deferral. |

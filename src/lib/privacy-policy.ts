@@ -6,7 +6,7 @@ export type PrivacySection = {
 };
 
 export const privacyPolicy = {
-  updated: "July 28, 2026",
+  updated: "July 29, 2026",
   contactEmail: "neima@nakhaee.us",
   summary:
     "Kairo stores the account and planner information needed to keep your day available across devices. We do not sell personal information, do not run ads, and do not use advertising trackers.",
@@ -15,7 +15,7 @@ export const privacyPolicy = {
       id: "information",
       title: "Information Kairo receives",
       paragraphs: [
-        "When you create an account, Kairo receives your email address, account identifier, and authentication records. Kairo stores the plans, tasks, routines, notes, checklists, preferences, completion history, focus sessions, and mood check-ins you choose to add.",
+        "When you create an account, Kairo receives your email address, account identifier, and authentication records. If you choose Google identity to sign in or explicitly link it in Settings, Kairo receives the basic profile information Google provides for authentication, such as your name, email address, profile image, and provider account identifier. Kairo stores the plans, tasks, routines, notes, checklists, preferences, completion history, focus sessions, and mood check-ins you choose to add.",
         "Kairo also processes limited technical records needed to sync changes, prevent abuse, diagnose failures, and keep the service secure. If you connect or import a calendar, Kairo receives the calendar events and connection information required for that feature.",
       ],
     },
@@ -44,14 +44,15 @@ export const privacyPolicy = {
       bullets: [
         "Anthropic processes a task or the minimum planner context only when you explicitly use an AI planning feature. Suggestions are returned for your review; the model has no direct account-mutation tools.",
         "Resend delivers account and security email when email delivery is configured.",
-        "Google Calendar processes calendar authorization and events only if you choose to connect Google Calendar.",
+        "Google identity processes authentication only if you choose Continue with Google or explicitly connect Google in Settings. This basic identity and account-linkage flow is separate from Google Calendar and does not grant Kairo access to your calendar events.",
+        "Google Calendar processes separate calendar authorization and events only if you choose to connect Google Calendar. Calendar scopes are not requested by Google identity sign-in.",
       ],
     },
     {
       id: "choices",
       title: "Your choices and control",
       paragraphs: [
-        "You control what you add, which optional integrations you enable, whether notifications are allowed, and whether either Apple Health feature is on. Imported calendar connections can be removed from Settings.",
+        "You control what you add, which optional integrations you enable, whether notifications are allowed, and whether either Apple Health feature is on. Imported calendar connections can be removed from Settings. Kairo does not request access to Apple Reminders: Apple provides no read-only Reminders permission, and Kairo will not request broader read/write access for a one-way import.",
         "Signed-in users can export their Kairo data or delete their account from Settings. Account deletion removes active account and planner records from the service. Recovery backups may retain a protected copy for a limited operational period before they expire.",
       ],
     },

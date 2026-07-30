@@ -39,6 +39,40 @@ Interactive Xcode builds should continue to review and approve the Apple
 package plugin in the Xcode UI instead of bypassing that prompt.
 Point at a local API with the `KAIRO_BASE_URL` env var in the scheme.
 
+### Google identity build settings
+
+GoogleSignIn-iOS is pinned to 9.0.0. Simulator builds remain
+credential-independent, but a distribution build must provide these public
+identifiers through ignored `ios/Signing.local.xcconfig` or the release
+environment:
+
+```xcconfig
+KAIRO_GOOGLE_IOS_CLIENT_ID = <iOS OAuth client>.apps.googleusercontent.com
+KAIRO_GOOGLE_SERVER_CLIENT_ID = <Web OAuth client>.apps.googleusercontent.com
+KAIRO_GOOGLE_REVERSED_CLIENT_ID = com.googleusercontent.apps.<reversed iOS client>
+```
+
+The iOS client must be registered in Google Cloud for bundle ID
+`me.neima.kairo`. The server-client value must exactly match
+`GOOGLE_WEB_CLIENT_ID`; the iOS value must exactly match
+`GOOGLE_IOS_CLIENT_ID`. The reversed scheme must match the iOS client. These
+values are identifiers, not secrets. `GOOGLE_CLIENT_SECRET` is server-only and
+must never enter an xcconfig, plist, app binary, log, screenshot, or test
+fixture.
+
+`pnpm ios:release:preflight` checks the package pin, target products, Info.plist
+indirection, and public setting names. Archive/export validation additionally
+rejects blank, placeholder, or mismatched production identifiers. Passing
+either repository gate is not proof that Google OAuth works.
+
+Before describing native Google authentication as released, use a synthetic
+account on a signed physical iPhone and prove sign-in, force-quit/relaunch
+Keychain session restoration, explicit Settings linking without account-scope
+change, cancellation and provider errors without false logout, revoked/expired
+401 purge, and logout purge. Also verify the same Google account lifecycle in a
+real production browser. Simulator fixtures and an unsigned build are UI and
+transport evidence only.
+
 ## Tests
 ```bash
 ./scripts/ios-xcodebuild.sh \

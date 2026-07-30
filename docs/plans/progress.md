@@ -1,5 +1,57 @@
 # Progress log
 
+## 2026-07-29 — Round 23: cross-platform Google authentication code (Codex)
+
+Roadmap:
+`docs/plans/2026-07-29-round23-google-auth.md`.
+
+- **Fail-closed web identity.** Commits `7c73328..a3f9df2` add a three-value
+  Google provider contract, exact `{ magicLink, apple, google }` capability
+  response, branded sign-in/sign-up controls, explicit Settings linking,
+  overlapping-request guards, and allowlisted redirect recovery. Google remains
+  absent when any server value is blank; implicit same-email merging remains
+  disabled.
+- **Native transport and UI.** Commits `1dfb925..b9edbaa` pin
+  GoogleSignIn-iOS 9.0.0, route refreshed ID tokens through Better Auth, preserve
+  valid sessions on expected provider/link errors, fence stale cookies across
+  auth generations, route the reversed-client callback, and ship polished
+  sign-in/linking states. The deterministic iPhone 17 Pro fixture tour retained
+  ten non-failure screenshots for unavailable, ready, loading, error,
+  duplicate-account, success, dark, linking, and linked states under ignored
+  `browser-qa/round23-google-auth/`; follow-up fixtures prove account-link
+  hydration.
+- **Privacy and parity truth.** Apple Reminders F02 is now `excluded | 0`.
+  EventKit has no read-only Reminders authorization, and Kairo will not request
+  full read/write access for a one-way import. Calendar import remains a
+  separate feature and is not claimed as equivalent. The privacy policy now
+  distinguishes basic Google identity/account linkage from separately
+  authorized Google Calendar data and records that Kairo requests no Apple
+  Reminders access.
+- **Release contract.** Deployment and iOS runbooks now bind the Web and iOS
+  Google Cloud clients, production callback, bundle ID, reversed URL scheme,
+  three mirrored Coolify variables, public native build settings, fail-closed
+  release validation, and real browser/device proof. Phase **8B remains
+  unchecked**: code-complete is not release-complete.
+- **Task 4 gates.** Focused privacy/release/docs coverage passed **4 files /
+  31 tests**. `pnpm lint`, `pnpm typecheck`, **98 web files / 979 tests**,
+  `pnpm build`, OpenAPI sync, generated-client adoption (**22 operations across
+  47 shipping Swift files**), and repository iOS release preflight passed.
+  The build emitted only the expected local warning that this credential-free
+  worktree uses Better Auth's default development secret. Scripted parity is
+  web **89.74%** and iOS **85.80%**; both gates pass.
+
+**External blockers / not claimed:** Google Cloud project `Kairo`
+(`kairo-nntime-2026`, account `neimarules@gmail.com`) exists, and its branding
+wizard has the Kairo name, external audience, support account, and developer
+contact. Setup intentionally stopped before accepting the Google API Services:
+User Data Policy agreement. Consent is not finalized, so no Web client, iOS
+client, or secret exists and no Coolify/native environment was activated.
+Accepting that legal agreement requires Neima's confirmation. Live production
+browser sign-in/linking, signed physical-iPhone sign-in, Keychain relaunch,
+linking, 401 purge, and logout remain unproven. This documentation task did not
+provision credentials, push, deploy, mutate production, or claim OAuth/device
+proof.
+
 ## 2026-07-29 — Round 22: secure iOS glance surfaces (Codex)
 
 Roadmap:

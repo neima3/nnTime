@@ -10,13 +10,18 @@ describe("public privacy policy", () => {
   it("states the implemented data and Apple Health boundaries", () => {
     const copy = JSON.stringify(privacyPolicy);
 
-    expect(privacyPolicy.updated).toBe("July 28, 2026");
+    expect(privacyPolicy.updated).toBe("July 29, 2026");
     expect(copy).toContain("email address");
     expect(copy).toContain("plans, tasks, routines, notes");
     expect(copy).toContain("never uploaded to Kairo");
     expect(copy).toContain("Anthropic");
     expect(copy).toContain("Resend");
     expect(copy).toContain("Google Calendar");
+    expect(copy).toContain("Google identity");
+    expect(copy).toContain("basic profile");
+    expect(copy).toContain("separate");
+    expect(copy).toContain("Apple Reminders");
+    expect(copy).toContain("does not request access");
     expect(copy).toContain("do not sell");
     expect(copy).toContain("do not use advertising trackers");
     expect(copy).toContain("export");
