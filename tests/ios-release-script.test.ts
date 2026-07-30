@@ -36,6 +36,9 @@ describe("iOS release driver", () => {
     expect(output).toContain("Kairo.xcarchive");
     expect(output).toContain("-skipPackagePluginValidation");
     expect(output).toContain("-onlyUsePackageVersionsFromResolvedFile");
+    expect(output).toContain("--archive");
+    expect(output).toContain("--distribution");
+    expect(output).toContain("--expected-team-id TESTTEAM123");
   });
 
   it("keeps export and upload destinations explicit", () => {
@@ -52,6 +55,13 @@ describe("iOS release driver", () => {
     expect(exportOutput).toContain("-onlyUsePackageVersionsFromResolvedFile");
     expect(uploadOutput).toContain("-skipPackagePluginValidation");
     expect(uploadOutput).toContain("-onlyUsePackageVersionsFromResolvedFile");
+    expect(exportOutput).toContain("--archive");
+    expect(exportOutput).toContain("--distribution");
+    expect(uploadOutput).toContain("--archive");
+    expect(uploadOutput).toContain("--distribution");
+    expect(uploadOutput.indexOf("--distribution")).toBeLessThan(
+      uploadOutput.indexOf("-exportArchive"),
+    );
   });
 
   it("does not echo App Store Connect credential values", () => {

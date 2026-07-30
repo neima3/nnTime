@@ -1248,7 +1248,11 @@ struct RootView: View {
                     return
                 }
 #endif
-                await routeAuthCallback(url)
+                await AppURLRouter(
+                    routeAuthCallback: {
+                        await routeAuthCallback($0)
+                    }
+                ).route(url)
             }
         }
         .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { activity in

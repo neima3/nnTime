@@ -115,13 +115,16 @@ actor KairoAPI: NativeSyncTransport {
 
     nonisolated let baseURL: URL
     private let authSession: URLSession
+    private let authTransport: any NativeAuthRequestTransport
     private let planner: KairoAPIClient.Client
     private let sessionController: NativeSessionController
     private let idempotencyKeyProvider: @Sendable () -> String
+    private var authOperationGeneration: UInt = 0
 
     init(
         baseURL: URL = KairoAPI.defaultBaseURL(),
         session: URLSession = KairoClient.makeSharedCookieSession(),
+        authTransport: (any NativeAuthRequestTransport)? = nil,
         sessionController: NativeSessionController? = nil,
         timezoneIdentifierProvider: @escaping @Sendable () -> String = {
             TimeZone.current.identifier
@@ -132,6 +135,7 @@ actor KairoAPI: NativeSyncTransport {
     ) {
         self.baseURL = baseURL
         authSession = session
+        self.authTransport = authTransport ?? session
         self.sessionController = sessionController ?? NativeSessionController(
             baseURL: baseURL,
             cookieStorage:
@@ -154,12 +158,14 @@ actor KairoAPI: NativeSyncTransport {
         baseURL: URL,
         plannerTransport: any ClientTransport,
         session: URLSession = KairoClient.makeSharedCookieSession(),
+        authTransport: (any NativeAuthRequestTransport)? = nil,
         sessionController: NativeSessionController? = nil,
         timezoneIdentifierProvider: @escaping @Sendable () -> String,
         idempotencyKeyProvider: @escaping @Sendable () -> String
     ) {
         self.baseURL = baseURL
         authSession = session
+        self.authTransport = authTransport ?? session
         self.sessionController = sessionController ?? NativeSessionController(
             baseURL: baseURL,
             cookieStorage:
@@ -252,17 +258,30 @@ actor KairoAPI: NativeSyncTransport {
             ?? object["message"] as? String
     }
 
+    private static func authErrorCode(_ data: Data) -> String? {
+        guard
+            let object = try? JSONSerialization.jsonObject(with: data)
+                as? [String: Any]
+        else {
+            return nil
+        }
+        let code = object["code"] as? String
+            ?? (object["error"] as? [String: Any])?["code"] as? String
+        return code?.uppercased()
+    }
+
     @discardableResult
     func signIn(
         email: String,
         password: String
     ) async throws -> NativeSessionController.PersistResult {
+        let generation = authOperationGeneration
         _ = try await authRequest(
             .signIn,
             body: ["email": email, "password": password],
             as: AuthResponse.self
         )
-        return try await sessionController.persist()
+        return try await persistSession(generation: generation)
     }
 
     @discardableResult
@@ -271,6 +290,7 @@ actor KairoAPI: NativeSyncTransport {
         email: String,
         password: String
     ) async throws -> NativeSessionController.PersistResult {
+        let generation = authOperationGeneration
         _ = try await authRequest(
             .signUp,
             body: [
@@ -280,10 +300,11 @@ actor KairoAPI: NativeSyncTransport {
             ],
             as: AuthResponse.self
         )
-        return try await sessionController.persist()
+        return try await persistSession(generation: generation)
     }
 
     func signOut() async {
+        authOperationGeneration &+= 1
         _ = try? await authRequest(
             .signOut,
             body: [String: String](),
@@ -304,6 +325,7 @@ actor KairoAPI: NativeSyncTransport {
     func googleSignIn(
         credential: NativeGoogleCredential
     ) async throws -> NativeSessionController.PersistResult {
+        let generation = authOperationGeneration
         do {
             _ = try await authRequest(
                 .googleSignIn,
@@ -313,7 +335,7 @@ actor KairoAPI: NativeSyncTransport {
         } catch let error as APIError {
             throw APIError.socialAuth(error.statusCode ?? 0)
         }
-        return try await sessionController.persist()
+        return try await persistSession(generation: generation)
     }
 
     func googleLink(
@@ -351,6 +373,7 @@ actor KairoAPI: NativeSyncTransport {
         challenge: NativeAppleChallenge,
         idToken: String
     ) async throws -> NativeSessionController.PersistResult? {
+        let generation = authOperationGeneration
         try await plannerCall {
             try GeneratedAPIAdapters.appleExchange(
                 await planner.exchangeAppleCredential(
@@ -366,7 +389,7 @@ actor KairoAPI: NativeSyncTransport {
         guard intent == .signIn else {
             return nil
         }
-        return try await sessionController.persist()
+        return try await persistSession(generation: generation)
     }
 
     func requestMagicLink(email: String) async throws {
@@ -401,6 +424,7 @@ actor KairoAPI: NativeSyncTransport {
     func redeemMagicLink(
         token: String
     ) async throws -> NativeSessionController.PersistResult {
+        let generation = authOperationGeneration
         var components = URLComponents(
             url: ["api", "auth", "magic-link", "verify"].reduce(baseURL) {
                 $0.appending(path: $1)
@@ -413,7 +437,7 @@ actor KairoAPI: NativeSyncTransport {
         var request = URLRequest(url: components.url!)
         request.httpMethod = "GET"
         _ = try await authData(for: request)
-        return try await sessionController.persist()
+        return try await persistSession(generation: generation)
     }
 
     func restoreSession() async throws -> String? {
@@ -428,10 +452,11 @@ actor KairoAPI: NativeSyncTransport {
     func persistCurrentSession() async throws
         -> NativeSessionController.PersistResult
     {
-        try await sessionController.persist()
+        try await persistSession(generation: authOperationGeneration)
     }
 
     func invalidateSession() async {
+        authOperationGeneration &+= 1
         await sessionController.invalidate()
     }
 
@@ -819,7 +844,24 @@ actor KairoAPI: NativeSyncTransport {
         for request: URLRequest
     ) async throws -> Data {
         do {
-            let (data, response) = try await authSession.data(for: request)
+            var authenticatedRequest = request
+            if authenticatedRequest.value(
+                forHTTPHeaderField: "Cookie"
+            ) == nil,
+               let storage = authSession.configuration.httpCookieStorage,
+               let url = authenticatedRequest.url,
+               let cookies = storage.cookies(for: url),
+               !cookies.isEmpty
+            {
+                let fields = HTTPCookie.requestHeaderFields(with: cookies)
+                authenticatedRequest.setValue(
+                    fields["Cookie"],
+                    forHTTPHeaderField: "Cookie"
+                )
+            }
+            let (data, response) = try await authTransport.data(
+                for: authenticatedRequest
+            )
             guard let http = response as? HTTPURLResponse else {
                 throw APIError.authHTTP(0, nil)
             }
@@ -827,7 +869,10 @@ actor KairoAPI: NativeSyncTransport {
             case 200 ... 299:
                 return data
             case 401:
-                if !Self.isGoogleIdentityPath(request.url?.path) {
+                let preservesCredentialFailure =
+                    Self.isGoogleIdentityPath(request.url?.path)
+                    && Self.isAllowlistedGoogleCredentialError(data)
+                if !preservesCredentialFailure {
                     await invalidateAndNotify()
                 }
                 throw APIError.authUnauthorized(Self.authErrorMessage(data))
@@ -848,6 +893,7 @@ actor KairoAPI: NativeSyncTransport {
     }
 
     private func invalidateAndNotify() async {
+        authOperationGeneration &+= 1
         guard await sessionController.invalidate() else {
             return
         }
@@ -875,6 +921,31 @@ actor KairoAPI: NativeSyncTransport {
     private static func isGoogleIdentityPath(_ path: String?) -> Bool {
         path == "/api/auth/sign-in/social"
             || path == "/api/auth/link-social"
+    }
+
+    private static func isAllowlistedGoogleCredentialError(
+        _ data: Data
+    ) -> Bool {
+        guard let code = authErrorCode(data) else {
+            return false
+        }
+        return code == "INVALID_TOKEN"
+            || code == "FAILED_TO_GET_USER_INFO"
+    }
+
+    private func persistSession(
+        generation: UInt
+    ) async throws -> NativeSessionController.PersistResult {
+        guard generation == authOperationGeneration else {
+            await sessionController.invalidate()
+            throw CancellationError()
+        }
+        let result = try await sessionController.persist()
+        guard generation == authOperationGeneration else {
+            await sessionController.invalidate()
+            throw CancellationError()
+        }
+        return result
     }
 
     private static func decodingError(

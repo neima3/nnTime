@@ -631,15 +631,22 @@ function extendedAuthTransportContract(source) {
   const authDataCalls = urlSessionAnalysis(source).calls.filter((call) =>
     isInside(call.index, authDataRange),
   );
+  const injectedAuthDataCalls = [
+    ...authData.matchAll(
+      /\bauthTransport\s*\.\s*data\s*\(\s*for\s*:\s*authenticatedRequest\s*\)/g,
+    ),
+  ];
   const authDataValid =
     /\bprivate\s+func\s+authData\s*\(\s*for\s+request\s*:\s*URLRequest\s*\)\s*async\s+throws\s*->\s*Data\s*\{/s.test(
       authData,
     ) &&
-    authDataCalls.length === 1 &&
-    authDataCalls[0].member === "data" &&
-    /\bauthSession\s*\.\s*data\s*\(\s*for\s*:\s*request\s*\)/.test(
-      authData,
-    );
+    ((authDataCalls.length === 1 &&
+      authDataCalls[0].member === "data" &&
+      /\bauthSession\s*\.\s*data\s*\(\s*for\s*:\s*request\s*\)/.test(
+        authData,
+      )) ||
+      (authDataCalls.length === 0 &&
+        injectedAuthDataCalls.length === 1));
 
   const magicLink = source.slice(magicLinkRange.start, magicLinkRange.end);
   const magicLinkMasked = masked.slice(

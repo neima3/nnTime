@@ -665,6 +665,31 @@ export function validateRepositoryReleaseContract(
   return validateReleaseContract(readRepositoryReleaseContract(root, buildNumber));
 }
 
+export function builtArtifactExpectationFromArguments(argumentsList) {
+  if (!argumentsList.includes("--distribution")) {
+    throw new Error(
+      "Built artifact validation requires --distribution.",
+    );
+  }
+  const valueAfter = (flag) => {
+    const index = argumentsList.indexOf(flag);
+    return index >= 0 ? argumentsList[index + 1] : undefined;
+  };
+  const teamId = valueAfter("--expected-team-id");
+  if (!teamId) {
+    throw new Error(
+      "Distribution artifact validation requires --expected-team-id.",
+    );
+  }
+  return {
+    buildNumber: valueAfter("--expected-build-number"),
+    gitSha: valueAfter("--expected-git-sha"),
+    buildDate: valueAfter("--expected-build-date"),
+    distribution: true,
+    teamId,
+  };
+}
+
 function runCli() {
   const rootIndex = process.argv.indexOf("--root");
   const appIndex = process.argv.indexOf("--app");
@@ -672,10 +697,6 @@ function runCli() {
   const authCapabilitiesFromStdin = process.argv.includes(
     "--auth-capabilities-stdin",
   );
-  const expectedBuildIndex = process.argv.indexOf("--expected-build-number");
-  const expectedGitIndex = process.argv.indexOf("--expected-git-sha");
-  const expectedDateIndex = process.argv.indexOf("--expected-build-date");
-  const expectedTeamIndex = process.argv.indexOf("--expected-team-id");
   let failures;
   let successMessage;
 
@@ -693,25 +714,7 @@ function runCli() {
               process.argv[archiveIndex + 1],
               "Products/Applications/Kairo.app",
             );
-      const expected = {
-        buildNumber:
-          expectedBuildIndex >= 0
-            ? process.argv[expectedBuildIndex + 1]
-            : undefined,
-        gitSha:
-          expectedGitIndex >= 0
-            ? process.argv[expectedGitIndex + 1]
-            : undefined,
-        buildDate:
-          expectedDateIndex >= 0
-            ? process.argv[expectedDateIndex + 1]
-            : undefined,
-        distribution: process.argv.includes("--distribution"),
-        teamId:
-          expectedTeamIndex >= 0
-            ? process.argv[expectedTeamIndex + 1]
-            : undefined,
-      };
+      const expected = builtArtifactExpectationFromArguments(process.argv);
       failures = validateBuiltAppReleaseContract(
         readBuiltAppReleaseContract(appPath),
         expected,

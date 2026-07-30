@@ -1,5 +1,6 @@
 import UIKit
 import XCTest
+import GoogleSignIn
 @testable import Kairo
 
 @MainActor
@@ -67,6 +68,24 @@ final class GoogleSignInCoordinatorTests: XCTestCase {
             XCTFail("Unexpected error: \(error)")
         }
         XCTAssertNil(provider.presenter)
+    }
+
+    func testCancellationClassifierRequiresExactGoogleDomainAndCode() {
+        XCTAssertTrue(
+            GoogleSignInErrorClassifier.isCancellation(
+                NSError(domain: kGIDSignInErrorDomain, code: -5)
+            )
+        )
+        XCTAssertFalse(
+            GoogleSignInErrorClassifier.isCancellation(
+                NSError(domain: kGIDSignInErrorDomain, code: -4)
+            )
+        )
+        XCTAssertFalse(
+            GoogleSignInErrorClassifier.isCancellation(
+                NSError(domain: "not-google", code: -5)
+            )
+        )
     }
 }
 

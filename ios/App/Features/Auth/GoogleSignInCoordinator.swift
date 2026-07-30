@@ -1,8 +1,6 @@
 import GoogleSignIn
 import UIKit
 
-private let googleSignInCancelledCode = -5
-
 enum GoogleIdentityError: Error, Equatable, LocalizedError {
     case presentationUnavailable
     case invalidTokens
@@ -14,6 +12,16 @@ enum GoogleIdentityError: Error, Equatable, LocalizedError {
 
 enum GoogleIdentityProviderError: Error {
     case cancelled
+}
+
+enum GoogleSignInErrorClassifier {
+    private static let cancelledCode = -5
+
+    static func isCancellation(_ error: Error) -> Bool {
+        let providerError = error as NSError
+        return providerError.domain == kGIDSignInErrorDomain
+            && providerError.code == cancelledCode
+    }
 }
 
 @MainActor
@@ -105,10 +113,7 @@ private final class GoogleSDKIdentityProvider: GoogleIdentityProviding {
             )
             return GoogleSDKIdentitySession(user: result.user)
         } catch {
-            let providerError = error as NSError
-            if providerError.domain == kGIDSignInErrorDomain,
-               providerError.code == googleSignInCancelledCode
-            {
+            if GoogleSignInErrorClassifier.isCancellation(error) {
                 throw GoogleIdentityProviderError.cancelled
             }
             throw GoogleIdentityError.invalidTokens

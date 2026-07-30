@@ -142,9 +142,13 @@ final class NativeAuthTransportTests: XCTestCase {
             ),
         ])
         let vault = MemorySessionEnvelopeStore()
+        let transport = CapturingNativeAuthTransport(
+            session: Self.session(storage: storage)
+        )
         let api = KairoAPI(
             baseURL: URL(string: "https://time.neima.me")!,
-            session: Self.session(storage: storage),
+            session: transport.session,
+            authTransport: transport,
             sessionController: NativeSessionController(
                 baseURL: URL(string: "https://time.neima.me")!,
                 cookieStorage: storage,
@@ -158,7 +162,7 @@ final class NativeAuthTransportTests: XCTestCase {
         XCTAssertEqual(result.scope.count, 64)
         let savedMagicEnvelope = await vault.savedEnvelope()
         XCTAssertNotNil(savedMagicEnvelope)
-        let requests = NativeAuthURLProtocol.requests()
+        let requests = await transport.requests()
         XCTAssertEqual(
             requests.map { $0.url?.path },
             [
@@ -166,12 +170,7 @@ final class NativeAuthTransportTests: XCTestCase {
                 "/api/auth/magic-link/verify",
             ]
         )
-        let requestBody = try XCTUnwrap(
-            KairoAPI.magicLinkRequest(
-                baseURL: URL(string: "https://time.neima.me")!,
-                email: "synthetic@example.test"
-            ).httpBody
-        )
+        let requestBody = try XCTUnwrap(requests[0].httpBody)
         let json = try XCTUnwrap(
             JSONSerialization.jsonObject(with: requestBody)
                 as? [String: Any]
@@ -338,9 +337,13 @@ final class NativeAuthTransportTests: XCTestCase {
             ),
         ])
         let vault = MemorySessionEnvelopeStore()
+        let transport = CapturingNativeAuthTransport(
+            session: Self.session(storage: storage)
+        )
         let api = KairoAPI(
             baseURL: URL(string: "https://time.neima.me")!,
-            session: Self.session(storage: storage),
+            session: transport.session,
+            authTransport: transport,
             sessionController: NativeSessionController(
                 baseURL: URL(string: "https://time.neima.me")!,
                 cookieStorage: storage,
@@ -358,17 +361,11 @@ final class NativeAuthTransportTests: XCTestCase {
         XCTAssertEqual(result.scope.count, 64)
         let savedEnvelope = await vault.savedEnvelope()
         XCTAssertNotNil(savedEnvelope)
-        let request = try XCTUnwrap(NativeAuthURLProtocol.requests().first)
+        let capturedRequests = await transport.requests()
+        let request = try XCTUnwrap(capturedRequests.first)
         XCTAssertEqual(request.httpMethod, "POST")
         XCTAssertEqual(request.url?.path, "/api/auth/sign-in/social")
-        let encodedBody = try JSONEncoder().encode(
-            GoogleIdentityRequest(
-                credential: .init(
-                idToken: "google-id-token",
-                accessToken: "google-access-token"
-                )
-            )
-        )
+        let encodedBody = try XCTUnwrap(request.httpBody)
         XCTAssertEqual(
             try Self.jsonBody(encodedBody)
                 as NSDictionary,
@@ -396,9 +393,13 @@ final class NativeAuthTransportTests: XCTestCase {
         NativeAuthURLProtocol.install([
             .init(status: 200, body: #"{"status":true}"#),
         ])
+        let transport = CapturingNativeAuthTransport(
+            session: Self.session(storage: storage)
+        )
         let api = KairoAPI(
             baseURL: URL(string: "https://time.neima.me")!,
-            session: Self.session(storage: storage),
+            session: transport.session,
+            authTransport: transport,
             sessionController: controller
         )
 
@@ -409,28 +410,15 @@ final class NativeAuthTransportTests: XCTestCase {
             )
         )
 
-        let request = try XCTUnwrap(NativeAuthURLProtocol.requests().first)
+        let capturedRequests = await transport.requests()
+        let request = try XCTUnwrap(capturedRequests.first)
         XCTAssertEqual(request.httpMethod, "POST")
         XCTAssertEqual(request.url?.path, "/api/auth/link-social")
-        let storedCookies = try XCTUnwrap(
-            storage.cookies(
-                for: URL(string: "https://time.neima.me")!
-            )
-        )
         XCTAssertTrue(
-            try XCTUnwrap(
-                HTTPCookie.requestHeaderFields(with: storedCookies)["Cookie"]
-            )
+            try XCTUnwrap(request.value(forHTTPHeaderField: "Cookie"))
                 .contains("better-auth.session_token=session-a")
         )
-        let encodedBody = try JSONEncoder().encode(
-            GoogleIdentityRequest(
-                credential: .init(
-                idToken: "google-id-token",
-                accessToken: "google-access-token"
-                )
-            )
-        )
+        let encodedBody = try XCTUnwrap(request.httpBody)
         XCTAssertEqual(
             try Self.jsonBody(encodedBody)
                 as NSDictionary,
@@ -498,6 +486,156 @@ final class NativeAuthTransportTests: XCTestCase {
         let retainedScope = await api.sessionScope()
         XCTAssertEqual(persistedEnvelope, baselineEnvelope)
         XCTAssertEqual(retainedScope, baseline.scope)
+    }
+
+    func testGoogleInvalidToken401PreservesValidSession() async throws {
+        let (api, vault) = try await Self.googleAPIWithPersistedSession(
+            fixture: .init(
+                status: 401,
+                body: #"{"code":"INVALID_TOKEN","message":"Invalid token"}"#
+            )
+        )
+
+        do {
+            _ = try await api.googleSignIn(
+                credential: .init(idToken: "bad", accessToken: "bad")
+            )
+            XCTFail("Expected invalid token")
+        } catch let error as APIError {
+            XCTAssertEqual(error.statusCode, 401)
+        }
+
+        let envelope = await vault.savedEnvelope()
+        let scope = await api.sessionScope()
+        XCTAssertNotNil(envelope)
+        XCTAssertNotNil(scope)
+    }
+
+    func testGoogleUnauthorized401InvalidatesExpiredSession() async throws {
+        let (api, vault) = try await Self.googleAPIWithPersistedSession(
+            fixture: .init(
+                status: 401,
+                body: #"{"code":"UNAUTHORIZED","message":"Unauthorized"}"#
+            )
+        )
+
+        do {
+            try await api.googleLink(
+                credential: .init(idToken: "expired", accessToken: "expired")
+            )
+            XCTFail("Expected unauthorized")
+        } catch let error as APIError {
+            XCTAssertEqual(error.statusCode, 401)
+        }
+
+        let envelope = await vault.savedEnvelope()
+        let scope = await api.sessionScope()
+        XCTAssertNil(envelope)
+        XCTAssertNil(scope)
+    }
+
+    func testGoogleUnknown401InvalidatesSession() async throws {
+        let (api, vault) = try await Self.googleAPIWithPersistedSession(
+            fixture: .init(
+                status: 401,
+                body: #"{"error":{"message":"Unauthorized"}}"#
+            )
+        )
+
+        do {
+            try await api.googleLink(
+                credential: .init(idToken: "unknown", accessToken: "unknown")
+            )
+            XCTFail("Expected unauthorized")
+        } catch let error as APIError {
+            XCTAssertEqual(error.statusCode, 401)
+        }
+
+        let envelope = await vault.savedEnvelope()
+        let scope = await api.sessionScope()
+        XCTAssertNil(envelope)
+        XCTAssertNil(scope)
+    }
+
+    func testLateGoogleSignInCannotRestoreSessionAfterSignOut() async throws {
+        let storage = Self.cookieStorage()
+        storage.setCookie(try Self.sessionCookie(value: "session-a"))
+        let vault = MemorySessionEnvelopeStore()
+        let controller = NativeSessionController(
+            baseURL: URL(string: "https://time.neima.me")!,
+            cookieStorage: storage,
+            envelopeStore: vault
+        )
+        _ = try await controller.persist()
+        let responseGate = NativeAuthResponseGate()
+        NativeAuthURLProtocol.install([
+            .init(
+                status: 200,
+                body: #"{"redirect":false,"token":"late"}"#,
+                headers: [
+                    "Set-Cookie":
+                        "better-auth.session_token=late-session; Path=/; Secure; HttpOnly",
+                ],
+                cookieStorage: storage,
+                responseGate: responseGate
+            ),
+            .init(status: 200, body: #"{"status":true}"#),
+        ])
+        let api = KairoAPI(
+            baseURL: URL(string: "https://time.neima.me")!,
+            session: Self.session(storage: storage),
+            sessionController: controller
+        )
+        let signIn = Task {
+            try await api.googleSignIn(
+                credential: .init(idToken: "id", accessToken: "access")
+            )
+        }
+        while NativeAuthURLProtocol.requests().isEmpty {
+            await Task.yield()
+        }
+
+        await api.signOut()
+        responseGate.open()
+
+        do {
+            _ = try await signIn.value
+            XCTFail("Expected stale sign-in cancellation")
+        } catch {
+            XCTAssertTrue(error is CancellationError)
+        }
+        let envelope = await vault.savedEnvelope()
+        let scope = await api.sessionScope()
+        XCTAssertNil(envelope)
+        XCTAssertNil(scope)
+        XCTAssertFalse(
+            (storage.cookies ?? []).contains {
+                $0.name == "better-auth.session_token"
+            }
+        )
+    }
+
+    private static func googleAPIWithPersistedSession(
+        fixture: NativeAuthURLProtocol.Fixture
+    ) async throws -> (KairoAPI, MemorySessionEnvelopeStore) {
+        let storage = cookieStorage()
+        storage.setCookie(try sessionCookie(value: "session-a"))
+        let vault = MemorySessionEnvelopeStore()
+        let controller = NativeSessionController(
+            baseURL: URL(string: "https://time.neima.me")!,
+            cookieStorage: storage,
+            envelopeStore: vault
+        )
+        _ = try await controller.persist()
+        NativeAuthURLProtocol.install([fixture])
+        return (
+            KairoAPI(
+                baseURL: URL(string: "https://time.neima.me")!,
+                session: session(storage: storage),
+                sessionController: controller
+            ),
+            vault
+        )
     }
 
     private static func cookieStorage() -> HTTPCookieStorage {
@@ -755,6 +893,26 @@ private struct NativeAuthPlannerTransport: ClientTransport {
     }
 }
 
+private actor CapturingNativeAuthTransport: NativeAuthRequestTransport {
+    nonisolated let session: URLSession
+    private var captured: [URLRequest] = []
+
+    init(session: URLSession) {
+        self.session = session
+    }
+
+    func data(
+        for request: URLRequest
+    ) async throws -> (Data, URLResponse) {
+        captured.append(request)
+        return try await session.data(for: request)
+    }
+
+    func requests() -> [URLRequest] {
+        captured
+    }
+}
+
 private final class NativeAuthURLProtocol: URLProtocol {
     struct Fixture {
         let status: Int
@@ -762,6 +920,7 @@ private final class NativeAuthURLProtocol: URLProtocol {
         var headers: [String: String] = [:]
         var cookieStorage: HTTPCookieStorage?
         var urlErrorCode: URLError.Code?
+        var responseGate: NativeAuthResponseGate?
     }
 
     nonisolated(unsafe) private static var fixtures: [Fixture] = []
@@ -816,31 +975,38 @@ private final class NativeAuthURLProtocol: URLProtocol {
             client?.urlProtocol(self, didFailWithError: URLError(code))
             return
         }
-        var headers = fixture.headers
-        headers["Content-Type"] = "application/json"
-        if let storage = fixture.cookieStorage {
-            storage.setCookies(
-                HTTPCookie.cookies(
-                    withResponseHeaderFields: headers,
-                    for: request.url!
-                ),
-                for: request.url,
-                mainDocumentURL: nil
+        let deliver = { [self] in
+            var headers = fixture.headers
+            headers["Content-Type"] = "application/json"
+            if let storage = fixture.cookieStorage {
+                storage.setCookies(
+                    HTTPCookie.cookies(
+                        withResponseHeaderFields: headers,
+                        for: request.url!
+                    ),
+                    for: request.url,
+                    mainDocumentURL: nil
+                )
+            }
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: fixture.status,
+                httpVersion: nil,
+                headerFields: headers
+            )!
+            client?.urlProtocol(
+                self,
+                didReceive: response,
+                cacheStoragePolicy: .notAllowed
             )
+            client?.urlProtocol(self, didLoad: Data(fixture.body.utf8))
+            client?.urlProtocolDidFinishLoading(self)
         }
-        let response = HTTPURLResponse(
-            url: request.url!,
-            statusCode: fixture.status,
-            httpVersion: nil,
-            headerFields: headers
-        )!
-        client?.urlProtocol(
-            self,
-            didReceive: response,
-            cacheStoragePolicy: .notAllowed
-        )
-        client?.urlProtocol(self, didLoad: Data(fixture.body.utf8))
-        client?.urlProtocolDidFinishLoading(self)
+        if let responseGate = fixture.responseGate {
+            responseGate.hold(deliver)
+        } else {
+            deliver()
+        }
     }
 
     override func stopLoading() {}
@@ -858,5 +1024,33 @@ private final class NativeAuthURLProtocol: URLProtocol {
             data.append(buffer, count: count)
         }
         return data
+    }
+}
+
+private final class NativeAuthResponseGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var delivery: (() -> Void)?
+    private var isOpen = false
+
+    func hold(_ delivery: @escaping () -> Void) {
+        let deliverImmediately = lock.withLock {
+            if isOpen {
+                return true
+            }
+            self.delivery = delivery
+            return false
+        }
+        if deliverImmediately {
+            delivery()
+        }
+    }
+
+    func open() {
+        let delivery = lock.withLock {
+            isOpen = true
+            defer { self.delivery = nil }
+            return self.delivery
+        }
+        delivery?()
     }
 }

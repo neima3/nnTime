@@ -205,28 +205,31 @@ preflight() {
 
 inspect_archive() {
   local expected_build_date="${1:-}"
-  if [[ "$DRY_RUN" == "1" ]]; then
-    echo "Inspect archive: $ARCHIVE_PATH"
-    return
-  fi
-
   local app="$ARCHIVE_PATH/Products/Applications/Kairo.app"
   local widget="$app/PlugIns/KairoWidget.appex"
+
+  local contract_command=(
+    node scripts/ios-release-contract.mjs
+      --archive "$ARCHIVE_PATH"
+      --expected-build-number "$BUILD_NUMBER"
+      --expected-git-sha "$GIT_SHA"
+      --distribution
+      --expected-team-id "$TEAM_ID"
+  )
+  if [[ -n "$expected_build_date" ]]; then
+    contract_command+=(--expected-build-date "$expected_build_date")
+  fi
+
+  if [[ "$DRY_RUN" == "1" ]]; then
+    run "${contract_command[@]}"
+    return
+  fi
 
   [[ -d "$app" ]] || { echo "Archive does not contain Kairo.app." >&2; exit 66; }
   [[ -d "$widget" ]] || { echo "Archive does not contain KairoWidget.appex." >&2; exit 66; }
 
   codesign --verify --deep --strict --verbose=2 "$app"
   codesign --verify --strict --verbose=2 "$widget"
-  local contract_command=(
-    node scripts/ios-release-contract.mjs
-      --archive "$ARCHIVE_PATH"
-      --expected-build-number "$BUILD_NUMBER"
-      --expected-git-sha "$GIT_SHA"
-  )
-  if [[ -n "$expected_build_date" ]]; then
-    contract_command+=(--expected-build-date "$expected_build_date")
-  fi
   "${contract_command[@]}"
 
   echo "Verified archive: $ARCHIVE_PATH"

@@ -5,6 +5,7 @@ import {
   expectedWidgetPrivacyContract,
   readRepositoryReleaseContract,
   validateBuiltAppReleaseContract,
+  builtArtifactExpectationFromArguments,
   validateProductionAuthCapabilityResponse,
   validateReleaseContract,
 } from "../scripts/ios-release-contract.mjs";
@@ -90,6 +91,41 @@ const validBuiltArtifact = {
 };
 
 describe("iOS release contract", () => {
+  it("fails closed when a built artifact CLI omits distribution validation", () => {
+    expect(() =>
+      builtArtifactExpectationFromArguments([
+        "--archive",
+        "Kairo.xcarchive",
+        "--expected-team-id",
+        "A45F46XD54",
+      ]),
+    ).toThrow("requires --distribution");
+  });
+
+  it("parses an explicit distribution artifact expectation", () => {
+    expect(
+      builtArtifactExpectationFromArguments([
+        "--archive",
+        "Kairo.xcarchive",
+        "--distribution",
+        "--expected-team-id",
+        "A45F46XD54",
+      ]),
+    ).toMatchObject({
+      distribution: true,
+      teamId: "A45F46XD54",
+    });
+  });
+
+  it("fails closed when distribution validation omits its team", () => {
+    expect(() =>
+      builtArtifactExpectationFromArguments([
+        "--app",
+        "Kairo.app",
+        "--distribution",
+      ]),
+    ).toThrow("requires --expected-team-id");
+  });
   it("keeps the checked-in app target aligned with the release contract", () => {
     const repositoryContract = readRepositoryReleaseContract(resolve("."));
     expect(validateReleaseContract(repositoryContract)).toEqual([]);
