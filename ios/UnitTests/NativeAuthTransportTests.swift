@@ -33,7 +33,10 @@ final class NativeAuthTransportTests: XCTestCase {
         )
 
         let capabilities = try await api.authCapabilities()
-        XCTAssertEqual(capabilities, .init(magicLink: true, apple: true))
+        XCTAssertEqual(
+            capabilities,
+            .init(magicLink: true, apple: true, google: true)
+        )
 
         let challenge = try await api.appleChallenge(intent: .signIn)
         XCTAssertEqual(challenge.state, "state-1")
@@ -321,6 +324,182 @@ final class NativeAuthTransportTests: XCTestCase {
         XCTAssertNotNil(sessionScope)
     }
 
+    func testGoogleSignInPostsExactTokenBodyAndPersistsResponseCookie() async throws {
+        let storage = Self.cookieStorage()
+        NativeAuthURLProtocol.install([
+            .init(
+                status: 200,
+                body: #"{"redirect":false,"token":"session-token"}"#,
+                headers: [
+                    "Set-Cookie":
+                        "better-auth.session_token=google-session; Path=/; Secure; HttpOnly",
+                ],
+                cookieStorage: storage
+            ),
+        ])
+        let vault = MemorySessionEnvelopeStore()
+        let api = KairoAPI(
+            baseURL: URL(string: "https://time.neima.me")!,
+            session: Self.session(storage: storage),
+            sessionController: NativeSessionController(
+                baseURL: URL(string: "https://time.neima.me")!,
+                cookieStorage: storage,
+                envelopeStore: vault
+            )
+        )
+
+        let result = try await api.googleSignIn(
+            credential: .init(
+                idToken: "google-id-token",
+                accessToken: "google-access-token"
+            )
+        )
+
+        XCTAssertEqual(result.scope.count, 64)
+        let savedEnvelope = await vault.savedEnvelope()
+        XCTAssertNotNil(savedEnvelope)
+        let request = try XCTUnwrap(NativeAuthURLProtocol.requests().first)
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.path, "/api/auth/sign-in/social")
+        let encodedBody = try JSONEncoder().encode(
+            GoogleIdentityRequest(
+                credential: .init(
+                idToken: "google-id-token",
+                accessToken: "google-access-token"
+                )
+            )
+        )
+        XCTAssertEqual(
+            try Self.jsonBody(encodedBody)
+                as NSDictionary,
+            [
+                "provider": "google",
+                "idToken": [
+                    "token": "google-id-token",
+                    "accessToken": "google-access-token",
+                ],
+            ] as NSDictionary
+        )
+    }
+
+    func testGoogleLinkIsAuthenticatedAndPreservesSessionEnvelopeAndScope() async throws {
+        let storage = Self.cookieStorage()
+        storage.setCookie(try Self.sessionCookie(value: "session-a"))
+        let vault = MemorySessionEnvelopeStore()
+        let controller = NativeSessionController(
+            baseURL: URL(string: "https://time.neima.me")!,
+            cookieStorage: storage,
+            envelopeStore: vault
+        )
+        let baseline = try await controller.persist()
+        let baselineEnvelope = await vault.savedEnvelope()
+        NativeAuthURLProtocol.install([
+            .init(status: 200, body: #"{"status":true}"#),
+        ])
+        let api = KairoAPI(
+            baseURL: URL(string: "https://time.neima.me")!,
+            session: Self.session(storage: storage),
+            sessionController: controller
+        )
+
+        try await api.googleLink(
+            credential: .init(
+                idToken: "google-id-token",
+                accessToken: "google-access-token"
+            )
+        )
+
+        let request = try XCTUnwrap(NativeAuthURLProtocol.requests().first)
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.path, "/api/auth/link-social")
+        let storedCookies = try XCTUnwrap(
+            storage.cookies(
+                for: URL(string: "https://time.neima.me")!
+            )
+        )
+        XCTAssertTrue(
+            try XCTUnwrap(
+                HTTPCookie.requestHeaderFields(with: storedCookies)["Cookie"]
+            )
+                .contains("better-auth.session_token=session-a")
+        )
+        let encodedBody = try JSONEncoder().encode(
+            GoogleIdentityRequest(
+                credential: .init(
+                idToken: "google-id-token",
+                accessToken: "google-access-token"
+                )
+            )
+        )
+        XCTAssertEqual(
+            try Self.jsonBody(encodedBody)
+                as NSDictionary,
+            [
+                "provider": "google",
+                "idToken": [
+                    "token": "google-id-token",
+                    "accessToken": "google-access-token",
+                ],
+            ] as NSDictionary
+        )
+        let persistedEnvelope = await vault.savedEnvelope()
+        let retainedScope = await api.sessionScope()
+        XCTAssertEqual(persistedEnvelope, baselineEnvelope)
+        XCTAssertEqual(retainedScope, baseline.scope)
+    }
+
+    func testGoogleProviderErrorIsRedactedAndPreservesValidSession() async throws {
+        let storage = Self.cookieStorage()
+        storage.setCookie(try Self.sessionCookie(value: "session-a"))
+        let vault = MemorySessionEnvelopeStore()
+        let controller = NativeSessionController(
+            baseURL: URL(string: "https://time.neima.me")!,
+            cookieStorage: storage,
+            envelopeStore: vault
+        )
+        let baseline = try await controller.persist()
+        let baselineEnvelope = await vault.savedEnvelope()
+        NativeAuthURLProtocol.install([
+            .init(
+                status: 400,
+                body:
+                    #"{"message":"google-id-token google-access-token provider payload"}"#
+            ),
+        ])
+        let api = KairoAPI(
+            baseURL: URL(string: "https://time.neima.me")!,
+            session: Self.session(storage: storage),
+            sessionController: controller
+        )
+
+        do {
+            try await api.googleLink(
+                credential: .init(
+                    idToken: "google-id-token",
+                    accessToken: "google-access-token"
+                )
+            )
+            XCTFail("Expected provider error")
+        } catch let error as APIError {
+            XCTAssertEqual(error.statusCode, 400)
+            XCTAssertEqual(
+                error.errorDescription,
+                "Google authentication couldn't be completed. Try again."
+            )
+            XCTAssertFalse(
+                String(describing: error).contains("google-id-token")
+            )
+            XCTAssertFalse(
+                String(describing: error).contains("google-access-token")
+            )
+        }
+
+        let persistedEnvelope = await vault.savedEnvelope()
+        let retainedScope = await api.sessionScope()
+        XCTAssertEqual(persistedEnvelope, baselineEnvelope)
+        XCTAssertEqual(retainedScope, baseline.scope)
+    }
+
     private static func cookieStorage() -> HTTPCookieStorage {
         .sharedCookieStorage(
             forGroupContainerIdentifier: "NativeAuthTransport.\(UUID())"
@@ -354,6 +533,15 @@ final class NativeAuthTransportTests: XCTestCase {
     ) throws -> [String: Any] {
         try XCTUnwrap(
             JSONSerialization.jsonObject(with: Data(body.utf8))
+                as? [String: Any]
+        )
+    }
+
+    private static func jsonBody(
+        _ body: Data
+    ) throws -> [String: Any] {
+        try XCTUnwrap(
+            JSONSerialization.jsonObject(with: body)
                 as? [String: Any]
         )
     }
@@ -531,7 +719,10 @@ private struct NativeAuthPlannerTransport: ClientTransport {
         let response: (HTTPResponse.Status, String)
         switch operationID {
         case "getAuthCapabilities":
-            response = (.ok, #"{"magicLink":true,"apple":true}"#)
+            response = (
+                .ok,
+                #"{"magicLink":true,"apple":true,"google":true}"#
+            )
         case "createAppleAuthChallenge":
             response = (
                 .created,

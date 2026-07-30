@@ -25,6 +25,9 @@ settings:
 packages:
   KairoAPIClient:
     path: Kairo
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    exactVersion: 9.0.0
 targets:
   Kairo:
     type: application
@@ -56,6 +59,10 @@ targets:
         ENABLE_PREVIEWS: "YES"
       - package: KairoAPIClient
         product: KairoAPIClient
+      - package: GoogleSignIn
+        product: GoogleSignIn
+      - package: GoogleSignIn
+        product: GoogleSignInSwift
   KairoUITests:
     type: bundle.ui-testing
     platform: iOS

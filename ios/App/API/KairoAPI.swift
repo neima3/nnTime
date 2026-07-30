@@ -8,6 +8,7 @@ enum APIError: LocalizedError {
     case conflict(Int, ServerErrorData)
     case authHTTP(Int, String?)
     case authUnauthorized(String?)
+    case socialAuth(Int)
     case network(Error)
     case decoding(Error)
 
@@ -16,7 +17,8 @@ enum APIError: LocalizedError {
         case let .http(statusCode, _),
              let .unauthorized(statusCode, _),
              let .conflict(statusCode, _),
-             let .authHTTP(statusCode, _):
+             let .authHTTP(statusCode, _),
+             let .socialAuth(statusCode):
             statusCode
         case .authUnauthorized:
             401
@@ -31,7 +33,7 @@ enum APIError: LocalizedError {
              let .unauthorized(_, error),
              let .conflict(_, error):
             error
-        case .authHTTP, .authUnauthorized, .network, .decoding:
+        case .authHTTP, .authUnauthorized, .socialAuth, .network, .decoding:
             nil
         }
     }
@@ -54,6 +56,8 @@ enum APIError: LocalizedError {
             message ?? "Request failed (\(code))"
         case let .authUnauthorized(message):
             message ?? "Please sign in again."
+        case .socialAuth:
+            "Google authentication couldn't be completed. Try again."
         case .network:
             "Couldn't reach Kairo — check your connection."
         case .decoding:
@@ -195,20 +199,24 @@ actor KairoAPI: NativeSyncTransport {
         case signIn
         case signUp
         case signOut
+        case googleSignIn
+        case googleLink
 
         var pathComponents: [String] {
             switch self {
             case .signIn: ["api", "auth", "sign-in", "email"]
             case .signUp: ["api", "auth", "sign-up", "email"]
             case .signOut: ["api", "auth", "sign-out"]
+            case .googleSignIn: ["api", "auth", "sign-in", "social"]
+            case .googleLink: ["api", "auth", "link-social"]
             }
         }
     }
 
     @discardableResult
-    private func authRequest<T: Decodable>(
+    private func authRequest<T: Decodable, Body: Encodable>(
         _ endpoint: AuthEndpoint,
-        body: [String: String],
+        body: Body,
         as type: T.Type
     ) async throws -> T {
         let url = endpoint.pathComponents.reduce(baseURL) {
@@ -278,7 +286,7 @@ actor KairoAPI: NativeSyncTransport {
     func signOut() async {
         _ = try? await authRequest(
             .signOut,
-            body: [:],
+            body: [String: String](),
             as: EmptyResponse.self
         )
         await sessionController.invalidate()
@@ -289,6 +297,39 @@ actor KairoAPI: NativeSyncTransport {
             try GeneratedAPIAdapters.authCapabilities(
                 await planner.getAuthCapabilities()
             )
+        }
+    }
+
+    @discardableResult
+    func googleSignIn(
+        credential: NativeGoogleCredential
+    ) async throws -> NativeSessionController.PersistResult {
+        do {
+            _ = try await authRequest(
+                .googleSignIn,
+                body: GoogleIdentityRequest(credential: credential),
+                as: AuthResponse.self
+            )
+        } catch let error as APIError {
+            throw APIError.socialAuth(error.statusCode ?? 0)
+        }
+        return try await sessionController.persist()
+    }
+
+    func googleLink(
+        credential: NativeGoogleCredential
+    ) async throws {
+        guard await sessionController.currentScope() != nil else {
+            throw APIError.socialAuth(401)
+        }
+        do {
+            _ = try await authRequest(
+                .googleLink,
+                body: GoogleIdentityRequest(credential: credential),
+                as: EmptyResponse.self
+            )
+        } catch let error as APIError {
+            throw APIError.socialAuth(error.statusCode ?? 0)
         }
     }
 
@@ -786,7 +827,9 @@ actor KairoAPI: NativeSyncTransport {
             case 200 ... 299:
                 return data
             case 401:
-                await invalidateAndNotify()
+                if !Self.isGoogleIdentityPath(request.url?.path) {
+                    await invalidateAndNotify()
+                }
                 throw APIError.authUnauthorized(Self.authErrorMessage(data))
             default:
                 throw APIError.authHTTP(
@@ -827,6 +870,11 @@ actor KairoAPI: NativeSyncTransport {
             return isCancellation(clientError.underlyingError)
         }
         return false
+    }
+
+    private static func isGoogleIdentityPath(_ path: String?) -> Bool {
+        path == "/api/auth/sign-in/social"
+            || path == "/api/auth/link-social"
     }
 
     private static func decodingError(
@@ -943,4 +991,21 @@ private struct MagicLinkRequest: Encodable {
 
     let email: String
     let metadata: Metadata
+}
+
+struct GoogleIdentityRequest: Encodable {
+    struct IDToken: Encodable {
+        let token: String
+        let accessToken: String
+    }
+
+    let provider = "google"
+    let idToken: IDToken
+
+    init(credential: NativeGoogleCredential) {
+        idToken = .init(
+            token: credential.idToken,
+            accessToken: credential.accessToken
+        )
+    }
 }

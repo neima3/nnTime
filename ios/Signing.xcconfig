@@ -12,5 +12,8 @@
 // `scripts/ios-device-install.sh` writes that file for you.
 
 KAIRO_DEVELOPMENT_TEAM =
+KAIRO_GOOGLE_IOS_CLIENT_ID =
+KAIRO_GOOGLE_SERVER_CLIENT_ID =
+KAIRO_GOOGLE_REVERSED_CLIENT_ID =
 
 #include? "Signing.local.xcconfig"

@@ -36,7 +36,8 @@ enum GeneratedAPIAdapters {
             let value = try response.body.json
             return .init(
                 magicLink: value.magicLink,
-                apple: value.apple
+                apple: value.apple,
+                google: value.google
             )
         case let .undocumented(statusCode, _):
             throw GeneratedAPIAdapterError.undocumented(

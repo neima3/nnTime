@@ -6,6 +6,14 @@ import { parse as parseYaml } from "yaml";
 
 const FACADE_PATH = "ios/App/API/KairoAPI.swift";
 
+export const REQUIRED_MANUAL_AUTH_OPERATIONS = Object.freeze([
+  "/api/auth/sign-in/email",
+  "/api/auth/sign-up/email",
+  "/api/auth/sign-out",
+  "/api/auth/sign-in/social",
+  "/api/auth/link-social",
+]);
+
 export const REQUIRED_GENERATED_OPERATIONS = Object.freeze([
   "getAuthCapabilities",
   "createAppleAuthChallenge",
@@ -223,6 +231,7 @@ function authEndpointContract(source) {
     return { valid: false, range: enumRange };
   }
 
+  const paths = [];
   for (const name of cases) {
     const marker = `case .${name}:`;
     const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -271,9 +280,10 @@ function authEndpointContract(source) {
     ) {
       return { valid: false, range: enumRange };
     }
+    paths.push(`/${components.join("/")}`);
   }
 
-  return { valid: true, range: enumRange };
+  return { valid: true, range: enumRange, paths };
 }
 
 const BENIGN_URL_SESSION_MEMBERS = new Set([
@@ -745,7 +755,7 @@ export function validateGeneratedClientAdoption({ sources, spec, project }) {
   );
   const endpointContract = facade
     ? authEndpointContract(facade.source)
-    : { valid: false, range: null };
+    : { valid: false, range: null, paths: [] };
   const authContract = facade
     ? authRequestContract(facade.source, endpointContract)
     : { valid: false, range: null };
@@ -812,6 +822,13 @@ export function validateGeneratedClientAdoption({ sources, spec, project }) {
     if (!endpointContract.valid) {
       failures.push(
         "KairoAPI AuthEndpoint.pathComponents must contain only closed /api/auth/* paths",
+      );
+    } else if (
+      JSON.stringify([...endpointContract.paths].sort()) !==
+      JSON.stringify([...REQUIRED_MANUAL_AUTH_OPERATIONS].sort())
+    ) {
+      failures.push(
+        "KairoAPI manual Better Auth operation inventory does not match the reviewed endpoints",
       );
     } else if (!authContract.valid) {
       failures.push(

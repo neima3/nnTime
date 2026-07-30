@@ -122,9 +122,55 @@ export function validateReleaseContract(contract) {
     failures.push("AASA must route /auth/callback");
   }
   if (
-    !sameContract(contract.authCapabilityFields, ["magicLink", "apple"])
+    !sameContract(contract.authCapabilityFields, [
+      "magicLink",
+      "apple",
+      "google",
+    ])
   ) {
-    failures.push("AuthCapabilities must require magicLink and apple booleans");
+    failures.push(
+      "AuthCapabilities must require magicLink, apple, and google booleans",
+    );
+  }
+  if (contract.googlePackageVersion !== "9.0.0") {
+    failures.push("GoogleSignIn-iOS must be pinned exactly to 9.0.0");
+  }
+  if (
+    !sameContract(contract.googleAppProducts, [
+      "GoogleSignIn",
+      "GoogleSignInSwift",
+    ])
+  ) {
+    failures.push(
+      "Kairo app target must link GoogleSignIn and GoogleSignInSwift",
+    );
+  }
+  if ((contract.googleOtherTargetProducts ?? []).length !== 0) {
+    failures.push(
+      "Google Sign-In products must only be linked to the Kairo app target",
+    );
+  }
+  if (
+    contract.googleIOSClientIDValue !== "$(KAIRO_GOOGLE_IOS_CLIENT_ID)" ||
+    contract.googleServerClientIDValue !==
+      "$(KAIRO_GOOGLE_SERVER_CLIENT_ID)" ||
+    contract.googleReversedClientIDValue !==
+      "$(KAIRO_GOOGLE_REVERSED_CLIENT_ID)"
+  ) {
+    failures.push(
+      "Info.plist must source Google client identifiers from public build settings",
+    );
+  }
+  if (
+    !sameContract(contract.googleBuildSettings, [
+      "KAIRO_GOOGLE_IOS_CLIENT_ID",
+      "KAIRO_GOOGLE_SERVER_CLIENT_ID",
+      "KAIRO_GOOGLE_REVERSED_CLIENT_ID",
+    ])
+  ) {
+    failures.push(
+      "Signing.xcconfig must declare all Google public identifier settings",
+    );
   }
   if (contract.openAPISynced !== true) {
     failures.push(
@@ -189,16 +235,21 @@ export function validateProductionAuthCapabilityResponse(response) {
 
   if (
     typeof response?.magicLink !== "boolean" ||
-    typeof response?.apple !== "boolean"
+    typeof response?.apple !== "boolean" ||
+    typeof response?.google !== "boolean"
   ) {
     failures.push(
-      "Production auth capabilities must expose boolean magicLink and apple fields",
+      "Production auth capabilities must expose boolean magicLink, apple, and google fields",
     );
   }
-  if (!sameContract(keys, ["magicLink", "apple"])) {
+  if (!sameContract(keys, ["magicLink", "apple", "google"])) {
     failures.push("Production auth capabilities must expose availability only");
   }
-  if (response?.magicLink !== true || response?.apple !== true) {
+  if (
+    response?.magicLink !== true ||
+    response?.apple !== true ||
+    response?.google !== true
+  ) {
     failures.push("Production native auth providers are not fully configured");
   }
 
@@ -348,6 +399,27 @@ export function validateBuiltAppReleaseContract(contract, expected = {}) {
     );
   }
   if (expected.distribution === true) {
+    if (!isProductionGoogleClientID(contract.googleIOSClientID)) {
+      failures.push(
+        "Distribution app must contain a production Google iOS client ID",
+      );
+    }
+    if (!isProductionGoogleClientID(contract.googleServerClientID)) {
+      failures.push(
+        "Distribution app must contain a production Google server client ID",
+      );
+    }
+    const reversedClientID = reversedGoogleClientID(
+      contract.googleIOSClientID,
+    );
+    if (
+      !reversedClientID ||
+      !contract.googleURLSchemes?.includes(reversedClientID)
+    ) {
+      failures.push(
+        "Distribution app must contain the matching reversed Google client URL scheme",
+      );
+    }
     if (
       !contract.appSigningAuthorities?.some((authority) =>
         authority.startsWith("Apple Distribution:"),
@@ -403,6 +475,19 @@ export function validateBuiltAppReleaseContract(contract, expected = {}) {
   return failures;
 }
 
+function isProductionGoogleClientID(value) {
+  return (
+    typeof value === "string" &&
+    /^[A-Za-z0-9_-]+\.apps\.googleusercontent\.com$/.test(value)
+  );
+}
+
+function reversedGoogleClientID(value) {
+  return isProductionGoogleClientID(value)
+    ? value.split(".").reverse().join(".")
+    : null;
+}
+
 export function readBuiltAppReleaseContract(appPath) {
   const widgetPath = resolve(appPath, "PlugIns/KairoWidget.appex");
   const info = readPlist(resolve(appPath, "Info.plist"));
@@ -428,6 +513,11 @@ export function readBuiltAppReleaseContract(appPath) {
     buildDate: info.KairoBuildDate,
     healthShareDescription: info.NSHealthShareUsageDescription,
     healthUpdateDescription: info.NSHealthUpdateUsageDescription,
+    googleIOSClientID: info.GIDClientID,
+    googleServerClientID: info.GIDServerClientID,
+    googleURLSchemes: (info.CFBundleURLTypes ?? []).flatMap(
+      (entry) => entry.CFBundleURLSchemes ?? [],
+    ),
     appSigningAuthorities: appSigning.authorities,
     widgetSigningAuthorities: widgetSigning.authorities,
     appTeamIdentifier:
@@ -502,6 +592,30 @@ export function readRepositoryReleaseContract(
   const baseSettings = project.settings?.base ?? {};
   const appSettings = project.targets?.Kairo?.settings?.base ?? {};
   const widgetSettings = project.targets?.KairoWidget?.settings?.base ?? {};
+  const googlePackage = project.packages?.GoogleSignIn ?? {};
+  const googleProductsForTarget = (target) =>
+    (target?.dependencies ?? [])
+      .filter((dependency) => dependency?.package === "GoogleSignIn")
+      .map((dependency) => dependency.product)
+      .filter(Boolean);
+  const googleAppProducts = googleProductsForTarget(project.targets?.Kairo);
+  const googleOtherTargetProducts = Object.entries(project.targets ?? {})
+    .filter(([name]) => name !== "Kairo")
+    .flatMap(([, target]) => googleProductsForTarget(target));
+  const googleURLSchemes = (info.CFBundleURLTypes ?? []).flatMap(
+    (entry) => entry.CFBundleURLSchemes ?? [],
+  );
+  const signing = readFileSync(
+    resolve(root, "ios/Signing.xcconfig"),
+    "utf8",
+  );
+  const googleBuildSettings = [
+    "KAIRO_GOOGLE_IOS_CLIENT_ID",
+    "KAIRO_GOOGLE_SERVER_CLIENT_ID",
+    "KAIRO_GOOGLE_REVERSED_CLIENT_ID",
+  ].filter((name) =>
+    new RegExp(`^${name}\\s*=`, "m").test(signing),
+  );
 
   return {
     appBundleId: appSettings.PRODUCT_BUNDLE_IDENTIFIER,
@@ -525,6 +639,15 @@ export function readRepositoryReleaseContract(
       (detail.components ?? []).map((component) => component["/"]),
     ),
     authCapabilityFields,
+    googlePackageVersion: String(googlePackage.exactVersion ?? ""),
+    googleAppProducts,
+    googleOtherTargetProducts,
+    googleIOSClientIDValue: info.GIDClientID,
+    googleServerClientIDValue: info.GIDServerClientID,
+    googleReversedClientIDValue: googleURLSchemes.find(
+      (scheme) => scheme === "$(KAIRO_GOOGLE_REVERSED_CLIENT_ID)",
+    ),
+    googleBuildSettings,
     openAPISynced: canonicalOpenAPI === iosOpenAPI,
     healthShareDescription: info.NSHealthShareUsageDescription,
     healthUpdateDescription: info.NSHealthUpdateUsageDescription,

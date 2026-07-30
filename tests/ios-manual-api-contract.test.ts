@@ -4,6 +4,7 @@ import { parse as parseYaml } from "yaml";
 import { describe, expect, it } from "vitest";
 
 type AdoptionModule = {
+  REQUIRED_MANUAL_AUTH_OPERATIONS?: readonly string[];
   REQUIRED_GENERATED_OPERATIONS?: readonly string[];
   collectShippingSwiftSources?: (
     appRoot: string,
@@ -19,6 +20,14 @@ type AdoptionModule = {
 const adoption = (await import(
   "../scripts/ios-manual-api-contract.mjs"
 )) as AdoptionModule;
+
+const requiredManualAuthOperations = [
+  "/api/auth/sign-in/email",
+  "/api/auth/sign-up/email",
+  "/api/auth/sign-out",
+  "/api/auth/sign-in/social",
+  "/api/auth/link-social",
+] as const;
 
 const requiredOperations = [
   "getAuthCapabilities",
@@ -81,12 +90,18 @@ function facadeSource(
 
       private enum AuthEndpoint {
         case signIn
+        case signUp
         case signOut
+        case googleSignIn
+        case googleLink
 
         var pathComponents: [String] {
           switch self {
           case .signIn: ["api", "auth", "sign-in", "email"]
+          case .signUp: ["api", "auth", "sign-up", "email"]
           case .signOut: ["api", "auth", "sign-out"]
+          case .googleSignIn: ["api", "auth", "sign-in", "social"]
+          case .googleLink: ["api", "auth", "link-social"]
           }
         }
       }
@@ -129,6 +144,12 @@ function validate(
 }
 
 describe("generated Swift client adoption gate", () => {
+  it("exports the complete reviewed manual Better Auth operation inventory", () => {
+    expect(adoption.REQUIRED_MANUAL_AUTH_OPERATIONS).toEqual(
+      requiredManualAuthOperations,
+    );
+  });
+
   it("exports the complete current shipping operation inventory, including categories", () => {
     expect(adoption.REQUIRED_GENERATED_OPERATIONS).toEqual(requiredOperations);
     expect(adoption.REQUIRED_GENERATED_OPERATIONS).toContain("listCategories");

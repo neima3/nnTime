@@ -22,7 +22,18 @@ const validContract = {
   signInWithApple: ["Default"],
   aasaAppIDs: ["A45F46XD54.me.neima.kairo"],
   aasaPaths: ["/auth/callback"],
-  authCapabilityFields: ["magicLink", "apple"],
+  authCapabilityFields: ["magicLink", "apple", "google"],
+  googlePackageVersion: "9.0.0",
+  googleAppProducts: ["GoogleSignIn", "GoogleSignInSwift"],
+  googleOtherTargetProducts: [],
+  googleIOSClientIDValue: "$(KAIRO_GOOGLE_IOS_CLIENT_ID)",
+  googleServerClientIDValue: "$(KAIRO_GOOGLE_SERVER_CLIENT_ID)",
+  googleReversedClientIDValue: "$(KAIRO_GOOGLE_REVERSED_CLIENT_ID)",
+  googleBuildSettings: [
+    "KAIRO_GOOGLE_IOS_CLIENT_ID",
+    "KAIRO_GOOGLE_SERVER_CLIENT_ID",
+    "KAIRO_GOOGLE_REVERSED_CLIENT_ID",
+  ],
   openAPISynced: true,
   healthShareDescription:
     "Kairo reads recent sleep times to suggest a private wind-down reminder on this iPhone.",
@@ -66,6 +77,12 @@ const validBuiltArtifact = {
   hasHealthKit: true,
   associatedDomains: ["applinks:time.neima.me"],
   signInWithApple: ["Default"],
+  googleIOSClientID: "ios-client.apps.googleusercontent.com",
+  googleServerClientID: "web-client.apps.googleusercontent.com",
+  googleURLSchemes: [
+    "kairo",
+    "com.googleusercontent.apps.ios-client",
+  ],
   widgetAppGroups: ["group.me.neima.kairo"],
   widgetHasHealthKit: false,
   privacy: expectedPrivacyContract,
@@ -141,6 +158,13 @@ describe("iOS release contract", () => {
       aasaAppIDs: [],
       aasaPaths: [],
       authCapabilityFields: ["magicLink"],
+      googlePackageVersion: "9.1.0",
+      googleAppProducts: ["GoogleSignIn"],
+      googleOtherTargetProducts: ["GoogleSignIn"],
+      googleIOSClientIDValue: "",
+      googleServerClientIDValue: "",
+      googleReversedClientIDValue: "",
+      googleBuildSettings: [],
       openAPISynced: false,
     });
 
@@ -150,7 +174,12 @@ describe("iOS release contract", () => {
         "Sign in with Apple entitlement must include Default",
         "AASA must include A45F46XD54.me.neima.kairo",
         "AASA must route /auth/callback",
-        "AuthCapabilities must require magicLink and apple booleans",
+        "AuthCapabilities must require magicLink, apple, and google booleans",
+        "GoogleSignIn-iOS must be pinned exactly to 9.0.0",
+        "Kairo app target must link GoogleSignIn and GoogleSignInSwift",
+        "Google Sign-In products must only be linked to the Kairo app target",
+        "Info.plist must source Google client identifiers from public build settings",
+        "Signing.xcconfig must declare all Google public identifier settings",
         "Generated iOS OpenAPI contract is out of sync with api/openapi.yaml",
       ]),
     );
@@ -161,6 +190,7 @@ describe("iOS release contract", () => {
       validateProductionAuthCapabilityResponse({
         magicLink: true,
         apple: true,
+        google: true,
       }),
     ).toEqual([]);
 
@@ -168,11 +198,12 @@ describe("iOS release contract", () => {
       validateProductionAuthCapabilityResponse({
         magicLink: "configured",
         apple: false,
+        google: false,
         clientId: "should-not-be-public",
       }),
     ).toEqual(
       expect.arrayContaining([
-        "Production auth capabilities must expose boolean magicLink and apple fields",
+        "Production auth capabilities must expose boolean magicLink, apple, and google fields",
         "Production auth capabilities must expose availability only",
         "Production native auth providers are not fully configured",
       ]),
@@ -278,6 +309,26 @@ describe("iOS release contract", () => {
         "Widget distribution entitlement beta-reports-active must be true",
         "App distribution entitlement get-task-allow must be false",
         "Widget distribution entitlement get-task-allow must be false",
+      ]),
+    );
+  });
+
+  it("fails closed when a distribution build has incomplete Google identifiers", () => {
+    const failures = validateBuiltAppReleaseContract(
+      {
+        ...validBuiltArtifact,
+        googleIOSClientID: "",
+        googleServerClientID: "$(KAIRO_GOOGLE_SERVER_CLIENT_ID)",
+        googleURLSchemes: ["kairo"],
+      },
+      { distribution: true, teamId: "A45F46XD54" },
+    );
+
+    expect(failures).toEqual(
+      expect.arrayContaining([
+        "Distribution app must contain a production Google iOS client ID",
+        "Distribution app must contain a production Google server client ID",
+        "Distribution app must contain the matching reversed Google client URL scheme",
       ]),
     );
   });

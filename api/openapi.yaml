@@ -1247,10 +1247,11 @@ components:
     AuthCapabilities:
       type: object
       additionalProperties: false
-      required: [magicLink, apple]
+      required: [magicLink, apple, google]
       properties:
         magicLink: { type: boolean }
         apple: { type: boolean }
+        google: { type: boolean }
 
     AppleAuthIntent:
       type: string
