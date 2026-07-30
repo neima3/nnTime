@@ -488,73 +488,68 @@ final class NativeAuthTransportTests: XCTestCase {
         XCTAssertEqual(retainedScope, baseline.scope)
     }
 
-    func testGoogleInvalidToken401PreservesValidSession() async throws {
-        let (api, vault) = try await Self.googleAPIWithPersistedSession(
-            fixture: .init(
-                status: 401,
-                body: #"{"code":"INVALID_TOKEN","message":"Invalid token"}"#
-            )
-        )
+    func testReviewedGoogle401CodesPreserveValidSessionByEndpoint()
+        async throws
+    {
+        let cases: [(GoogleIdentityEndpoint, String)] = [
+            (.signIn, "INVALID_TOKEN"),
+            (.signIn, "FAILED_TO_GET_USER_INFO"),
+            (.signIn, "USER_EMAIL_NOT_FOUND"),
+            (.signIn, "OAUTH_LINK_ERROR"),
+            (.link, "INVALID_TOKEN"),
+            (.link, "FAILED_TO_GET_USER_INFO"),
+            (.link, "USER_EMAIL_NOT_FOUND"),
+            (.link, "LINKING_NOT_ALLOWED"),
+            (.link, "LINKING_DIFFERENT_EMAILS_NOT_ALLOWED"),
+        ]
 
-        do {
-            _ = try await api.googleSignIn(
-                credential: .init(idToken: "bad", accessToken: "bad")
+        for (endpoint, code) in cases {
+            let (api, vault) = try await Self.googleAPIWithPersistedSession(
+                fixture: .init(
+                    status: 401,
+                    body: #"{"code":"\#(code)","message":"Provider error"}"#
+                )
             )
-            XCTFail("Expected invalid token")
-        } catch let error as APIError {
-            XCTAssertEqual(error.statusCode, 401)
+            let baselineEnvelope = await vault.savedEnvelope()
+            let baselineScope = await api.sessionScope()
+
+            await Self.assertGoogle401(api: api, endpoint: endpoint)
+
+            let envelope = await vault.savedEnvelope()
+            let scope = await api.sessionScope()
+            XCTAssertEqual(envelope, baselineEnvelope, "\(endpoint): \(code)")
+            XCTAssertEqual(scope, baselineScope, "\(endpoint): \(code)")
         }
-
-        let envelope = await vault.savedEnvelope()
-        let scope = await api.sessionScope()
-        XCTAssertNotNil(envelope)
-        XCTAssertNotNil(scope)
     }
 
-    func testGoogleUnauthorized401InvalidatesExpiredSession() async throws {
-        let (api, vault) = try await Self.googleAPIWithPersistedSession(
-            fixture: .init(
-                status: 401,
-                body: #"{"code":"UNAUTHORIZED","message":"Unauthorized"}"#
-            )
-        )
+    func testGoogle401DefaultDenyInvalidatesByEndpoint() async throws {
+        let cases: [(GoogleIdentityEndpoint, String?)] = [
+            (.signIn, "LINKING_NOT_ALLOWED"),
+            (.signIn, "LINKING_DIFFERENT_EMAILS_NOT_ALLOWED"),
+            (.link, "OAUTH_LINK_ERROR"),
+            (.signIn, "UNAUTHORIZED"),
+            (.link, "UNAUTHORIZED"),
+            (.signIn, "UNKNOWN_PROVIDER_CODE"),
+            (.link, "UNKNOWN_PROVIDER_CODE"),
+            (.signIn, nil),
+            (.link, nil),
+        ]
 
-        do {
-            try await api.googleLink(
-                credential: .init(idToken: "expired", accessToken: "expired")
+        for (endpoint, code) in cases {
+            let body = code.map {
+                #"{"code":"\#($0)","message":"Provider error"}"#
+            } ?? #"{"message":"Provider error"}"#
+            let (api, vault) = try await Self.googleAPIWithPersistedSession(
+                fixture: .init(status: 401, body: body)
             )
-            XCTFail("Expected unauthorized")
-        } catch let error as APIError {
-            XCTAssertEqual(error.statusCode, 401)
+
+            await Self.assertGoogle401(api: api, endpoint: endpoint)
+
+            let envelope = await vault.savedEnvelope()
+            let scope = await api.sessionScope()
+            XCTAssertNil(envelope, "\(endpoint): \(code ?? "missing")")
+            XCTAssertNil(scope, "\(endpoint): \(code ?? "missing")")
         }
-
-        let envelope = await vault.savedEnvelope()
-        let scope = await api.sessionScope()
-        XCTAssertNil(envelope)
-        XCTAssertNil(scope)
-    }
-
-    func testGoogleUnknown401InvalidatesSession() async throws {
-        let (api, vault) = try await Self.googleAPIWithPersistedSession(
-            fixture: .init(
-                status: 401,
-                body: #"{"error":{"message":"Unauthorized"}}"#
-            )
-        )
-
-        do {
-            try await api.googleLink(
-                credential: .init(idToken: "unknown", accessToken: "unknown")
-            )
-            XCTFail("Expected unauthorized")
-        } catch let error as APIError {
-            XCTAssertEqual(error.statusCode, 401)
-        }
-
-        let envelope = await vault.savedEnvelope()
-        let scope = await api.sessionScope()
-        XCTAssertNil(envelope)
-        XCTAssertNil(scope)
     }
 
     func testLateGoogleSignInCannotRestoreSessionAfterSignOut() async throws {
@@ -638,6 +633,33 @@ final class NativeAuthTransportTests: XCTestCase {
         )
     }
 
+    private static func assertGoogle401(
+        api: KairoAPI,
+        endpoint: GoogleIdentityEndpoint
+    ) async {
+        do {
+            switch endpoint {
+            case .signIn:
+                _ = try await api.googleSignIn(
+                    credential: .init(idToken: "bad", accessToken: "bad")
+                )
+            case .link:
+                try await api.googleLink(
+                    credential: .init(idToken: "bad", accessToken: "bad")
+                )
+            }
+            XCTFail("Expected Google 401 for \(endpoint)")
+        } catch let error as APIError {
+            XCTAssertEqual(error.statusCode, 401)
+            XCTAssertEqual(
+                error.errorDescription,
+                "Google authentication couldn't be completed. Try again."
+            )
+        } catch {
+            XCTFail("Unexpected error for \(endpoint): \(error)")
+        }
+    }
+
     private static func cookieStorage() -> HTTPCookieStorage {
         .sharedCookieStorage(
             forGroupContainerIdentifier: "NativeAuthTransport.\(UUID())"
@@ -683,6 +705,11 @@ final class NativeAuthTransportTests: XCTestCase {
                 as? [String: Any]
         )
     }
+}
+
+private enum GoogleIdentityEndpoint {
+    case signIn
+    case link
 }
 
 private final class LocalAppleAuthHTTPServer {

@@ -870,8 +870,10 @@ actor KairoAPI: NativeSyncTransport {
                 return data
             case 401:
                 let preservesCredentialFailure =
-                    Self.isGoogleIdentityPath(request.url?.path)
-                    && Self.isAllowlistedGoogleCredentialError(data)
+                    Self.isAllowlistedGoogleCredentialError(
+                        data,
+                        path: request.url?.path
+                    )
                 if !preservesCredentialFailure {
                     await invalidateAndNotify()
                 }
@@ -918,19 +920,32 @@ actor KairoAPI: NativeSyncTransport {
         return false
     }
 
-    private static func isGoogleIdentityPath(_ path: String?) -> Bool {
-        path == "/api/auth/sign-in/social"
-            || path == "/api/auth/link-social"
-    }
-
     private static func isAllowlistedGoogleCredentialError(
-        _ data: Data
+        _ data: Data,
+        path: String?
     ) -> Bool {
         guard let code = authErrorCode(data) else {
             return false
         }
-        return code == "INVALID_TOKEN"
-            || code == "FAILED_TO_GET_USER_INFO"
+        switch path {
+        case "/api/auth/sign-in/social":
+            return [
+                "INVALID_TOKEN",
+                "FAILED_TO_GET_USER_INFO",
+                "USER_EMAIL_NOT_FOUND",
+                "OAUTH_LINK_ERROR",
+            ].contains(code)
+        case "/api/auth/link-social":
+            return [
+                "INVALID_TOKEN",
+                "FAILED_TO_GET_USER_INFO",
+                "USER_EMAIL_NOT_FOUND",
+                "LINKING_NOT_ALLOWED",
+                "LINKING_DIFFERENT_EMAILS_NOT_ALLOWED",
+            ].contains(code)
+        default:
+            return false
+        }
     }
 
     private func persistSession(
