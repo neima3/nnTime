@@ -25,7 +25,7 @@ enum AppSessionFailure: Equatable {
             return .decoding
         case let .http(status, _),
              let .authHTTP(status, _),
-             let .socialAuth(status):
+             let .socialAuth(status, _):
             if status == 429 {
                 return .rateLimited
             }

@@ -130,6 +130,9 @@ final class SignInPresentationModel {
 #endif
 
     private static func failureStatus(for error: Error) -> Status {
+        if case APIError.socialAuth(_, .accountConflict) = error {
+            return .duplicateAccount
+        }
         if let apiError = error as? APIError,
            let code = apiError.serverError?.code,
            [

@@ -37,16 +37,31 @@ final class GoogleLinkPresentationModel {
         }
     }
 
-    func loadAvailability(
-        using load: () async throws -> NativeAuthCapabilities
+    func loadConnection(
+        capabilities loadCapabilities: () async throws
+            -> NativeAuthCapabilities,
+        isLinked loadLinkedState: () async throws -> Bool
     ) async {
+        state = .loadingAvailability
+        showsControl = false
         do {
-            let capabilities = try await load()
+            let capabilities = try await loadCapabilities()
             showsControl = capabilities.google
-            state = capabilities.google ? .ready : .unavailable
+            guard capabilities.google else {
+                state = .unavailable
+                return
+            }
+            state = try await loadLinkedState() ? .linked : .ready
         } catch {
-            showsControl = false
-            state = .unavailable
+            if AppSessionFailure.classify(error) == .unauthorized {
+                state = .sessionRequired
+            } else if showsControl {
+                state = .failed(
+                    "Couldn't verify your Google connection. Try again."
+                )
+            } else {
+                state = .unavailable
+            }
         }
     }
 

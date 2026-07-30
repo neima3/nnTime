@@ -12,6 +12,7 @@ export const REQUIRED_MANUAL_AUTH_OPERATIONS = Object.freeze([
   "/api/auth/sign-out",
   "/api/auth/sign-in/social",
   "/api/auth/link-social",
+  "/api/auth/list-accounts",
 ]);
 
 export const REQUIRED_GENERATED_OPERATIONS = Object.freeze([
@@ -283,6 +284,51 @@ function authEndpointContract(source) {
     paths.push(`/${components.join("/")}`);
   }
 
+  const methodRange = declarationRange(
+    enumMasked,
+    /\bvar\s+httpMethod\s*:\s*String\s*\{/g,
+  );
+  if (!methodRange) {
+    return { valid: false, range: enumRange };
+  }
+  const methodMasked = enumMasked.slice(
+    methodRange.start,
+    methodRange.end,
+  );
+  const methodSource = enumSource.slice(
+    methodRange.start,
+    methodRange.end,
+  );
+  if (
+    !/\bswitch\s+self\s*\{/.test(methodMasked) ||
+    /\bdefault\s*:/.test(methodMasked)
+  ) {
+    return { valid: false, range: enumRange };
+  }
+  const methods = new Map();
+  for (const branch of methodSource.matchAll(
+    /\bcase\s+([^:]+):\s*"(GET|POST)"/g,
+  )) {
+    for (const match of branch[1].matchAll(
+      /\.([A-Za-z_][A-Za-z0-9_]*)/g,
+    )) {
+      if (methods.has(match[1])) {
+        return { valid: false, range: enumRange };
+      }
+      methods.set(match[1], branch[2]);
+    }
+  }
+  if (
+    methods.size !== cases.length ||
+    cases.some((name) => !methods.has(name)) ||
+    methods.get("listAccounts") !== "GET" ||
+    cases.some(
+      (name) => name !== "listAccounts" && methods.get(name) !== "POST",
+    )
+  ) {
+    return { valid: false, range: enumRange };
+  }
+
   return { valid: true, range: enumRange, paths };
 }
 
@@ -544,9 +590,9 @@ function authRequestContract(source, endpointContract) {
   const allowedRequestMember = (match) => {
     const operation = originalFunctionSource.slice(match.index);
     if (match[1] === "httpMethod") {
-      return /^request\s*\.\s*httpMethod\s*=\s*"POST"[ \t]*(?:\r?\n|$)/.test(
-        operation,
-      );
+      return /^request\s*\.\s*httpMethod\s*=\s*endpoint\s*\.\s*httpMethod[ \t]*(?:\r?\n|$)/.test(
+          operation,
+        );
     }
     if (match[1] === "httpBody") {
       return /^request\s*\.\s*httpBody\s*=\s*try\s+JSONEncoder\s*\(\s*\)\s*\.\s*encode\s*\(\s*body\s*\)[ \t]*(?:\r?\n|$)/.test(

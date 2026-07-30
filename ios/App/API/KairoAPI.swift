@@ -2,13 +2,18 @@ import Foundation
 import KairoAPIClient
 import OpenAPIRuntime
 
+enum SocialAuthFailureReason: Equatable, Sendable {
+    case accountConflict
+    case providerFailure
+}
+
 enum APIError: LocalizedError {
     case http(Int, ServerErrorData)
     case unauthorized(Int, ServerErrorData)
     case conflict(Int, ServerErrorData)
     case authHTTP(Int, String?)
     case authUnauthorized(String?)
-    case socialAuth(Int)
+    case socialAuth(Int, SocialAuthFailureReason)
     case network(Error)
     case decoding(Error)
 
@@ -18,7 +23,7 @@ enum APIError: LocalizedError {
              let .unauthorized(statusCode, _),
              let .conflict(statusCode, _),
              let .authHTTP(statusCode, _),
-             let .socialAuth(statusCode):
+             let .socialAuth(statusCode, _):
             statusCode
         case .authUnauthorized:
             401
@@ -207,6 +212,7 @@ actor KairoAPI: NativeSyncTransport {
         case signOut
         case googleSignIn
         case googleLink
+        case listAccounts
 
         var pathComponents: [String] {
             switch self {
@@ -215,6 +221,16 @@ actor KairoAPI: NativeSyncTransport {
             case .signOut: ["api", "auth", "sign-out"]
             case .googleSignIn: ["api", "auth", "sign-in", "social"]
             case .googleLink: ["api", "auth", "link-social"]
+            case .listAccounts: ["api", "auth", "list-accounts"]
+            }
+        }
+
+        var httpMethod: String {
+            switch self {
+            case .listAccounts:
+                "GET"
+            case .signIn, .signUp, .signOut, .googleSignIn, .googleLink:
+                "POST"
             }
         }
     }
@@ -222,19 +238,21 @@ actor KairoAPI: NativeSyncTransport {
     @discardableResult
     private func authRequest<T: Decodable, Body: Encodable>(
         _ endpoint: AuthEndpoint,
-        body: Body,
+        body: Body?,
         as type: T.Type
     ) async throws -> T {
         let url = endpoint.pathComponents.reduce(baseURL) {
             $0.appending(path: $1)
         }
         var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue(
-            "application/json",
-            forHTTPHeaderField: "Content-Type"
-        )
-        request.httpBody = try JSONEncoder().encode(body)
+        request.httpMethod = endpoint.httpMethod
+        if let body {
+            request.setValue(
+                "application/json",
+                forHTTPHeaderField: "Content-Type"
+            )
+            request.httpBody = try JSONEncoder().encode(body)
+        }
 
         let data = try await authData(for: request)
         if T.self == EmptyResponse.self {
@@ -333,7 +351,13 @@ actor KairoAPI: NativeSyncTransport {
                 as: AuthResponse.self
             )
         } catch let error as APIError {
-            throw APIError.socialAuth(error.statusCode ?? 0)
+            if case .socialAuth = error {
+                throw error
+            }
+            throw APIError.socialAuth(
+                error.statusCode ?? 0,
+                .providerFailure
+            )
         }
         return try await persistSession(generation: generation)
     }
@@ -342,7 +366,7 @@ actor KairoAPI: NativeSyncTransport {
         credential: NativeGoogleCredential
     ) async throws {
         guard await sessionController.currentScope() != nil else {
-            throw APIError.socialAuth(401)
+            throw APIError.socialAuth(401, .providerFailure)
         }
         do {
             _ = try await authRequest(
@@ -351,8 +375,26 @@ actor KairoAPI: NativeSyncTransport {
                 as: EmptyResponse.self
             )
         } catch let error as APIError {
-            throw APIError.socialAuth(error.statusCode ?? 0)
+            if case .socialAuth = error {
+                throw error
+            }
+            throw APIError.socialAuth(
+                error.statusCode ?? 0,
+                .providerFailure
+            )
         }
+    }
+
+    func isGoogleAccountLinked() async throws -> Bool {
+        guard await sessionController.currentScope() != nil else {
+            throw APIError.authUnauthorized(nil)
+        }
+        let accounts = try await authRequest(
+            .listAccounts,
+            body: Optional<[String: String]>.none,
+            as: [BetterAuthAccount].self
+        )
+        return accounts.contains { $0.providerId == "google" }
     }
 
     func appleChallenge(
@@ -877,8 +919,26 @@ actor KairoAPI: NativeSyncTransport {
                 if !preservesCredentialFailure {
                     await invalidateAndNotify()
                 }
+                if Self.isGoogleIdentityPath(request.url?.path) {
+                    throw APIError.socialAuth(
+                        http.statusCode,
+                        Self.socialAuthFailureReason(
+                            data,
+                            path: request.url?.path
+                        )
+                    )
+                }
                 throw APIError.authUnauthorized(Self.authErrorMessage(data))
             default:
+                if Self.isGoogleIdentityPath(request.url?.path) {
+                    throw APIError.socialAuth(
+                        http.statusCode,
+                        Self.socialAuthFailureReason(
+                            data,
+                            path: request.url?.path
+                        )
+                    )
+                }
                 throw APIError.authHTTP(
                     http.statusCode,
                     Self.authErrorMessage(data)
@@ -946,6 +1006,24 @@ actor KairoAPI: NativeSyncTransport {
         default:
             return false
         }
+    }
+
+    private static func isGoogleIdentityPath(_ path: String?) -> Bool {
+        path == "/api/auth/sign-in/social"
+            || path == "/api/auth/link-social"
+    }
+
+    private static func socialAuthFailureReason(
+        _ data: Data,
+        path: String?
+    ) -> SocialAuthFailureReason {
+        guard
+            path == "/api/auth/sign-in/social",
+            authErrorCode(data) == "OAUTH_LINK_ERROR"
+        else {
+            return .providerFailure
+        }
+        return .accountConflict
     }
 
     private func persistSession(
@@ -1068,6 +1146,10 @@ private extension NativeAppleIntent {
 
 struct EmptyResponse: Decodable {
     init() {}
+}
+
+private struct BetterAuthAccount: Decodable {
+    let providerId: String
 }
 
 private struct MagicLinkRequest: Encodable {

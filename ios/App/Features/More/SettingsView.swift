@@ -472,7 +472,7 @@ struct SettingsView: View {
 
             if googleLink.canRetry {
                 Button("Try Google connection again") {
-                    googleLink.retry()
+                    Task { await loadGoogleLink() }
                 }
                 .font(.kBody(13.5, weight: .semibold))
                 .foregroundStyle(Color.kIris)
@@ -594,8 +594,16 @@ struct SettingsView: View {
             return
         }
 #endif
-        await googleLink.loadAvailability {
-            try await KairoAPI.shared.authCapabilities()
+        await googleLink.loadConnection(
+            capabilities: {
+                try await KairoAPI.shared.authCapabilities()
+            },
+            isLinked: {
+                try await KairoAPI.shared.isGoogleAccountLinked()
+            }
+        )
+        if googleLink.state == .sessionRequired {
+            await app.handleSessionInvalidation()
         }
     }
 

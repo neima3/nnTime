@@ -72,6 +72,37 @@ final class SignInPresentationTests: XCTestCase {
         )
     }
 
+    func testReviewedGoogleAccountConflictShowsEmailFirstGuidance() async {
+        let model = SignInPresentationModel()
+
+        let session = await model.authenticate(using: .google) {
+            throw APIError.socialAuth(401, .accountConflict)
+        }
+
+        XCTAssertNil(session)
+        XCTAssertEqual(model.status, .duplicateAccount)
+        XCTAssertEqual(
+            model.errorMessage,
+            "Sign in with your email first, then connect Google or Apple in Settings."
+        )
+    }
+
+    func testUnrelatedGoogleFailureStaysGeneric() async {
+        let model = SignInPresentationModel()
+
+        let session = await model.authenticate(using: .google) {
+            throw APIError.socialAuth(400, .providerFailure)
+        }
+
+        XCTAssertNil(session)
+        XCTAssertEqual(
+            model.status,
+            .failed(
+                "Google authentication couldn't be completed. Try again."
+            )
+        )
+    }
+
     func testOnlyOneAuthenticationOperationRunsAtATime() async {
         let model = SignInPresentationModel()
         var nestedRan = false

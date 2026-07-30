@@ -14,6 +14,7 @@ final class KairoRound23GoogleAuthTour: XCTestCase {
         XCTAssertTrue(google.waitForExistence(timeout: 5))
         XCTAssertGreaterThanOrEqual(google.frame.height, 44)
         XCTAssertGreaterThanOrEqual(google.frame.width, 44)
+        assertLightGoogleLogo(google)
         capture(app, name: "google-ready-light")
     }
 
@@ -250,5 +251,58 @@ final class KairoRound23GoogleAuthTour: XCTestCase {
             file: file,
             line: line
         )
+    }
+
+    private func assertLightGoogleLogo(
+        _ element: XCUIElement,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        guard
+            let image = UIImage(
+                data: element.screenshot().pngRepresentation
+            )?.cgImage,
+            let data = image.dataProvider?.data,
+            let bytes = CFDataGetBytePtr(data)
+        else {
+            XCTFail(
+                "Could not inspect Google button pixels",
+                file: file,
+                line: line
+            )
+            return
+        }
+
+        var red = 0
+        var green = 0
+        var blue = 0
+        var yellow = 0
+        for y in stride(from: 0, to: image.height, by: 2) {
+            for x in stride(from: 0, to: image.width, by: 2) {
+                let offset = y * image.bytesPerRow + x * 4
+                let r = Int(bytes[offset])
+                let g = Int(bytes[offset + 1])
+                let b = Int(bytes[offset + 2])
+                if r > 180, g < 140, b < 140 { red += 1 }
+                if g > 100, r < 150, b < 160 { green += 1 }
+                if b > 150, g > 70, r < 150 { blue += 1 }
+                if r > 180, g > 130, b < 120 { yellow += 1 }
+            }
+        }
+
+        for (count, color) in [
+            (red, "red"),
+            (green, "green"),
+            (blue, "blue"),
+            (yellow, "yellow"),
+        ] {
+            XCTAssertGreaterThan(
+                count,
+                3,
+                "Official Google logo is missing its \(color) segment.",
+                file: file,
+                line: line
+            )
+        }
     }
 }

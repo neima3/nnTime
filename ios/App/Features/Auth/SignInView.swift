@@ -541,12 +541,14 @@ struct SignInView: View {
 
     @MainActor
     private func signInWithGoogle() async {
-        let session = await model.authenticate(using: .google) {
-            let credential = try await GoogleSignInCoordinator().credential()
-            return try await KairoAPI.shared.googleSignIn(
-                credential: credential
-            )
-        }
+        let session: NativeSessionController.PersistResult? =
+            await model.authenticate(using: .google) {
+                let credential =
+                    try await GoogleSignInCoordinator().credential()
+                return try await KairoAPI.shared.googleSignIn(
+                    credential: credential
+                )
+            }
         if let session {
             await finish(session)
         }

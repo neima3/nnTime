@@ -436,6 +436,142 @@ final class NativeAuthTransportTests: XCTestCase {
         XCTAssertEqual(retainedScope, baseline.scope)
     }
 
+    func testGoogleAccountConflictFlowsFromTransportToEmailFirstGuidance()
+        async throws
+    {
+        let (api, vault) = try await Self.googleAPIWithPersistedSession(
+            fixture: .init(
+                status: 401,
+                body:
+                    #"{"code":"OAUTH_LINK_ERROR","message":"opaque provider payload"}"#
+            )
+        )
+        let baselineEnvelope = await vault.savedEnvelope()
+        let model = await MainActor.run { SignInPresentationModel() }
+
+        let result = await model.authenticate(using: .google) {
+            try await api.googleSignIn(
+                credential: .init(idToken: "id", accessToken: "access")
+            )
+        }
+
+        XCTAssertNil(result)
+        let status = await MainActor.run { model.status }
+        XCTAssertEqual(status, .duplicateAccount)
+        let retainedEnvelope = await vault.savedEnvelope()
+        XCTAssertEqual(retainedEnvelope, baselineEnvelope)
+    }
+
+    func testReviewedNonConflictGoogleFailureStaysGenericInPresentation()
+        async throws
+    {
+        let (api, vault) = try await Self.googleAPIWithPersistedSession(
+            fixture: .init(
+                status: 401,
+                body:
+                    #"{"code":"INVALID_TOKEN","message":"raw provider payload"}"#
+            )
+        )
+        let baselineEnvelope = await vault.savedEnvelope()
+        let model = await MainActor.run { SignInPresentationModel() }
+
+        let result = await model.authenticate(using: .google) {
+            try await api.googleSignIn(
+                credential: .init(idToken: "id", accessToken: "access")
+            )
+        }
+
+        XCTAssertNil(result)
+        let status = await MainActor.run { model.status }
+        XCTAssertEqual(
+            status,
+            .failed(
+                "Google authentication couldn't be completed. Try again."
+            )
+        )
+        XCTAssertFalse(String(describing: status).contains("INVALID_TOKEN"))
+        XCTAssertFalse(String(describing: status).contains("raw provider"))
+        let retainedEnvelope = await vault.savedEnvelope()
+        XCTAssertEqual(retainedEnvelope, baselineEnvelope)
+    }
+
+    func testGoogleLinkedStateUsesAuthenticatedClosedAccountInventory()
+        async throws
+    {
+        let storage = Self.cookieStorage()
+        storage.setCookie(try Self.sessionCookie(value: "session-a"))
+        let controller = NativeSessionController(
+            baseURL: URL(string: "https://time.neima.me")!,
+            cookieStorage: storage,
+            envelopeStore: MemorySessionEnvelopeStore()
+        )
+        _ = try await controller.persist()
+        NativeAuthURLProtocol.install([
+            .init(
+                status: 200,
+                body:
+                    #"[{"providerId":"credential"},{"providerId":"Google"},{"providerId":"google","accessToken":"must-not-escape"}]"#
+            ),
+        ])
+        let transport = CapturingNativeAuthTransport(
+            session: Self.session(storage: storage)
+        )
+        let api = KairoAPI(
+            baseURL: URL(string: "https://time.neima.me")!,
+            session: transport.session,
+            authTransport: transport,
+            sessionController: controller
+        )
+
+        let linked = try await api.isGoogleAccountLinked()
+        XCTAssertTrue(linked)
+        let requests = await transport.requests()
+        let request = try XCTUnwrap(requests.first)
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertEqual(request.url?.path, "/api/auth/list-accounts")
+        XCTAssertNil(request.httpBody)
+        XCTAssertTrue(
+            try XCTUnwrap(request.value(forHTTPHeaderField: "Cookie"))
+                .contains("better-auth.session_token=session-a")
+        )
+    }
+
+    func testGoogleLinkedStateRejectsNonCanonicalProviderSpelling()
+        async throws
+    {
+        let (api, _) = try await Self.googleAPIWithPersistedSession(
+            fixture: .init(
+                status: 200,
+                body:
+                    #"[{"providerId":"Google"},{"providerId":"google-oauth"}]"#
+            )
+        )
+
+        let linked = try await api.isGoogleAccountLinked()
+        XCTAssertFalse(linked)
+    }
+
+    func testGoogleAccountInventory401InvalidatesSession() async throws {
+        let (api, vault) = try await Self.googleAPIWithPersistedSession(
+            fixture: .init(
+                status: 401,
+                body: #"{"code":"UNAUTHORIZED","message":"Expired"}"#
+            )
+        )
+
+        do {
+            _ = try await api.isGoogleAccountLinked()
+            XCTFail("Expected account inventory to require a valid session")
+        } catch let error as APIError {
+            XCTAssertEqual(error.statusCode, 401)
+        }
+
+        let envelope = await vault.savedEnvelope()
+        let scope = await api.sessionScope()
+        XCTAssertNil(envelope)
+        XCTAssertNil(scope)
+    }
+
     func testGoogleProviderErrorIsRedactedAndPreservesValidSession() async throws {
         let storage = Self.cookieStorage()
         storage.setCookie(try Self.sessionCookie(value: "session-a"))
