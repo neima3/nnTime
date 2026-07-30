@@ -27,6 +27,7 @@ const requiredManualAuthOperations = [
   "/api/auth/sign-out",
   "/api/auth/sign-in/social",
   "/api/auth/link-social",
+  "/api/auth/list-accounts",
 ] as const;
 
 const requiredOperations = [
@@ -94,6 +95,7 @@ function facadeSource(
         case signOut
         case googleSignIn
         case googleLink
+        case listAccounts
 
         var pathComponents: [String] {
           switch self {
@@ -102,25 +104,37 @@ function facadeSource(
           case .signOut: ["api", "auth", "sign-out"]
           case .googleSignIn: ["api", "auth", "sign-in", "social"]
           case .googleLink: ["api", "auth", "link-social"]
+          case .listAccounts: ["api", "auth", "list-accounts"]
+          }
+        }
+
+        var httpMethod: String {
+          switch self {
+          case .listAccounts:
+            "GET"
+          case .signIn, .signUp, .signOut, .googleSignIn, .googleLink:
+            "POST"
           }
         }
       }
 
-      private func authRequest<T>(
+      private func authRequest<T, Body>(
         _ endpoint: AuthEndpoint,
-        body: [String: String],
+        body: Body?,
         as type: T.Type
       ) async throws {
         let url = endpoint.pathComponents.reduce(baseURL) {
           $0.appending(path: $1)
         }
         var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue(
-          "application/json",
-          forHTTPHeaderField: "Content-Type"
-        )
-        request.httpBody = try JSONEncoder().encode(body)
+        request.httpMethod = endpoint.httpMethod
+        if let body {
+          request.setValue(
+            "application/json",
+            forHTTPHeaderField: "Content-Type"
+          )
+          request.httpBody = try JSONEncoder().encode(body)
+        }
         _ = try await authSession.data(for: request)
       }
 
