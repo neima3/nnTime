@@ -1,3 +1,4 @@
+import GoogleSignInSwift
 import SwiftUI
 
 struct SignInView: View {
@@ -94,7 +95,9 @@ struct SignInView: View {
             feedback
             passwordButton
 
-            if model.showsApple || model.showsMagicLink {
+            if model.showsApple || model.showsGoogle
+                || model.showsMagicLink
+            {
                 providerDivider
                 providerControls
             }
@@ -106,10 +109,16 @@ struct SignInView: View {
 
     @ViewBuilder
     private var feedback: some View {
-        if model.status == .loading(.apple) {
+        if model.status == .loading(.apple)
+            || model.status == .loading(.google)
+        {
             HStack(spacing: 10) {
                 ProgressView().tint(.kIris)
-                Text("Signing in securely with Apple…")
+                Text(
+                    model.status == .loading(.google)
+                        ? "Signing in securely with Google…"
+                        : "Signing in securely with Apple…"
+                )
                     .font(.kBody(13.5, weight: .medium))
                     .foregroundStyle(Color.kInkSoft)
             }
@@ -121,6 +130,14 @@ struct SignInView: View {
                     .fill(Color.kIrisGhost)
             )
             .accessibilityElement(children: .combine)
+        } else if model.status == .signedIn {
+            feedbackCard(
+                icon: "checkmark.shield.fill",
+                title: "Planner secured",
+                message: "Opening your day with your private planner ready.",
+                color: .kSuccess,
+                background: .kSuccessSoft
+            )
         } else if case let .magicLinkSent(address) = model.status {
             feedbackCard(
                 icon: "envelope.badge",
@@ -238,6 +255,9 @@ struct SignInView: View {
 
     private var providerControls: some View {
         VStack(spacing: 11) {
+            if model.showsGoogle {
+                googleControl
+            }
             if model.showsApple {
                 appleControl
             }
@@ -281,6 +301,25 @@ struct SignInView: View {
                 )
             }
         }
+    }
+
+    private var googleControl: some View {
+        GoogleSignInButton(
+            scheme: .light,
+            style: .wide,
+            state: model.isBusy ? .disabled : .normal
+        ) {
+            Task { await signInWithGoogle() }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 52)
+        .contentShape(Rectangle())
+        .disabled(model.isBusy)
+        .accessibilityLabel("Sign in with Google")
+        .accessibilityHint(
+            "Uses Google to sign in, then opens your private Kairo planner."
+        )
+        .accessibilityIdentifier("auth.google.sign-in")
     }
 
     @ViewBuilder
@@ -430,7 +469,8 @@ struct SignInView: View {
         let capability = arguments[capabilityIndex + 1]
         let capabilities = NativeAuthCapabilities(
             magicLink: capability == "all",
-            apple: capability == "all"
+            apple: capability == "all",
+            google: capability == "all" || capability == "google"
         )
         var status = SignInPresentationModel.Status.idle
         if let stateIndex = arguments.firstIndex(
@@ -443,6 +483,18 @@ struct SignInView: View {
                 status = .failed(
                     "Apple sign-in couldn’t be completed. Please try again."
                 )
+            case "googleLoading":
+                status = .loading(.google)
+            case "googleError":
+                status = .failed(
+                    "Google authentication couldn't be completed. Try again."
+                )
+            case "googleDuplicate":
+                status = .duplicateAccount
+            case "googleSuccess":
+                status = .signedIn
+            case "googleCancelled":
+                status = .idle
             case "magicSent":
                 email = "planner@example.test"
                 status = .magicLinkSent(email)
@@ -483,6 +535,19 @@ struct SignInView: View {
             applePreparationFailed = true
         }
         preparingApple = false
+    }
+
+    @MainActor
+    private func signInWithGoogle() async {
+        let session = await model.authenticate(using: .google) {
+            let credential = try await GoogleSignInCoordinator().credential()
+            return try await KairoAPI.shared.googleSignIn(
+                credential: credential
+            )
+        }
+        if let session {
+            await finish(session)
+        }
     }
 
     @MainActor

@@ -1,3 +1,4 @@
+import GoogleSignInSwift
 import SwiftUI
 
 struct SettingsView: View {
@@ -18,6 +19,7 @@ struct SettingsView: View {
     @State private var appleLinkChallenge: NativeAppleChallenge?
     @State private var preparingAppleLink = false
     @State private var applePreparationError: String?
+    @State private var googleLink = GoogleLinkPresentationModel()
 
     var body: some View {
         ZStack {
@@ -233,9 +235,24 @@ struct SettingsView: View {
                         .padding(16)
                     }
 
-                    if appleLink.showsControl {
+                    if appleLink.showsControl || googleLink.showsControl {
                         group("Connected accounts") {
-                            appleAccountContent
+                            VStack(alignment: .leading, spacing: 0) {
+                                if appleLink.showsControl {
+                                    appleAccountContent
+                                }
+                                if appleLink.showsControl
+                                    && googleLink.showsControl
+                                {
+                                    Rectangle()
+                                        .fill(Color.kBorder)
+                                        .frame(height: 1)
+                                        .padding(.horizontal, 16)
+                                }
+                                if googleLink.showsControl {
+                                    googleAccountContent
+                                }
+                            }
                         }
                     }
 
@@ -276,6 +293,7 @@ struct SettingsView: View {
         .toolbarBackground(Color.kCanvas, for: .navigationBar)
         .task { await loadSettings() }
         .task { await loadAppleLink() }
+        .task { await loadGoogleLink() }
     }
 
     private var appleAccountContent: some View {
@@ -347,6 +365,112 @@ struct SettingsView: View {
                         appleLink.retry()
                         await prepareAppleLink()
                     }
+                }
+                .font(.kBody(13.5, weight: .semibold))
+                .foregroundStyle(Color.kIris)
+                .frame(minHeight: 44)
+            }
+        }
+        .padding(16)
+    }
+
+    private var googleAccountContent: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "person.crop.circle.badge.plus")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Color.kIris)
+                    .frame(width: 36, height: 36)
+                    .background(
+                        RoundedRectangle(
+                            cornerRadius: 11,
+                            style: .continuous
+                        )
+                        .fill(Color.kIrisGhost)
+                    )
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Google")
+                        .font(.kBody(15, weight: .semibold))
+                        .foregroundStyle(Color.kInk)
+                    Text(
+                        "Kairo keeps this planner and never merges accounts silently."
+                    )
+                    .font(.kBody(12.5))
+                    .foregroundStyle(Color.kInkSoft)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            switch googleLink.state {
+            case .linked:
+                Label(
+                    "Google is connected",
+                    systemImage: "checkmark.circle.fill"
+                )
+                .font(.kBody(13.5, weight: .semibold))
+                .foregroundStyle(Color.kSuccess)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(
+                        cornerRadius: 13,
+                        style: .continuous
+                    )
+                    .fill(Color.kSuccessSoft)
+                )
+                .accessibilityIdentifier("settings.google.linked")
+            case .linking:
+                HStack(spacing: 9) {
+                    ProgressView().tint(.kIris)
+                    Text("Connecting Google securely…")
+                        .font(.kBody(13.5, weight: .medium))
+                        .foregroundStyle(Color.kInkSoft)
+                }
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 52)
+                .background(
+                    RoundedRectangle(
+                        cornerRadius: 14,
+                        style: .continuous
+                    )
+                    .fill(Color.kSurfaceSunken)
+                )
+                .accessibilityElement(children: .combine)
+            default:
+                GoogleSignInButton(
+                    scheme: .light,
+                    style: .wide,
+                    state: .normal
+                ) {
+                    Task { await connectGoogle() }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 52)
+                .contentShape(Rectangle())
+                .accessibilityLabel("Connect Google account")
+                .accessibilityHint(
+                    "Adds Google as a sign-in method without changing or merging this planner."
+                )
+                .accessibilityIdentifier("settings.google.link")
+            }
+
+            if let message = googleLink.errorMessage {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundStyle(Color.kDanger)
+                    Text(message)
+                        .font(.kBody(12.5))
+                        .foregroundStyle(Color.kInkSoft)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .accessibilityElement(children: .combine)
+            }
+
+            if googleLink.canRetry {
+                Button("Try Google connection again") {
+                    googleLink.retry()
                 }
                 .font(.kBody(13.5, weight: .semibold))
                 .foregroundStyle(Color.kIris)
@@ -462,6 +586,44 @@ struct SettingsView: View {
     }
 
     @MainActor
+    private func loadGoogleLink() async {
+#if DEBUG
+        if installGoogleLinkFixture() {
+            return
+        }
+#endif
+        await googleLink.loadAvailability {
+            try await KairoAPI.shared.authCapabilities()
+        }
+    }
+
+    @MainActor
+    private func connectGoogle() async {
+        let priorScope = app.sessionScope
+        let linkedScope = await googleLink.link(
+            currentScope: priorScope
+        ) {
+            let credential = try await GoogleSignInCoordinator().credential()
+            try await KairoAPI.shared.googleLink(credential: credential)
+        }
+
+        if let linkedScope {
+            let currentScope = await KairoAPI.shared.sessionScope()
+            guard
+                linkedScope == priorScope,
+                currentScope == priorScope
+            else {
+                await app.handleSessionInvalidation()
+                return
+            }
+            UINotificationFeedbackGenerator()
+                .notificationOccurred(.success)
+        } else if googleLink.state == .sessionRequired {
+            await app.handleSessionInvalidation()
+        }
+    }
+
+    @MainActor
     private func prepareAppleLink() async {
         guard !preparingAppleLink else {
             return
@@ -533,6 +695,8 @@ struct SettingsView: View {
             return false
         }
         switch arguments[index + 1] {
+        case "unavailable":
+            appleLink.installFixture(state: .unavailable)
         case "linked":
             appleLink.installFixture(state: .linked)
         case "expired":
@@ -544,6 +708,36 @@ struct SettingsView: View {
                 nonce: "synthetic-link-nonce",
                 expiresAt: Date().addingTimeInterval(3_600)
             )
+        }
+        return true
+    }
+
+    @MainActor
+    private func installGoogleLinkFixture() -> Bool {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard
+            let index = arguments.firstIndex(
+                of: "-kairoGoogleLinkFixture"
+            ),
+            arguments.indices.contains(index + 1)
+        else {
+            return false
+        }
+        switch arguments[index + 1] {
+        case "unavailable":
+            googleLink.installFixture(state: .unavailable)
+        case "linking":
+            googleLink.installFixture(state: .linking)
+        case "linked":
+            googleLink.installFixture(state: .linked)
+        case "error":
+            googleLink.installFixture(
+                state: .failed(
+                    "Google authentication couldn't be completed. Try again."
+                )
+            )
+        default:
+            googleLink.installFixture(state: .ready)
         }
         return true
     }

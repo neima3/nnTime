@@ -8,13 +8,15 @@ final class SignInPresentationTests: XCTestCase {
         let model = SignInPresentationModel()
 
         XCTAssertFalse(model.showsApple)
+        XCTAssertFalse(model.showsGoogle)
         XCTAssertFalse(model.showsMagicLink)
 
         await model.loadCapabilities {
-            .init(magicLink: true, apple: true)
+            .init(magicLink: true, apple: true, google: true)
         }
 
         XCTAssertTrue(model.showsApple)
+        XCTAssertTrue(model.showsGoogle)
         XCTAssertTrue(model.showsMagicLink)
     }
 
@@ -26,7 +28,48 @@ final class SignInPresentationTests: XCTestCase {
         }
 
         XCTAssertFalse(model.showsApple)
+        XCTAssertFalse(model.showsGoogle)
         XCTAssertFalse(model.showsMagicLink)
+    }
+
+    func testGoogleAuthenticationPublishesLoadingAndSuccess() async {
+        let model = SignInPresentationModel()
+        var observedLoading = false
+
+        let session = await model.authenticate(using: .google) {
+            observedLoading = model.status == .loading(.google)
+            return .init(scope: "scope-google", replacedScope: "scope-email")
+        }
+
+        XCTAssertTrue(observedLoading)
+        XCTAssertEqual(session?.scope, "scope-google")
+        XCTAssertEqual(model.status, .signedIn)
+    }
+
+    func testGoogleCancellationReturnsToReadyWithoutError() async {
+        let model = SignInPresentationModel()
+
+        let session = await model.authenticate(using: .google) {
+            throw CancellationError()
+        }
+
+        XCTAssertNil(session)
+        XCTAssertEqual(model.status, .idle)
+        XCTAssertNil(model.errorMessage)
+    }
+
+    func testGoogleProviderFailureUsesActionableMessage() async {
+        let model = SignInPresentationModel()
+
+        let session = await model.authenticate(using: .google) {
+            throw GoogleIdentityError.invalidTokens
+        }
+
+        XCTAssertNil(session)
+        XCTAssertEqual(
+            model.errorMessage,
+            "Google authentication couldn't be completed. Try again."
+        )
     }
 
     func testOnlyOneAuthenticationOperationRunsAtATime() async {
@@ -98,7 +141,7 @@ final class SignInPresentationTests: XCTestCase {
         XCTAssertEqual(model.status, .duplicateAccount)
         XCTAssertEqual(
             model.errorMessage,
-            "Sign in with your email first, then connect Apple in Settings."
+            "Sign in with your email first, then connect Google or Apple in Settings."
         )
     }
 

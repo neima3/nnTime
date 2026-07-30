@@ -7,6 +7,7 @@ final class SignInPresentationModel {
     enum Operation: Equatable {
         case password
         case apple
+        case google
         case magicLink
     }
 
@@ -30,6 +31,10 @@ final class SignInPresentationModel {
         capabilities?.magicLink == true
     }
 
+    var showsGoogle: Bool {
+        capabilities?.google == true
+    }
+
     var isBusy: Bool {
         if case .loading = status {
             return true
@@ -46,7 +51,7 @@ final class SignInPresentationModel {
         case let .failed(message):
             message
         case .duplicateAccount:
-            "Sign in with your email first, then connect Apple in Settings."
+            "Sign in with your email first, then connect Google or Apple in Settings."
         case .idle, .loading, .signedIn, .magicLinkSent:
             nil
         }
