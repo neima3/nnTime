@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 
 final class KairoRound23GoogleAuthTour: XCTestCase {
     func testGoogleUnavailableAndReadyFixtures() {
@@ -83,9 +84,10 @@ final class KairoRound23GoogleAuthTour: XCTestCase {
             theme: "dark",
             extraArguments: ["-AppleInterfaceStyle", "Dark"]
         )
-        XCTAssertTrue(
-            app.buttons["Sign in with Google"].waitForExistence(timeout: 5)
-        )
+        let google = app.buttons["Sign in with Google"]
+        XCTAssertTrue(google.waitForExistence(timeout: 5))
+        XCTAssertEqual(google.label, "Sign in with Google")
+        assertDarkGoogleBranding(google)
         capture(app, name: "google-ready-dark")
     }
 
@@ -203,6 +205,50 @@ final class KairoRound23GoogleAuthTour: XCTestCase {
         )
         try? screenshot.pngRepresentation.write(
             to: directory.appendingPathComponent("\(name).png")
+        )
+    }
+
+    private func assertDarkGoogleBranding(
+        _ element: XCUIElement,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        guard
+            let image = UIImage(
+                data: element.screenshot().pngRepresentation
+            )?.cgImage,
+            let data = image.dataProvider?.data,
+            let bytes = CFDataGetBytePtr(data)
+        else {
+            XCTFail(
+                "Could not inspect Google button pixels",
+                file: file,
+                line: line
+            )
+            return
+        }
+
+        var googleBluePixels = 0
+        var inspectedPixels = 0
+        for y in stride(from: 0, to: image.height, by: 4) {
+            for x in stride(from: 0, to: image.width, by: 4) {
+                let offset = y * image.bytesPerRow + x * 4
+                let red = Int(bytes[offset])
+                let green = Int(bytes[offset + 1])
+                let blue = Int(bytes[offset + 2])
+                if blue > green + 40, green > red + 20 {
+                    googleBluePixels += 1
+                }
+                inspectedPixels += 1
+            }
+        }
+
+        XCTAssertGreaterThan(
+            Double(googleBluePixels) / Double(inspectedPixels),
+            0.35,
+            "Dark mode must render Google's official blue button, not a blank white surface.",
+            file: file,
+            line: line
         )
     }
 }

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(AppState.self) private var app
+    @Environment(\.colorScheme) private var colorScheme
     @State private var remindersOn = KairoPrefs.remindersEnabled
     @State private var permissionDenied = false
     @State private var hourCycle = "h12"
@@ -440,7 +441,7 @@ struct SettingsView: View {
                 .accessibilityElement(children: .combine)
             default:
                 GoogleSignInButton(
-                    scheme: .light,
+                    scheme: colorScheme == .dark ? .dark : .light,
                     style: .wide,
                     state: .normal
                 ) {
@@ -454,6 +455,7 @@ struct SettingsView: View {
                     "Adds Google as a sign-in method without changing or merging this planner."
                 )
                 .accessibilityIdentifier("settings.google.link")
+                .id(colorScheme)
             }
 
             if let message = googleLink.errorMessage {

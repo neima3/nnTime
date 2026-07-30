@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SignInView: View {
     @Environment(AppState.self) private var app
+    @Environment(\.colorScheme) private var colorScheme
 
     var externalError: String?
 
@@ -305,7 +306,7 @@ struct SignInView: View {
 
     private var googleControl: some View {
         GoogleSignInButton(
-            scheme: .light,
+            scheme: colorScheme == .dark ? .dark : .light,
             style: .wide,
             state: model.isBusy ? .disabled : .normal
         ) {
@@ -320,6 +321,7 @@ struct SignInView: View {
             "Uses Google to sign in, then opens your private Kairo planner."
         )
         .accessibilityIdentifier("auth.google.sign-in")
+        .id(colorScheme)
     }
 
     @ViewBuilder
