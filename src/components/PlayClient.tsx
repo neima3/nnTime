@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Brain breaks arcade (wave 3). Four small games, personal bests only, all
+ * Brain breaks arcade (wave 4). Nine small games, personal bests only, all
  * client-side. Framed honestly: play that rests the brain — not "training".
  */
 import { useEffect, useState } from "react";
@@ -12,6 +12,9 @@ import { GRAMMAR_BANK, SPELLING_BANK } from "@/lib/games";
 import { QuickTap } from "./games/QuickTap";
 import { EmojiMatch } from "./games/EmojiMatch";
 import { SteadyBreath } from "./games/SteadyBreath";
+import { FocusFinder } from "./games/FocusFinder";
+import { MemoryTrail } from "./games/MemoryTrail";
+import { ColorClash } from "./games/ColorClash";
 
 const GAMES: {
   id: GameId;
@@ -62,6 +65,30 @@ const GAMES: {
     bestLabel: (v) => `best ${v}/8`,
   },
   {
+    id: "number-hunt",
+    emoji: "🔍",
+    title: "Focus Finder",
+    hook: "1 to 25, hiding in plain sight. Eyes on sprint duty.",
+    tint: "bg-cat-sky",
+    bestLabel: (v) => `best ${v}s`,
+  },
+  {
+    id: "memory-trail",
+    emoji: "🐾",
+    title: "Memory Trail",
+    hook: "Watch the path glow, then walk it back.",
+    tint: "bg-cat-lilac",
+    bestLabel: (v) => `best trail ${v}`,
+  },
+  {
+    id: "color-clash",
+    emoji: "🎨",
+    title: "Color Clash",
+    hook: "Tap what you see, not what you read.",
+    tint: "bg-cat-rose",
+    bestLabel: (v) => `best ${v}/12`,
+  },
+  {
     id: "steady-breath",
     emoji: "🫧",
     title: "Steady Breath",
@@ -96,6 +123,9 @@ export function PlayClient() {
   if (active === "quick-tap") return <QuickTap onExit={exit} />;
   if (active === "emoji-match") return <EmojiMatch onExit={exit} />;
   if (active === "steady-breath") return <SteadyBreath onExit={exit} />;
+  if (active === "number-hunt") return <FocusFinder onExit={exit} />;
+  if (active === "memory-trail") return <MemoryTrail onExit={exit} />;
+  if (active === "color-clash") return <ColorClash onExit={exit} />;
   if (active === "grammar-snap")
     return (
       <QuizGame

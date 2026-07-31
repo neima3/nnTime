@@ -290,6 +290,73 @@ export function missedItems(bank: QuizItem[], misses: string[]): QuizItem[] {
     .filter((x): x is QuizItem => x != null);
 }
 
+/* ---- Focus Finder (Schulte grid) ----------------------------------------- */
+
+export const SCHULTE_SIZE = 25;
+
+/** Shuffled 1..25 number grid from a seeded RNG in [0,1). */
+export function buildSchulteGrid(random: () => number = Math.random): number[] {
+  const cells = Array.from({ length: SCHULTE_SIZE }, (_, i) => i + 1);
+  for (let i = cells.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [cells[i], cells[j]] = [cells[j]!, cells[i]!];
+  }
+  return cells;
+}
+
+/** Elapsed ms → score in seconds with one decimal (lower is better). */
+export function schulteSeconds(elapsedMs: number): number {
+  return Math.max(0.1, Math.round(elapsedMs / 100) / 10);
+}
+
+/* ---- Memory Trail (sequence recall) -------------------------------------- */
+
+export const TRAIL_TILES = 9;
+export const TRAIL_START_LENGTH = 3;
+
+/** Extend a trail by one tile — never the same tile twice in a row. */
+export function extendTrail(
+  trail: number[],
+  random: () => number = Math.random,
+): number[] {
+  const last = trail[trail.length - 1];
+  let next = Math.floor(random() * TRAIL_TILES);
+  if (next === last) {
+    next = (next + 1 + Math.floor(random() * (TRAIL_TILES - 1))) % TRAIL_TILES;
+  }
+  return [...trail, next];
+}
+
+/** Starting trail of TRAIL_START_LENGTH tiles. */
+export function buildTrail(random: () => number = Math.random): number[] {
+  let trail: number[] = [];
+  while (trail.length < TRAIL_START_LENGTH) trail = extendTrail(trail, random);
+  return trail;
+}
+
+/* ---- Color Clash (Stroop) ------------------------------------------------ */
+
+export const CLASH_COLOR_NAMES = ["Pink", "Blue", "Green", "Purple"] as const;
+export const CLASH_ROUNDS = 12;
+
+export interface ClashRound {
+  /** Index into CLASH_COLOR_NAMES for the word shown. */
+  word: number;
+  /** Index into CLASH_COLOR_NAMES for the ink it's painted in — the answer. */
+  ink: number;
+}
+
+/** One Stroop round; roughly 1 in 4 is congruent to keep players honest. */
+export function buildClashRound(
+  random: () => number = Math.random,
+): ClashRound {
+  const n = CLASH_COLOR_NAMES.length;
+  const word = Math.floor(random() * n);
+  if (random() < 0.25) return { word, ink: word };
+  const shift = 1 + Math.floor(random() * (n - 1));
+  return { word, ink: (word + shift) % n };
+}
+
 /* ---- localStorage bests -------------------------------------------------- */
 
 export type GameId =
@@ -298,7 +365,10 @@ export type GameId =
   | "emoji-match"
   | "steady-breath"
   | "grammar-snap"
-  | "spell-check";
+  | "spell-check"
+  | "number-hunt"
+  | "memory-trail"
+  | "color-clash";
 
 const KEY = (id: GameId) => `kairo-play-best-${id}`;
 

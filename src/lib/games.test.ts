@@ -3,8 +3,13 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  buildClashRound,
   buildMatchDeck,
+  buildSchulteGrid,
+  buildTrail,
+  CLASH_COLOR_NAMES,
   clearMiss,
+  extendTrail,
   GRAMMAR_BANK,
   MATCH_EMOJI,
   missedItems,
@@ -16,8 +21,12 @@ import {
   readMisses,
   recordMiss,
   recordResult,
+  SCHULTE_SIZE,
+  schulteSeconds,
   SPELLING_BANK,
   timeFeelFeeling,
+  TRAIL_START_LENGTH,
+  TRAIL_TILES,
   timeFeelRoundError,
   timeFeelScore,
   type GameId,
@@ -525,5 +534,96 @@ describe("miss tracking (recordMiss / clearMiss / readMisses / missedItems)", ()
     const p5 = GRAMMAR_BANK[5]!.prompt;
     const items = missedItems(GRAMMAR_BANK, [p5, "not-a-real-prompt", p0]);
     expect(items.map((i) => i.prompt)).toEqual([p5, p0]);
+  });
+});
+
+describe("buildSchulteGrid", () => {
+  it("contains exactly 1..25 once each", () => {
+    const grid = buildSchulteGrid();
+    expect([...grid].sort((a, b) => a - b)).toEqual(
+      Array.from({ length: SCHULTE_SIZE }, (_, i) => i + 1),
+    );
+  });
+
+  it("shuffles deterministically from a seeded RNG", () => {
+    let calls = 0;
+    const seeded = () => {
+      calls += 1;
+      return (calls * 0.37) % 1;
+    };
+    const a = buildSchulteGrid(seeded);
+    calls = 0;
+    const b = buildSchulteGrid(seeded);
+    expect(a).toEqual(b);
+    expect(a).not.toEqual(buildSchulteGrid(() => 0));
+  });
+});
+
+describe("schulteSeconds", () => {
+  it("rounds elapsed ms to one decimal second", () => {
+    expect(schulteSeconds(43_240)).toBe(43.2);
+    expect(schulteSeconds(43_260)).toBe(43.3);
+    expect(schulteSeconds(60_000)).toBe(60);
+  });
+
+  it("floors at a tenth of a second", () => {
+    expect(schulteSeconds(0)).toBe(0.1);
+    expect(schulteSeconds(20)).toBe(0.1);
+  });
+});
+
+describe("extendTrail / buildTrail", () => {
+  it("starts with TRAIL_START_LENGTH tiles in range", () => {
+    const trail = buildTrail();
+    expect(trail).toHaveLength(TRAIL_START_LENGTH);
+    for (const t of trail) {
+      expect(t).toBeGreaterThanOrEqual(0);
+      expect(t).toBeLessThan(TRAIL_TILES);
+    }
+  });
+
+  it("never repeats the same tile twice in a row", () => {
+    // Force the raw roll to collide with the previous tile every time.
+    let trail = [4];
+    for (let i = 0; i < 50; i++) {
+      const collide = () => 4 / TRAIL_TILES + 0.001;
+      trail = extendTrail(trail, collide);
+      expect(trail[trail.length - 1]).not.toBe(trail[trail.length - 2]);
+    }
+  });
+
+  it("extends by exactly one tile without mutating the input", () => {
+    const start = [1, 2, 3];
+    const next = extendTrail(start, () => 0.9);
+    expect(start).toEqual([1, 2, 3]);
+    expect(next).toHaveLength(4);
+    expect(next.slice(0, 3)).toEqual(start);
+  });
+});
+
+describe("buildClashRound", () => {
+  it("returns indexes within the color set", () => {
+    for (let i = 0; i < 100; i++) {
+      const r = buildClashRound();
+      expect(r.word).toBeGreaterThanOrEqual(0);
+      expect(r.word).toBeLessThan(CLASH_COLOR_NAMES.length);
+      expect(r.ink).toBeGreaterThanOrEqual(0);
+      expect(r.ink).toBeLessThan(CLASH_COLOR_NAMES.length);
+    }
+  });
+
+  it("is congruent when the congruence roll is under 0.25", () => {
+    const rolls = [0.5, 0.1]; // word=2, congruent
+    const r = buildClashRound(() => rolls.shift() ?? 0);
+    expect(r.word).toBe(2);
+    expect(r.ink).toBe(2);
+  });
+
+  it("is incongruent otherwise, never mapping ink onto the word", () => {
+    for (let shift = 0; shift < 30; shift++) {
+      const rolls = [0.5, 0.9, (shift % 3) / 3];
+      const r = buildClashRound(() => rolls.shift() ?? 0);
+      expect(r.ink).not.toBe(r.word);
+    }
   });
 });
