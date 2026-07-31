@@ -218,4 +218,25 @@ final class PlayArcadeLogicTests: XCTestCase {
         XCTAssertEqual(ArcadeLogic.spanShowSeconds(len: 3), 1.95, accuracy: 0.001)
         XCTAssertEqual(ArcadeLogic.spanShowSeconds(len: 8), 3.7, accuracy: 0.001)
     }
+
+    // MARK: Green Light
+
+    func testGoSequenceStartsInMotionAndFillsTheRun() {
+        let seq = ArcadeLogic.buildGoSequence()
+        XCTAssertEqual(seq.count, ArcadeLogic.goRounds)
+        XCTAssertTrue(seq[0])
+        XCTAssertTrue(seq[1])
+    }
+
+    func testGoSequenceNeverAllowsThreeNoGosInARow() {
+        let seq = ArcadeLogic.buildGoSequence(random: { 0 })
+        for i in 2..<seq.count {
+            XCTAssertTrue(seq[i - 2] || seq[i - 1] || seq[i])
+        }
+        XCTAssertTrue(seq.contains(false))
+    }
+
+    func testGoSequenceIsAllGoAboveTheNoGoBand() {
+        XCTAssertTrue(ArcadeLogic.buildGoSequence(random: { 0.9 }).allSatisfy { $0 })
+    }
 }

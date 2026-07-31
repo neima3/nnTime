@@ -251,3 +251,109 @@ struct DigitSpanGame: View {
         if !entered.isEmpty { entered.removeLast() }
     }
 }
+
+// MARK: Green Light — go / no-go; holding back is the game.
+
+struct GreenLightGame: View {
+    let onExit: () -> Void
+
+    @State private var stage = 0  // 0 intro, 1 playing, 2 done
+    @State private var idx = 0
+    @State private var showing = false
+    @State private var goNow = true
+    @State private var flash: Bool?  // true hit, false slip
+    @State private var score = 0
+    @State private var isNewBest = false
+    @State private var best: Int?
+    @State private var sequence: [Bool] = []
+    @State private var tapped = false
+    @State private var runTask: Task<Void, Never>?
+
+    var body: some View {
+        GameChrome(title: "Green Light", subtitle: "Green means tap. Red means don't.", onExit: onExit) {
+            VStack(spacing: 18) {
+                if stage == 0 {
+                    Text("Signals flash fast: tap every green light, and let the red ones pass. Your tapping finger will have opinions.")
+                        .font(.kBody(14)).foregroundStyle(Color.kInkSoft)
+                        .multilineTextAlignment(.center).padding(.horizontal, 36)
+                    Button("Start the signals") { start() }.buttonStyle(PrimaryPill())
+                } else if stage == 1 {
+                    Text("\(min(idx + 1, ArcadeLogic.goRounds)) of \(ArcadeLogic.goRounds)")
+                        .font(.kMono(13, weight: .semibold)).foregroundStyle(Color.kInkSoft)
+                    Button { tap() } label: {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 40)
+                                .fill(flash == true ? Color.kSuccessSoft : flash == false ? Color.kDangerSoft : Color.kSurfaceSunken)
+                            RoundedRectangle(cornerRadius: 40)
+                                .stroke(flash == true ? Color.kSuccess.opacity(0.5) : flash == false ? Color.kDanger.opacity(0.5) : Color.kBorder, lineWidth: 4)
+                            Text(showing ? (goNow ? "🟢" : "🛑") : "")
+                                .font(.system(size: 64))
+                        }
+                        .frame(width: 250, height: 250)
+                    }
+                    .accessibilityLabel(showing ? (goNow ? "Green light — tap!" : "Red light — hold back") : "Waiting for the next signal")
+                } else {
+                    Text("\(score) of \(ArcadeLogic.goRounds) right calls")
+                        .font(.kDisplay(28)).foregroundStyle(Color.kInk)
+                    Text(isNewBest ? "New personal best 🎉" : best.map { "Your best: \($0)/\(ArcadeLogic.goRounds)" } ?? "")
+                        .font(.kBody(13, weight: .semibold)).foregroundStyle(Color.kIris)
+                    Text(endDetail)
+                        .font(.kBody(14)).foregroundStyle(Color.kInkSoft)
+                        .multilineTextAlignment(.center).padding(.horizontal, 30)
+                    HStack(spacing: 10) {
+                        Button("Once more") { start() }.buttonStyle(SecondaryPill())
+                        Button("Back to my day") { onExit() }.buttonStyle(PrimaryPill())
+                    }
+                }
+            }
+        }
+        .onDisappear { runTask?.cancel() }
+    }
+
+    private var endDetail: String {
+        if score >= 21 { return "Elite impulse control. Your tapping finger takes orders now." }
+        if score >= 15 { return "Solid — stopping a tap mid-flight is genuinely harder than starting one." }
+        return "The red lights are rigged against eager fingers. Another run evens it out."
+    }
+
+    private func start() {
+        runTask?.cancel()
+        sequence = ArcadeLogic.buildGoSequence()
+        score = 0
+        isNewBest = false
+        best = PlayScores.best(for: "greenlight")
+        stage = 1
+        runTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            var runningScore = 0
+            for i in 0..<sequence.count {
+                if Task.isCancelled { return }
+                tapped = false
+                goNow = sequence[i]
+                idx = i
+                showing = true
+                flash = nil
+                try? await Task.sleep(nanoseconds: UInt64(ArcadeLogic.goShowSeconds * 1_000_000_000))
+                if Task.isCancelled { return }
+                showing = false
+                try? await Task.sleep(nanoseconds: UInt64(ArcadeLogic.goGapSeconds * 1_000_000_000))
+                if Task.isCancelled { return }
+                let correct = sequence[i] == tapped
+                if correct { runningScore += 1 }
+                score = runningScore
+                if sequence[i] && !tapped { flash = false }
+            }
+            let prior = PlayScores.best(for: "greenlight")
+            best = PlayScores.recordHigher(runningScore, for: "greenlight")
+            isNewBest = prior == nil || runningScore > prior!
+            stage = 2
+        }
+    }
+
+    private func tap() {
+        guard stage == 1, !tapped else { return }
+        tapped = true
+        flash = goNow
+        if goNow { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
+    }
+}

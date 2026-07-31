@@ -35,6 +35,8 @@ struct FocusView: View {
     @State private var companion = KairoPrefs.companion
     @State private var companionBreath = false
     @State private var liveActivity: ActivityKit.Activity<FocusAttributes>?
+    /// Post-session brain-break nudge — presents the arcade without leaving Focus.
+    @State private var showArcade = false
 
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     private let resync = Timer.publish(every: 15, on: .main, in: .common).autoconnect()
@@ -66,6 +68,9 @@ struct FocusView: View {
             .toolbarBackground(Color.kCanvas, for: .navigationBar)
         }
         .task { await hydrate() }
+        .sheet(isPresented: $showArcade) {
+            NavigationStack { PlayView() }
+        }
         .onDisappear { SoundscapeEngine.shared.stop(); scene = nil }
         .onReceive(tick) { _ in
             if let bs = breakSec {
@@ -408,6 +413,15 @@ struct FocusView: View {
                         .background(Capsule().fill(Color.kIris))
                 }
                 .kFloatShadow()
+                Button {
+                    showArcade = true
+                } label: {
+                    Label("Play a brain break", systemImage: "gamecontroller.fill")
+                        .font(.kBody(14, weight: .semibold))
+                        .foregroundStyle(Color.kInk)
+                        .frame(maxWidth: .infinity).padding(.vertical, 12)
+                        .background(Capsule().fill(Color.kSurface).overlay(Capsule().stroke(Color.kBorder, lineWidth: 1)))
+                }
                 HStack(spacing: 10) {
                     Button {
                         finishedMin = nil
@@ -489,6 +503,14 @@ struct FocusView: View {
     // MARK: Data
 
     private func hydrate(silent: Bool = false) async {
+#if DEBUG
+        // Deterministic tour fixture: land directly on the post-session menu.
+        if ProcessInfo.processInfo.arguments.contains("-kairoFocusDoneFixture") {
+            finishedMin = 25
+            loading = false
+            return
+        }
+#endif
         do {
             let state = try await KairoAPI.shared.activeFocus()
             if let s = state.session, s.state == "running" || s.state == "paused" {

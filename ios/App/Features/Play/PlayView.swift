@@ -7,7 +7,7 @@ struct PlayView: View {
     @State private var bests: [String: Int] = [:]
     enum Game: String, Identifiable {
         case timeFeel, quickTap, emojiMatch, grammar, spelling, focusFinder, memoryTrail, colorClash, breath,
-             oddOneOut, digitSpan
+             oddOneOut, digitSpan, greenLight
         var id: String { rawValue }
     }
 
@@ -28,6 +28,8 @@ struct PlayView: View {
                          best: bests["oddoneout"].map { String(format: "best %.1fs", Double($0) / 10) }) { active = .oddOneOut }
                     card("🎨", "Color Clash", "Tap what you see, not what you read.", .kCatRose,
                          best: bests["colorclash"].map { "best \($0)/12" }) { active = .colorClash }
+                    card("🚦", "Green Light", "Green means tap. Red means don't. Simple. Ha.", .kCatMint,
+                         best: bests["greenlight"].map { "best \($0)/24" }) { active = .greenLight }
 
                     sectionHeader("Hold it in mind", "Working memory, lifting gently.")
                     card("🃏", "Emoji Match", "Eight pairs hiding in sixteen cards.", .kCatPeach,
@@ -94,6 +96,7 @@ struct PlayView: View {
             case .colorClash: ColorClashGame { active = nil }
             case .oddOneOut: OddOneOutGame { active = nil }
             case .digitSpan: DigitSpanGame { active = nil }
+            case .greenLight: GreenLightGame { active = nil }
             case .breath: SteadyBreathGame { active = nil }
             }
         }
@@ -102,7 +105,7 @@ struct PlayView: View {
     private func refreshBests() {
         var next: [String: Int] = [:]
         for key in ["timefeel", "quicktap", "emojimatch", "grammarsnap", "spellcheck",
-                    "focusfinder", "memorytrail", "colorclash", "oddoneout", "digitspan"] {
+                    "focusfinder", "memorytrail", "colorclash", "oddoneout", "digitspan", "greenlight"] {
             next[key] = PlayScores.best(for: key)
         }
         bests = next

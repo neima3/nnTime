@@ -143,6 +143,23 @@ enum ArcadeLogic {
         0.9 + Double(len) * 0.35
     }
 
+    // MARK: Green Light (go / no-go)
+
+    static let goRounds = 24
+    static let goShowSeconds = 0.75
+    static let goGapSeconds = 0.35
+
+    /// Stimulus plan: ~30% no-go, never more than two no-gos in a row, and
+    /// the first two are always go so the run starts in motion.
+    static func buildGoSequence(random: () -> Double = { Double.random(in: 0..<1) }) -> [Bool] {
+        var seq: [Bool] = []
+        for i in 0..<goRounds {
+            let twoNoGosBehind = i >= 2 && !seq[i - 1] && !seq[i - 2]
+            seq.append(i < 2 || twoNoGosBehind || random() >= 0.3)
+        }
+        return seq
+    }
+
     // MARK: Word quizzes (Grammar Snap + Spell Check)
 
     static let quizRounds = 8
