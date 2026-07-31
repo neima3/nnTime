@@ -357,6 +357,86 @@ export function buildClashRound(
   return { word, ink: (word + shift) % n };
 }
 
+/* ---- Odd One Out (visual search) ----------------------------------------- */
+
+/** Look-alike emoji pairs — every round hides one impostor among its twin. */
+export const ODD_PAIRS: [string, string][] = [
+  ["🙂", "🙃"],
+  ["🐶", "🐺"],
+  ["⭐", "🌟"],
+  ["🍏", "🍐"],
+  ["😺", "😸"],
+  ["🌸", "🌺"],
+  ["🔵", "🟣"],
+  ["🌛", "🌜"],
+];
+
+export const ODD_ROUNDS = 8;
+
+/** Grid side length for a round: 3×3 warm-up → 5×5 finale. */
+export function oddGridSize(round: number): number {
+  return round < 3 ? 3 : round < 6 ? 4 : 5;
+}
+
+/** Shuffled copy of ODD_PAIRS so each run meets the pairs in a new order. */
+export function shuffledOddPairs(
+  random: () => number = Math.random,
+): [string, string][] {
+  const pairs = [...ODD_PAIRS];
+  for (let i = pairs.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [pairs[i], pairs[j]] = [pairs[j]!, pairs[i]!];
+  }
+  return pairs;
+}
+
+export interface OddRound {
+  base: string;
+  odd: string;
+  size: number;
+  oddIndex: number;
+}
+
+/** One round: pick which twin plays impostor and where it hides. */
+export function buildOddRound(
+  round: number,
+  pair: [string, string],
+  random: () => number = Math.random,
+): OddRound {
+  const flip = random() < 0.5;
+  const base = flip ? pair[1] : pair[0];
+  const odd = flip ? pair[0] : pair[1];
+  const size = oddGridSize(round);
+  const cells = size * size;
+  const oddIndex = Math.min(Math.floor(random() * cells), cells - 1);
+  return { base, odd, size, oddIndex };
+}
+
+/* ---- Digit Span (working memory) ----------------------------------------- */
+
+export const SPAN_START = 3;
+
+/** A digit string with no immediate repeats (kinder to read at a glance). */
+export function makeSpan(
+  len: number,
+  random: () => number = Math.random,
+): string {
+  let span = "";
+  for (let i = 0; i < len; i++) {
+    let digit = Math.floor(random() * 10);
+    if (i > 0 && Number(span[i - 1]) === digit) {
+      digit = (digit + 1 + Math.floor(random() * 9)) % 10;
+    }
+    span += String(digit);
+  }
+  return span;
+}
+
+/** How long the digits stay visible before they vanish. */
+export function spanShowMs(len: number): number {
+  return 900 + len * 350;
+}
+
 /* ---- localStorage bests -------------------------------------------------- */
 
 export type GameId =
@@ -368,7 +448,9 @@ export type GameId =
   | "spell-check"
   | "number-hunt"
   | "memory-trail"
-  | "color-clash";
+  | "color-clash"
+  | "odd-one-out"
+  | "digit-span";
 
 const KEY = (id: GameId) => `kairo-play-best-${id}`;
 

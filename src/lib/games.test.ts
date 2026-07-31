@@ -5,14 +5,19 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildClashRound,
   buildMatchDeck,
+  buildOddRound,
   buildSchulteGrid,
   buildTrail,
   CLASH_COLOR_NAMES,
   clearMiss,
   extendTrail,
   GRAMMAR_BANK,
+  makeSpan,
   MATCH_EMOJI,
   missedItems,
+  ODD_PAIRS,
+  ODD_ROUNDS,
+  oddGridSize,
   pickQuizRounds,
   QUIZ_ROUNDS,
   quickTapAverage,
@@ -23,6 +28,8 @@ import {
   recordResult,
   SCHULTE_SIZE,
   schulteSeconds,
+  shuffledOddPairs,
+  spanShowMs,
   SPELLING_BANK,
   timeFeelFeeling,
   TRAIL_START_LENGTH,
@@ -625,5 +632,72 @@ describe("buildClashRound", () => {
       const r = buildClashRound(() => rolls.shift() ?? 0);
       expect(r.ink).not.toBe(r.word);
     }
+  });
+});
+
+describe("odd one out", () => {
+  it("shuffles pairs deterministically without losing any", () => {
+    let calls = 0;
+    const seeded = () => {
+      calls += 1;
+      return (calls * 0.31) % 1;
+    };
+    const a = shuffledOddPairs(seeded);
+    expect(a).toHaveLength(ODD_PAIRS.length);
+    expect(new Set(a.map((p) => p[0]))).toEqual(
+      new Set(ODD_PAIRS.map((p) => p[0])),
+    );
+    calls = 0;
+    expect(shuffledOddPairs(seeded)).toEqual(a);
+  });
+
+  it("grows the grid 3x3 → 4x4 → 5x5 across rounds", () => {
+    expect([0, 1, 2].map(oddGridSize)).toEqual([3, 3, 3]);
+    expect([3, 4, 5].map(oddGridSize)).toEqual([4, 4, 4]);
+    expect([6, 7].map(oddGridSize)).toEqual([5, 5]);
+  });
+
+  it("builds a round whose impostor differs from the crowd and fits the grid", () => {
+    for (let round = 0; round < ODD_ROUNDS; round++) {
+      const r = buildOddRound(round, ODD_PAIRS[0]!);
+      expect(r.base).not.toBe(r.odd);
+      expect([ODD_PAIRS[0]![0], ODD_PAIRS[0]![1]]).toContain(r.base);
+      expect(r.size).toBe(oddGridSize(round));
+      expect(r.oddIndex).toBeGreaterThanOrEqual(0);
+      expect(r.oddIndex).toBeLessThan(r.size * r.size);
+    }
+  });
+
+  it("flips which twin is the impostor based on the first roll", () => {
+    const low = buildOddRound(0, ODD_PAIRS[0]!, () => 0.1);
+    expect(low.base).toBe(ODD_PAIRS[0]![1]);
+    expect(low.odd).toBe(ODD_PAIRS[0]![0]);
+    const rolls = [0.9, 0.5];
+    const high = buildOddRound(0, ODD_PAIRS[0]!, () => rolls.shift() ?? 0);
+    expect(high.base).toBe(ODD_PAIRS[0]![0]);
+    expect(high.odd).toBe(ODD_PAIRS[0]![1]);
+  });
+});
+
+describe("digit span", () => {
+  it("makes a span of the requested length from digits only", () => {
+    const span = makeSpan(7);
+    expect(span).toHaveLength(7);
+    expect(span).toMatch(/^[0-9]+$/);
+  });
+
+  it("never repeats a digit immediately", () => {
+    // A roll that would repeat the previous digit every time.
+    const same = () => 0.45; // floor(4.5) = 4 each round
+    const span = makeSpan(20, same);
+    for (let i = 1; i < span.length; i++) {
+      expect(span[i]).not.toBe(span[i - 1]);
+    }
+  });
+
+  it("scales visible time with length", () => {
+    expect(spanShowMs(3)).toBe(1950);
+    expect(spanShowMs(8)).toBe(3700);
+    expect(spanShowMs(4)).toBeGreaterThan(spanShowMs(3));
   });
 });
