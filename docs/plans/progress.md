@@ -1,5 +1,76 @@
 # Progress log
 
+## 2026-07-31 — Round 24: nine-game brain-breaks arcade on both platforms (Fable)
+
+Roadmap: `docs/plans/2026-07-31-round24-brain-games.md`.
+
+- **Three new web games.** Focus Finder (5×5 Schulte grid, tap 1→25, timed
+  to tenths, wrong taps flash danger and only cost time), Memory Trail
+  (nine-tile glowing path, starts at 3 steps, grows each clean run, best =
+  longest completed trail), and Color Clash (12 Stroop rounds, ~1 in 4
+  congruent, tap the ink not the word). Pure logic in `src/lib/games.ts`
+  with seeded-RNG unit tests; personal bests stay in localStorage;
+  celebration on new bests; success/danger tokens for feedback; the arcade
+  keeps its honest no-brain-training framing.
+- **iOS reaches full game parity (3 → 9).** Emoji Match, Grammar Snap,
+  Spell Check, Focus Finder, Memory Trail, and Color Clash join Time Feel,
+  Quick Tap, and Steady Breath. The quiz engine ports the web contract
+  whole: 66 grammar + 16 spelling bank items transcribed verbatim into
+  `QuizBank.swift` (subagent-transcribed, count/answer/topic-validated),
+  topic-spread picker (cap 2 per topic, second-pass fill), tricky-ones
+  practice offered at 3+ misses with per-prompt redemption, and
+  fresh-run-only bests. `PlayArcadeLogic.swift` mirrors `src/lib/games.ts`
+  and `PlayArcadeLogicTests` pins both platforms to the same behavior
+  (grids, trails, Stroop rounds, deck pairing, picker spread, miss
+  memory). Play cards now show personal-best chips; the shared game chrome
+  gains a subtitle and an accessibility-labeled exit control (the tour
+  caught the icon-only exit button having no VoiceOver label — fixed).
+- **Web evidence.** All three new games were played end-to-end in a real
+  browser (Color Clash full 12 rounds with verdict flashes and new-best
+  chip; Memory Trail failure path, seeded success path through a
+  4-length trail, and best recording; Focus Finder full 1→25 sweep with
+  wrong-tap flash and live timer). Playwright captures at 1440×1000 and
+  390×844 in light and dark report `clientWidth == scrollWidth` (no
+  horizontal overflow); dark-mode ink tokens verified on the arcade and
+  in-game. Ignored evidence under `browser-qa/round24-brain-games/`.
+- **iOS evidence.** Deterministic `KairoRound24ArcadeTour` on the offline
+  fixture account passed **2/2** on an iPhone 17 Pro simulator: all nine
+  cards, Focus Finder find-1→find-2 advance, Memory Trail playback →
+  your-turn phase, Color Clash round + verdict, Grammar Snap question
+  render, in light and dark. Screenshots exported from the `.xcresult`
+  and visually inspected under ignored `browser-qa/round24-brain-games/ios/`.
+- **Gates.** `pnpm lint`, `pnpm typecheck`, **98 files / 989 web tests**,
+  production build, OpenAPI sync check, and `pnpm ios:release:preflight`
+  passed. The iOS main-thread gate passed with **340 executed app-hosted
+  tests, 1 expected skip, 0 failures** and no Main Thread Checker output.
+  Scripted parity is intentionally unchanged (web **89.74%**, iOS
+  **85.80%**, both above gate) — the arcade is a beyond-Tiimo extra with
+  no checklist rows.
+- **No server surface changed.** Games are fully client-local; no API,
+  schema, or migration work; nothing in this round touches production
+  planner data.
+
+**Release state:** shipped and live-verified. Web commit `d720de2` and iOS
+commit `025ce35c7fb14c6ef59a0ff51d0418a4ceef8570` were pushed to `main`.
+Coolify deployment `hlc4mgcd67ei70uhsx4h1qnx` (webhook-triggered by the
+push) built that exact SHA and reached `finished`; the `kairo` app reports
+`running:healthy`. Live `/api/health` returned 200 with migrate, database,
+AI, and scheduler all `ok`; CSP and HSTS are present on `/`. The live
+`/app/play` server render contains all nine cards, and a real browser
+session on https://time.neima.me played Color Clash interactively (correct
+answer scored, "round 2 of 12 · 1 right") with a clean console. Live
+Playwright captures at 1440×1000 and 390×844, light and dark, report zero
+horizontal overflow (ignored under `browser-qa/round24-brain-games/live/`).
+GitHub Actions run `30664075202` on the exact SHA concluded `success`
+with all three jobs green: `build-test`, `e2e`, and the macOS
+`native-contract`.
+
+**Environment note:** the Claude Code iOS Simulator panel could not attach
+on this Mac because the active developer directory is not Xcode — fix with
+`sudo xcode-select -s /Applications/Xcode.app/Contents/Developer` (needs
+password). Simulator evidence was collected via `xcodebuild`/XCUITest
+instead, which work regardless.
+
 ## 2026-07-29 — Round 23: cross-platform Google authentication code (Codex)
 
 Roadmap:
