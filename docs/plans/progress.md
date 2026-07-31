@@ -1,5 +1,51 @@
 # Progress log
 
+## 2026-07-31 — Round 26: Green Light + the post-focus brain break (Fable)
+
+Roadmap: `docs/plans/2026-07-31-round26-green-light.md`.
+
+- **Green Light on both platforms.** The classic go/no-go: twenty-four
+  signals at 750ms + 350ms, tap the greens 🟢, let the reds 🛑 pass —
+  response inhibition as honest play. The shared sequence contract
+  (~30% no-go, never three no-gos in a row, first two always go) lives in
+  `src/lib/games.ts` and `ArcadeLogic` with seeded tests on both sides.
+  Score = right calls out of 24 (hits + correct rejections); the arcade
+  is now **twelve games**.
+- **The first planner↔arcade integration.** The focus "Session done —
+  what now?" menu on web and iOS now offers **Play a brain break**: web
+  routes to `/app/play`, iOS presents the arcade in a sheet without
+  leaving Focus. Post-session transitions — the classic ADHD cliff —
+  now have somewhere soft and structured to land.
+- **Web evidence.** A seeded hands-free Green Light run scored exactly
+  the mathematically predicted **15/24** (all correct rejections, all
+  misses), proving the stimulus loop, scoring, and end state; the
+  new-best chip recorded. The focus nudge is covered by a new E2E
+  assertion that completes a real session, clicks the button, and lands
+  on the arcade — the local Playwright focus suite passed **4/4**.
+- **Local E2E unblock.** The dev server rejected its own origin
+  ("Invalid origin" on signup) because `.env.local` lacked
+  `BETTER_AUTH_URL=http://localhost:3456` — the exact configuration
+  `auth-capabilities.test.ts` documents. Added (git-ignored); local
+  E2E against the :3456 dev server works again.
+- **iOS evidence.** `KairoRound26ArcadeTour` passed **2/2**: Green Light
+  intro → running signal ("1 of 24" with a live green), and the
+  `-kairoFocusDoneFixture` completion menu → nudge tap → arcade sheet.
+  Screenshots inspected under ignored `browser-qa/round26-green-light/ios/`.
+- **Gates.** `pnpm lint`, `pnpm typecheck`, **98 files / 1000 web
+  tests**, production build, `pnpm ios:release:preflight`, and the iOS
+  main-thread gate (**349 executed, 1 expected skip, 0 failures**) all
+  passed. Parity checklist intentionally unchanged.
+
+**Release state:** shipped and live-verified. Web commit `fa26dd6` and
+iOS commit `758ee2dbd96e052d5d1e962bfdf35e4a996f0d43` pushed to `main`.
+GitHub Actions run `30668937683` on the exact SHA concluded `success`.
+The webhook Coolify deployment drained; live `/api/health` returned all
+checks `ok`. The production `/app/play` client lists all **twelve**
+games, and a real production browser session started Green Light and
+reached "4 of 24" with a clean console. The signed-out focus page cannot
+show the completion menu, so the live nudge claim rests on the E2E flow
+(local 4/4) and CI's production-mode suite on the exact SHA.
+
 ## 2026-07-31 — Round 25: eleven-game arcade in four moods (Fable)
 
 Roadmap: `docs/plans/2026-07-31-round25-arcade-wave5.md`.
