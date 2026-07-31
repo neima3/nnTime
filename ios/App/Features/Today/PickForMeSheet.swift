@@ -6,16 +6,20 @@ struct PickForMeSheet: View {
     @Environment(\.dismiss) private var dismiss
     let blocks: [DayBlock]
     let nowMin: Int
+    var lowBattery: Bool = false
 
     @State private var index = 0
 
-    // now → next → slipped → any, not-done
+    // now → next → slipped → any, not-done. Low-battery days demote heavy
+    // picks and slightly prefer light ones (mirrors the web picker weights).
     private var ordered: [DayBlock] {
         let live = blocks.filter { !$0.done }
         func rank(_ b: DayBlock) -> Int {
-            if b.startMin <= nowMin && nowMin < b.endMin { return 0 }
-            if b.startMin > nowMin { return 1 }
-            return 2
+            let base: Int
+            if b.startMin <= nowMin && nowMin < b.endMin { base = 0 }
+            else if b.startMin > nowMin { base = 1 }
+            else { base = 2 }
+            return LowBatteryDay.pickRank(baseRank: base, energy: b.energy, lowBattery: lowBattery)
         }
         return live.sorted { rank($0) != rank($1) ? rank($0) < rank($1) : $0.startMin < $1.startMin }
     }
@@ -40,6 +44,10 @@ struct PickForMeSheet: View {
                     Text(pick.title).font(.kDisplay(28)).foregroundStyle(Color.kInk)
                         .multilineTextAlignment(.center).padding(.horizontal, 24).padding(.top, 12)
                     Text(kindLine(pick)).font(.kBody(14)).foregroundStyle(Color.kInkSoft).padding(.top, 6)
+                    if lowBattery {
+                        Text("Low-battery day — keeping it light.")
+                            .font(.kBody(12.5, weight: .medium)).foregroundStyle(Color.kCatButterInk).padding(.top, 2)
+                    }
                     Spacer()
                     VStack(spacing: 10) {
                         Button {

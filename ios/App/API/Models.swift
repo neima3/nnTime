@@ -50,6 +50,8 @@ struct Activity: Decodable, Identifiable {
     /// Present on day-expanded occurrences.
     let occurrenceKey: Date?
     let status: String?
+    /// Energy cost when set — low-battery days dim `high` blocks.
+    var energy: ActivityEnergy? = nil
 
     struct ChecklistItem: Decodable, Hashable {
         let label: String
@@ -322,7 +324,7 @@ enum ActivityEditScope: String, CaseIterable, Equatable, Sendable {
     case all
 }
 
-enum ActivityEnergy: String, CaseIterable, Equatable, Sendable {
+enum ActivityEnergy: String, CaseIterable, Equatable, Sendable, Codable {
     case low
     case medium
     case high
@@ -459,6 +461,8 @@ struct DayBlock: Identifiable {
     let revision: Int
     let occurrenceKey: String?
     let checklist: [(label: String, done: Bool)]
+    /// Energy cost when set — low-battery days dim `high` blocks.
+    var energy: ActivityEnergy? = nil
 
     var endMin: Int { startMin + durationMin }
 }
@@ -483,7 +487,8 @@ extension Activity {
             recurring: rrule != nil,
             revision: revision,
             occurrenceKey: occurrenceKey.map { iso.string(from: $0) },
-            checklist: (checklistTemplate ?? []).map { ($0.label, $0.done ?? false) }
+            checklist: (checklistTemplate ?? []).map { ($0.label, $0.done ?? false) },
+            energy: energy
         )
     }
 }

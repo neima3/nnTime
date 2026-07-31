@@ -28,6 +28,8 @@ struct TodayView: View {
         OfflineTodayStatusMutation.Failure.Stage?
     /// 0 = today, ±n days.
     @State private var dayOffset = 0
+    /// Device-local "today I don't have it" switch (mirrors web LowBattery).
+    @State private var lowBattery = false
 
     private let tick = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
@@ -52,6 +54,11 @@ struct TodayView: View {
                             header
                                 .padding(.horizontal, 20)
                                 .padding(.top, 8)
+                            if dayOffset == 0 && !mutationsLocked {
+                                lowBatteryRow
+                                    .padding(.horizontal, 20)
+                                    .padding(.top, 8)
+                            }
                             if noticeMode != .hidden {
                                 cachedNotice
                                     .padding(.horizontal, 16)
@@ -71,6 +78,7 @@ struct TodayView: View {
                                 blocks: blocks,
                                 nowMin: nowMin,
                                 readOnly: mutationsLocked,
+                                lowBattery: lowBattery && dayOffset == 0,
                                 onComplete: { block in Task { await toggle(block) } },
                                 onDelete: { block in Task { await remove(block) } },
                                 onFocus: { block in
@@ -190,7 +198,7 @@ struct TodayView: View {
                 EditorSheet(date: date, startMin: block.startMin, editing: block)
             }
             .sheet(isPresented: $showPick) {
-                PickForMeSheet(blocks: blocks, nowMin: nowMin)
+                PickForMeSheet(blocks: blocks, nowMin: nowMin, lowBattery: lowBattery && dayOffset == 0)
             }
             .sheet(isPresented: $showReview, onDismiss: { Task { await load() } }) {
                 ReviewSheet(date: date, zone: app.timezone, items: blocks) { }
@@ -353,6 +361,38 @@ struct TodayView: View {
     private func upNextMeta(_ block: DayBlock) -> String {
         let inMin = block.startMin - nowMin
         return inMin <= 90 ? "in \(inMin) min" : "at \(KTime.hhmm(block.startMin))"
+    }
+
+    /// Low-battery chip + softened note — device-local, today only.
+    private var lowBatteryRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button {
+                lowBattery.toggle()
+                LowBatteryDay.set(date, on: lowBattery)
+                UISelectionFeedbackGenerator().selectionChanged()
+            } label: {
+                Label(lowBattery ? "Low-battery day" : "Low battery?",
+                      systemImage: "battery.25percent")
+                    .font(.kBody(13, weight: .semibold))
+                    .foregroundStyle(lowBattery ? Color.kCatButterInk : Color.kInkSoft)
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .background(
+                        Capsule().fill(lowBattery ? Color.kCatButter : Color.kSurface)
+                            .overlay(Capsule().stroke(
+                                lowBattery ? Color.kCatButterInk.opacity(0.3) : Color.kBorder,
+                                lineWidth: 1))
+                    )
+            }
+            .accessibilityLabel("Low-battery day")
+            .accessibilityValue(lowBattery ? "on" : "off")
+            .accessibilityHint("Dims heavy activities and suggests lighter ones")
+            if lowBattery {
+                Text("Low-battery day — heavy things are dimmed. Doing less on purpose still counts as a plan.")
+                    .font(.kBody(12.5, weight: .medium))
+                    .foregroundStyle(Color.kInkSoft)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var header: some View {
@@ -541,6 +581,38 @@ struct TodayView: View {
     // MARK: Data
 
     private func load() async {
+#if DEBUG
+        // Deterministic tour fixture: a normal (mutable) Today with mixed
+        // energies so the low-battery surfaces can be proven without a server.
+        if ProcessInfo.processInfo.arguments.contains("-kairoTodayFixture") {
+            // Pin the zone: bootstrap ordering must not shift the date key
+            // (an early load in UTC lands on a different calendar day).
+            let zone = TimeZone(identifier: "America/New_York") ?? .current
+            let dateStr = KTime.dateString(viewedDate, zone: zone)
+            date = dateStr
+            nowMin = dayOffset == 0 ? KTime.nowMinutes(in: zone) : -1
+            lowBattery = LowBatteryDay.isOn(dateStr)
+            blocks = [
+                DayBlock(
+                    id: "fixture-deep-work", title: "Deep work block", emoji: "🧠",
+                    startMin: 9 * 60, durationMin: 90, category: .lilac,
+                    done: false, recurring: false, revision: 1,
+                    occurrenceKey: nil, checklist: [], energy: .high),
+                DayBlock(
+                    id: "fixture-walk", title: "Slow walk", emoji: "🌤",
+                    startMin: 11 * 60, durationMin: 30, category: .mint,
+                    done: false, recurring: false, revision: 1,
+                    occurrenceKey: nil, checklist: [], energy: .low),
+                DayBlock(
+                    id: "fixture-email", title: "Email sweep", emoji: "📮",
+                    startMin: 13 * 60, durationMin: 45, category: .sky,
+                    done: false, recurring: false, revision: 1,
+                    occurrenceKey: nil, checklist: [], energy: nil),
+            ]
+            loading = false
+            return
+        }
+#endif
         guard let requestedScope = app.sessionScope else {
             loading = false
             return
@@ -554,6 +626,7 @@ struct TodayView: View {
             ? KTime.nowMinutes(in: app.timezone)
             : -1
         date = dateStr
+        lowBattery = LowBatteryDay.isOn(dateStr)
         do {
             let day = try await KairoAPI.shared.day(dateStr)
             guard
@@ -900,6 +973,7 @@ struct TimelineCanvas: View {
     let blocks: [DayBlock]
     let nowMin: Int
     let readOnly: Bool
+    var lowBattery: Bool = false
     let onComplete: (DayBlock) -> Void
     let onDelete: (DayBlock) -> Void
     let onFocus: (DayBlock) -> Void
@@ -959,6 +1033,7 @@ struct TimelineCanvas: View {
                     block: block,
                     nowMin: nowMin,
                     readOnly: readOnly,
+                    lowBattery: lowBattery,
                     onComplete: { onComplete(block) },
                     onDelete: { onDelete(block) },
                     onFocus: { onFocus(block) },
@@ -988,6 +1063,7 @@ struct BlockCard: View {
     let block: DayBlock
     let nowMin: Int
     let readOnly: Bool
+    var lowBattery: Bool = false
     let onComplete: () -> Void
     let onDelete: () -> Void
     let onFocus: () -> Void
@@ -1002,6 +1078,9 @@ struct BlockCard: View {
     private var isPast: Bool { block.endMin <= nowMin && !block.done }
     private var isCurrent: Bool { block.startMin <= nowMin && nowMin < block.endMin && !block.done }
     private var compact: Bool { CGFloat(block.durationMin) * 1.7 < 66 }
+    private var heavy: Bool {
+        LowBatteryDay.isHeavy(energy: block.energy, done: block.done, lowBattery: lowBattery)
+    }
 
     /// Checklist lines only when the block is tall enough to hold them.
     private var stepRows: Int {
@@ -1046,6 +1125,13 @@ struct BlockCard: View {
                             .fixedSize(horizontal: true, vertical: false)
                     }
                     .font(.kMono(11, weight: .medium))
+                    if heavy {
+                        Text("heavy")
+                            .font(.kBody(9.5, weight: .bold))
+                            .padding(.horizontal, 5).padding(.vertical, 1.5)
+                            .background(Capsule().fill(Color.kSurfaceRaised.opacity(0.85)))
+                            .accessibilityLabel("Heavy for a low-battery day")
+                    }
                 }
                 .lineLimit(1)
                 if stepRows > 0 {
@@ -1117,6 +1203,7 @@ struct BlockCard: View {
         )
         .saturation(isPast ? 0.5 : 1)
         .compositingGroup()
+        .opacity(heavy ? 0.55 : 1)
         .kCardShadow()
         .offset(y: dragOffset)
         .scaleEffect(lifting ? 1.03 : 1)
@@ -1159,6 +1246,7 @@ struct BlockCard: View {
                         || OfflineTodayMutationPolicy.cachedDay
                             .allowsCompletion(for: block),
                 pending: pending,
+                heavy: heavy,
                 onComplete: onComplete,
                 onFocus: onFocus,
                 onDelete: onDelete,
@@ -1173,6 +1261,7 @@ private struct BlockAccessibilityModifier: ViewModifier {
     let readOnly: Bool
     let allowsCompletion: Bool
     let pending: Bool
+    var heavy: Bool = false
     let onComplete: () -> Void
     let onFocus: () -> Void
     let onDelete: () -> Void
@@ -1183,7 +1272,7 @@ private struct BlockAccessibilityModifier: ViewModifier {
         let labelled = content
             .accessibilityElement(children: .combine)
             .accessibilityLabel(
-                "\(block.title), \(KTime.hhmm(block.startMin)) to \(KTime.hhmm(block.endMin)), \(block.category.rawValue), \(block.done ? "done" : "not done")"
+                "\(block.title), \(KTime.hhmm(block.startMin)) to \(KTime.hhmm(block.endMin)), \(block.category.rawValue), \(block.done ? "done" : "not done")\(heavy ? ", heavy for a low-battery day" : "")"
             )
         if readOnly {
             if allowsCompletion {

@@ -408,7 +408,8 @@ enum GeneratedAPIAdapters {
             },
             revision: Int(value.revision),
             occurrenceKey: value.occurrenceKey,
-            status: value.status.rawValue
+            status: value.status.rawValue,
+            energy: value.energy.flatMap { ActivityEnergy(rawValue: $0.rawValue) }
         )
     }
 
