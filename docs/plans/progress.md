@@ -1,5 +1,51 @@
 # Progress log
 
+## 2026-07-31 — Round 25: eleven-game arcade in four moods (Fable)
+
+Roadmap: `docs/plans/2026-07-31-round25-arcade-wave5.md`.
+
+- **Two new games on both platforms.** Odd One Out (a near-twin emoji
+  impostor hides in a grid growing 3×3 → 5×5 over eight rounds; overall
+  tenths-of-a-second time is the only score; wrong taps flash and cost
+  time, never points) and Digit Span (digits flash for 900ms + 350ms per
+  digit, an on-screen keypad takes them back, one digit added per clean
+  recall, no immediate-repeat digits). Pure logic in `src/lib/games.ts`
+  is mirrored by `ArcadeLogic` on iOS; both sides carry seeded-RNG unit
+  tests pinning the shared contract.
+- **The arcade got structure.** Eleven games now read in four moods —
+  Sharp & fast, Hold it in mind, Wordplay, Slow down — as labeled
+  sections on web (semantic `<section>`s, section h2s, card headings
+  demoted to h3) and iOS (uppercase headers with the combined
+  accessibility header trait). Personal-best chips carried over.
+- **Web evidence.** Both games were played end-to-end in a real browser:
+  Odd One Out through all eight rounds across all three grid sizes to a
+  new-best end screen; Digit Span through a correct 3-digit recall,
+  level-up to four, and a deliberate miss showing "Span of 3" plus the
+  new-best chip. Playwright captures (desktop/mobile × light/dark) report
+  zero horizontal overflow, under ignored `browser-qa/round25-arcade/`.
+- **iOS evidence.** `KairoRound25ArcadeTour` passed **2/2** on the
+  offline fixture: all four section headers, all eleven cards, Odd One
+  Out round 1 with live clock (light and dark), Digit Span memorize →
+  keypad entry registering "1 of 3". Screenshots exported from the
+  `.xcresult` and inspected under `browser-qa/round25-arcade/ios/`.
+- **Gates.** `pnpm lint`, `pnpm typecheck`, **98 files / 996 web tests**,
+  production build, `pnpm ios:release:preflight`, and the iOS main-thread
+  gate (**346 executed app-hosted tests, 1 expected skip, 0 failures**)
+  all passed. Scripted parity unchanged and above gate (web **89.74%**,
+  iOS **85.80%**); the arcade remains a beyond-Tiimo extra.
+
+**Release state:** shipped and live-verified. Web commit `aaf3ee7` and iOS
+commit `8374219f63b13dfbdbc61921d5aba3e605831015` pushed to `main`.
+GitHub Actions run `30666345435` on the exact SHA concluded `success`
+(build-test, e2e, macOS native-contract). The webhook Coolify deployment
+built and drained; the `kairo` app reports `running:healthy` and live
+`/api/health` returned all checks `ok`. The live `/app/play` server render
+contains the four mood sections plus Odd One Out and Digit Span, and a
+real production browser session opened Odd One Out and reached "round 1
+of 8" with a clean console. The web unit count above (996) and the iOS
+count (346 executed, 1 expected skip, 0 failures) were both re-verified
+on the committed code state.
+
 ## 2026-07-31 — Round 24: nine-game brain-breaks arcade on both platforms (Fable)
 
 Roadmap: `docs/plans/2026-07-31-round24-brain-games.md`.
