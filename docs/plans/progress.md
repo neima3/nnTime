@@ -1,5 +1,45 @@
 # Progress log
 
+## 2026-07-31 — Round 27: low-battery day lands on native Today (Fable)
+
+Roadmap: `docs/plans/2026-07-31-round27-low-battery-ios.md`.
+
+- **The gap.** A feature sweep found the web's low-battery day and daily
+  brief had no iOS counterparts; low-battery day (the higher-empathy,
+  fully client-local one) shipped this round with exact web semantics.
+- **What shipped.** Energy decodes from the generated day adapter into
+  `Activity`/`DayBlock`. Today gains a per-date, device-local
+  "Low battery?" chip (today only, absent on read-only cached days):
+  when on, pending high-energy blocks dim to 55% with a visible "heavy"
+  tag, a softened note appears ("Doing less on purpose still counts as a
+  plan."), and Pick-for-me demotes heavy picks / slightly prefers light
+  ones within each kind — `LowBatteryDay.pickRank` mirrors the web
+  picker's weights, pinned by unit tests.
+- **Two real defects caught by the deterministic tour.** (1) The
+  combined block accessibility label silently swallowed the "heavy" tag
+  — VoiceOver heard nothing; the label now appends ", heavy for a
+  low-battery day". (2) The tour fixture's date key shifted across
+  relaunches because an early load could compute the date in UTC before
+  bootstrap set the planning zone — the debug fixture now pins its zone,
+  and `LowBatteryDay.set` forces a defaults flush so an immediate app
+  kill cannot drop the toggle.
+- **Evidence.** `KairoRound27LowBatteryTour` passed **1/1** on the new
+  `-kairoTodayFixture` (mutable mixed-energy Today): off state, toggle →
+  dim + tag + note, relaunch persistence, and a clean off state at the
+  end. Screenshots inspected under ignored
+  `browser-qa/round27-low-battery/ios/`.
+- **Gates.** iOS main-thread gate passed on the final state
+  (**352 executed, 1 expected skip, 0 failures**) plus
+  `pnpm ios:release:preflight`. No web files changed this round.
+
+**Release state:** iOS commit
+`224a84ff1817dd6a79e6e8a52f6ff2ffc484301e` pushed to `main`. GitHub
+Actions run `30671403192` on the exact SHA concluded `success`. The
+webhook Coolify deployment drained (web code unchanged this round) and
+live `/api/health` returned all checks `ok`. Native low-battery behavior
+is simulator-proven; a physical-device pass remains part of the standing
+7B device checklist.
+
 ## 2026-07-31 — Round 26: Green Light + the post-focus brain break (Fable)
 
 Roadmap: `docs/plans/2026-07-31-round26-green-light.md`.
