@@ -15,6 +15,24 @@ final class KairoRound27LowBatteryTour: XCTestCase {
         return app
     }
 
+    func testDailyBriefShowsAndDismissesForTheDay() throws {
+        let app = launch()
+        XCTAssertTrue(app.staticTexts["Deep work block"].waitForExistence(timeout: 10))
+        // Fixture pins a 9am hour: the brief greets and summarizes the day.
+        let brief = app.staticTexts
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "Good morning. 3 things on today."))
+            .firstMatch
+        XCTAssertTrue(brief.waitForExistence(timeout: 6))
+        XCTAssertTrue(
+            app.staticTexts
+                .matching(NSPredicate(format: "label BEGINSWITH %@", "First up · 🧠 Deep work block"))
+                .firstMatch.exists)
+        snap(app, "r28-daily-brief")
+        app.buttons["Dismiss brief for today"].tap()
+        XCTAssertFalse(brief.exists)
+        snap(app, "r28-daily-brief-dismissed")
+    }
+
     func testLowBatteryDayToggleDimsAndPersists() throws {
         var app = launch()
         XCTAssertTrue(app.staticTexts["Deep work block"].waitForExistence(timeout: 10))

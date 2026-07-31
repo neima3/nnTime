@@ -18,6 +18,7 @@ struct TodayView: View {
     @State private var peakHour: Int?
     @State private var peakDismissedDay = ""
     @State private var ritualDismissedDay = ""
+    @State private var briefDismissedDay = ""
     @State private var showTemplates = false
     @State private var usingCachedDay = false
     @State private var mutationsLocked = false
@@ -54,6 +55,11 @@ struct TodayView: View {
                             header
                                 .padding(.horizontal, 20)
                                 .padding(.top, 8)
+                            if let brief = dailyBrief {
+                                brief
+                                    .padding(.horizontal, 16)
+                                    .padding(.top, 10)
+                            }
                             if dayOffset == 0 && !mutationsLocked {
                                 lowBatteryRow
                                     .padding(.horizontal, 20)
@@ -248,6 +254,70 @@ struct TodayView: View {
 
     /// Day Rituals (parity) — a morning kickoff on a sparse day, an evening
     /// shutdown when things are still open. Time-windowed, once per day.
+    /// Warm morning orientation (web DailyBrief parity): morning-only,
+    /// today-only, once per day. Reuses the loaded peak-hour insight.
+    private var dailyBrief: AnyView? {
+        guard dayOffset == 0, !mutationsLocked else { return nil }
+        var hour = Calendar.current.component(.hour, from: Date())
+#if DEBUG
+        // The tour fixture pins a morning hour so the card is provable at
+        // any wall-clock time.
+        if ProcessInfo.processInfo.arguments.contains("-kairoTodayFixture") {
+            hour = 9
+        }
+#endif
+        let today = KTime.dateString(Date(), zone: .current)
+        guard DailyBriefPolicy.shouldShow(
+            hour: hour, dismissedDay: briefDismissedDay, today: today
+        ) else { return nil }
+
+        let done = blocks.filter(\.done).count
+        let first = blocks.filter { !$0.done }.min { $0.startMin < $1.startMin }
+
+        return AnyView(
+            HStack(alignment: .top, spacing: 12) {
+                Text("☀️")
+                    .font(.system(size: 18))
+                    .frame(width: 36, height: 36)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Color.kCatButter))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("\(DailyBriefPolicy.greeting(hour: hour)). \(DailyBriefPolicy.summary(total: blocks.count, done: done))")
+                        .font(.kBody(14, weight: .bold))
+                        .foregroundStyle(Color.kInk)
+                    if let first {
+                        Text("First up · \(first.emoji) \(first.title) at \(KTime.hhmm(first.startMin))")
+                            .font(.kBody(13, weight: .medium))
+                            .foregroundStyle(Color.kInkSoft)
+                    }
+                    if let peakHour {
+                        Text("💡 Your focus usually peaks around \(Insights.hourLabel(peakHour)) — a good slot for the hard one.")
+                            .font(.kBody(12.5, weight: .medium))
+                            .foregroundStyle(Color.kInkSoft)
+                    }
+                }
+                Spacer(minLength: 0)
+                Button {
+                    briefDismissedDay = today
+                    UserDefaults.standard.set(today, forKey: "kairo.briefDismissed")
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.kInkFaint)
+                        .frame(width: 28, height: 28)
+                }
+                .accessibilityLabel("Dismiss brief for today")
+            }
+            .padding(.horizontal, 14).padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.kCatButter.opacity(0.35))
+                    .background(RoundedRectangle(cornerRadius: 16).fill(Color.kSurface))
+            )
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.kBorder, lineWidth: 1))
+            .kCardShadow()
+        )
+    }
+
     private var dayRitual: AnyView? {
         guard dayOffset == 0, !mutationsLocked else { return nil }
         let today = KTime.dateString(Date(), zone: .current)
@@ -592,6 +662,9 @@ struct TodayView: View {
             date = dateStr
             nowMin = dayOffset == 0 ? KTime.nowMinutes(in: zone) : -1
             lowBattery = LowBatteryDay.isOn(dateStr)
+            // Reruns of the tour always start with a visible brief.
+            UserDefaults.standard.removeObject(forKey: "kairo.briefDismissed")
+            briefDismissedDay = ""
             blocks = [
                 DayBlock(
                     id: "fixture-deep-work", title: "Deep work block", emoji: "🧠",
@@ -755,6 +828,7 @@ struct TodayView: View {
     private func loadPeak(scope: String) async {
         peakDismissedDay = UserDefaults.standard.string(forKey: "kairo.peakNudgeDismissed") ?? ""
         ritualDismissedDay = UserDefaults.standard.string(forKey: "kairo.ritualDismissed") ?? ""
+        briefDismissedDay = UserDefaults.standard.string(forKey: "kairo.briefDismissed") ?? ""
         let stats = try? await KairoAPI.shared.stats()
         guard TodayLoadPolicy.isCurrentScope(
             requested: scope,
