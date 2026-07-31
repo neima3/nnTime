@@ -437,6 +437,27 @@ export function spanShowMs(len: number): number {
   return 900 + len * 350;
 }
 
+/* ---- Green Light (go / no-go) --------------------------------------------- */
+
+export const GO_ROUNDS = 24;
+export const GO_SHOW_MS = 750;
+export const GO_GAP_MS = 350;
+
+/**
+ * Stimulus plan: ~30% no-go, never more than two no-gos in a row, and the
+ * first two are always go so the run starts in motion.
+ */
+export function buildGoSequence(
+  random: () => number = Math.random,
+): boolean[] {
+  const seq: boolean[] = [];
+  for (let i = 0; i < GO_ROUNDS; i++) {
+    const twoNoGosBehind = i >= 2 && !seq[i - 1] && !seq[i - 2];
+    seq.push(i < 2 || twoNoGosBehind || random() >= 0.3);
+  }
+  return seq;
+}
+
 /* ---- localStorage bests -------------------------------------------------- */
 
 export type GameId =
@@ -450,7 +471,8 @@ export type GameId =
   | "memory-trail"
   | "color-clash"
   | "odd-one-out"
-  | "digit-span";
+  | "digit-span"
+  | "green-light";
 
 const KEY = (id: GameId) => `kairo-play-best-${id}`;
 

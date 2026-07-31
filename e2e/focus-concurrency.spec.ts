@@ -180,6 +180,13 @@ test("transport retries reuse their key and rapid starts stay single-flight", as
   await expect(page.getByText("min of real focus", { exact: false })).toBeVisible({
     timeout: 15_000,
   });
+
+  // The post-session menu offers a brain break that lands on the arcade.
+  await page.getByRole("button", { name: "Play a brain break" }).click();
+  await expect(page).toHaveURL(/\/app\/play/);
+  await expect(
+    page.getByRole("heading", { name: "Brain breaks" }),
+  ).toBeVisible();
 });
 
 test("a failed conflict refresh never claims the stale tab was refreshed", async ({

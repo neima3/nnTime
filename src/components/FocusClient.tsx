@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Coffee, Pause, Play, Plus, SkipForward } from "lucide-react";
+import { Check, Coffee, Gamepad2, Pause, Play, Plus, SkipForward } from "lucide-react";
 import { celebrate } from "./Celebration";
 import { companionLine, readCompanionPref, writeCompanionPref } from "@/lib/companion";
 
@@ -588,6 +588,15 @@ export function FocusClient({
             className="rounded-2xl border border-border bg-surface py-3.5 text-[15px] font-semibold text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:cursor-wait disabled:opacity-60"
           >
             Keep going +10 min
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push("/app/play")}
+            className="rounded-2xl border border-border bg-surface py-3.5 text-[15px] font-semibold text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+          >
+            <span className="inline-flex items-center gap-2">
+              <Gamepad2 size={16} /> Play a brain break
+            </span>
           </button>
           <button
             type="button"

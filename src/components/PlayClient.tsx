@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Brain breaks arcade (wave 5). Eleven small games in four moods, personal
+ * Brain breaks arcade (wave 6). Twelve small games in four moods, personal
  * bests only, all client-side. Framed honestly: play that rests the brain —
  * not "training".
  */
@@ -18,6 +18,7 @@ import { MemoryTrail } from "./games/MemoryTrail";
 import { ColorClash } from "./games/ColorClash";
 import { OddOneOut } from "./games/OddOneOut";
 import { DigitSpan } from "./games/DigitSpan";
+import { GreenLight } from "./games/GreenLight";
 
 interface GameCard {
   id: GameId;
@@ -64,6 +65,14 @@ const SECTIONS: { label: string; blurb: string; games: GameCard[] }[] = [
         hook: "Tap what you see, not what you read.",
         tint: "bg-cat-rose",
         bestLabel: (v) => `best ${v}/12`,
+      },
+      {
+        id: "green-light",
+        emoji: "🚦",
+        title: "Green Light",
+        hook: "Green means tap. Red means don't. Simple. Ha.",
+        tint: "bg-cat-mint",
+        bestLabel: (v) => `best ${v}/24`,
       },
     ],
   },
@@ -175,6 +184,7 @@ export function PlayClient() {
   if (active === "color-clash") return <ColorClash onExit={exit} />;
   if (active === "odd-one-out") return <OddOneOut onExit={exit} />;
   if (active === "digit-span") return <DigitSpan onExit={exit} />;
+  if (active === "green-light") return <GreenLight onExit={exit} />;
   if (active === "grammar-snap")
     return (
       <QuizGame

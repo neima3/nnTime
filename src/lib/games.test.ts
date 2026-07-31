@@ -4,10 +4,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   buildClashRound,
+  buildGoSequence,
   buildMatchDeck,
   buildOddRound,
   buildSchulteGrid,
   buildTrail,
+  GO_ROUNDS,
   CLASH_COLOR_NAMES,
   clearMiss,
   extendTrail,
@@ -699,5 +701,32 @@ describe("digit span", () => {
     expect(spanShowMs(3)).toBe(1950);
     expect(spanShowMs(8)).toBe(3700);
     expect(spanShowMs(4)).toBeGreaterThan(spanShowMs(3));
+  });
+});
+
+describe("green light (go / no-go)", () => {
+  it("builds a full-length plan that always starts in motion", () => {
+    const seq = buildGoSequence();
+    expect(seq).toHaveLength(GO_ROUNDS);
+    expect(seq[0]).toBe(true);
+    expect(seq[1]).toBe(true);
+  });
+
+  it("never allows three no-gos in a row, even when the RNG insists", () => {
+    const seq = buildGoSequence(() => 0); // every optional roll says no-go
+    for (let i = 2; i < seq.length; i++) {
+      expect(seq[i - 2] || seq[i - 1] || seq[i]).toBe(true);
+    }
+    expect(seq.some((go) => !go)).toBe(true);
+  });
+
+  it("is all go when the RNG never rolls under the no-go band", () => {
+    expect(buildGoSequence(() => 0.9).every(Boolean)).toBe(true);
+  });
+
+  it("keeps the no-go share meaningful for a mid RNG", () => {
+    const seq = buildGoSequence(() => 0.1);
+    const noGos = seq.filter((go) => !go).length;
+    expect(noGos).toBeGreaterThanOrEqual(6);
   });
 });
