@@ -8,6 +8,13 @@
 import { test as setup } from "@playwright/test";
 import { signUp } from "./helpers";
 
+// The whole suite plans in America/New_York (every spec mocks it). The
+// sign-up MUST run under the same zone, or the account's planning zone
+// follows the runner's clock (UTC in CI) and the specs' day math shears
+// against it — a nightly 23:20–24:00 UTC flake window where a "40 minutes
+// from now" block rolls onto the next planning day.
+setup.use({ locale: "en-US", timezoneId: "America/New_York" });
+
 export const STORAGE_STATE = "browser-qa/e2e-artifacts/.auth/user.json";
 
 setup("sign up once and persist the session", async ({ page }) => {

@@ -39,7 +39,9 @@ export async function signUp(page: Page, tag: string): Promise<string> {
  */
 export function dayUrl(offsetDays: number): string {
   const d = new Date(Date.now() + offsetDays * 86_400_000);
-  const iso = d.toISOString().slice(0, 10);
+  // The suite's planning zone, NOT the runner's: a UTC slice would name a
+  // different calendar day than the account plans on for hours every night.
+  const iso = d.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
   return `/app/today?date=${iso}`;
 }
 
