@@ -4,7 +4,11 @@ import SwiftUI
 
 struct PlayView: View {
     @State private var active: Game?
-    enum Game: String, Identifiable { case timeFeel, quickTap, breath; var id: String { rawValue } }
+    @State private var bests: [String: Int] = [:]
+    enum Game: String, Identifiable {
+        case timeFeel, quickTap, emojiMatch, grammar, spelling, focusFinder, memoryTrail, colorClash, breath
+        var id: String { rawValue }
+    }
 
     var body: some View {
         ZStack {
@@ -13,9 +17,23 @@ struct PlayView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Two minutes of play counts as rest. No streaks, no scores that matter — just your own bests.")
                         .font(.kBody(14)).foregroundStyle(Color.kInkSoft).padding(.bottom, 4)
-                    card("⏳", "Time Feel", "Your brain vs. the clock — no peeking.", .kCatLilac) { active = .timeFeel }
-                    card("⚡", "Quick Tap", "Purple means go. How fast are you today?", .kCatButter) { active = .quickTap }
-                    card("🫧", "Steady Breath", "A square minute for a spinning head.", .kCatMint) { active = .breath }
+                    card("⏳", "Time Feel", "Your brain vs. the clock — no peeking.", .kCatLilac,
+                         best: bests["timefeel"].map { "best \($0)/100" }) { active = .timeFeel }
+                    card("⚡", "Quick Tap", "Purple means go. How fast are you today?", .kCatButter,
+                         best: bests["quicktap"].map { "best \($0) ms" }) { active = .quickTap }
+                    card("🃏", "Emoji Match", "Eight pairs hiding in sixteen cards.", .kCatPeach,
+                         best: bests["emojimatch"].map { "best \($0) moves" }) { active = .emojiMatch }
+                    card("📝", "Grammar Snap", "60+ classic snags across ten topics — it remembers the ones that get you.", .kCatSky,
+                         best: bests["grammarsnap"].map { "best \($0)/8" }) { active = .grammar }
+                    card("🔤", "Spell Check", "Definitely? Definately? One of these is real.", .kCatRose,
+                         best: bests["spellcheck"].map { "best \($0)/8" }) { active = .spelling }
+                    card("🔍", "Focus Finder", "1 to 25, hiding in plain sight. Eyes on sprint duty.", .kCatSky,
+                         best: bests["focusfinder"].map { String(format: "best %.1fs", Double($0) / 10) }) { active = .focusFinder }
+                    card("🐾", "Memory Trail", "Watch the path glow, then walk it back.", .kCatLilac,
+                         best: bests["memorytrail"].map { "best trail \($0)" }) { active = .memoryTrail }
+                    card("🎨", "Color Clash", "Tap what you see, not what you read.", .kCatRose,
+                         best: bests["colorclash"].map { "best \($0)/12" }) { active = .colorClash }
+                    card("🫧", "Steady Breath", "A square minute for a spinning head.", .kCatMint, best: nil) { active = .breath }
                     Text("Honesty corner: these are breaks, not brain training — the science on games \"fixing\" attention is thin, and we won't pretend otherwise.")
                         .font(.kBody(11.5)).foregroundStyle(Color.kInkFaint).padding(.top, 8)
                 }
@@ -27,16 +45,53 @@ struct PlayView: View {
             Text("Brain breaks").font(.kDisplay(18, relativeTo: .headline)).foregroundStyle(Color.kInk)
         } }
         .toolbarBackground(Color.kCanvas, for: .navigationBar)
-        .fullScreenCover(item: $active) { game in
+        .onAppear { refreshBests() }
+        .fullScreenCover(item: $active, onDismiss: { refreshBests() }) { game in
             switch game {
             case .timeFeel: TimeFeelGame { active = nil }
             case .quickTap: QuickTapGame { active = nil }
+            case .emojiMatch: EmojiMatchGame { active = nil }
+            case .grammar:
+                QuizGameView(
+                    id: "grammarsnap",
+                    title: "Grammar Snap",
+                    intro: "Tap the word that fits. No red pens here.",
+                    bank: QuizBank.grammar,
+                    endDetail: { score in
+                        score >= 7 ? "Basically an editor. English fears you."
+                        : score >= 4 ? "Solid — and every miss came with a memory hook."
+                        : "These pairs trip up native speakers daily. Now you know their tricks."
+                    }
+                ) { active = nil }
+            case .spelling:
+                QuizGameView(
+                    id: "spellcheck",
+                    title: "Spell Check",
+                    intro: "Tap the real spelling among the impostors.",
+                    bank: QuizBank.spelling,
+                    endDetail: { score in
+                        score >= 7 ? "Spelling bee champion energy."
+                        : score >= 4 ? "Good eye — the impostors are convincing on purpose."
+                        : "These are the most-misspelled words in English. You're in excellent company."
+                    }
+                ) { active = nil }
+            case .focusFinder: FocusFinderGame { active = nil }
+            case .memoryTrail: MemoryTrailGame { active = nil }
+            case .colorClash: ColorClashGame { active = nil }
             case .breath: SteadyBreathGame { active = nil }
             }
         }
     }
 
-    private func card(_ emoji: String, _ title: String, _ hook: String, _ tint: Color, _ tap: @escaping () -> Void) -> some View {
+    private func refreshBests() {
+        var next: [String: Int] = [:]
+        for key in ["timefeel", "quicktap", "emojimatch", "grammarsnap", "spellcheck", "focusfinder", "memorytrail", "colorclash"] {
+            next[key] = PlayScores.best(for: key)
+        }
+        bests = next
+    }
+
+    private func card(_ emoji: String, _ title: String, _ hook: String, _ tint: Color, best: String?, _ tap: @escaping () -> Void) -> some View {
         Button(action: tap) {
             HStack(spacing: 14) {
                 Text(emoji).font(.system(size: 26)).frame(width: 52, height: 52).background(RoundedRectangle(cornerRadius: 16).fill(tint))
@@ -45,6 +100,12 @@ struct PlayView: View {
                     Text(hook).font(.kBody(13)).foregroundStyle(Color.kInkSoft)
                 }
                 Spacer()
+                if let best {
+                    Text(best)
+                        .font(.kMono(11, weight: .bold)).foregroundStyle(Color.kInkSoft)
+                        .padding(.horizontal, 7).padding(.vertical, 4)
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.kSurfaceSunken))
+                }
                 Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(Color.kInkFaint)
             }
             .padding(16).frame(maxWidth: .infinity, alignment: .leading).kCard(radius: 20)
@@ -53,19 +114,28 @@ struct PlayView: View {
 }
 
 // Shared game chrome
-private struct GameChrome<Content: View>: View {
-    let title: String; let onExit: () -> Void; @ViewBuilder var content: Content
+struct GameChrome<Content: View>: View {
+    let title: String
+    var subtitle: String? = nil
+    let onExit: () -> Void
+    @ViewBuilder var content: Content
     var body: some View {
         ZStack {
             Color.kCanvas.ignoresSafeArea()
             VStack {
                 HStack {
-                    Text(title).font(.kBody(16, weight: .bold)).foregroundStyle(Color.kInk)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title).font(.kBody(16, weight: .bold)).foregroundStyle(Color.kInk)
+                        if let subtitle {
+                            Text(subtitle).font(.kBody(12)).foregroundStyle(Color.kInkSoft).lineLimit(1)
+                        }
+                    }
                     Spacer()
                     Button { onExit() } label: {
                         Image(systemName: "xmark").font(.system(size: 15, weight: .semibold)).foregroundStyle(Color.kInkSoft)
                             .frame(width: 40, height: 40).background(Circle().fill(Color.kSurface)).kCardShadow()
                     }
+                    .accessibilityLabel("Exit game")
                 }.padding(.horizontal, 20).padding(.top, 16)
                 Spacer(); content; Spacer()
             }
@@ -288,14 +358,14 @@ struct SteadyBreathGame: View {
     }
 }
 
-private struct PrimaryPill: ButtonStyle {
+struct PrimaryPill: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.font(.kBody(16, weight: .semibold)).foregroundStyle(Color.kInkInverse)
             .padding(.horizontal, 28).padding(.vertical, 14).background(Capsule().fill(Color.kIris))
             .scaleEffect(configuration.isPressed ? 0.97 : 1).kFloatShadow()
     }
 }
-private struct SecondaryPill: ButtonStyle {
+struct SecondaryPill: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.font(.kBody(16, weight: .semibold)).foregroundStyle(Color.kInkSoft)
             .padding(.horizontal, 28).padding(.vertical, 14).background(Capsule().fill(Color.kSurface).overlay(Capsule().stroke(Color.kBorder, lineWidth: 1)))
