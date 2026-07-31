@@ -169,4 +169,53 @@ final class PlayArcadeLogicTests: XCTestCase {
         let items = QuizMisses.items(in: bank, misses: [bank[5].prompt, "not-a-real-prompt", bank[0].prompt])
         XCTAssertEqual(items.map(\.prompt), [bank[5].prompt, bank[0].prompt])
     }
+
+    // MARK: Odd One Out
+
+    func testOddPairsShuffleKeepsEveryPair() {
+        var calls = 0
+        func seeded() -> Double {
+            calls += 1
+            return Double((calls * 31) % 100) / 100
+        }
+        let shuffled = ArcadeLogic.shuffledOddPairs(random: seeded)
+        XCTAssertEqual(shuffled.count, ArcadeLogic.oddPairs.count)
+        XCTAssertEqual(Set(shuffled.map(\.0)), Set(ArcadeLogic.oddPairs.map(\.0)))
+    }
+
+    func testOddGridGrowsAcrossRounds() {
+        XCTAssertEqual([0, 1, 2].map { ArcadeLogic.oddGridSize(round: $0) }, [3, 3, 3])
+        XCTAssertEqual([3, 4, 5].map { ArcadeLogic.oddGridSize(round: $0) }, [4, 4, 4])
+        XCTAssertEqual([6, 7].map { ArcadeLogic.oddGridSize(round: $0) }, [5, 5])
+    }
+
+    func testOddRoundImpostorDiffersAndFitsGrid() {
+        for round in 0..<ArcadeLogic.oddRounds {
+            let r = ArcadeLogic.buildOddRound(round: round, pair: ArcadeLogic.oddPairs[0])
+            XCTAssertNotEqual(r.base, r.odd)
+            XCTAssertEqual(r.size, ArcadeLogic.oddGridSize(round: round))
+            XCTAssertTrue((0..<(r.size * r.size)).contains(r.oddIndex))
+        }
+    }
+
+    // MARK: Digit Span
+
+    func testMakeSpanLengthAndDigitsOnly() {
+        let span = ArcadeLogic.makeSpan(len: 7)
+        XCTAssertEqual(span.count, 7)
+        XCTAssertTrue(span.allSatisfy(\.isNumber))
+    }
+
+    func testMakeSpanNeverRepeatsImmediately() {
+        let same = { 0.45 }
+        let span = Array(ArcadeLogic.makeSpan(len: 20, random: same))
+        for i in 1..<span.count {
+            XCTAssertNotEqual(span[i], span[i - 1])
+        }
+    }
+
+    func testSpanShowSecondsScalesWithLength() {
+        XCTAssertEqual(ArcadeLogic.spanShowSeconds(len: 3), 1.95, accuracy: 0.001)
+        XCTAssertEqual(ArcadeLogic.spanShowSeconds(len: 8), 3.7, accuracy: 0.001)
+    }
 }

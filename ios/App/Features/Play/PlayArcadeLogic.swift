@@ -75,6 +75,74 @@ enum ArcadeLogic {
         return deck
     }
 
+    // MARK: Odd One Out (visual search)
+
+    /// Look-alike emoji pairs — every round hides one impostor among its twin.
+    static let oddPairs: [(String, String)] = [
+        ("🙂", "🙃"), ("🐶", "🐺"), ("⭐", "🌟"), ("🍏", "🍐"),
+        ("😺", "😸"), ("🌸", "🌺"), ("🔵", "🟣"), ("🌛", "🌜"),
+    ]
+    static let oddRounds = 8
+
+    /// Grid side length for a round: 3×3 warm-up → 5×5 finale.
+    static func oddGridSize(round: Int) -> Int {
+        round < 3 ? 3 : round < 6 ? 4 : 5
+    }
+
+    /// Shuffled copy of oddPairs so each run meets the pairs in a new order.
+    static func shuffledOddPairs(random: () -> Double = { Double.random(in: 0..<1) }) -> [(String, String)] {
+        var pairs = oddPairs
+        for i in stride(from: pairs.count - 1, to: 0, by: -1) {
+            let j = min(Int(random() * Double(i + 1)), i)
+            pairs.swapAt(i, j)
+        }
+        return pairs
+    }
+
+    struct OddRound: Equatable {
+        let base: String
+        let odd: String
+        let size: Int
+        let oddIndex: Int
+    }
+
+    /// One round: pick which twin plays impostor and where it hides.
+    static func buildOddRound(
+        round: Int,
+        pair: (String, String),
+        random: () -> Double = { Double.random(in: 0..<1) }
+    ) -> OddRound {
+        let flip = random() < 0.5
+        let base = flip ? pair.1 : pair.0
+        let odd = flip ? pair.0 : pair.1
+        let size = oddGridSize(round: round)
+        let cells = size * size
+        let oddIndex = min(Int(random() * Double(cells)), cells - 1)
+        return OddRound(base: base, odd: odd, size: size, oddIndex: oddIndex)
+    }
+
+    // MARK: Digit Span (working memory)
+
+    static let spanStart = 3
+
+    /// A digit string with no immediate repeats (kinder to read at a glance).
+    static func makeSpan(len: Int, random: () -> Double = { Double.random(in: 0..<1) }) -> String {
+        var span = ""
+        for i in 0..<len {
+            var digit = min(Int(random() * 10), 9)
+            if i > 0, let prev = span.last, String(prev) == String(digit) {
+                digit = (digit + 1 + min(Int(random() * 9), 8)) % 10
+            }
+            span += String(digit)
+        }
+        return span
+    }
+
+    /// How long the digits stay visible before they vanish.
+    static func spanShowSeconds(len: Int) -> Double {
+        0.9 + Double(len) * 0.35
+    }
+
     // MARK: Word quizzes (Grammar Snap + Spell Check)
 
     static let quizRounds = 8

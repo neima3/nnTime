@@ -6,7 +6,8 @@ struct PlayView: View {
     @State private var active: Game?
     @State private var bests: [String: Int] = [:]
     enum Game: String, Identifiable {
-        case timeFeel, quickTap, emojiMatch, grammar, spelling, focusFinder, memoryTrail, colorClash, breath
+        case timeFeel, quickTap, emojiMatch, grammar, spelling, focusFinder, memoryTrail, colorClash, breath,
+             oddOneOut, digitSpan
         var id: String { rawValue }
     }
 
@@ -17,23 +18,36 @@ struct PlayView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Two minutes of play counts as rest. No streaks, no scores that matter — just your own bests.")
                         .font(.kBody(14)).foregroundStyle(Color.kInkSoft).padding(.bottom, 4)
-                    card("⏳", "Time Feel", "Your brain vs. the clock — no peeking.", .kCatLilac,
-                         best: bests["timefeel"].map { "best \($0)/100" }) { active = .timeFeel }
+
+                    sectionHeader("Sharp & fast", "Eyes and reflexes on sprint duty.")
                     card("⚡", "Quick Tap", "Purple means go. How fast are you today?", .kCatButter,
                          best: bests["quicktap"].map { "best \($0) ms" }) { active = .quickTap }
+                    card("🔍", "Focus Finder", "1 to 25, hiding in plain sight. Eyes on sprint duty.", .kCatSky,
+                         best: bests["focusfinder"].map { String(format: "best %.1fs", Double($0) / 10) }) { active = .focusFinder }
+                    card("🕵️", "Odd One Out", "One of these is not like the others.", .kCatButter,
+                         best: bests["oddoneout"].map { String(format: "best %.1fs", Double($0) / 10) }) { active = .oddOneOut }
+                    card("🎨", "Color Clash", "Tap what you see, not what you read.", .kCatRose,
+                         best: bests["colorclash"].map { "best \($0)/12" }) { active = .colorClash }
+
+                    sectionHeader("Hold it in mind", "Working memory, lifting gently.")
                     card("🃏", "Emoji Match", "Eight pairs hiding in sixteen cards.", .kCatPeach,
                          best: bests["emojimatch"].map { "best \($0) moves" }) { active = .emojiMatch }
+                    card("🐾", "Memory Trail", "Watch the path glow, then walk it back.", .kCatLilac,
+                         best: bests["memorytrail"].map { "best trail \($0)" }) { active = .memoryTrail }
+                    card("🔢", "Digit Span", "Numbers flash, then it's all you.", .kCatPeach,
+                         best: bests["digitspan"].map { "best span \($0)" }) { active = .digitSpan }
+
+                    sectionHeader("Wordplay", "Snags and spellings, zero red pens.")
                     card("📝", "Grammar Snap", "60+ classic snags across ten topics — it remembers the ones that get you.", .kCatSky,
                          best: bests["grammarsnap"].map { "best \($0)/8" }) { active = .grammar }
                     card("🔤", "Spell Check", "Definitely? Definately? One of these is real.", .kCatRose,
                          best: bests["spellcheck"].map { "best \($0)/8" }) { active = .spelling }
-                    card("🔍", "Focus Finder", "1 to 25, hiding in plain sight. Eyes on sprint duty.", .kCatSky,
-                         best: bests["focusfinder"].map { String(format: "best %.1fs", Double($0) / 10) }) { active = .focusFinder }
-                    card("🐾", "Memory Trail", "Watch the path glow, then walk it back.", .kCatLilac,
-                         best: bests["memorytrail"].map { "best trail \($0)" }) { active = .memoryTrail }
-                    card("🎨", "Color Clash", "Tap what you see, not what you read.", .kCatRose,
-                         best: bests["colorclash"].map { "best \($0)/12" }) { active = .colorClash }
+
+                    sectionHeader("Slow down", "For spinning heads and racing clocks.")
+                    card("⏳", "Time Feel", "Your brain vs. the clock — no peeking.", .kCatLilac,
+                         best: bests["timefeel"].map { "best \($0)/100" }) { active = .timeFeel }
                     card("🫧", "Steady Breath", "A square minute for a spinning head.", .kCatMint, best: nil) { active = .breath }
+
                     Text("Honesty corner: these are breaks, not brain training — the science on games \"fixing\" attention is thin, and we won't pretend otherwise.")
                         .font(.kBody(11.5)).foregroundStyle(Color.kInkFaint).padding(.top, 8)
                 }
@@ -78,6 +92,8 @@ struct PlayView: View {
             case .focusFinder: FocusFinderGame { active = nil }
             case .memoryTrail: MemoryTrailGame { active = nil }
             case .colorClash: ColorClashGame { active = nil }
+            case .oddOneOut: OddOneOutGame { active = nil }
+            case .digitSpan: DigitSpanGame { active = nil }
             case .breath: SteadyBreathGame { active = nil }
             }
         }
@@ -85,10 +101,23 @@ struct PlayView: View {
 
     private func refreshBests() {
         var next: [String: Int] = [:]
-        for key in ["timefeel", "quicktap", "emojimatch", "grammarsnap", "spellcheck", "focusfinder", "memorytrail", "colorclash"] {
+        for key in ["timefeel", "quicktap", "emojimatch", "grammarsnap", "spellcheck",
+                    "focusfinder", "memorytrail", "colorclash", "oddoneout", "digitspan"] {
             next[key] = PlayScores.best(for: key)
         }
         bests = next
+    }
+
+    private func sectionHeader(_ label: String, _ blurb: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Text(label.uppercased())
+                .font(.kBody(11.5, weight: .bold)).kerning(1.4)
+                .foregroundStyle(Color.kInkFaint)
+            Text(blurb).font(.kBody(11.5)).foregroundStyle(Color.kInkFaint)
+        }
+        .padding(.top, 10)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
     }
 
     private func card(_ emoji: String, _ title: String, _ hook: String, _ tint: Color, best: String?, _ tap: @escaping () -> Void) -> some View {
