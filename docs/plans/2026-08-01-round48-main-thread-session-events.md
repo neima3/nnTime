@@ -37,25 +37,25 @@ session invalidation, provider activation, or product parity.
 
 ### Task 1: Pin the warning red
 
-- [ ] Extend `testPlanner401InvalidatesSessionAndPublishesOnce` to capture
+- [x] Extend `testPlanner401InvalidatesSessionAndPublishesOnce` to capture
   `Thread.isMainThread` in the real notification observer.
-- [ ] Run the focused app-hosted XCTest and observe failure because the current
+- [x] Run the focused app-hosted XCTest and observe failure because the current
   post inherits the `KairoAPI` actor's executor.
 
 ### Task 2: Isolate UI event delivery
 
-- [ ] In `invalidateAndNotify()`, retain actor-owned invalidation and use
+- [x] In `invalidateAndNotify()`, retain actor-owned invalidation and use
   `await MainActor.run` only around the notification post.
-- [ ] Run the focused XCTest and require main-thread, exactly-once delivery.
-- [ ] Run the native source/contract checks that cover every invalidation path.
+- [x] Run the focused XCTest and require main-thread, exactly-once delivery.
+- [x] Run the native source/contract checks that cover every invalidation path.
 
 ### Task 3: Verify and release
 
-- [ ] Run `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
-- [ ] Run `./scripts/ios-main-thread-gate.sh` and require all app-hosted tests,
+- [x] Run `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
+- [x] Run `./scripts/ios-main-thread-gate.sh` and require all app-hosted tests,
   Main Thread Checker, and the unsigned shipping build to pass without the
   background-publishing warning.
-- [ ] Request independent review and address every Critical/Important finding.
+- [x] Request independent review and address every Critical/Important finding.
 - [ ] Commit, fast-forward `main`, push, and require all GitHub Actions jobs.
 - [ ] Require Coolify to finish the exact pushed SHA and verify live health.
 - [ ] Update this checklist and `docs/plans/progress.md` with exact evidence;

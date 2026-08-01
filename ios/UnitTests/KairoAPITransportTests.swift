@@ -481,11 +481,16 @@ final class KairoAPITransportTests: XCTestCase {
             description: "session invalidated"
         )
         invalidated.expectedFulfillmentCount = 1
+        invalidated.assertForOverFulfill = true
         let observer = NotificationCenter.default.addObserver(
             forName: .kairoSessionInvalidated,
             object: nil,
             queue: nil
         ) { _ in
+            XCTAssertTrue(
+                Thread.isMainThread,
+                "Session invalidation must reach SwiftUI on the main thread"
+            )
             invalidated.fulfill()
         }
         defer {

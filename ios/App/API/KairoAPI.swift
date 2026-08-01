@@ -965,10 +965,12 @@ actor KairoAPI: NativeSyncTransport {
         guard await sessionController.invalidate() else {
             return
         }
-        NotificationCenter.default.post(
-            name: .kairoSessionInvalidated,
-            object: nil
-        )
+        await MainActor.run {
+            NotificationCenter.default.post(
+                name: .kairoSessionInvalidated,
+                object: nil
+            )
+        }
     }
 
     private static func isCancellation(_ error: Error) -> Bool {
