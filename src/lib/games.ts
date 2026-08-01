@@ -458,6 +458,79 @@ export function buildGoSequence(
   return seq;
 }
 
+/* ---- Night Sky (calm constellation tracing) ------------------------------- */
+
+/**
+ * Small invented constellations, points in normalized [0,1] canvas space,
+ * traced in order. No timer, no failure — a wind-down, not a test.
+ */
+export const CONSTELLATIONS: { name: string; points: [number, number][] }[] = [
+  {
+    name: "The Kite",
+    points: [
+      [0.5, 0.08],
+      [0.26, 0.32],
+      [0.74, 0.34],
+      [0.5, 0.58],
+      [0.42, 0.8],
+      [0.6, 0.92],
+    ],
+  },
+  {
+    name: "The Little Cup",
+    points: [
+      [0.18, 0.24],
+      [0.36, 0.5],
+      [0.6, 0.56],
+      [0.82, 0.42],
+      [0.74, 0.18],
+      [0.46, 0.14],
+    ],
+  },
+  {
+    name: "The River",
+    points: [
+      [0.1, 0.85],
+      [0.3, 0.62],
+      [0.44, 0.72],
+      [0.6, 0.45],
+      [0.74, 0.52],
+      [0.88, 0.18],
+    ],
+  },
+  {
+    name: "The Door",
+    points: [
+      [0.3, 0.85],
+      [0.3, 0.25],
+      [0.52, 0.1],
+      [0.72, 0.25],
+      [0.72, 0.85],
+      [0.52, 0.6],
+    ],
+  },
+  {
+    name: "The Fox",
+    points: [
+      [0.14, 0.3],
+      [0.34, 0.16],
+      [0.52, 0.32],
+      [0.72, 0.2],
+      [0.86, 0.44],
+      [0.62, 0.62],
+      [0.36, 0.56],
+    ],
+  },
+];
+
+/** Pick tonight's constellation index from a [0,1) roll. */
+export function pickConstellation(random: () => number = Math.random): number {
+  return Math.min(
+    Math.floor(random() * CONSTELLATIONS.length),
+    CONSTELLATIONS.length - 1,
+  );
+}
+
 /* ---- localStorage bests -------------------------------------------------- */
 
 export type GameId =
@@ -472,7 +545,8 @@ export type GameId =
   | "color-clash"
   | "odd-one-out"
   | "digit-span"
-  | "green-light";
+  | "green-light"
+  | "night-sky";
 
 const KEY = (id: GameId) => `kairo-play-best-${id}`;
 

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Brain breaks arcade (wave 6). Twelve small games in four moods, personal
+ * Brain breaks arcade (wave 7). Thirteen small games in four moods, personal
  * bests only, all client-side. Framed honestly: play that rests the brain —
  * not "training".
  */
@@ -19,6 +19,7 @@ import { ColorClash } from "./games/ColorClash";
 import { OddOneOut } from "./games/OddOneOut";
 import { DigitSpan } from "./games/DigitSpan";
 import { GreenLight } from "./games/GreenLight";
+import { NightSky } from "./games/NightSky";
 
 interface GameCard {
   id: GameId;
@@ -148,6 +149,14 @@ const SECTIONS: { label: string; blurb: string; games: GameCard[] }[] = [
         tint: "bg-cat-mint",
         bestLabel: (v) => `${v} cycles breathed`,
       },
+      {
+        id: "night-sky",
+        emoji: "🌌",
+        title: "Night Sky",
+        hook: "Connect the stars. Nothing is timed.",
+        tint: "bg-cat-lilac",
+        bestLabel: (v) => `${v} skies traced`,
+      },
     ],
   },
 ];
@@ -185,6 +194,7 @@ export function PlayClient() {
   if (active === "odd-one-out") return <OddOneOut onExit={exit} />;
   if (active === "digit-span") return <DigitSpan onExit={exit} />;
   if (active === "green-light") return <GreenLight onExit={exit} />;
+  if (active === "night-sky") return <NightSky onExit={exit} />;
   if (active === "grammar-snap")
     return (
       <QuizGame

@@ -12,6 +12,8 @@ import {
   GO_ROUNDS,
   CLASH_COLOR_NAMES,
   clearMiss,
+  CONSTELLATIONS,
+  pickConstellation,
   extendTrail,
   GRAMMAR_BANK,
   makeSpan,
@@ -728,5 +730,32 @@ describe("green light (go / no-go)", () => {
     const seq = buildGoSequence(() => 0.1);
     const noGos = seq.filter((go) => !go).length;
     expect(noGos).toBeGreaterThanOrEqual(6);
+  });
+});
+
+describe("night sky", () => {
+  it("keeps every star inside the canvas", () => {
+    for (const c of CONSTELLATIONS) {
+      expect(c.points.length).toBeGreaterThanOrEqual(5);
+      for (const [x, y] of c.points) {
+        expect(x).toBeGreaterThanOrEqual(0);
+        expect(x).toBeLessThanOrEqual(1);
+        expect(y).toBeGreaterThanOrEqual(0);
+        expect(y).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it("names every constellation uniquely", () => {
+    const names = CONSTELLATIONS.map((c) => c.name);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("picks deterministically and in range", () => {
+    expect(pickConstellation(() => 0)).toBe(0);
+    expect(pickConstellation(() => 0.999999)).toBe(CONSTELLATIONS.length - 1);
+    expect(pickConstellation(() => 0.5)).toBe(
+      Math.floor(0.5 * CONSTELLATIONS.length),
+    );
   });
 });
