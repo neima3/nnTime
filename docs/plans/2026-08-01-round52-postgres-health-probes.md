@@ -50,11 +50,11 @@ readiness probe.
 ### Task 3: Review and release
 
 - [x] Obtain independent review and resolve every actionable finding.
-- [ ] Fast-forward `main`, rerun merged focused gates, push, and require exact-SHA
+- [x] Fast-forward `main`, rerun merged focused gates, push, and require exact-SHA
   GitHub CI success.
-- [ ] Require both completed Linux service logs to contain zero false-FATAL
+- [x] Require both completed Linux service logs to contain zero false-FATAL
   database line while preserving unit and **21/21** browser coverage.
-- [ ] Require Coolify exact-SHA deployment plus read-only live health, record the
+- [x] Require Coolify exact-SHA deployment plus read-only live health, record the
   handoff, and clean the feature worktree.
 
 ## Self-review

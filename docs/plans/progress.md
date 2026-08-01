@@ -1,5 +1,38 @@
 # Progress log
 
+## 2026-08-01 — Round 52: accurate Postgres CI health probes (Codex)
+
+- **Readiness now targets the real job databases.** The two Postgres service
+  probes previously relied on PostgreSQL's implicit user-named database,
+  connecting to nonexistent `kairo` while each container had created
+  `kairo_test` or `kairo_e2e`. Build-test now probes `kairo_test`; E2E probes
+  `kairo_e2e`. This remains a server-acceptance probe, not a query-level health
+  check.
+- **Full mapping contract.** A YAML-parsed regression test pins, per job, the
+  Postgres 17 image, user, password, created database, application
+  `DATABASE_URL`, published port, explicit `pg_isready -d` target, 5-second
+  interval/timeout, and ten retries. Image, credentials, URLs, timing, app code,
+  schemas, and product behavior are otherwise unchanged.
+- **TDD, review, and local proof.** Both job cases failed first on the missing
+  database target and passed after the two-line workflow fix. Independent
+  review returned READY with no Critical or Important finding; its one minor
+  contract gap for password/application URL and wording nuance about
+  `pg_isready` semantics were resolved. Lint, typecheck, production build,
+  parity, `git diff --check`, and **107 test files / 1,054 tests** passed. Parity
+  remains **89.74% web / 86.93% iOS**.
+- **Exact release proof.** SHA
+  `5fc881a4f4ba31f712e55958014e69389c100d8a` passed GitHub Actions run
+  `30716602234`: build/test, **21/21** Playwright scenarios, generated/native
+  contracts, **378** app-hosted native tests (1 skipped, 0 failures), and the
+  unsigned shipping build. Hosted Docker commands explicitly show the correct
+  databases; both completed Linux service logs contain zero prior false-FATAL
+  line and remain free of Round 51's auth warnings. Coolify deployment
+  `r7poc1qyfx2b4rsj9f7mppod` finished on that exact SHA; live migration, DB, AI,
+  and scheduler checks reported `ok`, and landing returned 200.
+- **Standing boundary.** Phase 7B physical-device/provider lifecycle and Phase
+  8B Google consent/client activation remain external evidence gates. No
+  external provider, production secret, or planner data was changed.
+
 ## 2026-08-01 — Round 51: explicit synthetic auth secrets in CI (Codex)
 
 - **Hosted auth noise converted into a contract.** Round 50's exact green run
