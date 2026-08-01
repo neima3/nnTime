@@ -22,6 +22,9 @@ import {
   ODD_PAIRS,
   ODD_ROUNDS,
   oddGridSize,
+  PATTERN_GRID,
+  patternShowMs,
+  pickPatternTiles,
   pickQuizRounds,
   QUIZ_ROUNDS,
   quickTapAverage,
@@ -805,5 +808,40 @@ describe("letter soup", () => {
     const out = scrambleWord("candle", identity);
     expect(out.join("")).not.toBe("candle");
     expect([...out].sort()).toEqual("candle".split("").sort());
+  });
+});
+
+describe("pattern tiles", () => {
+  it("draws the requested count of distinct in-grid tiles, sorted", () => {
+    for (const count of [3, 5, 9]) {
+      const tiles = pickPatternTiles(count);
+      expect(tiles).toHaveLength(count);
+      expect(new Set(tiles).size).toBe(count);
+      expect([...tiles].sort((a, b) => a - b)).toEqual(tiles);
+      for (const t of tiles) {
+        expect(t).toBeGreaterThanOrEqual(0);
+        expect(t).toBeLessThan(PATTERN_GRID);
+      }
+    }
+  });
+
+  it("caps the draw at the grid size", () => {
+    expect(pickPatternTiles(99)).toHaveLength(PATTERN_GRID);
+  });
+
+  it("is deterministic for a seeded RNG", () => {
+    let calls = 0;
+    const seeded = () => {
+      calls += 1;
+      return (calls * 0.31) % 1;
+    };
+    const a = pickPatternTiles(5, seeded);
+    calls = 0;
+    expect(pickPatternTiles(5, seeded)).toEqual(a);
+  });
+
+  it("scales visible time with the pattern size", () => {
+    expect(patternShowMs(3)).toBe(1650);
+    expect(patternShowMs(9)).toBe(3150);
   });
 });

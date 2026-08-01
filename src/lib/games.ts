@@ -579,6 +579,30 @@ export function scrambleWord(
   return [...word.slice(1).split(""), word[0]!];
 }
 
+/* ---- Pattern Tiles (simultaneous spatial recall) -------------------------- */
+
+export const PATTERN_GRID = 16;
+export const PATTERN_START = 3;
+export const PATTERN_MAX = 9;
+
+/** Draw `count` distinct lit tiles on the 4×4 grid. */
+export function pickPatternTiles(
+  count: number,
+  random: () => number = Math.random,
+): number[] {
+  const idx = Array.from({ length: PATTERN_GRID }, (_, i) => i);
+  for (let i = idx.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [idx[i], idx[j]] = [idx[j]!, idx[i]!];
+  }
+  return idx.slice(0, Math.min(count, PATTERN_GRID)).sort((a, b) => a - b);
+}
+
+/** How long the pattern stays visible before it hides. */
+export function patternShowMs(count: number): number {
+  return 900 + count * 250;
+}
+
 /* ---- localStorage bests -------------------------------------------------- */
 
 export type GameId =
@@ -595,7 +619,8 @@ export type GameId =
   | "digit-span"
   | "green-light"
   | "night-sky"
-  | "letter-soup";
+  | "letter-soup"
+  | "pattern-tiles";
 
 const KEY = (id: GameId) => `kairo-play-best-${id}`;
 

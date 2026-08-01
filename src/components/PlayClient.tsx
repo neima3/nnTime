@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Brain breaks arcade (wave 8). Fourteen small games in four moods, personal
+ * Brain breaks arcade (wave 9). Fifteen small games in four moods, personal
  * bests only, all client-side. Framed honestly: play that rests the brain —
  * not "training".
  */
@@ -21,6 +21,7 @@ import { DigitSpan } from "./games/DigitSpan";
 import { GreenLight } from "./games/GreenLight";
 import { NightSky } from "./games/NightSky";
 import { LetterSoup } from "./games/LetterSoup";
+import { PatternTiles } from "./games/PatternTiles";
 
 interface GameCard {
   id: GameId;
@@ -105,6 +106,14 @@ const SECTIONS: { label: string; blurb: string; games: GameCard[] }[] = [
         hook: "Numbers flash, then it's all you.",
         tint: "bg-cat-peach",
         bestLabel: (v) => `best span ${v}`,
+      },
+      {
+        id: "pattern-tiles",
+        emoji: "🧩",
+        title: "Pattern Tiles",
+        hook: "A few tiles flash together. Hold the shape.",
+        tint: "bg-cat-sky",
+        bestLabel: (v) => `best pattern ${v}`,
       },
     ],
   },
@@ -205,6 +214,7 @@ export function PlayClient() {
   if (active === "green-light") return <GreenLight onExit={exit} />;
   if (active === "night-sky") return <NightSky onExit={exit} />;
   if (active === "letter-soup") return <LetterSoup onExit={exit} />;
+  if (active === "pattern-tiles") return <PatternTiles onExit={exit} />;
   if (active === "grammar-snap")
     return (
       <QuizGame
