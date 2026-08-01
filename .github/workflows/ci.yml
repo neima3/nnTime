@@ -41,6 +41,7 @@ jobs:
       # The CI service container listens on localhost:5432 (runner network).
       TEST_DATABASE_URL: postgresql://kairo:kairo@localhost:5432/kairo_test
       DATABASE_URL: postgresql://kairo:kairo@localhost:5432/kairo_test
+      BETTER_AUTH_SECRET: ci-only-r8V4qP2zN7mK5xT9cL3wH6dF1sJ0bGaeY42uQk
 
     steps:
       - uses: actions/checkout@v6
@@ -172,7 +173,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql://kairo:kairo@localhost:5432/kairo_e2e
-      BETTER_AUTH_SECRET: ci-e2e-throwaway-secret
+      BETTER_AUTH_SECRET: ci-only-r8V4qP2zN7mK5xT9cL3wH6dF1sJ0bGaeY42uQk
       BETTER_AUTH_URL: http://localhost:3456
 
     steps:
