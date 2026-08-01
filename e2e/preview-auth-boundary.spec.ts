@@ -9,15 +9,12 @@ test("signed-out Today preview does not call protected planner APIs", async ({
   });
   await context.clearCookies();
   const page = await context.newPage();
-  const protectedFailures: string[] = [];
+  const protectedRequests: string[] = [];
 
-  page.on("response", (response) => {
-    const url = new URL(response.url());
-    if (
-      url.pathname.startsWith("/api/v1/") &&
-      response.status() === 401
-    ) {
-      protectedFailures.push(`${response.request().method()} ${url.pathname}`);
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname.startsWith("/api/v1/")) {
+      protectedRequests.push(`${request.method()} ${url.pathname}`);
     }
   });
 
@@ -27,9 +24,11 @@ test("signed-out Today preview does not call protected planner APIs", async ({
       timeout: 30_000,
     });
     await expect(page.getByRole("heading", { name: "July 12" })).toBeVisible();
-    await page.waitForLoadState("networkidle");
+    // A negative network assertion needs a bounded observation window. Avoid
+    // `networkidle`: production background traffic can keep it pending forever.
+    await page.waitForTimeout(1_000);
 
-    expect(protectedFailures).toEqual([]);
+    expect(protectedRequests).toEqual([]);
   } finally {
     await context.close();
   }

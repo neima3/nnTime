@@ -1,5 +1,33 @@
 # Progress log
 
+## 2026-08-01 — Round 42: public preview auth boundary + CI failure-path hardening (Codex)
+
+- **Production leak removed.** A fresh signed-out browser session showed the
+  public Today preview rendering correctly while still issuing three doomed
+  protected requests (`/api/v1/stats`, `/api/v1/day/{date}`, and
+  `/api/v1/settings`). The server already knew the visitor was signed out, so
+  Today now passes that boundary into `AppShell`, `NowProvider`, and
+  `SoftStreaks`; preview mode keeps its static fixture without mounting live
+  planner effects. Authenticated Today retains the default live-data behavior.
+- **Regression made release-real.** The new browser test starts from a truly
+  cookie-free context and rejects any `/api/v1/*` request, not merely a 401
+  response. Its first GitHub run (`30699233540`) exposed a test-harness flaw:
+  the page was ready in under half a second, but a `networkidle` wait consumed
+  the 45-second timeout under `pnpm start`. The test now uses a bounded
+  post-hydration observation window. In local production mode it failed in
+  1.4 seconds with the exact three requests when the boundary was deliberately
+  removed, then passed in 1.4 seconds when restored.
+- **Failure path modernized.** The failed run also proved that trace upload was
+  the last workflow action on deprecated Node 20. `actions/upload-artifact`
+  now uses its official Node 24-based v6 major, with a parsed-workflow contract
+  that was observed red on v4 before the upgrade.
+- **Release evidence.** The product fix shipped as `0bbbbff`; Coolify deployment
+  `taz99obzajrgi1hspfm1f6kt` finished on that exact SHA. Desktop and mobile live
+  browser probes rendered the July 12 fixture with no page errors and no 4xx or
+  protected planner requests; live health reported migration, database, AI,
+  and scheduler `ok`. Parity remains **89.74% web / 86.93% iOS**. The final
+  corrective CI/deploy proof is reported in the session handoff.
+
 ## 2026-08-01 — Round 41: Node 24 GitHub Actions hardening (Codex)
 
 - **CI deprecation closed.** Round 40's otherwise-green release surfaced that

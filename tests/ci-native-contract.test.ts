@@ -61,6 +61,14 @@ describe("native API contract CI", () => {
     }
   });
 
+  it("uses the Node 24 artifact runtime on the failure path", () => {
+    const uploadStep = workflow.jobs?.e2e?.steps?.find(
+      (step) => step.name === "Upload traces on failure",
+    );
+
+    expect(uploadStep?.uses).toBe("actions/upload-artifact@v6");
+  });
+
   it("checks canonical sync and generated-client adoption before Swift compilation", () => {
     const steps = workflow.jobs?.["native-contract"]?.steps ?? [];
     const commands = steps.map((step) => step.run ?? "").join("\n");
