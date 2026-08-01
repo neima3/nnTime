@@ -168,18 +168,35 @@ function contrastRatio(foreground: string, background: string): number {
 
 - [x] Request an independent pre-merge review; fix every Critical/Important
   finding and rerun focused/full gates.
-- [ ] Commit the reviewed implementation, fast-forward `main`, and rerun merged
+- [x] Commit the reviewed implementation, fast-forward `main`, and rerun merged
   tests.
-- [ ] Push `main`; require build/test, 15+ standalone Playwright scenarios,
+- [x] Push `main`; require build/test, 15+ standalone Playwright scenarios,
   generated/native contracts, 377 iOS tests, Main Thread Checker gate, and
   unsigned iOS build to pass.
-- [ ] Require Coolify to finish the exact pushed SHA.
-- [ ] Re-run mobile Lighthouse and the read-only anonymous Playwright suite on
+- [x] Require Coolify to finish the exact pushed SHA.
+- [x] Re-run mobile Lighthouse and the read-only anonymous Playwright suite on
   `https://time.neima.me`; capture live light/dark mobile/desktop evidence and
   require `/api/health` fully `ok`.
-- [ ] Update this checklist, the ignored QA report, and
+- [x] Update this checklist, the ignored QA report, and
   `docs/plans/progress.md` with exact SHA/run/deployment evidence. Preserve the
   Phase 7B/8B external activation boundaries.
+
+## Release evidence
+
+- Implementation SHA `5e121320aec26b09faaca669d374274270f3ee46` passed
+  GitHub Actions run `30708541761`: build/test, **15/15** standalone
+  Playwright scenarios, generated/native contracts, **377** app-hosted iOS
+  tests (1 skipped, 0 failures), and the unsigned shipping-app build.
+- Coolify deployment `w7nblm13ifsiayvmeeacc3r3` finished on that exact SHA;
+  its rolling-update healthcheck passed and the app reports
+  `running:healthy`.
+- Live `/api/health` returned migration, DB, AI, and scheduler `ok`; the unique
+  deployed stylesheet contains both `--now-text:#b8241a` and the new
+  saturation-only heavy state. The production anonymous suite passed **3/3**.
+- Live mobile Lighthouse returned landing `99/100/100/100` and Today
+  `100/100/100/90`; both color-contrast audits pass. Eight live light/dark
+  mobile/desktop screenshots were inspected with intact hierarchy and no
+  visible overflow. Product parity remains **89.74% web / 86.93% iOS**.
 
 ## Self-review
 

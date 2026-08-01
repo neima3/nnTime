@@ -1,5 +1,41 @@
 # Progress log
 
+## 2026-08-01 — Round 47: WCAG contrast contract + live accessibility proof (Codex)
+
+- **Contrast fixed without flattening the design.** Production Lighthouse
+  isolated the only accessibility failure on landing and Today: bright coral
+  used as small text, white on bright coral, category ink made translucent,
+  and faint placeholder copy. Kairo now separates coral graphic, surface-text,
+  and on-coral-ink roles; timeline past/done/heavy states use saturation rather
+  than opacity, preserving every category pair's identity and readability.
+- **Signed-in gap caught in review.** Independent review found that the
+  signed-out Today Lighthouse route could not mount the desktop Now card or One
+  Thing eyebrow. Both were migrated to the semantic text token; the audit also
+  corrected a latent undefined overtime-chip background and moved offline
+  status icons to the danger role. No Critical or Important findings remained.
+- **Regression depth.** Nineteen focused contracts pin normal light/dark coral
+  ratios, all raw and post-filter category pairs at WCAG AA, high-contrast
+  overrides, opacity-free timeline states, landing usage, and a recursive
+  component-tree ban on using the bright now graphic token as text/status ink.
+- **Local proof.** Lint, typecheck, production build, **104 test files / 1,045
+  tests**, `git diff --check`, parity, and the deployable standalone artifact's
+  **15/15** Playwright scenarios passed. Local Lighthouse reached accessibility
+  100 on both target routes; eight light/dark mobile/desktop views had no
+  overflow or console errors. Synthetic signed-in Now card and One Thing
+  captures proved the review fix, then the synthetic activity was deleted.
+- **Exact release proof.** SHA `5e12132` passed GitHub Actions run
+  `30708541761`: build/test, standalone E2E, generated/native contracts,
+  **377** app-hosted iOS tests (1 skipped, 0 failures), and unsigned shipping
+  build. Coolify deployment `w7nblm13ifsiayvmeeacc3r3` finished on that exact
+  SHA. Live health reported migration, DB, AI, and scheduler `ok`; the unique
+  Round 47 CSS marker was present; the anonymous production suite passed
+  **3/3**; live Lighthouse scored landing `99/100/100/100` and Today
+  `100/100/100/90`, with both contrast audits passing. Eight live light/dark
+  mobile/desktop captures preserved the visual hierarchy.
+- **Parity and standing boundary.** This is hardening, so parity stays **89.74%
+  web / 86.93% iOS**. Phase 7B physical-device/provider lifecycle and Phase 8B
+  Google consent/client activation remain external evidence gates.
+
 ## 2026-08-01 — Round 46: fail-closed signed-out product previews (Codex)
 
 - **Systemic preview boundary fixed.** Production dogfood found anonymous Week
