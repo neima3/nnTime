@@ -160,6 +160,41 @@ enum ArcadeLogic {
         return seq
     }
 
+    // MARK: Night Sky (calm constellation tracing)
+
+    struct Constellation: Equatable {
+        let name: String
+        let points: [(Double, Double)]
+
+        static func == (lhs: Constellation, rhs: Constellation) -> Bool {
+            lhs.name == rhs.name && lhs.points.count == rhs.points.count
+        }
+    }
+
+    /// Mirrors CONSTELLATIONS in src/lib/games.ts — same names, same points.
+    static let constellations: [Constellation] = [
+        Constellation(name: "The Kite", points: [
+            (0.5, 0.08), (0.26, 0.32), (0.74, 0.34), (0.5, 0.58), (0.42, 0.8), (0.6, 0.92),
+        ]),
+        Constellation(name: "The Little Cup", points: [
+            (0.18, 0.24), (0.36, 0.5), (0.6, 0.56), (0.82, 0.42), (0.74, 0.18), (0.46, 0.14),
+        ]),
+        Constellation(name: "The River", points: [
+            (0.1, 0.85), (0.3, 0.62), (0.44, 0.72), (0.6, 0.45), (0.74, 0.52), (0.88, 0.18),
+        ]),
+        Constellation(name: "The Door", points: [
+            (0.3, 0.85), (0.3, 0.25), (0.52, 0.1), (0.72, 0.25), (0.72, 0.85), (0.52, 0.6),
+        ]),
+        Constellation(name: "The Fox", points: [
+            (0.14, 0.3), (0.34, 0.16), (0.52, 0.32), (0.72, 0.2), (0.86, 0.44), (0.62, 0.62), (0.36, 0.56),
+        ]),
+    ]
+
+    /// Pick tonight's constellation index from a [0,1) roll.
+    static func pickConstellation(random: () -> Double = { Double.random(in: 0..<1) }) -> Int {
+        min(Int(random() * Double(constellations.count)), constellations.count - 1)
+    }
+
     // MARK: Word quizzes (Grammar Snap + Spell Check)
 
     static let quizRounds = 8

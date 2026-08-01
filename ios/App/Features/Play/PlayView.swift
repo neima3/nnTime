@@ -7,7 +7,7 @@ struct PlayView: View {
     @State private var bests: [String: Int] = [:]
     enum Game: String, Identifiable {
         case timeFeel, quickTap, emojiMatch, grammar, spelling, focusFinder, memoryTrail, colorClash, breath,
-             oddOneOut, digitSpan, greenLight
+             oddOneOut, digitSpan, greenLight, nightSky
         var id: String { rawValue }
     }
 
@@ -49,6 +49,8 @@ struct PlayView: View {
                     card("⏳", "Time Feel", "Your brain vs. the clock — no peeking.", .kCatLilac,
                          best: bests["timefeel"].map { "best \($0)/100" }) { active = .timeFeel }
                     card("🫧", "Steady Breath", "A square minute for a spinning head.", .kCatMint, best: nil) { active = .breath }
+                    card("🌌", "Night Sky", "Connect the stars. Nothing is timed.", .kCatLilac,
+                         best: bests["nightsky"].flatMap { $0 > 0 ? "\($0) skies traced" : nil }) { active = .nightSky }
 
                     Text("Honesty corner: these are breaks, not brain training — the science on games \"fixing\" attention is thin, and we won't pretend otherwise.")
                         .font(.kBody(11.5)).foregroundStyle(Color.kInkFaint).padding(.top, 8)
@@ -97,6 +99,7 @@ struct PlayView: View {
             case .oddOneOut: OddOneOutGame { active = nil }
             case .digitSpan: DigitSpanGame { active = nil }
             case .greenLight: GreenLightGame { active = nil }
+            case .nightSky: NightSkyGame { active = nil }
             case .breath: SteadyBreathGame { active = nil }
             }
         }
@@ -105,7 +108,7 @@ struct PlayView: View {
     private func refreshBests() {
         var next: [String: Int] = [:]
         for key in ["timefeel", "quicktap", "emojimatch", "grammarsnap", "spellcheck",
-                    "focusfinder", "memorytrail", "colorclash", "oddoneout", "digitspan", "greenlight"] {
+                    "focusfinder", "memorytrail", "colorclash", "oddoneout", "digitspan", "greenlight", "nightsky"] {
             next[key] = PlayScores.best(for: key)
         }
         bests = next
@@ -246,6 +249,14 @@ enum PlayScores {
         let best = max(value, prev ?? value)
         if prev == nil || value > prev! { store.set(best, forKey: k) }
         return best
+    }
+
+    /// Accumulate a lifetime counter (e.g. skies traced); returns the total.
+    static func recordCount(_ value: Int, for key: String) -> Int {
+        let k = "kairo-best-\(key)"
+        let total = (store.object(forKey: k) as? Int ?? 0) + value
+        store.set(total, forKey: k)
+        return total
     }
 
     /// Record a score where lower is better (e.g. reaction ms); returns best.

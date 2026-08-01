@@ -239,4 +239,34 @@ final class PlayArcadeLogicTests: XCTestCase {
     func testGoSequenceIsAllGoAboveTheNoGoBand() {
         XCTAssertTrue(ArcadeLogic.buildGoSequence(random: { 0.9 }).allSatisfy { $0 })
     }
+
+    // MARK: Night Sky
+
+    func testConstellationsMatchTheWebContract() {
+        XCTAssertEqual(ArcadeLogic.constellations.count, 5)
+        let names = ArcadeLogic.constellations.map(\.name)
+        XCTAssertEqual(Set(names).count, names.count, "names are unique")
+        for sky in ArcadeLogic.constellations {
+            XCTAssertGreaterThanOrEqual(sky.points.count, 5)
+            for (x, y) in sky.points {
+                XCTAssertTrue((0.0...1.0).contains(x))
+                XCTAssertTrue((0.0...1.0).contains(y))
+            }
+        }
+    }
+
+    func testPickConstellationIsDeterministicAndInRange() {
+        XCTAssertEqual(ArcadeLogic.pickConstellation(random: { 0 }), 0)
+        XCTAssertEqual(
+            ArcadeLogic.pickConstellation(random: { 0.999999 }),
+            ArcadeLogic.constellations.count - 1)
+    }
+
+    func testRecordCountAccumulatesALifetimeTotal() {
+        let key = "test-count-\(UUID().uuidString)"
+        XCTAssertEqual(PlayScores.recordCount(1, for: key), 1)
+        XCTAssertEqual(PlayScores.recordCount(1, for: key), 2)
+        XCTAssertEqual(PlayScores.recordCount(3, for: key), 5)
+        XCTAssertEqual(PlayScores.best(for: key), 5)
+    }
 }
