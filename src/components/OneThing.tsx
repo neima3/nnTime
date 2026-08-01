@@ -91,7 +91,7 @@ export function OneThing() {
         <div className="rise-in flex max-w-lg flex-col items-center text-center">
           <p
             className={`text-[12px] font-bold uppercase tracking-[0.16em] ${
-              current ? "text-now" : "text-ink-faint"
+              current ? "text-now-text" : "text-ink-faint"
             }`}
           >
             {current ? "This is the only thing" : `Next · at ${formatTime(subject.startMin, hourCycle)}`}

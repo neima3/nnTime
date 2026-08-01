@@ -29,7 +29,8 @@
 
   /* now-line + semantic */
   --now: #ff5c4d;
-  --now-ink: #ffffff; /* text on --now; white in both themes by design */
+  --now-text: #b8241a;
+  --now-ink: #241f31;
   --success: #1e7354;
   --success-soft: #d9f0e4;
   --danger: #c93a3a;
@@ -67,7 +68,8 @@
   --iris-ghost: #262242;
 
   --now: #ff6f61;
-  --now-ink: #ffffff;
+  --now-text: #ff8a7d;
+  --now-ink: #241f31;
   --success: #4cc593;
   --success-soft: #1d3a2e;
   --danger: #f07d7d;
@@ -100,6 +102,7 @@
   --color-iris-soft: var(--iris-soft);
   --color-iris-ghost: var(--iris-ghost);
   --color-now: var(--now);
+  --color-now-text: var(--now-text);
   --color-now-ink: var(--now-ink);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
@@ -145,15 +148,19 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Past (incomplete) timeline blocks — desaturated in light, opacity-only in
-   dark where saturate() turns the deep category fills muddy. */
+/* Timeline state is communicated without translucency so category ink keeps
+   its contrast-tuned relationship with the fill underneath it. */
 .timeline-past {
-  opacity: 0.55;
   filter: saturate(0.5);
 }
 .dark .timeline-past {
-  opacity: 0.45;
-  filter: none;
+  filter: saturate(0.72);
+}
+.timeline-done {
+  filter: saturate(0.42);
+}
+.timeline-heavy {
+  filter: saturate(0.58);
 }
 
 /* Gentle entrance for timeline blocks + cards (collapsed by the global
@@ -320,6 +327,8 @@ input:focus-visible,
   --iris-ghost: #eeebfd;
 
   --now: #b8241a;
+  --now-text: #b8241a;
+  --now-ink: #fffdf9;
   --success: #10603f;
   --success-soft: #cdeddd;
   --danger: #a3221f;
@@ -351,6 +360,8 @@ input:focus-visible,
   --iris-ghost: #241f45;
 
   --now: #ff8a7d;
+  --now-text: #ff8a7d;
+  --now-ink: #241f31;
   --success: #79e0b0;
   --success-soft: #17402f;
   --danger: #ff9d9d;
@@ -364,12 +375,14 @@ input:focus-visible,
   --cat-rose-ink: #ffc2d8;
 }
 
-/* Past blocks are dimmed + desaturated by default, which directly fights the
-   point of this mode — a high-contrast user was reading 0.55-opacity titles.
-   Keep them recognisably "past" (slightly back) but fully legible. */
+/* State labels and strikethrough remain visible; high-contrast mode restores
+   the category colors themselves to full strength. */
 .high-contrast .timeline-past,
-.high-contrast.dark .timeline-past {
-  opacity: 0.88;
+.high-contrast.dark .timeline-past,
+.high-contrast .timeline-done,
+.high-contrast.dark .timeline-done,
+.high-contrast .timeline-heavy,
+.high-contrast.dark .timeline-heavy {
   filter: none;
 }
 
@@ -399,6 +412,9 @@ input:focus-visible,
     --ink-faint: #3a3348;
     --iris: #3d31b5;
     --iris-deep: #2e2496;
+    --now: #b8241a;
+    --now-text: #b8241a;
+    --now-ink: #fffdf9;
   }
   html.dark {
     --border: #7d7591;
@@ -408,6 +424,9 @@ input:focus-visible,
     --ink-faint: #c2bbd4;
     --iris: #b3aaff;
     --iris-deep: #c9c2ff;
+    --now: #ff8a7d;
+    --now-text: #ff8a7d;
+    --now-ink: #241f31;
   }
 }
 

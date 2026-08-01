@@ -74,6 +74,11 @@ coral text on a surface; `--now` remains reserved for current-time graphics;
   category metadata.
 - Modify `src/components/TimelineCanvas.tsx`: use the new state classes and
   fully opaque category metadata/checklists.
+- Modify `src/components/NowBar.tsx`, `OneThing.tsx`, and
+  `CurrentActivityRing.tsx`: migrate signed-in Today text and overtime text to
+  `--now-text`; remove the latent undefined `bg-now-soft` utility.
+- Modify `src/components/OfflineIndicator.tsx`: use the danger role for offline
+  status icons instead of the current-time graphic token.
 - Modify `src/app/a11y-css.test.ts`: add executable WCAG token/state contracts.
 - Modify `docs/design/design-spec.md`: record the three coral token roles and
   the non-opacity activity-state rule.
@@ -84,7 +89,7 @@ coral text on a surface; `--now` remains reserved for current-time graphics;
 
 ### Task 1: Pin the contrast regression red
 
-- [ ] Add test helpers in `src/app/a11y-css.test.ts` that extract token values,
+- [x] Add test helpers in `src/app/a11y-css.test.ts` that extract token values,
   compute sRGB relative luminance, and compute contrast ratios:
 
 ```ts
@@ -103,35 +108,35 @@ function contrastRatio(foreground: string, background: string): number {
 }
 ```
 
-- [ ] Require light/dark `--now-text`/surface, `--now-ink`/now, and all six
+- [x] Require light/dark `--now-text`/surface, `--now-ink`/now, and all six
   category ink/fill pairs to measure `>= 4.5`.
-- [ ] Require `.timeline-past`, `.timeline-done`, and `.timeline-heavy` to exist
+- [x] Require `.timeline-past`, `.timeline-done`, and `.timeline-heavy` to exist
   without `opacity`; reject `${cat.ink} opacity-` in `TimelineCanvas.tsx`.
-- [ ] Require landing small coral labels to use `text-now-text`, category demo
+- [x] Require landing small coral labels to use `text-now-text`, category demo
   metadata to have no opacity utility, and the placeholder to use
   `text-ink-soft`.
-- [ ] Run `pnpm test src/app/a11y-css.test.ts` and observe failure because
+- [x] Run `pnpm test src/app/a11y-css.test.ts` and observe failure because
   `--now-text` and the new state classes do not exist and opacity remains.
 
 ### Task 2: Establish the semantic token contract
 
-- [ ] In `:root`, add `--now-text: #b8241a` and set
+- [x] In `:root`, add `--now-text: #b8241a` and set
   `--now-ink: #241f31`; in `.dark`, add `--now-text: #ff8a7d` and keep
   `--now-ink: #241f31`.
-- [ ] Add `--color-now-text: var(--now-text)` to `@theme inline`.
-- [ ] Override `--now-text` and `--now-ink` consistently in both high-contrast
+- [x] Add `--color-now-text: var(--now-text)` to `@theme inline`.
+- [x] Override `--now-text` and `--now-ink` consistently in both high-contrast
   theme blocks and both branches of `prefers-contrast: more`.
-- [ ] Update `docs/design/design-spec.md` so `--now`, `--now-text`, and
+- [x] Update `docs/design/design-spec.md` so `--now`, `--now-text`, and
   `--now-ink` each have one unambiguous role.
-- [ ] Run the focused test; token-ratio assertions must pass while source/state
+- [x] Run the focused test; token-ratio assertions must pass while source/state
   assertions remain red.
 
 ### Task 3: Preserve category identity without translucency
 
-- [ ] In `TimelineCanvas.tsx`, replace whole-card `opacity-70` and `opacity-55`
+- [x] In `TimelineCanvas.tsx`, replace whole-card `opacity-70` and `opacity-55`
   with `timeline-done` and `timeline-heavy`, remove title/meta/checklist opacity
   utilities, and retain strikethrough plus the explicit `heavy for today` text.
-- [ ] In `globals.css`, define normal state rules with no opacity:
+- [x] In `globals.css`, define normal state rules with no opacity:
 
 ```css
 .timeline-past { filter: saturate(0.5); }
@@ -140,28 +145,28 @@ function contrastRatio(foreground: string, background: string): number {
 .timeline-heavy { filter: saturate(0.58); }
 ```
 
-- [ ] Update the high-contrast override so all three state classes use
+- [x] Update the high-contrast override so all three state classes use
   `filter: none`, with no opacity declaration.
-- [ ] In `page.tsx`, remove category metadata opacity, use `text-now-text` for
+- [x] In `page.tsx`, remove category metadata opacity, use `text-now-text` for
   small coral labels, and change the sunken placeholder to `text-ink-soft`.
-- [ ] Run `pnpm test src/app/a11y-css.test.ts`; all contrast and source
+- [x] Run `pnpm test src/app/a11y-css.test.ts`; all contrast and source
   contracts must pass.
 
 ### Task 4: Prove rendered light/dark accessibility
 
-- [ ] Run `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
-- [ ] Boot the standalone artifact on an isolated port with an ephemeral Better
+- [x] Run `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
+- [x] Boot the standalone artifact on an isolated port with an ephemeral Better
   Auth secret and run all Playwright scenarios.
-- [ ] Run mobile Lighthouse against standalone `/` and
+- [x] Run mobile Lighthouse against standalone `/` and
   `/app/today?preview=1`; require accessibility 100 and performance >=90.
-- [ ] Use Playwright to capture landing and Today at 390×844 and 1440×900 in
+- [x] Use Playwright to capture landing and Today at 390×844 and 1440×900 in
   both light and dark modes; inspect all eight for visual hierarchy, state
   differentiation, and overflow.
-- [ ] Run `node scripts/parity.mjs`; require unchanged 89.74% web / 86.93% iOS.
+- [x] Run `node scripts/parity.mjs`; require unchanged 89.74% web / 86.93% iOS.
 
 ### Task 5: Review, release, and verify
 
-- [ ] Request an independent pre-merge review; fix every Critical/Important
+- [x] Request an independent pre-merge review; fix every Critical/Important
   finding and rerun focused/full gates.
 - [ ] Commit the reviewed implementation, fast-forward `main`, and rerun merged
   tests.

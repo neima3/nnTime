@@ -21,8 +21,10 @@ doubt, copy patterns from them, don't improvise.
 - Surfaces: `--surface`, `--surface-raised`, `--surface-sunken`, borders `--border`/`--border-strong`.
 - Ink scale: `--ink`, `--ink-soft`, `--ink-faint`, `--ink-inverse`.
 - Primary **iris** `--iris` (#5b4fd6 light / #8c81ea dark) + `-deep`, `-soft`, `-ghost`.
-- **Now** coral `--now` — reserved EXCLUSIVELY for the current-time indicator and
-  "happening now" rings. Never decorative.
+- **Now** coral has three contrast-safe roles: `--now` is reserved EXCLUSIVELY
+  for the current-time line, dot, and "happening now" rings; `--now-text` is
+  coral text on a surface; `--now-ink` is text placed directly on `--now`.
+  Never use the bright graphic token as small text or assume white passes on it.
 - Semantic: `--success(-soft)`, `--danger(-soft)`.
 - **Six category pastels** (fill + ink pairs): peach, butter, mint, sky, lilac, rose.
   Every activity belongs to one. Fill = block background; ink = text/icons on that fill.
@@ -73,8 +75,10 @@ doubt, copy patterns from them, don't improvise.
   strikethrough when done), `start – end · duration` meta, checklist `n/m` +
   energy chips on `bg-surface-raised/70`, complete button (circle, fills success).
   Blocks < ~76px tall switch to compact single-line layout.
-- States: past = `opacity-55 saturate-50`; current = `ring-2 ring-now/70 shadow-float`;
-  future = full color.
+- States: past, completed, and low-battery-heavy use the `timeline-past`,
+  `timeline-done`, and `timeline-heavy` saturation filters; never lower the
+  activity card or category-ink opacity. Current =
+  `ring-2 ring-now/70 shadow-float`; future = full color.
 - Now-line: coral, time tag in gutter, dot at left, z-above blocks.
 - Right rail (≥lg): "Anytime" card (untimed tasks, drag-in affordance) + iris
   "Up next" card with Start early action.
@@ -148,8 +152,8 @@ agents copy these exactly:
 
 ## Token canonicality (resolves the review contradiction)
 Named design tokens in `globals.css` are **canonical**. Raw hex values are
-allowed ONLY inside token definitions in that file — `--surface-raised` and
-`--now-ink` legitimately resolve to `#ffffff` there. The "no pure white/black"
+allowed ONLY inside token definitions in that file — `--surface-raised`
+legitimately resolves to `#ffffff` there. The "no pure white/black"
 rule governs *surfaces and text at the component level*: components reference
 tokens (`text-now-ink`, `bg-surface-raised`), never Tailwind literals
 (`text-white`, `bg-black`) or inline hex. If a needed color has no token,

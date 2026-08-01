@@ -79,11 +79,11 @@ export function OfflineIndicator({ userId }: { userId: string | null }) {
     >
       <div className="flex items-start gap-2.5 text-[13px] font-semibold">
         {terminal > 0 ? (
-          <AlertTriangle size={17} className="mt-0.5 shrink-0 text-now" />
+          <AlertTriangle size={17} className="mt-0.5 shrink-0 text-danger" />
         ) : (
           <CloudOff
             size={17}
-            className={`mt-0.5 shrink-0 ${online ? "text-iris" : "text-now"}`}
+            className={`mt-0.5 shrink-0 ${online ? "text-iris" : "text-danger"}`}
           />
         )}
         <div className="min-w-0 flex-1">

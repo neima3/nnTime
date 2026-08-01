@@ -69,7 +69,7 @@ export function CurrentActivityRing({
       </svg>
       <span className="text-base">{emoji}</span>
       {isOvertime && (
-        <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-now-soft px-1.5 py-0.5 text-[10px] font-bold text-now">
+        <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md border border-now/30 bg-surface px-1.5 py-0.5 text-[10px] font-bold text-now-text">
           +{Math.floor(nowMin - activityStart - activityDuration)}m
         </span>
       )}

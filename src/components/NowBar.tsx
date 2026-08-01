@@ -272,7 +272,7 @@ export function NowCard({ active }: { active: string }) {
     >
       <p
         className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] ${
-          isNow ? "text-now" : "text-ink-faint"
+          isNow ? "text-now-text" : "text-ink-faint"
         }`}
       >
         {isNow && (

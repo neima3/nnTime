@@ -180,7 +180,7 @@ export default function LandingPage() {
                     )}
                     <div
                       className={`flex items-center gap-3 rounded-2xl px-3.5 py-3 ${cat.fill} ${
-                        b.done ? "opacity-55 saturate-50" : ""
+                        b.done ? "timeline-done" : ""
                       } ${b.now ? "ring-2 ring-now/60" : ""}`}
                     >
                       <span className="grid size-9 place-items-center rounded-full bg-surface-raised/80 text-base">
@@ -194,7 +194,7 @@ export default function LandingPage() {
                         >
                           {b.title}
                         </p>
-                        <p className={`tnum text-[11.5px] font-medium ${cat.ink} opacity-70`}>
+                        <p className={`tnum text-[11.5px] font-medium ${cat.ink}`}>
                           {b.time}
                         </p>
                       </div>
@@ -235,7 +235,7 @@ export default function LandingPage() {
                 &ldquo;Now&rdquo; follows you everywhere
               </h3>
               <div className="mt-4 rounded-2xl border border-now/30 bg-surface p-3.5 shadow-card">
-                <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-now">
+                <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-now-text">
                   <span className="size-2 rounded-full bg-now" aria-hidden /> Now
                 </p>
                 <p className="mt-1 text-[14px] font-semibold">🎨 Deep work</p>
@@ -305,7 +305,7 @@ export default function LandingPage() {
                 Out of your head in 3 seconds
               </h3>
               <div className="mt-4 flex items-center gap-2 rounded-2xl border border-border bg-surface p-2.5 shadow-card">
-                <span className="flex-1 rounded-xl bg-surface-sunken px-3 py-2 text-[13px] text-ink-faint">
+                <span className="flex-1 rounded-xl bg-surface-sunken px-3 py-2 text-[13px] text-ink-soft">
                   tuesday 3pm dentist…
                 </span>
                 <span className="rounded-xl bg-iris px-2.5 py-2 text-[11px] font-bold text-ink-inverse">
@@ -327,7 +327,7 @@ export default function LandingPage() {
                 One thing at a time, literally
               </h3>
               <div className="mt-4 rounded-2xl border border-border bg-surface p-4 text-center shadow-card">
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-now">
+                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-now-text">
                   This is the only thing
                 </p>
                 <p className="mt-1.5 text-[15px] font-bold">🧘 Stretch break</p>

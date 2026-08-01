@@ -390,7 +390,7 @@ export function TimelineCanvas({
               aria-keyshortcuts="ArrowUp ArrowDown + - Enter"
               className={`group absolute flex gap-3 overflow-hidden rounded-2xl px-3.5 outline-none transition-transform hover:-translate-y-px hover:shadow-card focus-visible:ring-2 focus-visible:ring-iris ${cat.fill} ${
                 past && !a.done ? "timeline-past" : ""
-              } ${a.done ? "opacity-70" : ""} ${heavy ? "opacity-55" : ""} ${current ? "shadow-float ring-2 ring-now/70" : ""} ${
+              } ${a.done ? "timeline-done" : ""} ${heavy ? "timeline-heavy" : ""} ${current ? "shadow-float ring-2 ring-now/70" : ""} ${
                 compact ? "items-center py-1.5" : "py-3"
               } ${hasConflict ? "ring-2 ring-danger animate-pulse" : ""} rise-in cursor-grab active:cursor-grabbing`}
               style={{
@@ -425,11 +425,11 @@ export function TimelineCanvas({
                 <p
                   className={`truncate font-semibold leading-tight ${cat.ink} ${
                     compact ? "text-[14px]" : "text-[15px]"
-                  } ${a.done ? "line-through decoration-2 opacity-70" : ""}`}
+                  } ${a.done ? "line-through decoration-2" : ""}`}
                 >
                   {a.title}
                 </p>
-                <p className={`tnum mt-0.5 truncate text-[12px] font-medium ${cat.ink} opacity-70`}>
+                <p className={`tnum mt-0.5 truncate text-[12px] font-medium ${cat.ink}`}>
                   {a.recurring && (
                     <span title="Repeats" aria-label="Repeats">
                       ↻{" "}
@@ -466,7 +466,7 @@ export function TimelineCanvas({
                               type="button"
                               aria-pressed={stepDone}
                               aria-label={`${stepDone ? "Uncheck" : "Check"} step: ${c.label}`}
-                              className={`max-w-full truncate rounded text-left text-[11px] font-medium ${cat.ink} opacity-60 transition-opacity hover:opacity-100 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none ${
+                              className={`max-w-full truncate rounded text-left text-[11px] font-medium ${cat.ink} focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none ${
                                 stepDone ? "line-through" : ""
                               }`}
                               onPointerDown={(e) => e.stopPropagation()}
@@ -491,7 +491,7 @@ export function TimelineCanvas({
                             </button>
                           ) : (
                             <span
-                              className={`text-[11px] font-medium ${cat.ink} opacity-60 ${
+                              className={`text-[11px] font-medium ${cat.ink} ${
                                 stepDone ? "line-through" : ""
                               }`}
                             >
@@ -510,7 +510,7 @@ export function TimelineCanvas({
                   <button
                     type="button"
                     aria-label={`Focus on ${a.title}`}
-                    className={`grid place-items-center rounded-full border-2 border-current opacity-40 hover:opacity-100 ${cat.ink} ${
+                    className={`grid place-items-center rounded-full border-2 border-current ${cat.ink} hover:bg-surface-raised/50 ${
                       compact ? "size-7" : "size-8"
                     }`}
                     onPointerDown={(e) => e.stopPropagation()}
@@ -531,7 +531,7 @@ export function TimelineCanvas({
                     } ${
                       a.done
                         ? "border-transparent bg-success text-ink-inverse"
-                        : `border-current ${cat.ink} opacity-50 hover:opacity-100 hover:bg-surface-raised/50`
+                         : `border-current ${cat.ink} hover:bg-surface-raised/50`
                     }`}
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={async (e) => {
