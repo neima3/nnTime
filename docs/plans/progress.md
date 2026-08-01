@@ -1,5 +1,47 @@
 # Progress log
 
+## 2026-08-01 — Round 50: warning-clean native release gates (Codex)
+
+- **Swift concurrency debt removed with checked semantics.** The hosted Round 49
+  log exposed `WidgetCompletionService` crossing an App Intent boundary with a
+  non-`Sendable` `DayCacheStore`. `DayCacheStore`, `CachedBlock`, and `Snapshot`
+  now satisfy checked `Sendable` without `@unchecked`; the immutable stored
+  `FileManager` reference was removed in favor of operation-local
+  `FileManager.default`. Widget network-first/cache behavior is unchanged. The
+  separate immutable Google auth tour control is now `let`.
+- **Warnings became a fail-closed release contract.** Every repository Xcode
+  invocation now passes through one wrapper that captures output, preserves
+  Xcode and log-writer failures, and rejects warning locations inside Kairo
+  Swift sources. Executable fixtures prove warning rejection, log-write failure,
+  temp-file cleanup, and macOS/Linux-portable `mktemp` behavior. The app-hosted
+  test and separate unsigned shipping build therefore share the same policy.
+- **TDD and independent review.** Strict widget compilation failed first on the
+  store and then its stored `FileManager`. The warning fixture, log-failure
+  fixture, leak contract, and Linux template contract were each observed red.
+  Independent review initially found the unsigned-build coverage gap, then the
+  temp leak/fail-open edge; all findings were resolved and the final verdict was
+  READY with no Critical or Important issue.
+- **Local proof.** Lint, typecheck, production build, generated-client sync and
+  adoption, Apple release preflight, Swift package tests, parity, and unsigned
+  shipping build passed. The final web suite passed **105 files / 1,051 tests**;
+  the app-hosted native gate executed **378 tests** (1 skipped, 0 failures) with
+  no Main Thread Checker violation or Kairo Swift warning. Parity remains
+  **89.74% web / 86.93% iOS** because this is hardening, not feature credit.
+- **Exact release proof, including hosted recovery.** Initial SHA `3aa9837`
+  exposed GNU `mktemp` rejecting the BSD-only invocation in CI run
+  `30714745021`; no success was claimed. Portable hotfix SHA
+  `6115523c2bc6912571f2513850af79fbc4c10c57` passed run `30714861148`:
+  build/test, **21/21** Playwright scenarios, generated/native contracts,
+  **378** app-hosted tests (1 skipped, 0 failures), and unsigned build. Its native
+  log contains no Kairo-source warning. Coolify deployment
+  `pzt666qroy74cr9q6d2n0u19` finished on that exact SHA; live health reported
+  migration, DB, AI, and scheduler `ok`, and landing returned 200.
+- **Next hardening target and standing boundary.** The clean run exposed noisy
+  auth configuration in both Linux jobs: build-test used Better Auth's default
+  secret and E2E's public synthetic secret was short/low-entropy. Round 51 fixes
+  this CI-only contract. Phase 7B physical-device/provider lifecycle and Phase
+  8B Google consent/client activation remain external evidence gates.
+
 ## 2026-08-01 — Round 49: truthful signed-out preview semantics (Codex)
 
 - **Production dogfood converted into one capability contract.** A fresh
