@@ -118,14 +118,14 @@ Better Auth, Vitest, Playwright.
 
 ### Task 6: Release and verify
 
-- [ ] Update `docs/plans/progress.md` and the ignored Round 46 QA report with
+- [x] Update `docs/plans/progress.md` and the ignored Round 46 QA report with
   local proof.
-- [ ] Commit the reviewed diff, fast-forward `main`, and rerun the merged tests.
-- [ ] Push `main`; require GitHub build/test, 13+ Playwright tests, generated
+- [x] Commit the reviewed diff, fast-forward `main`, and rerun the merged tests.
+- [x] Push `main`; require GitHub build/test, 13+ Playwright tests, generated
   native contracts, 377 iOS tests, Main Thread Checker, and unsigned iOS build
   to pass.
-- [ ] Require Coolify to finish the exact pushed SHA.
-- [ ] Re-run the signed-out route matrix and Week-to-Editor flow on
+- [x] Require Coolify to finish the exact pushed SHA.
+- [x] Re-run the signed-out route matrix and Week-to-Editor flow on
   `https://time.neima.me`; capture live mobile/desktop evidence and verify
   `/api/health` remains fully `ok`.
 

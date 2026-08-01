@@ -1,5 +1,45 @@
 # Progress log
 
+## 2026-08-01 — Round 46: fail-closed signed-out product previews (Codex)
+
+- **Systemic preview boundary fixed.** Production dogfood found anonymous Week
+  exposing the real activity editor and the shared shell probing protected day,
+  settings, stats, and categories APIs. One server-seeded, fail-closed session
+  boundary now prevents anonymous previews from mounting protected shell
+  effects while preserving their polished fixture content.
+- **Route-owned live clients gated.** Editor, Focus, Stats, Settings, and the AI
+  Planner now render actionable Kairo sign-in cards before their live clients
+  can mount. Week intentions remain hidden for previews. An independent review
+  found a second interaction edge in Routines; its anonymous fixture is now
+  read-only, all mutation/player controls require the server-known session, and
+  the player cannot issue a protected request anonymously.
+- **Regression and review evidence.** The boundary unit contract was observed
+  red before implementation and now covers fail-closed missing-provider,
+  signed-out fallback, and signed-in child behavior. The anonymous Playwright
+  project covers all 14 product preview routes plus Week-to-Editor and Routines
+  sign-in interactions. Independent pre-merge review reported no remaining
+  Critical or Important findings after the Routines correction.
+- **Local release evidence.** Lint, typecheck, production build, **104 test
+  files / 1,036 tests**, parity, and `git diff --check` passed. The deployable
+  standalone artifact passed **15/15** Playwright tests. Mobile Week-to-Editor
+  and desktop Settings were visually inspected with no overflow, console
+  errors/warnings, or protected API requests. Parity remains **89.74% web /
+  86.93% iOS** because this is hardening, not new feature credit.
+- **Exact release proof.** Implementation SHA `656f125` passed GitHub Actions
+  run `30705815880`: build/test, **15/15** standalone Playwright scenarios,
+  generated/native contracts, **377** app-hosted iOS tests (1 skipped, 0
+  failures), Main Thread Checker gate, and unsigned shipping-app build. The
+  native job's first dependency install hit a hosted-runner pnpm-cache reflink
+  `Illegal byte sequence`; the failed-job rerun cleared install and every native
+  gate without a repository change. Coolify deployment
+  `fr5vwrdyttzn8nbocrg2x1f3` finished on the exact implementation SHA. Live
+  health reported migration, DB, AI, and scheduler `ok`; the read-only
+  production anonymous suite passed **3/3**, and live 390×844 Editor plus
+  1440×900 Settings screenshots confirmed the actionable auth presentation.
+- **Standing boundary.** Phase 7B physical-device/provider lifecycle and Phase
+  8B Google consent/client activation remain external evidence gates; no
+  checkbox or parity credit was changed.
+
 ## 2026-08-01 — Round 45: fail-closed password-reset recovery (Codex)
 
 - **Dead-end removed.** Live signed-out dogfood showed `/reset-password` with no
