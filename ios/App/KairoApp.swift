@@ -14,6 +14,7 @@ struct KairoApp: App {
         if ProcessInfo.processInfo.arguments.contains("-kairoResetOnboarding") {
             KairoPrefs.hasOnboarded = false
         }
+        KairoPrefs.apiBaseURL = KairoAPI.shared.baseURL
     }
 
     var body: some Scene {

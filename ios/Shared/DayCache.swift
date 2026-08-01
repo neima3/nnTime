@@ -101,7 +101,8 @@ struct DayCacheStore {
         date: String,
         activityID: String,
         occurrenceKey: String,
-        done: Bool
+        done: Bool,
+        newRevision: Int? = nil
     ) throws -> Snapshot {
         guard
             !activityID.trimmingCharacters(
@@ -152,7 +153,7 @@ struct DayCacheStore {
             done: done,
             category: block.category,
             activityId: block.activityId,
-            revision: block.revision,
+            revision: newRevision ?? block.revision,
             occurrenceKey: block.occurrenceKey
         )
         let updated = Snapshot(
@@ -220,6 +221,10 @@ enum DayCache {
         directory: cacheDirectory
     )
 
+    /// The live store, for callers (widget completion) that need instance
+    /// APIs against the real cache location.
+    static var defaultStore: DayCacheStore { store }
+
     typealias Snapshot = DayCacheStore.Snapshot
 
     static func write(
@@ -253,14 +258,16 @@ enum DayCache {
         date: String,
         activityID: String,
         occurrenceKey: String,
-        done: Bool
+        done: Bool,
+        newRevision: Int? = nil
     ) throws -> Snapshot {
         try store.updateStatus(
             scope: scope,
             date: date,
             activityID: activityID,
             occurrenceKey: occurrenceKey,
-            done: done
+            done: done,
+            newRevision: newRevision
         )
     }
 

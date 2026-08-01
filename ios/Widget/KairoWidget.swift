@@ -1,3 +1,4 @@
+import AppIntents
 import WidgetKit
 import SwiftUI
 
@@ -125,6 +126,46 @@ struct NextUpWidgetView: View {
         }
     }
 
+    /// The done button, only when the cached row carries the full identity
+    /// the network write needs. Legacy snapshots render read-only.
+    @ViewBuilder
+    private func doneButton(
+        _ block: CachedBlock,
+        size: CGFloat,
+        tint: Color
+    ) -> some View {
+        if let activityID = block.activityId,
+           let occurrenceKey = block.occurrenceKey,
+           let revision = block.revision
+        {
+            Button(intent: CompleteBlockIntent(
+                activityID: activityID,
+                occurrenceKey: occurrenceKey,
+                revision: revision,
+                done: !block.done
+            )) {
+                ZStack {
+                    Circle()
+                        .strokeBorder(tint.opacity(0.55), lineWidth: 1.8)
+                    if block.done {
+                        Circle().fill(tint.opacity(0.9))
+                        Image(systemName: "checkmark")
+                            .font(.system(size: size * 0.42, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                }
+                .frame(width: size, height: size)
+                .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(
+                block.done
+                    ? "Mark \(block.title) not done"
+                    : "Mark \(block.title) done"
+            )
+        }
+    }
+
     // Large: date header + up to 5 upcoming rows + "+n more".
     private var largeList: some View {
         let upcoming = entry.blocks.filter {
@@ -171,6 +212,7 @@ struct NextUpWidgetView: View {
                         if active {
                             Circle().fill(Color(red: 1.0, green: 0.361, blue: 0.302)).frame(width: 6, height: 6)
                         }
+                        doneButton(block, size: 22, tint: ink(block.category))
                     }
                 }
                 if more > 0 {
@@ -321,9 +363,13 @@ struct NextUpWidgetView: View {
                         .font(.system(size: 14, weight: .bold, design: .rounded))
                         .lineLimit(2)
                         .minimumScaleFactor(0.8)
-                    Text(timeLine(block))
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                        .opacity(0.75)
+                    HStack(alignment: .bottom) {
+                        Text(timeLine(block))
+                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                            .opacity(0.75)
+                        Spacer(minLength: 4)
+                        doneButton(block, size: 24, tint: ink(block.category))
+                    }
                 }
                 .foregroundStyle(ink(block.category))
                 .containerBackground(fill(block.category), for: .widget)

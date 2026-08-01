@@ -73,6 +73,14 @@ enum KairoPrefs {
         set { store.set(newValue, forKey: "kairo-onboarded") }
     }
 
+    /// The API origin the app is signed in against, recorded at launch so the
+    /// widget extension (which never sees the app's environment overrides)
+    /// talks to the same server.
+    static var apiBaseURL: URL? {
+        get { store.string(forKey: "kairo-api-base-url").flatMap(URL.init) }
+        set { store.set(newValue?.absoluteString, forKey: "kairo-api-base-url") }
+    }
+
     /// Companion mode (T11) — quiet presence during focus. Device-local like
     /// the web (a vibe, not data — never synced); same storage key.
     static var companion: Bool {
