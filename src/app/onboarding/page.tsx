@@ -16,6 +16,7 @@ import { ArrowRight, Check, Loader2 } from "lucide-react";
 import { detectTimezone } from "@/lib/timezone";
 import { clientToday } from "@/lib/client-date";
 import { localMinutesToInstant } from "@/lib/adapters";
+import { useSession } from "@/lib/auth-client";
 
 interface Anchor {
   emoji: string;
@@ -57,13 +58,14 @@ function StepDots({ step }: { step: number }) {
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { data, isPending } = useSession();
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
-  const [authed, setAuthed] = useState<boolean | null>(null);
   const [picked, setPicked] = useState<Set<number>>(() => new Set([0, 2, 5]));
   const [busy, setBusy] = useState(false);
   const [createdCount, setCreatedCount] = useState<number | null>(null);
   const [zone, setZone] = useState("UTC");
+  const authed = isPending ? null : Boolean(data?.user);
 
   // Resume where they left off — onboarding survives a refresh or a wandered-off
   // tab (ADHD reality). Restored after hydration to avoid a mismatch.
@@ -99,19 +101,17 @@ export default function OnboardingPage() {
     const z = detectTimezone();
     setZone(z);
     /* eslint-enable react-hooks/set-state-in-effect */
-    let cancelled = false;
-    // Seed timezone on the settings row while we're here (idempotent).
-    fetch("/api/v1/settings", { headers: { "x-timezone": z } })
-      .then((r) => {
-        if (!cancelled) setAuthed(r.ok);
-      })
-      .catch(() => {
-        if (!cancelled) setAuthed(false);
-      });
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    if (!data?.user) return;
+    // Seed timezone on the settings row while we're here (idempotent), but
+    // only after the session probe succeeds so signed-out onboarding stays clean.
+    const z = detectTimezone();
+    void fetch("/api/v1/settings", { headers: { "x-timezone": z } }).catch(
+      () => {},
+    );
+  }, [data?.user]);
 
   const toggle = (i: number) => {
     setPicked((prev) => {

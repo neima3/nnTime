@@ -1,5 +1,27 @@
 # Progress log
 
+## 2026-08-01 — Round 44: public auth-route polish + clean onboarding boundary (Codex)
+
+- **Public-route audit.** Dogfooded landing, sign-in, sign-up, password recovery,
+  privacy, onboarding, and the signed-out Today preview in fresh production
+  browser sessions at desktop and 390-point mobile widths. The landing Preview
+  CTA correctly targets `/app/today`; the unlinked `/preview` 404 was not a
+  product regression.
+- **Recovery polish.** Password recovery now uses the same centered Kairo brand
+  affordance as sign-in/sign-up. Route-scoped server layouts give recovery and
+  onboarding specific document titles instead of the generic landing title.
+- **Auth boundary corrected.** Signed-out onboarding previously called protected
+  `GET /api/v1/settings` merely to infer authentication, creating a normal-path
+  401 console error. It now uses Better Auth's session hook and seeds the
+  timezone/settings row only after a real session exists; the signed-out step-2
+  “Create my planner” path remains unchanged.
+- **Regression evidence.** Four focused contracts were observed red before the
+  fixes and green afterward. Full web gates passed with **102 test files / 1,025
+  tests**, lint, typecheck, and a production build. The standalone artifact was
+  browser-verified at 390×844 and 1440×900: correct titles, clean layouts, zero
+  console errors, and the signed-out onboarding CTA present. Product parity is
+  unchanged; this is Phase 8C hardening.
+
 ## 2026-08-01 — Round 43: production-fidelity standalone browser CI (Codex)
 
 - **Runtime drift closed.** Next 16 warns that `next start` is unsupported when

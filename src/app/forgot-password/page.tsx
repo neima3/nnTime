@@ -36,6 +36,12 @@ export default function ForgotPasswordPage() {
   return (
     <div className="grid min-h-dvh place-items-center bg-canvas px-5 py-10">
       <div className="w-full max-w-sm">
+        <Link href="/" className="mb-8 flex items-center justify-center gap-2.5">
+          <span className="grid size-9 place-items-center rounded-xl bg-iris text-lg text-ink-inverse shadow-card">
+            ◔
+          </span>
+          <span className="font-display text-xl font-bold tracking-tight">Kairo</span>
+        </Link>
         <Link
           href="/sign-in"
           className="mb-6 inline-flex items-center gap-1.5 text-[13px] font-semibold text-ink-soft hover:text-ink"
