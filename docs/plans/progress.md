@@ -1,5 +1,47 @@
 # Progress log
 
+## 2026-08-01 — Round 49: truthful signed-out preview semantics (Codex)
+
+- **Production dogfood converted into one capability contract.** A fresh
+  anonymous sweep covered 21 mobile public/product routes and 14 desktop
+  product routes without overflow, browser errors, or unexpected 4xx/5xx.
+  It isolated three real gaps: Today activities advertised inert edit/resize
+  controls, template apply buttons ended at non-actionable status copy, and
+  route-level Focus/Planner/Editor auth gates exposed only an `h2`.
+- **Shared semantics fixed without weakening previews.** `TimelineCanvas` now
+  receives an explicit interaction capability: signed-out activities remain
+  readable groups with nested Focus navigation, but omit drag/resize handlers,
+  tab stops, keyboard shortcuts, touch capture, and edit affordances. Signed-in
+  behavior remains the default. Template cards render direct sign-in links
+  anonymously and preserve the existing authenticated mutation button. Shared
+  sign-out cards default to embedded `h2` semantics while route owners can opt
+  into the page `h1` required by Next's route announcer.
+- **TDD and independent review.** Focused contracts failed first on the missing
+  capability and heading API. Independent review returned READY with no
+  Critical or Important findings. Its three minor test gaps were closed before
+  release: authenticated ArrowDown persistence plus Enter-to-edit, signed-out
+  Focus click-through with zero protected requests, and exactly-one-`h1`
+  assertions for all three full-page gates.
+- **Local proof.** Lint, typecheck, production build, **105 test files / 1,048
+  tests**, `git diff --check`, and parity passed. The standalone artifact passed
+  **21/21** Playwright scenarios. Mobile Templates/Focus and desktop Today were
+  visually inspected; both mobile views stayed at 390px with no overflow and
+  the existing Soft Focus hierarchy remained intact. Parity remains **89.74%
+  web / 86.93% iOS** because this is hardening, not feature credit.
+- **Exact release proof.** SHA `c0953eb6b94463d5832a1f574dadcec52619fa94`
+  passed GitHub Actions run `30713013689`: build/test, **21/21** standalone
+  browser scenarios, generated/native release contracts, **377** app-hosted
+  iOS tests (1 skipped, 0 failures), and the unsigned shipping build. Coolify
+  deployment `uwl3s3j8yc8k31j34bu9yukd` finished on that exact SHA. Live health
+  reported migration, DB, AI, and scheduler `ok`; the production anonymous
+  suite passed **8/8**, unique template/h1 markers were served, and live mobile
+  and desktop captures showed no overflow or visual regression.
+- **Next hardening target and standing boundary.** The hosted native log exposed
+  a repeated Swift 6 sendability warning in `WidgetCompletionService`; Round 50
+  addresses that concrete release debt. Phase 7B physical-device/provider
+  lifecycle and Phase 8B Google consent/client activation remain external
+  evidence gates.
+
 ## 2026-08-01 — Round 48: main-thread native session events (Codex)
 
 - **Hosted warning converted into a contract.** Round 47's otherwise-green

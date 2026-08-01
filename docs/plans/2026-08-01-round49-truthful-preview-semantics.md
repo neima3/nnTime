@@ -79,12 +79,12 @@ behavior and independently protected APIs remain unchanged.
 
 ### Task 5: Release and prove production
 
-- [ ] Record local proof in `docs/plans/progress.md` and commit the reviewed diff.
-- [ ] Fast-forward `main`, rerun merged gates, push, and require the exact-SHA CI
+- [x] Record local proof in `docs/plans/progress.md` and commit the reviewed diff.
+- [x] Fast-forward `main`, rerun merged gates, push, and require the exact-SHA CI
   checks to pass.
-- [ ] Deploy that exact SHA through Coolify and verify `/api/health` plus the
+- [x] Deploy that exact SHA through Coolify and verify `/api/health` plus the
   three signed-out contracts on `https://time.neima.me`.
-- [ ] Record exact release evidence, commit/push the handoff, and clean the
+- [x] Record exact release evidence, commit/push the handoff, and clean the
   Round 49 worktree.
 
 ## Self-review
