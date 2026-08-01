@@ -34,6 +34,24 @@
 - **Known limitation (documented).** Repeat toggles on a server-split
   recurring occurrence can 409 until the app next reconciles — the widget
   throws, changes nothing, and the app's refetch resolves it.
+- **Ship postscript — two CI truths surfaced.** (1) The glance-surface
+  contract test still encoded "the widget target is read-only", so the
+  bridge commit correctly failed CI; the contract was retargeted to the
+  invariant that replaced it (every intent button routes through
+  CompleteBlockIntent; the service sends If-Match + Idempotency-Key on a
+  no-cookie-jar transport; a new regression case moves the cache write
+  ahead of the 2xx gate and must be caught). Lesson absorbed into the
+  round pipeline: web contract tests grep iOS sources — run the full web
+  suite even for iOS-only commits. (2) Chasing the recurring vitest
+  teardown flake exposed that the DB test harness shelled to psql via
+  the Homebrew /tmp socket, so **every DB integration test had been
+  silently skipping in CI since Phase 1B** (the skip-noise at worker
+  teardown was the flake's trigger). CREATE/DROP now go through the same
+  postgres-js TCP path as the data connections: CI build-test went from
+  963 passed + 27 skipped to **993 passed, 0 skipped** — first run ever
+  with the DB integration suite live in CI. Final release: `252952b`,
+  run `30686340667` success on the exact SHA, deploy drained, live
+  health all `ok`.
 
 ## 2026-08-01 — Round 37: arcade lazy-loading — games leave the first-load bundle (Fable)
 
