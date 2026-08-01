@@ -1,5 +1,29 @@
 # Progress log
 
+## 2026-08-01 — Round 45: fail-closed password-reset recovery (Codex)
+
+- **Dead-end removed.** Live signed-out dogfood showed `/reset-password` with no
+  token still presenting an actionable password form. The route now rejects
+  missing, empty, whitespace-only, and array-shaped tokens before the client
+  form mounts, rendering a clear unavailable-link state with direct paths to
+  request a new reset link or return to sign-in.
+- **Next 16 boundary corrected.** Query parsing moved from client-side
+  `useSearchParams` into the Server Component page, while Better Auth mutation
+  state lives in an isolated `ResetPasswordForm` client component. This puts the
+  safe state in initial HTML and keeps malformed credentials out of the
+  interactive boundary.
+- **Recovery presentation hardened.** Both reset states now share the branded
+  Kairo auth shell. The route has the specific title `Choose a new password ·
+  Kairo` and explicit `noindex, nofollow` metadata so token-bearing recovery
+  URLs stay out of search indexes.
+- **Evidence.** Eight focused contracts were observed red across the behavior,
+  architecture, and metadata gaps before implementation, then green. Full web
+  gates passed with **103 test files / 1,033 tests**, lint, typecheck, and a
+  production build. The standalone artifact rendered the missing-token state at
+  390×844 and the token-present form at 1440×900 with correct titles, no console
+  errors, and no horizontal overflow. Product parity is unchanged; this is
+  Phase 8C recovery hardening.
+
 ## 2026-08-01 — Round 44: public auth-route polish + clean onboarding boundary (Codex)
 
 - **Public-route audit.** Dogfooded landing, sign-in, sign-up, password recovery,
