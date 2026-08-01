@@ -1,5 +1,22 @@
 # Progress log
 
+## 2026-08-01 — Round 34: reduced stimulation stills the arcade (Fable)
+
+- **The gap.** An audit of the arcade against the app's own Reduced
+  stimulation toggle found the suppression list covered the literal
+  `animate-pulse`/`ping`/`bounce` utilities but not Tailwind's
+  `motion-safe:` variant — a differently named class — so Night Sky's
+  next-star kept pulsing for exactly the users who asked for calm.
+- **The fix.** `globals.css` now suppresses the escaped
+  `motion-safe\:animate-pulse` class too (settled 0.55 opacity), keeping
+  the OS-level `prefers-reduced-motion` gating intact. Verified by
+  computed styles in a live tracing round: animation `pulse` → `none`
+  with the toggle class applied. Native games audited clean: no
+  decorative motion or already gated on `KairoPrefs.reducedStimulation`.
+- **Release.** Commit `50cb4e4`; GitHub Actions run `30680214316`
+  concluded `success` on the exact SHA; deploy drained; live
+  `/api/health` all `ok`.
+
 ## 2026-08-01 — Round 33: Pattern Tiles, simultaneous spatial recall (Fable)
 
 Roadmap: `docs/plans/2026-08-01-round33-pattern-tiles.md`. (Round 32 was
