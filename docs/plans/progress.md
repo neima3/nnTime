@@ -1,5 +1,34 @@
 # Progress log
 
+## 2026-08-01 — Round 31: Letter Soup, a gentle unscramble (Fable)
+
+Roadmap: `docs/plans/2026-08-01-round31-letter-soup.md`.
+
+- **What shipped.** The fourteenth game and Wordplay's third: eight
+  everyday words per run, seeded-scrambled and rebuilt by tapping
+  letters into slots. Kindness is structural: the 46-word bank is
+  curated to be anagram-safe (no entry shares letters with a common
+  English word — a unit-tested invariant on both platforms), wrong
+  builds hand the letters back after a soft flash, and "Show me" reveals
+  without credit or shame. Shared logic in `src/lib/games.ts` ↔
+  `ArcadeLogic` with pinning tests including the never-original-order
+  scramble and its rotation fallback.
+- **Evidence.** Web: solved "travel" from a live scramble, exercised
+  "Show me" (advance, no credit), and a wrong build ("iborn" for robin)
+  that flashed and returned all letters — three paths proven in a real
+  browser. iOS: the tour proved the round header, slots/tiles render,
+  and the reveal → no-credit advance (1/1, screenshots inspected under
+  ignored `browser-qa/round31-letter-soup/ios/`).
+- **Gates.** Web **98 files / 1008 tests** + production build; iOS
+  main-thread gate (**361 executed, 1 expected skip, 0 failures**);
+  release preflight passed.
+
+**Release state:** shipped and live-verified. Web commit `f632d1b` and
+iOS commit `752485c9ae51f10f9451c22a2385dee6b08f8fac` pushed to `main`.
+GitHub Actions run `30677738572` on the exact SHA concluded `success`.
+The webhook Coolify deployment drained, live `/api/health` returned all
+checks `ok`, and the production `/app/play` render contains Letter Soup.
+
 ## 2026-08-01 — Round 30: full-surface quality sweep — clean (Fable)
 
 First full sweep since Round 12, after six feature rounds (24–29).
