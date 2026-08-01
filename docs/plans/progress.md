@@ -1,5 +1,40 @@
 # Progress log
 
+## 2026-08-01 — Round 48: main-thread native session events (Codex)
+
+- **Hosted warning converted into a contract.** Round 47's otherwise-green
+  native log exposed repeated SwiftUI `Publishing changes from background
+  threads is not allowed` warnings immediately after planner and auth 401
+  tests. The shared cause was `.kairoSessionInvalidated` inheriting the
+  `KairoAPI` actor's background executor before reaching SwiftUI `onReceive`.
+- **Minimal actor-boundary fix.** Session generation and persisted-auth
+  invalidation remain actor-owned. Only the UI-facing notification post crosses
+  through `MainActor.run`, and it still occurs only after invalidation succeeds.
+  The production 401 test now pins main-thread delivery and explicit
+  over-fulfillment failure while preserving cookie, envelope, scope, and
+  exactly-once assertions.
+- **TDD and review.** The focused app-hosted test failed on the original
+  off-main post, then passed after the event-only hop. Independent review found
+  no Critical or Important issues; its one minor exactly-once test-strengthening
+  suggestion was incorporated before the final gates.
+- **Local proof.** Lint, typecheck, production build, **104 test files / 1,045
+  tests**, generated-client adoption, Apple release contracts, and the full
+  native main-thread gate passed. The native gate executed **377** app-hosted
+  tests (1 skipped, 0 failures) with no background-publishing or Main Thread
+  Checker warning. A disk-full rerun was recovered by deleting only one
+  regenerable Kairo Xcode DerivedData cache; the clean rerun passed.
+- **Exact release proof.** SHA `d7efce6` passed GitHub Actions run
+  `30710108121`: build/test, **15/15** standalone Playwright scenarios,
+  generated/native contracts, **377** app-hosted iOS tests (1 skipped, 0
+  failures), and the unsigned shipping build. The hosted native log contains
+  no background-publishing or Main Thread Checker warning. Coolify deployment
+  `gdeg0ra6o25u9zy866abcd7u` finished on the exact SHA; live health reported
+  migration, DB, AI, and scheduler `ok`, landing returned 200, and the Round 47
+  contrast asset remained served.
+- **Parity and standing boundary.** This is hardening, so parity stays **89.74%
+  web / 86.93% iOS**. Phase 7B physical-device/provider lifecycle and Phase 8B
+  Google consent/client activation remain external evidence gates.
+
 ## 2026-08-01 — Round 47: WCAG contrast contract + live accessibility proof (Codex)
 
 - **Contrast fixed without flattening the design.** Production Lighthouse

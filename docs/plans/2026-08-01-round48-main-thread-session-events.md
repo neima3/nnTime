@@ -56,10 +56,28 @@ session invalidation, provider activation, or product parity.
   Main Thread Checker, and the unsigned shipping build to pass without the
   background-publishing warning.
 - [x] Request independent review and address every Critical/Important finding.
-- [ ] Commit, fast-forward `main`, push, and require all GitHub Actions jobs.
-- [ ] Require Coolify to finish the exact pushed SHA and verify live health.
-- [ ] Update this checklist and `docs/plans/progress.md` with exact evidence;
+- [x] Commit, fast-forward `main`, push, and require all GitHub Actions jobs.
+- [x] Require Coolify to finish the exact pushed SHA and verify live health.
+- [x] Update this checklist and `docs/plans/progress.md` with exact evidence;
   preserve the Phase 7B/8B external activation boundaries.
+
+## Release evidence
+
+- Implementation SHA `d7efce62803801cf19fde33893b98ae05736a8f0`
+  passed GitHub Actions run `30710108121`: build/test, **15/15** standalone
+  Playwright scenarios, generated/native contracts, **377** app-hosted iOS
+  tests (1 skipped, 0 failures), and the unsigned shipping-app build.
+- Both local and hosted native logs contain no `Publishing changes from
+  background threads` or Main Thread Checker warning. The focused production
+  notification test was observed red off-main before the fix and green after
+  the event-only `MainActor` hop.
+- Coolify deployment `gdeg0ra6o25u9zy866abcd7u` finished on the exact
+  implementation SHA. Live health reports migration, DB, AI, and scheduler
+  `ok`; the landing route returns 200 and the Round 47 contrast asset remains
+  served.
+- Product parity remains **89.74% web / 86.93% iOS**. Phase 7B physical-device
+  lifecycle proof and Phase 8B Google activation remain external evidence
+  gates.
 
 ## Self-review
 
