@@ -1,5 +1,35 @@
 # Progress log
 
+## 2026-08-01 — Round 33: Pattern Tiles, simultaneous spatial recall (Fable)
+
+Roadmap: `docs/plans/2026-08-01-round33-pattern-tiles.md`. (Round 32 was
+the docs consolidation: AGENTS.md refreshed to post-mock reality and
+`docs/plans/UNBLOCK-7B-8B.md` added — commit `a483cc5`.)
+
+- **What shipped.** The fifteenth game and Hold it in mind's fourth: a
+  handful of tiles flash together on a 4×4 grid, hide, and get tapped
+  back in any order. Clean recalls grow the pattern (3 → the nine-tile
+  cap); a miss kindly re-reveals the answer before the end state; best =
+  largest pattern held. Shared seeded draw contract pinned by tests on
+  both platforms.
+- **Evidence.** Web: a precomputed seeded draw let the run be played
+  exactly — the predicted tiles (10/13/14) completed the pattern and it
+  grew to four, then a deliberate miss produced the kind reveal and
+  "Pattern of 3" with the new-best chip. iOS: the tour proved memorize →
+  recall → guaranteed terminal outcome, 1/1, screenshots inspected under
+  ignored `browser-qa/round33-pattern-tiles/ios/` (the memorize phase
+  renders three iris tiles exactly as designed).
+- **Gates.** Web **98 files / 1012 tests** + production build; iOS
+  main-thread gate (**364 executed, 1 expected skip, 0 failures**);
+  release preflight passed.
+
+**Release state:** shipped and live-verified. Web commit `b23b212` and
+iOS commit `65635ef1b532bde8f03c0609c005276489646e47` pushed to `main`.
+GitHub Actions run `30679267087` on the exact SHA concluded `success`.
+The webhook Coolify deployment drained, live `/api/health` returned all
+checks `ok`, and the production `/app/play` render contains Pattern
+Tiles.
+
 ## 2026-08-01 — Round 31: Letter Soup, a gentle unscramble (Fable)
 
 Roadmap: `docs/plans/2026-08-01-round31-letter-soup.md`.
