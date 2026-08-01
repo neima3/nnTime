@@ -21,17 +21,25 @@ Visual daily planner (Tiimo category, ADHD/neurodivergent-first). Web app
 If you were given no other instructions: execute `docs/plans/kairo-agent-prompt.md`.
 
 ## Commands / gates
-- `pnpm dev` — dev server (port 3000; `.claude/launch.json` has a `nntime-dev` config)
-- `pnpm lint && pnpm build` — REQUIRED green before every commit
-  (becomes `lint && typecheck && test && build` once Phase 1B adds them)
+- `pnpm dev` — dev server (`.claude/launch.json` runs it on port 3456; auth
+  trusts that origin via `BETTER_AUTH_URL=http://localhost:3456` in `.env.local`)
+- `pnpm lint && pnpm typecheck && pnpm test && pnpm build` — REQUIRED green
+  before every commit; `pnpm test:e2e` reuses the running :3456 dev server
+- iOS gates: `./scripts/ios-main-thread-gate.sh` (xcodegen + app-hosted tests +
+  Main Thread Checker; trust "Executed N tests") and `pnpm ios:release:preflight`
 - `node scripts/parity.mjs` — recompute parity percentages after feature work
 
 ## Structure
-- `src/app/` — App Router. `/` landing; `/app/*` = product (today, week, focus,
-  routines, settings). Currently high-fidelity mocks on `src/lib/mock.ts` data;
-  phases 1+ wire them to real data. **Keep the visual quality — the mocks are the
-  design reference.**
-- `src/components/` — shared UI (AppShell).
+- `src/app/` — App Router. `/` landing; `/app/*` = the real product (today,
+  inbox, week, month, focus, routines, play, stats, settings, templates,
+  review, planner) on live `/api/v1/*` data. **Keep the visual quality — the
+  design bar is the product.**
+- `src/components/` — shared UI (AppShell, feature clients); `games/` holds the
+  14-game brain-breaks arcade whose pure logic lives in `src/lib/games.ts` and
+  is mirrored verbatim by iOS `ArcadeLogic` (both sides unit-pinned).
+- `ios/` — native SwiftUI app (XcodeGen; `ios/App/Features/*`). Debug tour
+  fixtures: `-kairoOfflineFixture`, `-kairoTodayFixture`,
+  `-kairoFocusDoneFixture`, `-kairoThemeFixture light|dark`.
 - `src/app/globals.css` — the entire design token system. Never add raw hex in components.
 - `docs/` — plans, design spec, research, deployment.
 
