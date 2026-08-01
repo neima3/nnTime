@@ -531,6 +531,54 @@ export function pickConstellation(random: () => number = Math.random): number {
   );
 }
 
+/* ---- Letter Soup (unscramble) --------------------------------------------- */
+
+/**
+ * Everyday 5–6 letter words, curated so no entry shares its letters with a
+ * common English anagram (no lemon/melon traps) — a correct-looking answer
+ * can never be "wrong".
+ */
+export const SOUP_BANK: string[] = [
+  "cocoa", "honey", "mango", "salad", "chair", "clock", "plant", "music",
+  "paint", "cloud", "river", "light", "tulip", "daisy", "koala", "panda",
+  "otter", "robin", "finch", "letter", "golden", "pebble", "purple",
+  "yellow", "orange", "summer", "winter", "autumn", "spring", "coffee",
+  "travel", "basket", "button", "candle", "pillow", "window", "breeze",
+  "meadow", "sunset", "waffle", "muffin", "cookie", "puzzle", "rocket",
+  "picnic", "ticket",
+];
+
+export const SOUP_ROUNDS = 8;
+
+/** Seeded draw of SOUP_ROUNDS distinct words from the bank. */
+export function pickSoupWords(
+  random: () => number = Math.random,
+): string[] {
+  const idx = SOUP_BANK.map((_, i) => i);
+  for (let i = idx.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [idx[i], idx[j]] = [idx[j]!, idx[i]!];
+  }
+  return idx.slice(0, SOUP_ROUNDS).map((i) => SOUP_BANK[i]!);
+}
+
+/** Shuffle a word's letters, guaranteed different from the original. */
+export function scrambleWord(
+  word: string,
+  random: () => number = Math.random,
+): string[] {
+  const letters = word.split("");
+  for (let attempt = 0; attempt < 12; attempt++) {
+    for (let i = letters.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [letters[i], letters[j]] = [letters[j]!, letters[i]!];
+    }
+    if (letters.join("") !== word) return letters;
+  }
+  // Pathological RNG: rotate by one, which always differs for length ≥ 2.
+  return [...word.slice(1).split(""), word[0]!];
+}
+
 /* ---- localStorage bests -------------------------------------------------- */
 
 export type GameId =
@@ -546,7 +594,8 @@ export type GameId =
   | "odd-one-out"
   | "digit-span"
   | "green-light"
-  | "night-sky";
+  | "night-sky"
+  | "letter-soup";
 
 const KEY = (id: GameId) => `kairo-play-best-${id}`;
 

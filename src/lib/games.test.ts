@@ -32,7 +32,11 @@ import {
   recordResult,
   SCHULTE_SIZE,
   schulteSeconds,
+  scrambleWord,
   shuffledOddPairs,
+  SOUP_BANK,
+  SOUP_ROUNDS,
+  pickSoupWords,
   spanShowMs,
   SPELLING_BANK,
   timeFeelFeeling,
@@ -757,5 +761,49 @@ describe("night sky", () => {
     expect(pickConstellation(() => 0.5)).toBe(
       Math.floor(0.5 * CONSTELLATIONS.length),
     );
+  });
+});
+
+describe("letter soup", () => {
+  it("keeps the bank anagram-safe in shape: 5-6 letter lowercase words", () => {
+    for (const word of SOUP_BANK) {
+      expect(word).toMatch(/^[a-z]{5,6}$/);
+    }
+    expect(new Set(SOUP_BANK).size).toBe(SOUP_BANK.length);
+  });
+
+  it("guards the curation: no two bank words are anagrams of each other", () => {
+    const keys = SOUP_BANK.map((w) => w.split("").sort().join(""));
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("draws eight distinct words deterministically", () => {
+    let calls = 0;
+    const seeded = () => {
+      calls += 1;
+      return (calls * 0.23) % 1;
+    };
+    const a = pickSoupWords(seeded);
+    expect(a).toHaveLength(SOUP_ROUNDS);
+    expect(new Set(a).size).toBe(SOUP_ROUNDS);
+    calls = 0;
+    expect(pickSoupWords(seeded)).toEqual(a);
+  });
+
+  it("scrambles to the same multiset of letters, never the original order", () => {
+    for (const word of SOUP_BANK) {
+      const scrambled = scrambleWord(word);
+      expect(scrambled.join("")).not.toBe(word);
+      expect([...scrambled].sort()).toEqual(word.split("").sort());
+    }
+  });
+
+  it("escapes a pathological RNG via rotation", () => {
+    // A "shuffle" that always swaps an index with itself changes nothing —
+    // the rotation fallback must still produce a different order.
+    const identity = () => 0.999999;
+    const out = scrambleWord("candle", identity);
+    expect(out.join("")).not.toBe("candle");
+    expect([...out].sort()).toEqual("candle".split("").sort());
   });
 });

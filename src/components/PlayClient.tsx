@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Brain breaks arcade (wave 7). Thirteen small games in four moods, personal
+ * Brain breaks arcade (wave 8). Fourteen small games in four moods, personal
  * bests only, all client-side. Framed honestly: play that rests the brain —
  * not "training".
  */
@@ -20,6 +20,7 @@ import { OddOneOut } from "./games/OddOneOut";
 import { DigitSpan } from "./games/DigitSpan";
 import { GreenLight } from "./games/GreenLight";
 import { NightSky } from "./games/NightSky";
+import { LetterSoup } from "./games/LetterSoup";
 
 interface GameCard {
   id: GameId;
@@ -127,6 +128,14 @@ const SECTIONS: { label: string; blurb: string; games: GameCard[] }[] = [
         tint: "bg-cat-rose",
         bestLabel: (v) => `best ${v}/8`,
       },
+      {
+        id: "letter-soup",
+        emoji: "🍲",
+        title: "Letter Soup",
+        hook: "Everyday words, gently scrambled.",
+        tint: "bg-cat-butter",
+        bestLabel: (v) => `best ${v}/8`,
+      },
     ],
   },
   {
@@ -195,6 +204,7 @@ export function PlayClient() {
   if (active === "digit-span") return <DigitSpan onExit={exit} />;
   if (active === "green-light") return <GreenLight onExit={exit} />;
   if (active === "night-sky") return <NightSky onExit={exit} />;
+  if (active === "letter-soup") return <LetterSoup onExit={exit} />;
   if (active === "grammar-snap")
     return (
       <QuizGame
