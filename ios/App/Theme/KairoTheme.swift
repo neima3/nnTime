@@ -59,7 +59,7 @@ extension Color {
     // now-line + semantic
     static let kNow = dyn(0xFF5C4D, 0xFF6F61, hcLight: 0xB8241A, hcDark: 0xFF8A7D)
     static let kNowInk = dyn(0xFFFFFF, 0xFFFFFF)
-    static let kSuccess = dyn(0x23805C, 0x4CC593, hcLight: 0x10603F, hcDark: 0x79E0B0)
+    static let kSuccess = dyn(0x1E7354, 0x4CC593, hcLight: 0x10603F, hcDark: 0x79E0B0)
     static let kSuccessSoft = dyn(0xD9F0E4, 0x1D3A2E, hcLight: 0xCDEDDD, hcDark: 0x17402F)
     static let kDanger = dyn(0xC93A3A, 0xF07D7D, hcLight: 0xA3221F, hcDark: 0xFF9D9D)
     static let kDangerSoft = dyn(0xFBDFDF, 0x3F2323, hcLight: 0xF8D6D6, hcDark: 0x451F1F)
