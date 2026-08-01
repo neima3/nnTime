@@ -260,6 +260,7 @@ input:focus-visible,
 .reduced-stimulation .sheet-up,
 .reduced-stimulation .kairo-particle,
 .reduced-stimulation .animate-pulse,
+.reduced-stimulation .motion-safe\:animate-pulse,
 .reduced-stimulation .animate-ping,
 .reduced-stimulation .animate-bounce {
   animation: none !important;
@@ -267,7 +268,8 @@ input:focus-visible,
 
 /* Skeletons and ping dots lose their animation above, so give them a settled
    resting appearance instead of sitting at a random keyframe's opacity. */
-.reduced-stimulation .animate-pulse {
+.reduced-stimulation .animate-pulse,
+.reduced-stimulation .motion-safe\:animate-pulse {
   opacity: 0.55;
 }
 .reduced-stimulation .animate-ping {
