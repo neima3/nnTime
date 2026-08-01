@@ -52,3 +52,18 @@ checked against Apple's platform contracts; their core premises are valid.
 Phases 7B and 8B stay unchecked. Their remaining work is still limited to the
 legal credential provisioning and physical-iPhone lifecycle in
 `docs/plans/UNBLOCK-7B-8B.md`; this audit does not redefine those gates.
+
+## Release result
+
+- Commits: `8056d55` and `01e3718` on `main`.
+- GitHub Actions: run `30697238345` concluded success on exact SHA
+  `01e3718ba1698e45c7d91f12a323469c4e43be42`; build/test, 12/12 Playwright,
+  generated/native contract, 377 app-hosted iOS tests, Main Thread Checker,
+  and unsigned shipping-app build all passed.
+- Coolify: deployment `q86xnjocqalglqho8ta171k4` finished on that exact SHA.
+- Live read-only proof: `/api/health` returned `status: ok` with migration,
+  database, AI, and scheduler checks all `ok`. A fresh production accessibility
+  snapshot exposed timeline activities as groups with distinct child actions;
+  Green Light retained its neutral state when clicked during a measured blank
+  gap.
+- Parity: web 89.74%; iOS 86.93%.

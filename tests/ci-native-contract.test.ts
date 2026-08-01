@@ -31,11 +31,34 @@ describe("native API contract CI", () => {
     expect(job?.["runs-on"]).toMatch(/^macos-/);
     expect(job?.steps).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ uses: "actions/checkout@v4" }),
-        expect.objectContaining({ uses: "pnpm/action-setup@v4" }),
-        expect.objectContaining({ uses: "actions/setup-node@v4" }),
+        expect.objectContaining({ uses: "actions/checkout@v6" }),
+        expect.objectContaining({ uses: "pnpm/action-setup@v6" }),
+        expect.objectContaining({ uses: "actions/setup-node@v6" }),
       ]),
     );
+  });
+
+  it("uses Node 24 setup-action runtimes in every job", () => {
+    for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
+      const actions = (job.steps ?? [])
+        .map((step) => step.uses)
+        .filter((uses): uses is string => Boolean(uses));
+
+      expect(actions, `${jobName} actions`).toEqual(
+        expect.arrayContaining([
+          "actions/checkout@v6",
+          "pnpm/action-setup@v6",
+          "actions/setup-node@v6",
+        ]),
+      );
+      expect(actions, `${jobName} actions`).not.toEqual(
+        expect.arrayContaining([
+          "actions/checkout@v4",
+          "pnpm/action-setup@v4",
+          "actions/setup-node@v4",
+        ]),
+      );
+    }
   });
 
   it("checks canonical sync and generated-client adoption before Swift compilation", () => {

@@ -1,5 +1,21 @@
 # Progress log
 
+## 2026-08-01 — Round 41: Node 24 GitHub Actions hardening (Codex)
+
+- **CI deprecation closed.** Round 40's otherwise-green release surfaced that
+  `actions/checkout@v4`, `actions/setup-node@v4`, and
+  `pnpm/action-setup@v4` still execute on the deprecated Node 20 action
+  runtime. All three setup actions now use their current Node 24-based v6
+  majors in build/test, native-contract, and browser E2E jobs. Kairo's tested
+  application runtime remains explicitly pinned to Node 20.
+- **Drift prevention.** The parsed-workflow contract now requires the v6 trio
+  in every job and rejects a return to the deprecated v4 setup actions. The
+  test was observed failing against the old workflow before the upgrade.
+- **Local evidence.** Lint, typecheck, production build, OpenAPI sync/adoption,
+  iOS release preflight, parity, and **100 files / 1,019 tests** passed. Web
+  parity remains **89.74%** and iOS **86.93%**; this is release-infrastructure
+  hardening, not feature inflation.
+
 ## 2026-08-01 — Round 40: other-agent audit + release hardening (Codex)
 
 - **Range independently reviewed.** Audited `a22fc59..73c89dd`: 80 files and
@@ -23,6 +39,14 @@
   assertions skipped probe cleanup and created duplicate text. The E2E now
   asserts the new `group` role, names and scopes each probe per attempt, and
   deletes it in `finally`; the complete local Playwright suite passed 12/12.
+- **Release proof.** Final commit `01e3718` passed GitHub Actions run
+  `30697238345`: build/test, **12/12** production-mode Playwright scenarios,
+  generated/native contract, **377** app-hosted iOS tests, Main Thread Checker,
+  and unsigned shipping-app build. Coolify deployment
+  `q86xnjocqalglqho8ta171k4` finished on that exact SHA. Read-only live health
+  reported migration, database, AI, and scheduler `ok`; live browser probes
+  confirmed timeline activities expose `group` semantics and Green Light
+  ignores taps during its blank signal gap.
 
 ## 2026-08-01 — Round 39: Live Activity pause/complete controls (Fable)
 
