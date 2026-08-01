@@ -38,6 +38,8 @@ interface DragState {
 
 interface TimelineCanvasProps {
   activities: Activity[];
+  /** Whether timeline blocks expose editing gestures and keyboard controls. */
+  interactive?: boolean;
   /** Low-battery day: dim high-energy blocks + tag them "heavy". */
   lowBattery?: boolean;
   nowMin: number;
@@ -110,6 +112,7 @@ function computeLanes(activities: Activity[]): Map<string, { lane: number; laneC
 
 export function TimelineCanvas({
   activities,
+  interactive = true,
   lowBattery = false,
   nowMin,
   showNowLine = true,
@@ -316,9 +319,9 @@ export function TimelineCanvas({
   return (
     <div
       ref={containerRef}
-      className="relative cursor-crosshair"
+      className={`relative ${interactive ? "cursor-crosshair" : ""}`}
       style={{ height: (dayEnd - dayStart) * PX_PER_MIN }}
-      onClick={handleContainerClick}
+      onClick={interactive ? handleContainerClick : undefined}
     >
       {/* Hour grid */}
       {Array.from({ length: (dayEnd - dayStart) / 60 + 1 }, (_, i) => dayStart / 60 + i).map(
@@ -349,8 +352,8 @@ export function TimelineCanvas({
       {/* Activities */}
       <div
         className="absolute inset-y-0 left-14 right-1"
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
+        onPointerMove={interactive ? handlePointerMove : undefined}
+        onPointerUp={interactive ? handlePointerUp : undefined}
       >
         {displayActivities.map((a, blockIdx) => {
           const cat = catClasses[a.category];
@@ -383,34 +386,44 @@ export function TimelineCanvas({
               key={a.id}
               role="group"
               aria-roledescription="timeline activity"
-              tabIndex={0}
+              tabIndex={interactive ? 0 : undefined}
               aria-label={`${a.title}, ${formatTime(a.start, hourCycle)} to ${formatTime(a.start + a.duration, hourCycle)}, ${fmtDuration(a.duration)}.${
                 usuallyMin != null ? ` Usually runs about ${usuallyMin} minutes.` : ""
-              } Use arrow keys to move, plus or minus to resize. Enter to edit.`}
-              aria-keyshortcuts="ArrowUp ArrowDown + - Enter"
-              className={`group absolute flex gap-3 overflow-hidden rounded-2xl px-3.5 outline-none transition-transform hover:-translate-y-px hover:shadow-card focus-visible:ring-2 focus-visible:ring-iris ${cat.fill} ${
+              }${interactive ? " Use arrow keys to move, plus or minus to resize. Enter to edit." : ""}`}
+              aria-keyshortcuts={interactive ? "ArrowUp ArrowDown + - Enter" : undefined}
+              className={`group absolute flex gap-3 overflow-hidden rounded-2xl px-3.5 outline-none ${cat.fill} ${
                 past && !a.done ? "timeline-past" : ""
               } ${a.done ? "timeline-done" : ""} ${heavy ? "timeline-heavy" : ""} ${current ? "shadow-float ring-2 ring-now/70" : ""} ${
                 compact ? "items-center py-1.5" : "py-3"
-              } ${hasConflict ? "ring-2 ring-danger animate-pulse" : ""} rise-in cursor-grab active:cursor-grabbing`}
+              } ${hasConflict ? "ring-2 ring-danger animate-pulse" : ""} rise-in ${
+                interactive
+                  ? "cursor-grab transition-transform hover:-translate-y-px hover:shadow-card active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-iris"
+                  : ""
+              }`}
               style={{
                 top: top(a.start),
                 height: h,
                 width: widthPct,
                 left: leftPct,
-                touchAction: "none",
+                touchAction: interactive ? "none" : undefined,
                 animationDelay: `${Math.min(blockIdx * 30, 240)}ms`,
               }}
-              onPointerDown={(e) => handlePointerDown(e, a.id, "move", a)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && onOpen) {
-                  e.preventDefault();
-                  onOpen(a.id);
-                  return;
-                }
-                handleKeyDown(e, a);
-              }}
-              onDoubleClick={() => onOpen?.(a.id)}
+              onPointerDown={
+                interactive ? (e) => handlePointerDown(e, a.id, "move", a) : undefined
+              }
+              onKeyDown={
+                interactive
+                  ? (e) => {
+                      if (e.key === "Enter" && onOpen) {
+                        e.preventDefault();
+                        onOpen(a.id);
+                        return;
+                      }
+                      handleKeyDown(e, a);
+                    }
+                  : undefined
+              }
+              onDoubleClick={interactive ? () => onOpen?.(a.id) : undefined}
             >
               <span
                 className={`grid shrink-0 place-items-center rounded-full bg-surface-raised/80 ${
@@ -559,7 +572,7 @@ export function TimelineCanvas({
               </div>
 
               {/* Resize handles (hidden on compact) */}
-              {!compact && (
+              {interactive && !compact && (
                 <>
                   <div
                     className="absolute inset-x-0 top-0 h-2 cursor-ns-resize"

@@ -10,17 +10,21 @@ export function SignedOutCard({
   icon: Icon,
   title,
   body,
+  headingLevel = "h2",
 }: {
   icon: LucideIcon;
   title: string;
   body: string;
+  headingLevel?: "h1" | "h2";
 }) {
+  const Heading = headingLevel;
+
   return (
     <section className="mx-auto max-w-md rounded-3xl border border-border bg-surface px-6 py-10 text-center shadow-card">
       <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-iris-ghost text-iris">
         <Icon size={26} strokeWidth={2.2} />
       </span>
-      <h2 className="mt-4 font-display text-xl font-bold tracking-tight">{title}</h2>
+      <Heading className="mt-4 font-display text-xl font-bold tracking-tight">{title}</Heading>
       <p className="mx-auto mt-1.5 max-w-xs text-[14px] leading-relaxed text-ink-soft">{body}</p>
       <Link
         href="/sign-in"

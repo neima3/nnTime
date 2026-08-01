@@ -293,6 +293,7 @@ export function TodayTimeline({
   return (
     <TimelineCanvas
       activities={shownActivities}
+      interactive={authed}
       lowBattery={lowBattery}
       nowMin={nowMin}
       showNowLine={isToday}

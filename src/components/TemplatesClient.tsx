@@ -5,6 +5,7 @@
  */
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { catClasses, type CategoryId } from "@/lib/mock";
 import { localMinutesToInstant } from "@/lib/adapters";
@@ -115,14 +116,23 @@ export function TemplatesClient({
                   <li key={s}>· {s}</li>
                 ))}
               </ul>
-              <button
-                type="button"
-                disabled={busy === t.id}
-                onClick={() => void apply(t)}
-                className="mt-4 inline-flex items-center gap-1.5 self-start rounded-xl bg-iris-soft px-4 py-2 text-[13px] font-semibold text-iris transition-colors hover:bg-iris hover:text-ink-inverse disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
-              >
-                {busy === t.id ? "Applying…" : "Apply to Today"}
-              </button>
+              {authed ? (
+                <button
+                  type="button"
+                  disabled={busy === t.id}
+                  onClick={() => void apply(t)}
+                  className="mt-4 inline-flex items-center gap-1.5 self-start rounded-xl bg-iris-soft px-4 py-2 text-[13px] font-semibold text-iris transition-colors hover:bg-iris hover:text-ink-inverse disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+                >
+                  {busy === t.id ? "Applying…" : "Apply to Today"}
+                </button>
+              ) : (
+                <Link
+                  href="/sign-in"
+                  className="mt-4 inline-flex items-center gap-1.5 self-start rounded-xl bg-iris-soft px-4 py-2 text-[13px] font-semibold text-iris transition-colors hover:bg-iris hover:text-ink-inverse focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+                >
+                  Sign in to apply
+                </Link>
+              )}
             </article>
           );
         })}

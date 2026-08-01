@@ -45,37 +45,37 @@ behavior and independently protected APIs remain unchanged.
 
 ### Task 1: Pin production findings red
 
-- [ ] Extend the timeline source contract to require an explicit capability and
+- [x] Extend the timeline source contract to require an explicit capability and
   conditional interaction semantics.
-- [ ] Extend the signed-out browser contract to assert Today activity groups
+- [x] Extend the signed-out browser contract to assert Today activity groups
   have no keyboard shortcuts/tab stop, templates link directly to sign-in, and
   Focus/Planner/Editor each expose their auth title as `h1`.
-- [ ] Run focused tests and record the intended failures.
+- [x] Run focused tests and record the intended failures.
 
 ### Task 2: Make timeline capability explicit
 
-- [ ] Add `interactive?: boolean` with an authenticated-safe default of `true`.
-- [ ] In read-only mode omit tab focus, edit/resize instructions, keyboard
+- [x] Add `interactive?: boolean` with an authenticated-safe default of `true`.
+- [x] In read-only mode omit tab focus, edit/resize instructions, keyboard
   shortcuts, drag cursor/touch capture, and mutation handlers while preserving
   activity group labels and nested Focus navigation.
-- [ ] Pass `interactive={authed}` from `TodayTimeline`.
+- [x] Pass `interactive={authed}` from `TodayTimeline`.
 
 ### Task 3: Make authentication paths semantic and actionable
 
-- [ ] Render template apply actions as `/sign-in` links when signed out and as
+- [x] Render template apply actions as `/sign-in` links when signed out and as
   mutation buttons when signed in.
-- [ ] Add `headingLevel="h1" | "h2"` to `SignedOutCard`, defaulting to `h2`.
-- [ ] Opt the route-level Focus, Planner, and Editor fallbacks into `h1`; leave
+- [x] Add `headingLevel="h1" | "h2"` to `SignedOutCard`, defaulting to `h2`.
+- [x] Opt the route-level Focus, Planner, and Editor fallbacks into `h1`; leave
   embedded cards unchanged.
 
 ### Task 4: Verify the artifact
 
-- [ ] Run focused red-to-green tests, then
+- [x] Run focused red-to-green tests, then
   `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
-- [ ] Run the complete Playwright suite against a production build.
-- [ ] Inspect desktop and mobile screenshots, require no overflow or browser
+- [x] Run the complete Playwright suite against a production build.
+- [x] Inspect desktop and mobile screenshots, require no overflow or browser
   errors, and recompute parity without changing credit.
-- [ ] Obtain an independent code review and resolve every actionable finding.
+- [x] Obtain an independent code review and resolve every actionable finding.
 
 ### Task 5: Release and prove production
 

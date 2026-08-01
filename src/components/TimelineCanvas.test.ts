@@ -12,4 +12,13 @@ describe("TimelineCanvas accessibility contract", () => {
     expect(source).toContain('aria-roledescription="timeline activity"');
     expect(source).not.toContain('role="button"');
   });
+
+  it("makes read-only preview semantics an explicit capability", () => {
+    expect(source).toContain("interactive?: boolean;");
+    expect(source).toContain("interactive = true");
+    expect(source).toContain("tabIndex={interactive ? 0 : undefined}");
+    expect(source).toContain(
+      'aria-keyshortcuts={interactive ? "ArrowUp ArrowDown + - Enter" : undefined}',
+    );
+  });
 });

@@ -32,6 +32,39 @@ test("plan an activity, complete it, and it sticks", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("signed-in timeline keeps keyboard move and Enter-to-edit controls", async ({
+  page,
+}) => {
+  const day = dayUrl(10);
+  const title = "Interactive timeline probe";
+  await createActivity(page, day, title);
+
+  let activity = page.getByRole("group", { name: new RegExp(title) });
+  await expect(activity).toHaveAttribute("tabindex", "0");
+  await expect(activity).toHaveAttribute(
+    "aria-keyshortcuts",
+    "ArrowUp ArrowDown + - Enter",
+  );
+  await expect(activity).toHaveAccessibleName(/arrow keys.*resize.*enter to edit/i);
+
+  const beforeMove = await activity.getAttribute("aria-label");
+  await activity.focus();
+  await page.keyboard.press("ArrowDown");
+  await expect
+    .poll(() => activity.getAttribute("aria-label"), { timeout: 15_000 })
+    .not.toBe(beforeMove);
+
+  await page.reload();
+  await page.waitForSelector('html[data-hydrated="true"]');
+  activity = page.getByRole("group", { name: new RegExp(title) });
+  await expect(activity).not.toHaveAttribute("aria-label", beforeMove ?? "");
+
+  await activity.focus();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/app\/editor\?id=/);
+  await expect(page.getByPlaceholder("What are you doing?")).toHaveValue(title);
+});
+
 test("a captured thought lands in the inbox", async ({ page }) => {
   await gotoHydrated(page, "/app/today");
 

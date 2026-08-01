@@ -31,6 +31,7 @@ export default async function FocusPage({
               icon={Timer}
               title="Focus after you sign in"
               body="Start a session, keep the timer in sync, and return to it from any Kairo screen."
+              headingLevel="h1"
             />
           </div>
         }

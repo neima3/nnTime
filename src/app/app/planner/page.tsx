@@ -15,6 +15,7 @@ export default function PlannerPage() {
               icon={Sparkles}
               title="Plan with Kairo after you sign in"
               body="Turn your real Inbox into a gentle day plan while keeping every suggestion under your control."
+              headingLevel="h1"
             />
           </div>
         }

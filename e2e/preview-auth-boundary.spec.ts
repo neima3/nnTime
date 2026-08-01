@@ -122,3 +122,58 @@ test("signed-out Routines stays read-only and offers an auth path", async ({
     await context.close();
   }
 });
+
+test("signed-out Today advertises only the preview interactions it supports", async ({
+  page,
+}) => {
+  const protectedRequests: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname.startsWith("/api/v1/")) {
+      protectedRequests.push(`${request.method()} ${url.pathname}`);
+    }
+  });
+
+  await page.goto("/app/today?preview=1");
+  const activities = page.locator(
+    '[role="group"][aria-roledescription="timeline activity"]',
+  );
+
+  await expect(activities.first()).toBeVisible();
+  expect(await activities.count()).toBeGreaterThan(0);
+  for (const activity of await activities.all()) {
+    await expect(activity).not.toHaveAttribute("tabindex", "0");
+    await expect(activity).not.toHaveAttribute("aria-keyshortcuts");
+    await expect(activity).not.toHaveAccessibleName(/arrow keys|resize|edit/i);
+  }
+  const focus = page.getByRole("button", { name: /^Focus on / }).first();
+  await expect(focus).toBeVisible();
+  await focus.click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Focus after you sign in" }),
+  ).toBeVisible();
+  expect(protectedRequests).toEqual([]);
+});
+
+test("signed-out template actions lead directly to sign in", async ({ page }) => {
+  await page.goto("/app/templates");
+
+  const authLinks = page.getByRole("link", { name: "Sign in to apply" });
+  await expect(authLinks.first()).toBeVisible();
+  expect(await authLinks.count()).toBeGreaterThan(0);
+  await expect(page.getByRole("button", { name: "Apply to Today" })).toHaveCount(0);
+  await expect(authLinks.first()).toHaveAttribute("href", "/sign-in");
+});
+
+for (const [route, title] of [
+  ["/app/focus", "Focus after you sign in"],
+  ["/app/planner", "Plan with Kairo after you sign in"],
+  ["/app/editor", "Plan after you sign in"],
+] as const) {
+  test(`signed-out ${route} auth boundary supplies the page heading`, async ({ page }) => {
+    await page.goto(route);
+
+    await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
+    await expect(page.locator("main h1")).toHaveCount(1);
+  });
+}
