@@ -1,5 +1,31 @@
 # Progress log
 
+## 2026-08-01 — Round 35: token-level WCAG audit — one sub-AA pair fixed (Fable)
+
+- **Method.** Probe-div contrast measurement of the arcade's real token
+  pairs (category inks, chips, found-states, success feedback) across
+  all four theme modes, computed with actual WCAG luminance math in the
+  live page. (First attempts measured mid-`transition-colors`
+  interpolation and the app's own theme manager fought root-class
+  toggles — container-scoped token probes sidestepped both.)
+- **Results.** Category inks on surface: 5.99–6.58 light, 8.46–10.4
+  dark, and **9.17–13.75 in the high-contrast modes** — the toggle
+  delivers its AAA promise on the arcade. Found-cells are disabled
+  (WCAG-exempt) and strengthened under high contrast anyway. One genuine
+  finding: light `--success` (#23805c) measured **4.06 on success-soft**
+  (quiz correct-answer text) and 4.43 on canvas (score counters) — under
+  the 4.5 AA line for normal text, a pre-existing pair the arcade
+  inherited.
+- **Fix.** Light `--success` → `#1e7354`: 4.82 on success-soft, 5.69 on
+  surface, 5.26 on canvas (verified live post-HMR at 4.82); the
+  inverse-on-success pairing improves too. Dark and high-contrast values
+  were already compliant and are untouched. iOS `kSuccess` mirrors the
+  same light value so the platforms stay token-identical; the iOS gate
+  re-passed (**364 executed, 0 failures**).
+- **Release.** Commit `2a867e2`; GitHub Actions run `30681484144`
+  concluded `success` on the exact SHA; deploy drained; live
+  `/api/health` all `ok`.
+
 ## 2026-08-01 — Round 34: reduced stimulation stills the arcade (Fable)
 
 - **The gap.** An audit of the arcade against the app's own Reduced
