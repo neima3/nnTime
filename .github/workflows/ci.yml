@@ -32,7 +32,7 @@ jobs:
           - 5432:5432
         # Wait until the server accepts connections before continuing.
         options: >-
-          --health-cmd "pg_isready -U kairo"
+          --health-cmd "pg_isready -U kairo -d kairo_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -166,7 +166,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U kairo"
+          --health-cmd "pg_isready -U kairo -d kairo_e2e"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10

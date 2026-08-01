@@ -37,19 +37,19 @@ readiness probe.
 
 ### Task 1: Pin the readiness drift red
 
-- [ ] Preserve the 25 build-test and 29 E2E false-FATAL lines from run
+- [x] Preserve the 25 build-test and 29 E2E false-FATAL lines from run
   `30715801239` as baseline evidence.
-- [ ] Add the structural health-probe contract and observe both mappings fail.
+- [x] Add the structural health-probe contract and observe both mappings fail.
 
 ### Task 2: Correct both probes
 
-- [ ] Add `-d kairo_test` to build-test and `-d kairo_e2e` to E2E.
-- [ ] Preserve every other service and timing option.
-- [ ] Run focused plus full local gates green.
+- [x] Add `-d kairo_test` to build-test and `-d kairo_e2e` to E2E.
+- [x] Preserve every other service and timing option.
+- [x] Run focused plus full local gates green.
 
 ### Task 3: Review and release
 
-- [ ] Obtain independent review and resolve every actionable finding.
+- [x] Obtain independent review and resolve every actionable finding.
 - [ ] Fast-forward `main`, rerun merged focused gates, push, and require exact-SHA
   GitHub CI success.
 - [ ] Require both completed Linux service logs to contain zero false-FATAL
@@ -59,8 +59,9 @@ readiness probe.
 
 ## Self-review
 
-- `pg_isready` now verifies the same database named in each job's environment,
-  so readiness means the dependency the application will actually use exists.
+- `pg_isready` now targets the same database endpoint name as each job instead
+  of PostgreSQL's incorrect implicit user-named database. It remains a server
+  acceptance probe, not a query-level application health check.
 - This changes no application query, schema, migration, data, or production
   deployment setting.
 - Remaining Postgres image locale/trust initialization notices are external
