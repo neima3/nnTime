@@ -48,9 +48,11 @@ const moreKeys = new Set(["routines", "stats", "settings", "templates", "more", 
 export function AppShell({
   active,
   children,
+  enableLiveData = true,
 }: {
   active: string;
   children: React.ReactNode;
+  enableLiveData?: boolean;
 }) {
   // Keyboard shortcuts: n=new, t=today, i=inbox, w=week, f=focus, s=settings
   useEffect(() => {
@@ -67,7 +69,7 @@ export function AppShell({
   }, []);
 
   return (
-    <NowProvider>
+    <NowProvider enabled={enableLiveData}>
     <div className="flex min-h-dvh w-full bg-canvas">
       {/* Skip to content — keyboard accessibility */}
       <a

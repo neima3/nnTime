@@ -304,7 +304,7 @@ export default async function TodayPage({
       : [];
 
   return (
-    <AppShell active="today">
+    <AppShell active="today" enableLiveData={authed}>
       <div className="timeline-scroll-container mx-auto flex max-w-5xl gap-8 px-4 py-6 md:px-8">
         <section className="min-w-0 flex-1">
           <header className="mb-6 flex flex-wrap items-center gap-3">
@@ -317,7 +317,7 @@ export default async function TodayPage({
               </h1>
             </div>
             {!emptyDay && <DayProgress activities={activities} />}
-            <SoftStreaks />
+            <SoftStreaks enabled={authed} />
             {authed && isToday && <LowBatteryToggle date={date} />}
             {authed && isToday && (
               <PickForMe candidates={pickCandidates} date={date} />

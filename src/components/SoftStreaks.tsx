@@ -18,6 +18,8 @@ import { Flame } from "lucide-react";
 interface SoftStreaksProps {
   /** Opt-out flag from user settings. */
   optOut?: boolean;
+  /** Skip protected stats work for signed-out fixture renders. */
+  enabled?: boolean;
 }
 
 interface StreakData {
@@ -25,11 +27,12 @@ interface StreakData {
   best: number;
 }
 
-export function SoftStreaks({ optOut }: SoftStreaksProps) {
+export function SoftStreaks({ optOut, enabled = true }: SoftStreaksProps) {
   const [mounted, setMounted] = useState(false);
   const [streak, setStreak] = useState<StreakData>({ current: 0, best: 0 });
 
   useEffect(() => {
+    if (!enabled) return;
     // Mount-gated: real streak from planner_events via stats service.
     /* eslint-disable react-hooks/set-state-in-effect */
     setMounted(true);
@@ -45,9 +48,9 @@ export function SoftStreaks({ optOut }: SoftStreaksProps) {
         // No data yet — streak stays at 0.
       });
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, []);
+  }, [enabled]);
 
-  if (optOut) return null;
+  if (optOut || !enabled) return null;
   if (!mounted) return null;
   if (streak.current === 0 && streak.best === 0) return null;
 

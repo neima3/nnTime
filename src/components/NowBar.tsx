@@ -54,13 +54,20 @@ export function useNowInfo() {
   return useContext(NowContext);
 }
 
-export function NowProvider({ children }: { children: React.ReactNode }) {
+export function NowProvider({
+  children,
+  enabled = true,
+}: {
+  children: React.ReactNode;
+  enabled?: boolean;
+}) {
   const [activities, setActivities] = useState<DayActivity[] | null>(null);
   const [zone, setZone] = useState<string | undefined>(undefined);
   const [nowMin, setNowMin] = useState<number | null>(null);
 
   // Load today's plan; refresh every 5 minutes and on tab re-focus.
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     async function load() {
       try {
@@ -120,7 +127,7 @@ export function NowProvider({ children }: { children: React.ReactNode }) {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener(DAY_CHANGED_EVENT, onDayChanged);
     };
-  }, []);
+  }, [enabled]);
 
   // Tick the clock every 30 s.
   useEffect(() => {
@@ -142,6 +149,7 @@ export function NowProvider({ children }: { children: React.ReactNode }) {
   const firedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     getSettingsCached().then((s) => {
       if (cancelled || !s) return;
@@ -157,7 +165,7 @@ export function NowProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
       window.removeEventListener("kairo:transition-warnings", onToggle);
     };
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
     if (!activities || nowMin == null) return;
