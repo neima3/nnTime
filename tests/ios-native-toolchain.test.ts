@@ -31,6 +31,14 @@ afterEach(() => {
 });
 
 describe("iOS native package toolchain", () => {
+  it("uses a portable explicit template for the wrapped xcodebuild log", () => {
+    const source = readFileSync(resolve("scripts/ios-xcodebuild.sh"), "utf8");
+
+    expect(source).toContain(
+      'mktemp "${TMPDIR:-/tmp}/kairo-xcodebuild.XXXXXX"',
+    );
+  });
+
   it("keeps an authoritative exact Swift package graph under version control", () => {
     const ignoreRules = [".gitignore", "ios/Kairo/.gitignore"].flatMap((file) =>
       readFileSync(resolve(file), "utf8")

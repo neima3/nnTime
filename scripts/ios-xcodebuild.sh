@@ -4,7 +4,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 PROJECT_ROOT="$PWD"
-LOG_FILE="$(mktemp -t kairo-xcodebuild)"
+LOG_FILE="$(mktemp "${TMPDIR:-/tmp}/kairo-xcodebuild.XXXXXX")"
 trap 'rm -f "$LOG_FILE"' EXIT
 
 set +e
