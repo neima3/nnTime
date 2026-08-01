@@ -28,7 +28,7 @@
     "drizzle-zod": "^0.8.3",
     "jose": "^6.1.3",
     "lucide-react": "^1.24.0",
-    "next": "16.2.10",
+    "next": "16.2.12",
     "postgres": "^3.4.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -53,5 +53,12 @@
     "vitest": "^4.1.10",
     "yaml": "^2.9.0"
   },
-  "packageManager": "pnpm@9.15.9"
+  "packageManager": "pnpm@9.15.9",
+  "pnpm": {
+    "overrides": {
+      "postcss@<8.5.18": ">=8.5.18",
+      "sharp@<0.35.0": ">=0.35.0",
+      "brace-expansion@<1.1.17": "1.1.17"
+    }
+  }
 }
