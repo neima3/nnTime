@@ -1,5 +1,39 @@
 # Progress log
 
+## 2026-08-01 — Round 51: explicit synthetic auth secrets in CI (Codex)
+
+- **Hosted auth noise converted into a contract.** Round 50's exact green run
+  still emitted Better Auth's default-secret error in `build-test` and repeated
+  short/low-entropy warnings in E2E build and runtime logs. A YAML-parsed
+  contract now requires both Linux auth runtimes to use one literal, clearly
+  CI-only value with sufficient length, character diversity, and lower/upper/
+  digit classes.
+- **Production stays fail-closed.** Only the two GitHub Actions jobs received
+  the public synthetic value. No application, Docker, Coolify, native, or local
+  production fallback changed; missing production configuration still fails in
+  Better Auth. Synthetic databases, localhost origin, and browser flows are
+  unchanged.
+- **TDD, review, and local proof.** The contract failed first on `build-test`'s
+  missing value. With the explicit value, a local production build contained
+  zero default-, short-, or low-entropy warning. Independent review returned
+  READY with no findings and verified job scope plus Better Auth's entropy
+  threshold. Lint, typecheck, production build, parity, `git diff --check`, and
+  **106 test files / 1,052 tests** passed; parity remains **89.74% web / 86.93%
+  iOS** because this is release hardening.
+- **Exact release proof.** SHA
+  `bf66139d117bfd7a6253acdd07369da8f3ae86ef` passed GitHub Actions run
+  `30715801239`: build/test, **21/21** Playwright scenarios, generated/native
+  contracts, **378** app-hosted native tests (1 skipped, 0 failures), and the
+  unsigned shipping build. Completed build-test and E2E logs contain zero
+  targeted Better Auth secret warning. Coolify deployment
+  `k9csnyyu5j6h55lucmegt7lz` finished on that exact SHA; live migration, DB, AI,
+  and scheduler checks all reported `ok`.
+- **Next hardening target and standing boundary.** Those same Linux job logs
+  exposed **54** avoidable Postgres `FATAL database "kairo" does not exist`
+  lines because each Docker health probe omitted its actual database. Round 52
+  makes readiness accurate. Phase 7B physical-device/provider lifecycle and
+  Phase 8B Google consent/client activation remain external evidence gates.
+
 ## 2026-08-01 — Round 50: warning-clean native release gates (Codex)
 
 - **Swift concurrency debt removed with checked semantics.** The hosted Round 49
