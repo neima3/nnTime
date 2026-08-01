@@ -6,22 +6,33 @@
  * not "training".
  */
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { readBest, type GameId } from "@/lib/games";
-import { TimeFeel } from "./games/TimeFeel";
-import { QuizGame } from "./games/QuizGame";
-import { GRAMMAR_BANK, SPELLING_BANK } from "@/lib/games";
-import { QuickTap } from "./games/QuickTap";
-import { EmojiMatch } from "./games/EmojiMatch";
-import { SteadyBreath } from "./games/SteadyBreath";
-import { FocusFinder } from "./games/FocusFinder";
-import { MemoryTrail } from "./games/MemoryTrail";
-import { ColorClash } from "./games/ColorClash";
-import { OddOneOut } from "./games/OddOneOut";
-import { DigitSpan } from "./games/DigitSpan";
-import { GreenLight } from "./games/GreenLight";
-import { NightSky } from "./games/NightSky";
-import { LetterSoup } from "./games/LetterSoup";
-import { PatternTiles } from "./games/PatternTiles";
+
+/* Games load on tap, not with the arcade — the grid stays feather-light
+   and each game's chunk (plus the quiz banks) arrives only when chosen. */
+function GameLoading() {
+  return (
+    <div className="fixed inset-0 z-[70] grid place-items-center bg-canvas">
+      <p className="text-[14px] font-semibold text-ink-soft">opening…</p>
+    </div>
+  );
+}
+const TimeFeel = dynamic(() => import("./games/TimeFeel").then((m) => m.TimeFeel), { loading: GameLoading });
+const QuickTap = dynamic(() => import("./games/QuickTap").then((m) => m.QuickTap), { loading: GameLoading });
+const EmojiMatch = dynamic(() => import("./games/EmojiMatch").then((m) => m.EmojiMatch), { loading: GameLoading });
+const SteadyBreath = dynamic(() => import("./games/SteadyBreath").then((m) => m.SteadyBreath), { loading: GameLoading });
+const FocusFinder = dynamic(() => import("./games/FocusFinder").then((m) => m.FocusFinder), { loading: GameLoading });
+const MemoryTrail = dynamic(() => import("./games/MemoryTrail").then((m) => m.MemoryTrail), { loading: GameLoading });
+const ColorClash = dynamic(() => import("./games/ColorClash").then((m) => m.ColorClash), { loading: GameLoading });
+const OddOneOut = dynamic(() => import("./games/OddOneOut").then((m) => m.OddOneOut), { loading: GameLoading });
+const DigitSpan = dynamic(() => import("./games/DigitSpan").then((m) => m.DigitSpan), { loading: GameLoading });
+const GreenLight = dynamic(() => import("./games/GreenLight").then((m) => m.GreenLight), { loading: GameLoading });
+const NightSky = dynamic(() => import("./games/NightSky").then((m) => m.NightSky), { loading: GameLoading });
+const LetterSoup = dynamic(() => import("./games/LetterSoup").then((m) => m.LetterSoup), { loading: GameLoading });
+const PatternTiles = dynamic(() => import("./games/PatternTiles").then((m) => m.PatternTiles), { loading: GameLoading });
+const GrammarSnap = dynamic(() => import("./games/GrammarSnap").then((m) => m.GrammarSnap), { loading: GameLoading });
+const SpellCheckGame = dynamic(() => import("./games/SpellCheckGame").then((m) => m.SpellCheckGame), { loading: GameLoading });
 
 interface GameCard {
   id: GameId;
@@ -215,42 +226,8 @@ export function PlayClient() {
   if (active === "night-sky") return <NightSky onExit={exit} />;
   if (active === "letter-soup") return <LetterSoup onExit={exit} />;
   if (active === "pattern-tiles") return <PatternTiles onExit={exit} />;
-  if (active === "grammar-snap")
-    return (
-      <QuizGame
-        id="grammar-snap"
-        title="Grammar Snap"
-        emoji="📝"
-        howTo="Tap the word that fits. No red pens here."
-        bank={GRAMMAR_BANK}
-        endDetail={(score) =>
-          score >= 7
-            ? "Basically an editor. English fears you."
-            : score >= 4
-              ? "Solid — and every miss came with a memory hook."
-              : "These pairs trip up native speakers daily. Now you know their tricks."
-        }
-        onExit={exit}
-      />
-    );
-  if (active === "spell-check")
-    return (
-      <QuizGame
-        id="spell-check"
-        title="Spell Check"
-        emoji="🔤"
-        howTo="Tap the real spelling among the impostors."
-        bank={SPELLING_BANK}
-        endDetail={(score) =>
-          score >= 7
-            ? "Spelling bee champion energy."
-            : score >= 4
-              ? "Good eye — the impostors are convincing on purpose."
-              : "These are the most-misspelled words in English. You're in excellent company."
-        }
-        onExit={exit}
-      />
-    );
+  if (active === "grammar-snap") return <GrammarSnap onExit={exit} />;
+  if (active === "spell-check") return <SpellCheckGame onExit={exit} />;
 
   return (
     <div className="flex flex-col gap-9">
