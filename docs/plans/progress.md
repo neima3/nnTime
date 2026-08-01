@@ -1,5 +1,31 @@
 # Progress log
 
+## 2026-08-01 — Round 36: 8C standing hardening — deps patched, restore re-proven (Fable)
+
+- **Dependency audit.** `pnpm audit` surfaced **16 advisories (9 high)**.
+  Next.js 16.2.10 → 16.2.12 closed nine — including a middleware/proxy
+  bypass and two Server-Action SSRF highs on the production app. Targeted
+  same-major overrides lifted the transitive pins (postcss ≥8.5.18,
+  sharp ≥0.35.0, brace-expansion pinned to exactly 1.1.17 after a naive
+  `>=` range briefly let pnpm jump minimatch@3's dep to the ESM-only 5.x
+  line — caught and corrected before commit). **One accepted moderate
+  remains:** esbuild ≤0.24.2 inside drizzle-kit's abandoned
+  `@esbuild-kit` loader — the advisory concerns esbuild's dev server,
+  which that loader never opens; dev-tooling only.
+- **Gates on the framework bump.** Lint, typecheck, **1012 unit tests**,
+  production build, and the production-mode E2E suite (**11 passed, 1
+  legitimate skip** — the calibration spec's own near-midnight guard, in
+  its designed window).
+- **Backup + restore drill (SEC-07).** The off-host Jul 29 prod backup's
+  SHA-256 matches the recorded value exactly (mode 0600). A full
+  `pg_restore` into an isolated scratch DB succeeded: 68 public tables,
+  9 migration rows (0000–0008, consistent with a pre-0009 predeploy
+  artifact); the scratch DB was dropped and no planner contents were
+  inspected.
+- **Release.** Commit `17ec675`; GitHub Actions run `30682505132`
+  concluded `success` on the exact SHA; deploy drained; live
+  `/api/health` all `ok` on Next 16.2.12.
+
 ## 2026-08-01 — Round 35: token-level WCAG audit — one sub-AA pair fixed (Fable)
 
 - **Method.** Probe-div contrast measurement of the arcade's real token
