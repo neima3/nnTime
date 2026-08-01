@@ -1,5 +1,31 @@
 # Progress log
 
+## 2026-08-01 — Round 37: arcade lazy-loading — games leave the first-load bundle (Fable)
+
+- **What changed.** All fifteen games in `PlayClient.tsx` moved behind
+  `next/dynamic` with a calm full-screen "opening…" loading state; the
+  Grammar Snap and Spell Check quizzes moved into self-contained
+  wrappers (`games/GrammarSnap.tsx`, `games/SpellCheckGame.tsx`) so
+  their 80+ bank items ship in the lazy chunk instead of the grid's
+  first load. Turbopack quirk: `next/dynamic` options must be an inline
+  object literal — a shared `opts` const fails the build.
+- **Measured.** Live `/app/play` initial script payload (sum of gzipped
+  transfer for every `/_next/static/*.js` referenced by the page HTML):
+  **before 15 chunks / 246,623 B → after 14 chunks / 236,287 B**
+  (−10,336 B gzipped, −4.2%); game code + quiz banks now arrive only on
+  tap.
+- **Verified.** Dev: Quick Tap intro and a full Grammar Snap
+  question→answer cycle through the dynamic boundary. Prod (post-
+  deploy): all 15 cards render on time.neima.me and Grammar Snap opens
+  live — bank chunk loaded on tap, question 1 of 8 rendering.
+- **Release.** Commit `27395ac`; run `30683597117` first attempt failed
+  on a Vitest worker-teardown race (`EnvironmentTeardownError: Closing
+  rpc while "onUserConsoleLog" was pending`, amplified by a runner
+  where the Postgres service socket never came up — all 964 tests had
+  passed; vitest already at latest 4.1.10, no code fault); failed-job
+  rerun concluded **success on the exact SHA** (build-test,
+  native-contract, e2e). Deploy drained; live `/api/health` all `ok`.
+
 ## 2026-08-01 — Round 36: 8C standing hardening — deps patched, restore re-proven (Fable)
 
 - **Dependency audit.** `pnpm audit` surfaced **16 advisories (9 high)**.
