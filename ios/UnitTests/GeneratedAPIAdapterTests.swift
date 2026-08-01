@@ -713,6 +713,17 @@ final class GeneratedAPIAdapterTests: XCTestCase {
             )
         }
         assertAdapterError(
+            .notFound(
+                operation: "createActivitySeries",
+                statusCode: 404,
+                error: error
+            )
+        ) {
+            try GeneratedAPIAdapters.activity(
+                .notFound(.init(body: .json(envelope)))
+            )
+        }
+        assertAdapterError(
             .conflict(
                 operation: "createActivitySeries",
                 statusCode: 409,

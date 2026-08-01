@@ -22,18 +22,18 @@ export default async function EditorPage({
   const start = typeof sp.start === "string" ? Number(sp.start) : undefined;
   const date = typeof sp.date === "string" ? sp.date : undefined;
   const title = typeof sp.title === "string" ? sp.title : undefined;
-  const session = taskId ? await getSession() : null;
+  const session = await getSession();
   const task =
     session && taskId
       ? await getTask(session.userId, taskId).catch(() => null)
       : null;
-  const [categories, checklist] =
+  const categories = session
+    ? await listCategories(session.userId)
+    : [];
+  const checklist =
     session && task
-      ? await Promise.all([
-          listCategories(session.userId).catch(() => []),
-          listChecklistItems(session.userId, "task", task.id).catch(() => []),
-        ])
-      : [[], []];
+      ? await listChecklistItems(session.userId, "task", task.id).catch(() => [])
+      : [];
   const categoryKey = task?.categoryId
     ? buildCategoryMap(
         categories as unknown as Parameters<typeof buildCategoryMap>[0],
@@ -66,6 +66,11 @@ export default async function EditorPage({
           initialEmoji={task?.emoji ?? undefined}
           initialCategoryKey={categoryKey}
           initialCategoryId={task?.categoryId ?? undefined}
+          initialCategories={categories.map(({ id, key, label }) => ({
+            id,
+            key,
+            label,
+          }))}
           initialEnergy={task?.energy ?? undefined}
           initialPriority={task?.priority ?? undefined}
           initialNotes={task?.notes ?? undefined}

@@ -154,4 +154,11 @@ describe("ADR-002: OpenAPI ↔ zod parity (CI drift gate)", () => {
       "Idempotency-Key parameter missing from components",
     ).toBe(true);
   });
+
+  it("declares nested-reference not-found responses for activity creation", () => {
+    const operation = spec.paths?.["/activities"]?.post as
+      | { responses?: Record<string, unknown> }
+      | undefined;
+    expect(operation?.responses).toHaveProperty("404");
+  });
 });

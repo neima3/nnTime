@@ -1,5 +1,40 @@
 # Progress log
 
+## 2026-08-01 — Round 54: canonical activity creation hardening (Codex)
+
+- **Canonical create no longer loses accepted fields.**
+  `POST /api/v1/activities` now transforms and forwards `exdate`, `rdate`,
+  `tags`, and `sourceRef` through the idempotency-locked DAL transaction. The
+  original 201 is private/no-store and malformed optional idempotency keys are
+  rejected before rate-limit or mutation work.
+- **Nested ownership is enforced atomically.** Ordinary creation and Inbox
+  conversion share one active owner-scoped category/tag assertion. A foreign
+  or deleted nested ID produces the same not-found boundary as any inaccessible
+  resource; PostgreSQL integration tests prove that neither an activity nor its
+  change-log row survives rejection.
+- **Editor categories are ready at first interaction.** Every authenticated
+  editor render now obtains the six owned category UUIDs server-side and seeds
+  client state with only `{id,key,label}`. The client request remains a refresh
+  path, so replay-safe offline create is unchanged. A real-browser regression
+  aborts that refresh, selects Life, saves immediately, and proves the outgoing
+  activity body still carries the authenticated Life UUID.
+- **Local release proof.** Red tests first reproduced all three gaps. Final
+  gates passed: lint, typecheck, production build, `git diff --check`, **114
+  test files / 1,080 tests**, **24/24** Playwright scenarios, parity (**89.74%
+  web / 86.93% iOS**), iOS release preflight, and the native main-thread gate.
+  The native gate caught the newly documented 404 response's missing generated
+  Swift adapter branch; the adapter and its exact-envelope regression were
+  added before the successful rerun. The app-hosted gate executed **378 tests**
+  (1 skipped, 0 failures). Independent re-review returned **READY** with no
+  Critical, Important, or Minor findings. Desktop and 390px evidence is saved at
+  `browser-qa/round54-editor-category-desktop.png` and
+  `browser-qa/round54-editor-category-mobile.png` (git-ignored).
+- **Release status.** Commit, exact-SHA CI, Coolify deployment, and live
+  read-only proof are pending this entry's implementation commit. Phase 7B
+  physical-device/provider lifecycle and Phase 8B Google activation remain
+  external evidence gates; no provider configuration or production planner
+  data changed.
+
 ## 2026-08-01 — Round 53: atomic Inbox task conversion (Codex)
 
 - **Dogfood defect fixed at the identity boundary.** Authenticated synthetic

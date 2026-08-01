@@ -260,6 +260,12 @@ enum GeneratedAPIAdapters {
                 statusCode: 401,
                 envelope: response.body.json
             )
+        case let .notFound(response):
+            throw try documentedError(
+                operation: Operations.createActivitySeries.id,
+                statusCode: 404,
+                envelope: response.body.json
+            )
         case let .conflict(response):
             throw try documentedError(
                 operation: Operations.createActivitySeries.id,

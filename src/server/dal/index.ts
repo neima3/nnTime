@@ -205,6 +205,44 @@ export async function listChecklistItems(
     .orderBy(asc(schema.checklistItems.sortOrder));
 }
 
+async function assertOwnedActivityReferences(
+  db: Db,
+  userId: string,
+  categoryId?: string,
+  tags?: string[],
+) {
+  if (categoryId) {
+    const [category] = await db
+      .select({ id: schema.categories.id })
+      .from(schema.categories)
+      .where(
+        and(
+          eq(schema.categories.id, categoryId),
+          eq(schema.categories.userId, userId),
+          isNull(schema.categories.deletedAt),
+        ),
+      )
+      .limit(1);
+    if (!category) throw new NotFoundError("category");
+  }
+  if (tags?.length) {
+    const requestedTagIds = [...new Set(tags)];
+    const ownedTags = await db
+      .select({ id: schema.tags.id })
+      .from(schema.tags)
+      .where(
+        and(
+          inArray(schema.tags.id, requestedTagIds),
+          eq(schema.tags.userId, userId),
+          isNull(schema.tags.deletedAt),
+        ),
+      );
+    if (ownedTags.length !== requestedTagIds.length) {
+      throw new NotFoundError("tag");
+    }
+  }
+}
+
 export async function scheduleTask(
   userId: string,
   taskId: string,
@@ -233,36 +271,12 @@ export async function scheduleTask(
     const tdb = tx as unknown as Db;
     const seriesId = crypto.randomUUID();
     const now = new Date();
-    if (input.categoryId) {
-      const [category] = await tdb
-        .select({ id: schema.categories.id })
-        .from(schema.categories)
-        .where(
-          and(
-            eq(schema.categories.id, input.categoryId),
-            eq(schema.categories.userId, userId),
-            isNull(schema.categories.deletedAt),
-          ),
-        )
-        .limit(1);
-      if (!category) throw new NotFoundError("category");
-    }
-    if (input.tags?.length) {
-      const requestedTagIds = [...new Set(input.tags)];
-      const ownedTags = await tdb
-        .select({ id: schema.tags.id })
-        .from(schema.tags)
-        .where(
-          and(
-            inArray(schema.tags.id, requestedTagIds),
-            eq(schema.tags.userId, userId),
-            isNull(schema.tags.deletedAt),
-          ),
-        );
-      if (ownedTags.length !== requestedTagIds.length) {
-        throw new NotFoundError("tag");
-      }
-    }
+    await assertOwnedActivityReferences(
+      tdb,
+      userId,
+      input.categoryId,
+      input.tags,
+    );
     const [task] = await tdb
       .update(schema.tasks)
       .set({
@@ -449,14 +463,18 @@ export async function createActivitySeries(
     tz: string;
     dtstartLocal: Date;
     rrule?: string | null;
+    exdate?: Date[];
+    rdate?: Date[];
     title: string;
     emoji?: string;
     categoryId?: string;
     durationMin: number;
     energy?: "low" | "medium" | "high" | null;
     priority?: "none" | "low" | "high";
+    tags?: string[];
     notes?: string;
     source?: "manual" | "routine" | "calendar";
+    sourceRef?: string;
     checklistTemplate?: unknown[];
   },
   opts: { db?: Db } = {},
@@ -465,6 +483,12 @@ export async function createActivitySeries(
   return db.transaction(async (tx) => {
     const tdb = tx as unknown as Db;
     const id = crypto.randomUUID();
+    await assertOwnedActivityReferences(
+      tdb,
+      userId,
+      input.categoryId,
+      input.tags,
+    );
     const [series] = await tdb
       .insert(schema.activitySeries)
       .values({
@@ -476,12 +500,16 @@ export async function createActivitySeries(
         tz: input.tz,
         dtstartLocal: input.dtstartLocal,
         rrule: input.rrule ?? null,
+        exdate: input.exdate ?? null,
+        rdate: input.rdate ?? null,
         title: input.title,
-        emoji: input.emoji,
-        categoryId: input.categoryId,
+        emoji: input.emoji ?? null,
+        categoryId: input.categoryId ?? null,
         durationMin: input.durationMin,
         energy: input.energy ?? null,
-        notes: input.notes,
+        tags: input.tags ?? null,
+        notes: input.notes ?? null,
+        sourceRef: input.sourceRef ?? null,
       })
       .returning();
     await appendChangeLog(tdb, userId, "activity_series", id, "upsert", series!.revision);

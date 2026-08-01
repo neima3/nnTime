@@ -101,7 +101,9 @@ design work BEFORE the consuming subphase starts.
         server contract plus matching iOS public identifiers, then prove
         live production web sign-in/linking and the signed physical-iPhone
         lifecycle.
-  - [x] 8C Ongoing hardening: repeated restore drill, E2E suite in CI, monitoring
+  - [x] 8C Ongoing hardening: repeated restore drill, E2E suite in CI,
+        monitoring, and canonical activity-create ownership/field-preservation
+        hardening (Round 54, 2026-08-01)
   - [x] 8D Privacy/review-prep contract + scripted parity gate
         (App Store upload, processing, and launch are tracked per release)
 

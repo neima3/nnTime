@@ -123,6 +123,7 @@ export type ActivityEditorProps = {
   initialEmoji?: string;
   initialCategoryKey?: string;
   initialCategoryId?: string;
+  initialCategories?: CategoryRow[];
   initialDate?: string;
   initialStartMin?: number;
   initialDurationMin?: number;
@@ -158,7 +159,9 @@ export function ActivityEditor(props: ActivityEditorProps) {
     normalizeEditorSteps(props.initialSteps),
   );
   const [stepDraft, setStepDraft] = useState("");
-  const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [categories, setCategories] = useState<CategoryRow[]>(
+    props.initialCategories ?? [],
+  );
   const [tz, setTz] = useState(
     props.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
   );
