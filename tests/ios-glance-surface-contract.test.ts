@@ -7,7 +7,7 @@ import { auditGlanceSurfaceContract } from "../scripts/ios-glance-surface-contra
 const root = process.cwd();
 
 describe("iOS glance surface contract", () => {
-  it("keeps the widget target read-only and isolated from authenticated transport", () => {
+  it("keeps widget writes on the network-first session bridge (R38)", () => {
     const result = auditGlanceSurfaceContract(root);
 
     expect(result.failures).toEqual([]);
@@ -24,8 +24,7 @@ describe("iOS glance surface contract", () => {
     );
   });
 
-  it("detects an extension mutation or transport regression", () => {
-    const project = readFileSync(resolve(root, "ios/project.yml"), "utf8");
+  it("detects transport or inline-intent regressions in widget UI", () => {
     const widget = readFileSync(
       resolve(root, "ios/Widget/KairoWidget.swift"),
       "utf8",
@@ -34,24 +33,61 @@ describe("iOS glance surface contract", () => {
       resolve(root, "ios/Widget/FocusLiveActivity.swift"),
       "utf8",
     );
-    const app = readFileSync(resolve(root, "ios/App/KairoApp.swift"), "utf8");
-    const today = readFileSync(
-      resolve(root, "ios/App/Features/Today/TodayView.swift"),
-      "utf8",
-    );
 
     const result = auditGlanceSurfaceContract(root, {
-      project,
-      widget: `${widget}\nstruct CompleteIntent: AppIntent {}`,
+      widget: `${widget}\nstruct RogueIntent: AppIntent {}`,
       liveActivity: `${liveActivity}\nlet session = URLSession.shared`,
-      app,
-      today,
     });
 
     expect(result.failures).toEqual(
       expect.arrayContaining([
-        "Widget sources must not declare AppIntent mutations",
+        "Widget UI sources must not declare inline App Intents",
         "Widget sources must not create network sessions",
+      ]),
+    );
+  });
+
+  it("detects a widget button bypassing the completion intent", () => {
+    const widget = readFileSync(
+      resolve(root, "ios/Widget/KairoWidget.swift"),
+      "utf8",
+    );
+
+    const result = auditGlanceSurfaceContract(root, {
+      widget: `${widget}\nlet rogue = Button(intent: SomeOtherIntent()) {}`,
+    });
+
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        "Widget intent buttons must all route through CompleteBlockIntent",
+      ]),
+    );
+  });
+
+  it("detects an optimistic-cache regression in the completion service", () => {
+    const service = readFileSync(
+      resolve(root, "ios/Shared/WidgetCompletion.swift"),
+      "utf8",
+    );
+    // Move a cache write ahead of the status gate — the exact failure mode
+    // H03 was withheld over.
+    const optimistic = service.replace(
+      "let (data, response) = try await session.data(for: request)",
+      [
+        "_ = try cacheStore.updateStatus(",
+        "    scope: scope, date: snapshot.date, activityID: activityID,",
+        "    occurrenceKey: occurrenceKey, done: done)",
+        "let (data, response) = try await session.data(for: request)",
+      ].join("\n        "),
+    );
+
+    const result = auditGlanceSurfaceContract(root, {
+      widgetCompletion: optimistic,
+    });
+
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        "Widget completion must update the cache only after the 2xx gate",
       ]),
     );
   });

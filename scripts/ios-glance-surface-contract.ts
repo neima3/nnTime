@@ -5,6 +5,9 @@ type ContractSources = {
   project: string;
   widget: string;
   liveActivity: string;
+  completeIntent: string;
+  widgetCompletion: string;
+  sessionEnvelope: string;
   app: string;
   today: string;
 };
@@ -24,18 +27,24 @@ const supportedFamilies = [
   "accessoryInline",
 ];
 
-const forbiddenSourcePatterns: Array<[RegExp, string]> = [
-  [/\bAppIntent\b/, "Widget sources must not declare AppIntent mutations"],
+// R38 replaced "the widget is read-only" with "the widget writes only through
+// the network-first bridge". Widget UI sources still may not own transport,
+// keychain access, or inline intent declarations — those live in the
+// dedicated intent + shared service files audited below.
+const forbiddenUiPatterns: Array<[RegExp, string]> = [
   [
-    /Button\s*\(\s*intent\s*:/,
-    "Widget sources must not expose AppIntent buttons",
+    /:\s*AppIntent\b/,
+    "Widget UI sources must not declare inline App Intents",
   ],
   [/\bURLSession\b/, "Widget sources must not create network sessions"],
   [
     /\bKairoAPIClient\b/,
     "Widget sources must not import the generated API client",
   ],
-  [/\bSecItem(?:Add|CopyMatching|Delete|Update)\b/, "Widget sources must not access Keychain"],
+  [
+    /\bSecItem(?:Add|CopyMatching|Delete|Update)\b/,
+    "Widget sources must not access Keychain directly",
+  ],
 ];
 
 export function auditGlanceSurfaceContract(
@@ -55,6 +64,24 @@ export function auditGlanceSurfaceContract(
         resolve(root, "ios/Widget/FocusLiveActivity.swift"),
         "utf8",
       ),
+    completeIntent:
+      overrides.completeIntent ??
+      readFileSync(
+        resolve(root, "ios/Widget/CompleteBlockIntent.swift"),
+        "utf8",
+      ),
+    widgetCompletion:
+      overrides.widgetCompletion ??
+      readFileSync(
+        resolve(root, "ios/Shared/WidgetCompletion.swift"),
+        "utf8",
+      ),
+    sessionEnvelope:
+      overrides.sessionEnvelope ??
+      readFileSync(
+        resolve(root, "ios/Shared/SessionEnvelope.swift"),
+        "utf8",
+      ),
     app:
       overrides.app ??
       readFileSync(resolve(root, "ios/App/KairoApp.swift"), "utf8"),
@@ -66,11 +93,79 @@ export function auditGlanceSurfaceContract(
       ),
   };
   const failures: string[] = [];
-  const extensionSource = `${sources.widget}\n${sources.liveActivity}`;
+  const extensionUiSource = `${sources.widget}\n${sources.liveActivity}`;
 
-  for (const [pattern, failure] of forbiddenSourcePatterns) {
-    if (pattern.test(extensionSource)) failures.push(failure);
+  for (const [pattern, failure] of forbiddenUiPatterns) {
+    if (pattern.test(extensionUiSource)) failures.push(failure);
   }
+
+  // Every intent button in the UI must be the audited completion intent.
+  const intentButtons = (
+    extensionUiSource.match(/Button\s*\(\s*intent\s*:/g) ?? []
+  ).length;
+  const completionButtons = (
+    extensionUiSource.match(
+      /Button\s*\(\s*intent\s*:\s*CompleteBlockIntent\s*\(/g,
+    ) ?? []
+  ).length;
+  if (intentButtons !== completionButtons) {
+    failures.push(
+      "Widget intent buttons must all route through CompleteBlockIntent",
+    );
+  }
+  if (completionButtons === 0) {
+    failures.push("Next Up widget must ship complete-from-widget (H03)");
+  }
+
+  // The intent itself: performs through the shared service, then reloads.
+  if (!/:\s*AppIntent\b/.test(sources.completeIntent)) {
+    failures.push("CompleteBlockIntent must be an AppIntent");
+  }
+  if (!sources.completeIntent.includes("WidgetCompletionService.live()")) {
+    failures.push(
+      "CompleteBlockIntent must perform through WidgetCompletionService",
+    );
+  }
+  if (!sources.completeIntent.includes("reloadTimelines")) {
+    failures.push("CompleteBlockIntent must reload the widget timelines");
+  }
+  if (/\bURLSession\b/.test(sources.completeIntent)) {
+    failures.push("CompleteBlockIntent must not own transport");
+  }
+
+  // The service: session isolation, optimistic-concurrency headers, and the
+  // network-first ordering — the cache write must appear after the 2xx gate.
+  if (!sources.widgetCompletion.includes("httpShouldSetCookies = false")) {
+    failures.push(
+      "Widget completion transport must not use an ambient cookie jar",
+    );
+  }
+  if (!sources.widgetCompletion.includes('"If-Match"')) {
+    failures.push("Widget completion must send If-Match");
+  }
+  if (!sources.widgetCompletion.includes('"Idempotency-Key"')) {
+    failures.push("Widget completion must send an idempotency key");
+  }
+  const statusGate = sources.widgetCompletion.indexOf("(200..<300)");
+  const cacheWrite = sources.widgetCompletion.indexOf("updateStatus(");
+  if (statusGate === -1 || cacheWrite === -1 || cacheWrite < statusGate) {
+    failures.push(
+      "Widget completion must update the cache only after the 2xx gate",
+    );
+  }
+
+  // The bridge: the envelope store must pin the shared app-group access
+  // group both targets already hold.
+  if (
+    !sources.sessionEnvelope.includes(
+      'sharedAccessGroup = "group.me.neima.kairo"',
+    )
+  ) {
+    failures.push(
+      "Session envelope store must use the shared app-group keychain group",
+    );
+  }
+
   if (/String\s*\(\s*format:\s*"%d:%02d"/.test(sources.widget)) {
     failures.push("Widget time labels must use the shared clock formatter");
   }
@@ -131,7 +226,7 @@ export function auditGlanceSurfaceContract(
   }
 
   const deepLinks = Array.from(
-    extensionSource.matchAll(/kairo:\/\/(?:today|focus)/g),
+    extensionUiSource.matchAll(/kairo:\/\/(?:today|focus)/g),
     (match) => match[0],
   ).filter((value, index, values) => values.indexOf(value) === index);
   for (const required of ["kairo://today", "kairo://focus"]) {
