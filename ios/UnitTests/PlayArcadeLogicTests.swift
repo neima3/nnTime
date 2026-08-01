@@ -269,4 +269,44 @@ final class PlayArcadeLogicTests: XCTestCase {
         XCTAssertEqual(PlayScores.recordCount(3, for: key), 5)
         XCTAssertEqual(PlayScores.best(for: key), 5)
     }
+
+    // MARK: Letter Soup
+
+    func testSoupBankMatchesTheWebShapeAndStaysAnagramSafe() {
+        XCTAssertEqual(ArcadeLogic.soupBank.count, 46)
+        XCTAssertEqual(Set(ArcadeLogic.soupBank).count, ArcadeLogic.soupBank.count)
+        var sortedKeys = Set<String>()
+        for word in ArcadeLogic.soupBank {
+            XCTAssertTrue((5...6).contains(word.count), word)
+            XCTAssertTrue(word.allSatisfy { $0.isLowercase && $0.isLetter }, word)
+            let key = String(word.sorted())
+            XCTAssertFalse(sortedKeys.contains(key), "anagram pair in bank: \(word)")
+            sortedKeys.insert(key)
+        }
+    }
+
+    func testPickSoupWordsDrawsEightDistinctDeterministically() {
+        var calls = 0
+        func seeded() -> Double {
+            calls += 1
+            return Double((calls * 23) % 100) / 100
+        }
+        let a = ArcadeLogic.pickSoupWords(random: seeded)
+        XCTAssertEqual(a.count, ArcadeLogic.soupRounds)
+        XCTAssertEqual(Set(a).count, ArcadeLogic.soupRounds)
+        calls = 0
+        XCTAssertEqual(ArcadeLogic.pickSoupWords(random: seeded), a)
+    }
+
+    func testScrambleKeepsLettersButNeverTheOriginalOrder() {
+        for word in ArcadeLogic.soupBank {
+            let scrambled = ArcadeLogic.scrambleWord(word)
+            XCTAssertNotEqual(scrambled.joined(), word)
+            XCTAssertEqual(scrambled.sorted(), word.map(String.init).sorted())
+        }
+        // Identity RNG must fall back to rotation.
+        let out = ArcadeLogic.scrambleWord("candle", random: { 0.999999 })
+        XCTAssertNotEqual(out.joined(), "candle")
+        XCTAssertEqual(out.sorted(), "candle".map(String.init).sorted())
+    }
 }

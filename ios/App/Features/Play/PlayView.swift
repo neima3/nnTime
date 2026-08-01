@@ -7,7 +7,7 @@ struct PlayView: View {
     @State private var bests: [String: Int] = [:]
     enum Game: String, Identifiable {
         case timeFeel, quickTap, emojiMatch, grammar, spelling, focusFinder, memoryTrail, colorClash, breath,
-             oddOneOut, digitSpan, greenLight, nightSky
+             oddOneOut, digitSpan, greenLight, nightSky, letterSoup
         var id: String { rawValue }
     }
 
@@ -44,6 +44,8 @@ struct PlayView: View {
                          best: bests["grammarsnap"].map { "best \($0)/8" }) { active = .grammar }
                     card("🔤", "Spell Check", "Definitely? Definately? One of these is real.", .kCatRose,
                          best: bests["spellcheck"].map { "best \($0)/8" }) { active = .spelling }
+                    card("🍲", "Letter Soup", "Everyday words, gently scrambled.", .kCatButter,
+                         best: bests["lettersoup"].map { "best \($0)/8" }) { active = .letterSoup }
 
                     sectionHeader("Slow down", "For spinning heads and racing clocks.")
                     card("⏳", "Time Feel", "Your brain vs. the clock — no peeking.", .kCatLilac,
@@ -100,6 +102,7 @@ struct PlayView: View {
             case .digitSpan: DigitSpanGame { active = nil }
             case .greenLight: GreenLightGame { active = nil }
             case .nightSky: NightSkyGame { active = nil }
+            case .letterSoup: LetterSoupGame { active = nil }
             case .breath: SteadyBreathGame { active = nil }
             }
         }
@@ -108,7 +111,8 @@ struct PlayView: View {
     private func refreshBests() {
         var next: [String: Int] = [:]
         for key in ["timefeel", "quicktap", "emojimatch", "grammarsnap", "spellcheck",
-                    "focusfinder", "memorytrail", "colorclash", "oddoneout", "digitspan", "greenlight", "nightsky"] {
+                    "focusfinder", "memorytrail", "colorclash", "oddoneout", "digitspan",
+                    "greenlight", "nightsky", "lettersoup"] {
             next[key] = PlayScores.best(for: key)
         }
         bests = next

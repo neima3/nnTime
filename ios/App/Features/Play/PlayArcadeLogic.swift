@@ -195,6 +195,47 @@ enum ArcadeLogic {
         min(Int(random() * Double(constellations.count)), constellations.count - 1)
     }
 
+    // MARK: Letter Soup (unscramble)
+
+    /// Mirrors SOUP_BANK in src/lib/games.ts — curated so no entry shares
+    /// its letters with a common anagram.
+    static let soupBank: [String] = [
+        "cocoa", "honey", "mango", "salad", "chair", "clock", "plant", "music",
+        "paint", "cloud", "river", "light", "tulip", "daisy", "koala", "panda",
+        "otter", "robin", "finch", "letter", "golden", "pebble", "purple",
+        "yellow", "orange", "summer", "winter", "autumn", "spring", "coffee",
+        "travel", "basket", "button", "candle", "pillow", "window", "breeze",
+        "meadow", "sunset", "waffle", "muffin", "cookie", "puzzle", "rocket",
+        "picnic", "ticket",
+    ]
+
+    static let soupRounds = 8
+
+    /// Seeded draw of soupRounds distinct words from the bank.
+    static func pickSoupWords(random: () -> Double = { Double.random(in: 0..<1) }) -> [String] {
+        var idx = Array(soupBank.indices)
+        for i in stride(from: idx.count - 1, to: 0, by: -1) {
+            let j = min(Int(random() * Double(i + 1)), i)
+            idx.swapAt(i, j)
+        }
+        return idx.prefix(soupRounds).map { soupBank[$0] }
+    }
+
+    /// Shuffle a word's letters, guaranteed different from the original.
+    static func scrambleWord(_ word: String, random: () -> Double = { Double.random(in: 0..<1) }) -> [String] {
+        var letters = word.map(String.init)
+        for _ in 0..<12 {
+            for i in stride(from: letters.count - 1, to: 0, by: -1) {
+                let j = min(Int(random() * Double(i + 1)), i)
+                letters.swapAt(i, j)
+            }
+            if letters.joined() != word { return letters }
+        }
+        // Pathological RNG: rotate by one, which always differs for length ≥ 2.
+        let original = word.map(String.init)
+        return Array(original.dropFirst()) + [original[0]]
+    }
+
     // MARK: Word quizzes (Grammar Snap + Spell Check)
 
     static let quizRounds = 8
