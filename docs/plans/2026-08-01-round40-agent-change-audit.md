@@ -41,6 +41,9 @@ checked against Apple's platform contracts; their core premises are valid.
 - Product: parity recompute; live read-only desktop/mobile browser sweep;
   actual Green Light, Night Sky, and Pattern Tiles gameplay; local browser
   verification of the repaired accessibility tree and blank-gap input guard.
+- CI contract: the calibration-hint E2E follows the timeline role change,
+  scopes a uniquely named probe per retry, and deletes the probe in `finally`
+  so a failed assertion cannot poison its retry.
 - Delivery: push to `main`, wait for exact-SHA CI and Coolify deployment, then
   verify live health plus unique behavior markers in a real browser.
 

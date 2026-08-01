@@ -11,11 +11,12 @@ import { gotoHydrated } from "./helpers";
 
 test.use({ locale: "en-US", timezoneId: "America/New_York" });
 
-test("a pending future block carries the usually-runs-longer hint", async ({ page }) => {
+test("a pending future block carries the usually-runs-longer hint", async ({ page }, testInfo) => {
+  const title = `Calibration probe ${testInfo.retry}-${Date.now()}`;
   // A 45-minute block starting 40 minutes from now (same planning day guard:
   // skip the test window where "now + 40min" crosses midnight).
   await gotoHydrated(page, "/app/today");
-  const created = await page.evaluate(async () => {
+  const created = await page.evaluate(async (activityTitle) => {
     const start = new Date(Date.now() + 40 * 60000);
     if (start.getHours() < new Date().getHours()) return { skipped: true, status: 0 };
     const res = await fetch("/api/v1/activities", {
@@ -23,7 +24,7 @@ test("a pending future block carries the usually-runs-longer hint", async ({ pag
       headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() },
       body: JSON.stringify({
         tz: "America/New_York",
-        title: "Calibration probe",
+        title: activityTitle,
         emoji: "🧪",
         dtstartLocal: start.toISOString(),
         durationMin: 45,
@@ -31,28 +32,34 @@ test("a pending future block carries the usually-runs-longer hint", async ({ pag
     });
     const body = await res.json().catch(() => null);
     return { skipped: false, status: res.status, id: body?.id, revision: body?.revision };
-  });
+  }, title);
   test.skip(created.skipped === true, "too close to midnight for a same-day future block");
   expect(created.status).toBe(201);
 
-  await gotoHydrated(page, "/app/today?calibrationDebug=1.4");
+  try {
+    await gotoHydrated(page, "/app/today?calibrationDebug=1.4");
 
-  // 45 min × 1.4 = 63 → rounds to 65.
-  await expect(page.getByText("usually ~65m")).toBeVisible({ timeout: 15_000 });
-  await expect(
-    page.getByRole("button", { name: /Calibration probe.*Usually runs about 65 minutes/ }),
-  ).toBeVisible();
-
-  // Without the override (fresh account has no focus history) the hint stays
-  // away — the label never claims signal that does not exist.
-  await gotoHydrated(page, "/app/today");
-  await expect(page.getByText("usually ~", { exact: false })).toHaveCount(0);
-
-  // Tidy up the probe block.
-  await page.evaluate(async ({ id, revision }) => {
-    await fetch(`/api/v1/activities/${id}`, {
-      method: "DELETE",
-      headers: { "If-Match": String(revision) },
+    // 45 min × 1.4 = 63 → rounds to 65. Scope the text assertion to this
+    // attempt's uniquely named activity so a failed retry cannot collide.
+    const calibratedProbe = page.getByRole("group", {
+      name: new RegExp(`${title}.*Usually runs about 65 minutes`),
     });
-  }, { id: created.id, revision: created.revision });
+    await expect(calibratedProbe).toBeVisible({ timeout: 15_000 });
+    await expect(calibratedProbe.getByText("usually ~65m")).toBeVisible();
+
+    // Without the override (fresh account has no focus history) the hint stays
+    // away — the label never claims signal that does not exist.
+    await gotoHydrated(page, "/app/today");
+    const plainProbe = page.getByRole("group", { name: new RegExp(title) });
+    await expect(plainProbe).toBeVisible();
+    await expect(plainProbe.getByText("usually ~", { exact: false })).toHaveCount(0);
+  } finally {
+    // Tidy up even when an assertion fails, keeping retries isolated.
+    await page.evaluate(async ({ id, revision }) => {
+      await fetch(`/api/v1/activities/${id}`, {
+        method: "DELETE",
+        headers: { "If-Match": String(revision) },
+      });
+    }, { id: created.id, revision: created.revision });
+  }
 });

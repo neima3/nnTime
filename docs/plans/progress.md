@@ -17,6 +17,12 @@
 - **Evidence.** Release details, exact test counts, CI/deploy SHA, and live
   probes are recorded in the Round 40 plan and release postscript once the
   push and production rollout complete.
+- **CI contract follow-up.** The first push (`8056d55`, run `30696976599`)
+  correctly failed because `calibration-hint.spec.ts` still looked for the old
+  timeline `button` role. Its retry then exposed a second weakness: failed
+  assertions skipped probe cleanup and created duplicate text. The E2E now
+  asserts the new `group` role, names and scopes each probe per attempt, and
+  deletes it in `finally`; the complete local Playwright suite passed 12/12.
 
 ## 2026-08-01 — Round 39: Live Activity pause/complete controls (Fable)
 
