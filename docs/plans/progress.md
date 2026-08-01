@@ -1,5 +1,33 @@
 # Progress log
 
+## 2026-08-01 — Round 29: Night Sky, a wind-down constellation trace (Fable)
+
+Roadmap: `docs/plans/2026-07-31-round29-night-sky.md`.
+
+- **What shipped.** The arcade's thirteenth game and Slow down's third:
+  five invented constellations traced star by star with lines appearing
+  as you go — no timer, no score, no failure; the only number kept is a
+  lifetime "skies traced" counter. The point sets are one shared
+  contract (web `CONSTELLATIONS` ↔ iOS `ArcadeLogic.constellations`),
+  pinned by unit tests on both sides; iOS gains
+  `PlayScores.recordCount` for lifetime counters.
+- **Evidence.** Web: a full seeded trace of The Kite in a real browser —
+  progressive lines, the completion state, and the counter chip ("1
+  skies traced") on the card. iOS: a dark-mode tour traced a complete
+  sky (The Door) to its completion state, 1/1, screenshots inspected
+  under ignored `browser-qa/round29-night-sky/ios/` — the dark render
+  reads as an actual night sky.
+- **Gates.** Web **98 files / 1003 tests** + production build; iOS
+  main-thread gate (**358 executed, 1 expected skip, 0 failures**);
+  release preflight passed.
+
+**Release state:** shipped and live-verified. Web commit `e4143ee` and
+iOS commit `1f688e9eb52d05941d03e27eb7790887acdbc9fc` pushed to `main`.
+GitHub Actions run `30675927901` on the exact SHA concluded `success`
+(including the e2e suite with the Round 28 zone fix in place). The
+webhook Coolify deployment drained, live `/api/health` returned all
+checks `ok`, and the production `/app/play` render contains Night Sky.
+
 ## 2026-07-31 — Round 28: the Daily Brief lands on native Today (Fable)
 
 Roadmap: `docs/plans/2026-07-31-round28-daily-brief-ios.md`.
