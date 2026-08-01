@@ -1,7 +1,8 @@
 # Round 53 — Atomic Inbox task conversion
 
-> **Status (2026-08-01):** implementation and local release gates complete;
-> exact-SHA CI, Coolify deployment, and read-only live verification pending.
+> **Status (2026-08-01):** shipped and live-verified. Implementation SHA
+> `e293d3d880e5b53974ee9cc8815e4a8ffc1d9aaa` passed CI run `30720058680` and
+> deployed as Coolify release `gil3ft74e9d6ajz1xpri0g2r`.
 
 > **Executor:** implement this plan test-first in the isolated
 > `codex/round53-inbox-conversion` worktree. ADR-001/002/005 and the existing

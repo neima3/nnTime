@@ -34,11 +34,20 @@
   prevention, and existing offline/concurrency coverage. Desktop and 390px
   mobile captures preserved the Soft Focus hierarchy without overflow. Parity
   remains **89.74% web / 86.93% iOS**.
-- **Release handoff.** Exact-SHA GitHub Actions, Coolify deployment, and
-  read-only live verification follow this implementation commit. Phase 7B
-  physical-device/provider lifecycle and Phase 8B Google consent/client
-  activation remain external evidence gates; no production planner data or
-  provider configuration was changed.
+- **Exact release proof.** SHA
+  `e293d3d880e5b53974ee9cc8815e4a8ffc1d9aaa` passed GitHub Actions run
+  `30720058680`: hosted build/test (**109 files / 1,050 tests**), **23/23**
+  standalone Playwright scenarios, generated/native contracts (**2 files / 21
+  tests**), **378** app-hosted tests (1 skipped, 0 failures), and the unsigned
+  shipping build. Coolify webhook deployment `gil3ft74e9d6ajz1xpri0g2r`
+  finished on that exact SHA. Live migration, DB, AI, and scheduler checks all
+  reported `ok`; the unique unauthenticated schedule route returned 401 instead
+  of the pre-release 404; landing returned 200 with the production security
+  headers; and the live 390px Inbox preview had no overflow or console error.
+  The probe was read-only and did not touch planner data.
+- **Standing boundary.** Phase 7B physical-device/provider lifecycle and Phase
+  8B Google consent/client activation remain external evidence gates. No
+  provider configuration or production planner data was changed.
 
 ## 2026-08-01 — Round 52: accurate Postgres CI health probes (Codex)
 
