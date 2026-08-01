@@ -114,6 +114,15 @@ struct FocusView: View {
             guard session != nil else { return }
             Task { await hydrate(silent: true) }
         }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: .kairoFocusMutatedExternally
+            )
+        ) { _ in
+            // A Live Activity button changed the session in the app process —
+            // re-hydrate so an on-screen Focus view doesn't go stale.
+            Task { await hydrate() }
+        }
     }
 
     // MARK: States

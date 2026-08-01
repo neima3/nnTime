@@ -486,6 +486,12 @@ actor KairoAPI: NativeSyncTransport {
         try await sessionController.restore()
     }
 
+    /// The scope of the currently restored session, if any — lets background
+    /// intent launches decide whether cookies still need hydrating.
+    func currentSessionScope() async -> String? {
+        await sessionController.currentScope()
+    }
+
     func sessionScope() async -> String? {
         await sessionController.currentScope()
     }

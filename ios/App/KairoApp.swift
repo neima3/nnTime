@@ -15,6 +15,7 @@ struct KairoApp: App {
             KairoPrefs.hasOnboarded = false
         }
         KairoPrefs.apiBaseURL = KairoAPI.shared.baseURL
+        FocusRemoteControl.install()
     }
 
     var body: some Scene {

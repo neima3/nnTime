@@ -1,3 +1,4 @@
+import AppIntents
 import WidgetKit
 import SwiftUI
 #if canImport(ActivityKit)
@@ -48,15 +49,37 @@ struct FocusLiveActivity: Widget {
                     .foregroundStyle(context.state.overtime ? now : ink)
                     .frame(minWidth: 78, alignment: .trailing)
                 }
-                Link(destination: URL(string: "kairo://focus")!) {
-                    Label("Open Kairo to adjust", systemImage: "arrow.up.forward.app")
+                HStack(spacing: 8) {
+                    Button(intent: ToggleFocusIntent(
+                        sessionId: context.attributes.sessionId,
+                        shouldPause: !context.state.paused
+                    )) {
+                        Label(
+                            context.state.paused ? "Resume" : "Pause",
+                            systemImage: context.state.paused
+                                ? "play.fill" : "pause.fill"
+                        )
                         .font(.system(size: 13, weight: .bold))
                         .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(skyInk)
+                    .accessibilityLabel(
+                        context.state.paused
+                            ? "Resume focus session"
+                            : "Pause focus session"
+                    )
+                    Button(intent: CompleteFocusIntent(
+                        sessionId: context.attributes.sessionId
+                    )) {
+                        Label("Done", systemImage: "checkmark")
+                            .font(.system(size: 13, weight: .bold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(skyInk)
+                    .accessibilityLabel("Complete focus session")
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(skyInk)
-                .accessibilityLabel("Open Kairo focus")
-                .accessibilityHint("Adjust this focus session in Kairo")
             }
             .foregroundStyle(ink)
             .padding(14)
@@ -105,14 +128,45 @@ struct FocusLiveActivity: Widget {
                     )
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    Link(destination: URL(string: "kairo://focus")!) {
-                        Label("Open Kairo", systemImage: "arrow.up.forward.app")
+                    HStack(spacing: 8) {
+                        Button(intent: ToggleFocusIntent(
+                            sessionId: context.attributes.sessionId,
+                            shouldPause: !context.state.paused
+                        )) {
+                            Label(
+                                context.state.paused ? "Resume" : "Pause",
+                                systemImage: context.state.paused
+                                    ? "play.fill" : "pause.fill"
+                            )
                             .font(.system(size: 13, weight: .bold))
                             .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(skyInk)
+                        .accessibilityLabel(
+                            context.state.paused
+                                ? "Resume focus session"
+                                : "Pause focus session"
+                        )
+                        Button(intent: CompleteFocusIntent(
+                            sessionId: context.attributes.sessionId
+                        )) {
+                            Label("Done", systemImage: "checkmark")
+                                .font(.system(size: 13, weight: .bold))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(skyInk)
+                        .accessibilityLabel("Complete focus session")
+                        Link(destination: URL(string: "kairo://focus")!) {
+                            Image(systemName: "arrow.up.forward.app")
+                                .font(.system(size: 13, weight: .bold))
+                                .frame(width: 34)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(skyInk)
+                        .accessibilityLabel("Open Kairo focus")
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(skyInk)
-                    .accessibilityLabel("Open Kairo focus")
                 }
             } compactLeading: {
                 Text("◔").font(.system(size: 15, weight: .bold)).foregroundStyle(sky)
