@@ -196,7 +196,7 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: E2E (Playwright against pnpm start)
+      - name: E2E (Playwright against standalone server)
         run: pnpm test:e2e
 
       - name: Upload traces on failure

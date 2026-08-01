@@ -2,7 +2,8 @@
  * E2E suite (T15) — the real browser proof for the core loop.
  *
  * Local: reuses a running dev server on :3456 (`pnpm dev --port 3456`) or
- * starts one. CI: `pnpm start` against a prebuilt app + service Postgres.
+ * starts one. CI: the deployable standalone server against a prebuilt app and
+ * service Postgres.
  * Each spec run signs up its own throwaway account (kairo.test domain), so
  * runs are independent and safe to repeat against any non-prod database.
  *
@@ -44,7 +45,7 @@ export default defineConfig({
   ],
   webServer: {
     command: process.env.CI
-      ? `pnpm start --port ${PORT}`
+      ? `HOSTNAME=127.0.0.1 PORT=${PORT} pnpm start:standalone`
       : `pnpm dev --port ${PORT}`,
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,

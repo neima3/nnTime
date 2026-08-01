@@ -1,5 +1,21 @@
 # Progress log
 
+## 2026-08-01 — Round 43: production-fidelity standalone browser CI (Codex)
+
+- **Runtime drift closed.** Next 16 warns that `next start` is unsupported when
+  `output: "standalone"` is enabled, but the browser job still used it while
+  Coolify correctly ran the generated `server.js`. CI now assembles the same
+  deployable artifact (`public`, `.next/static`, and the traced standalone
+  server) and boots it with the test port and loopback hostname.
+- **Contract pinned.** A focused Vitest contract requires the standalone entry
+  point and both static-asset copies, requires Playwright to select that script
+  in CI, and rejects a return to `pnpm start --port`. It was observed red before
+  the runtime change and green afterward.
+- **Production-mode proof.** A fresh build plus all **13/13** Playwright
+  scenarios passed against `.next/standalone/server.js`; the previous
+  unsupported-runtime warning disappeared. This changes release confidence,
+  not product parity, which remains **89.74% web / 86.93% iOS**.
+
 ## 2026-08-01 — Round 42: public preview auth boundary + CI failure-path hardening (Codex)
 
 - **Production leak removed.** A fresh signed-out browser session showed the
