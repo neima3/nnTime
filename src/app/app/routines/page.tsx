@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
+import { Repeat2, Sparkles } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
+import { SignedOutCard } from "@/components/EmptyState";
 import { RoutinesClient, type RoutineView } from "@/components/RoutinesClient";
 import { getSession } from "@/server/auth-session";
 import {
@@ -82,6 +83,15 @@ export default async function RoutinesPage() {
             Browse templates
           </Link>
         </header>
+        {!authed && (
+          <div className="mb-6">
+            <SignedOutCard
+              icon={Repeat2}
+              title="Build routines after you sign in"
+              body="Turn the preview into your own gentle sequences, play each step, and keep them synced across devices."
+            />
+          </div>
+        )}
         <RoutinesClient initial={items} authed={authed} />
       </div>
     </AppShell>

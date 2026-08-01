@@ -58,60 +58,62 @@ Better Auth, Vitest, Playwright.
 
 ### Task 1: Pin the regression red
 
-- [ ] Extend `e2e/preview-auth-boundary.spec.ts` with a matrix containing Today,
+- [x] Extend `e2e/preview-auth-boundary.spec.ts` with a matrix containing Today,
   Inbox, Week, Month, Focus, Routines, Play, Stats, Settings, Templates, Review,
   Planner, More, and Timeline States. For each route, wait for hydration and
   assert the collected `/api/v1/*` request list remains empty for a bounded
   observation window.
-- [ ] Add a Week interaction case that clicks the first `+ Add`, expects an
+- [x] Add a Week interaction case that clicks the first `+ Add`, expects an
   actionable sign-in card on Editor, and still observes no protected requests.
-- [ ] Run the browser contract against the current production build and confirm
+- [x] Run the browser contract against the current production build and confirm
   it fails with the reproduced settings/day/stats/categories request sequence.
-- [ ] Add `AppSessionBoundary.test.ts` describing a fail-closed default,
+- [x] Add `AppSessionBoundary.test.ts` describing a fail-closed default,
   signed-out fallback, and signed-in child behavior; run it and confirm the
   missing module/API fails for the intended reason.
 
 ### Task 2: Establish one fail-closed session boundary
 
-- [ ] Implement `AppSessionBoundary.tsx` with an internal context default of
+- [x] Implement `AppSessionBoundary.tsx` with an internal context default of
   `{ signedIn: false }`, an `AppSessionProvider`, `useAppSession`, and a
   `SignedInOnly({ children, fallback })` component.
-- [ ] Wrap both return paths in `src/app/app/layout.tsx` with
+- [x] Wrap both return paths in `src/app/app/layout.tsx` with
   `<AppSessionProvider signedIn={Boolean(session?.userId)}>`. Preserve the
   existing preference and hour-cycle behavior byte-for-byte inside the wrapper.
-- [ ] Run `pnpm test src/components/AppSessionBoundary.test.ts` and confirm all
+- [x] Run `pnpm test src/components/AppSessionBoundary.test.ts` and confirm all
   boundary behaviors pass.
 
 ### Task 3: Make the shared shell safe by default
 
-- [ ] In `AppShell.tsx`, remove `enableLiveData`; read `signedIn` from
+- [x] In `AppShell.tsx`, remove `enableLiveData`; read `signedIn` from
   `useAppSession()` and pass it to `NowProvider`.
-- [ ] Mount `OfflineShell`, `NowStrip`, `QuickCapture`, `OneThing`, and
+- [x] Mount `OfflineShell`, `NowStrip`, `QuickCapture`, `OneThing`, and
   `CommandPalette` only when `signedIn` is true. Keep navigation, UserMenu,
   ToastHost, and non-network presentation available to previews.
-- [ ] Remove the Today page's obsolete `enableLiveData={authed}` override.
-- [ ] Run focused Vitest contracts and typecheck.
+- [x] Remove the Today page's obsolete `enableLiveData={authed}` override.
+- [x] Run focused Vitest contracts and typecheck.
 
 ### Task 4: Gate route-owned protected clients
 
-- [ ] Wrap `ActivityEditor` with `SignedInOnly` and an existing `SignedOutCard`
+- [x] Wrap `ActivityEditor` with `SignedInOnly` and an existing `SignedOutCard`
   explaining that sign-in is required to save planner activities.
-- [ ] Wrap `FocusClient`, `StatsClient`, `SettingsClient`, and the Planner page's
+- [x] Wrap `FocusClient`, `StatsClient`, `SettingsClient`, and the Planner page's
   `PlanDayClient` with route-appropriate existing `SignedOutCard` copy and
   token-only styling.
-- [ ] Wrap `WeeklyIntentions` with `SignedInOnly fallback={null}` so Week keeps
+- [x] Wrap `WeeklyIntentions` with `SignedInOnly fallback={null}` so Week keeps
   its fixture without probing settings.
-- [ ] Run unit tests, lint, and typecheck.
+- [x] Keep the signed-out Routines fixture read-only, expose an actionable auth
+  card, and prevent its player from mounting without a server-known session.
+- [x] Run unit tests, lint, and typecheck.
 
 ### Task 5: Prove the production artifact
 
-- [ ] Run `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
-- [ ] Boot `.next/standalone/server.js` on an isolated port with an ephemeral
+- [x] Run `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
+- [x] Boot `.next/standalone/server.js` on an isolated port with an ephemeral
   Better Auth secret.
-- [ ] Run the expanded Playwright preview suite against the standalone server.
-- [ ] Inspect 390×844 Week-to-Editor and 1440×900 signed-out Settings/Stats
+- [x] Run the expanded Playwright preview suite against the standalone server.
+- [x] Inspect 390×844 Week-to-Editor and 1440×900 signed-out Settings/Stats
   screenshots; require no overflow and zero console errors/warnings.
-- [ ] Run `node scripts/parity.mjs`; parity must remain 89.74% web / 86.93% iOS
+- [x] Run `node scripts/parity.mjs`; parity must remain 89.74% web / 86.93% iOS
   because this hardens an existing feature rather than inflating credit.
 
 ### Task 6: Release and verify

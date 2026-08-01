@@ -1,6 +1,9 @@
 import { AppShell } from "@/components/AppShell";
+import { SignedInOnly } from "@/components/AppSessionBoundary";
 import { StatsClient } from "@/components/StatsClient";
 import { BrainBreaksCard } from "@/components/BrainBreaksCard";
+import { SignedOutCard } from "@/components/EmptyState";
+import { BarChart3 } from "lucide-react";
 
 export default function StatsPage() {
   return (
@@ -14,7 +17,17 @@ export default function StatsPage() {
             Gentle numbers — they describe, they don&apos;t judge.
           </p>
         </header>
-        <StatsClient />
+        <SignedInOnly
+          fallback={
+            <SignedOutCard
+              icon={BarChart3}
+              title="See your gentle numbers"
+              body="Completions, focus time, soft streaks, and mood — described, never judged. Sign in to start collecting yours."
+            />
+          }
+        >
+          <StatsClient />
+        </SignedInOnly>
         <div className="mt-4">
           <BrainBreaksCard />
         </div>

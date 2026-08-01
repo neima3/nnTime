@@ -304,7 +304,7 @@ export default async function TodayPage({
       : [];
 
   return (
-    <AppShell active="today" enableLiveData={authed}>
+    <AppShell active="today">
       <div className="timeline-scroll-container mx-auto flex max-w-5xl gap-8 px-4 py-6 md:px-8">
         <section className="min-w-0 flex-1">
           <header className="mb-6 flex flex-wrap items-center gap-3">

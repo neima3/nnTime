@@ -14,6 +14,7 @@ import { expandActivitiesForDay } from "@/server/services/day";
 import { instantToDateStr, resolveDayBounds } from "@/server/temporal/zone";
 import { formatTime, toHourCycle } from "@/lib/time-format";
 import { WeeklyIntentions } from "@/components/WeeklyIntentions";
+import { SignedInOnly } from "@/components/AppSessionBoundary";
 
 type Block = {
   id: string;
@@ -220,7 +221,9 @@ export default async function WeekPage({
           </div>
         </header>
 
-        <WeeklyIntentions weekStart={weekStart} />
+        <SignedInOnly>
+          <WeeklyIntentions weekStart={weekStart} />
+        </SignedInOnly>
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
           {days.map((d) => (

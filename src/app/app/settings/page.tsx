@@ -1,5 +1,8 @@
 import { AppShell } from "@/components/AppShell";
+import { SignedInOnly } from "@/components/AppSessionBoundary";
 import { SettingsClient } from "@/components/SettingsClient";
+import { SignedOutCard } from "@/components/EmptyState";
+import { Palette } from "lucide-react";
 import {
   getGoogleLinkRedirectError,
   type AuthRedirectSearchParams,
@@ -23,7 +26,17 @@ export default async function SettingsPage({
             Soft Focus personalization — theme, time, and privacy.
           </p>
         </header>
-        <SettingsClient initialLinkError={initialLinkError} />
+        <SignedInOnly
+          fallback={
+            <SignedOutCard
+              icon={Palette}
+              title="Make Kairo yours"
+              body="Theme, quiet notifications, reduced stimulation, calendars — sign in to personalize and sync across your devices."
+            />
+          }
+        >
+          <SettingsClient initialLinkError={initialLinkError} />
+        </SignedInOnly>
       </div>
     </AppShell>
   );

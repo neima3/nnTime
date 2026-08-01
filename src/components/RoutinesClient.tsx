@@ -165,16 +165,18 @@ export function RoutinesClient({
 
   return (
     <>
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="flex items-center gap-2 rounded-2xl bg-iris px-4 py-2.5 text-sm font-semibold text-ink-inverse shadow-card hover:bg-iris-deep focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
-        >
-          <Plus size={17} strokeWidth={2.5} />
-          New routine
-        </button>
-      </div>
+      {authed && (
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="flex items-center gap-2 rounded-2xl bg-iris px-4 py-2.5 text-sm font-semibold text-ink-inverse shadow-card hover:bg-iris-deep focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+          >
+            <Plus size={17} strokeWidth={2.5} />
+            New routine
+          </button>
+        </div>
+      )}
 
       {open && (
         <div
@@ -245,35 +247,35 @@ export function RoutinesClient({
                 </p>
               </div>
             </div>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setPlaying(r)}
-                disabled={r.stepCount === 0}
-                className="inline-flex items-center gap-1 rounded-xl bg-iris px-3 py-1.5 text-[12px] font-semibold text-ink-inverse transition-colors hover:bg-iris-deep disabled:opacity-40"
-              >
-                <PlayCircle size={13} />
-                Play
-              </button>
-              <button
-                type="button"
-                onClick={() => scheduleToday(r)}
-                className="inline-flex items-center gap-1 rounded-xl bg-iris-soft px-3 py-1.5 text-[12px] font-semibold text-iris-deep"
-              >
-                <Play size={13} />
-                Use today
-              </button>
-              {r.scheduleId && (
+            {authed && (
+              <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => void togglePause(r)}
-                  className="inline-flex items-center gap-1 rounded-xl border border-border px-3 py-1.5 text-[12px] font-semibold text-ink-soft"
+                  onClick={() => setPlaying(r)}
+                  disabled={r.stepCount === 0}
+                  className="inline-flex items-center gap-1 rounded-xl bg-iris px-3 py-1.5 text-[12px] font-semibold text-ink-inverse transition-colors hover:bg-iris-deep disabled:opacity-40"
                 >
-                  {r.paused ? <Play size={13} /> : <Pause size={13} />}
-                  {r.paused ? "Resume" : "Pause"}
+                  <PlayCircle size={13} />
+                  Play
                 </button>
-              )}
-              {authed && (
+                <button
+                  type="button"
+                  onClick={() => scheduleToday(r)}
+                  className="inline-flex items-center gap-1 rounded-xl bg-iris-soft px-3 py-1.5 text-[12px] font-semibold text-iris-deep"
+                >
+                  <Play size={13} />
+                  Use today
+                </button>
+                {r.scheduleId && (
+                  <button
+                    type="button"
+                    onClick={() => void togglePause(r)}
+                    className="inline-flex items-center gap-1 rounded-xl border border-border px-3 py-1.5 text-[12px] font-semibold text-ink-soft"
+                  >
+                    {r.paused ? <Play size={13} /> : <Pause size={13} />}
+                    {r.paused ? "Resume" : "Pause"}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => void remove(r)}
@@ -282,8 +284,8 @@ export function RoutinesClient({
                   <Trash2 size={13} />
                   Delete
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </article>
         ))}
         {items.length === 0 && (
@@ -306,7 +308,7 @@ export function RoutinesClient({
         )}
       </div>
 
-      {playing && (
+      {authed && playing && (
         <RoutinePlayer
           routineId={playing.id}
           title={playing.title}

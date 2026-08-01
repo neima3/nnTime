@@ -22,6 +22,7 @@ import { QuickCapture } from "./QuickCapture";
 import { OneThing } from "./OneThing";
 import { CommandPalette } from "./CommandPalette";
 import { ToastHost } from "./Toast";
+import { useAppSession } from "./AppSessionBoundary";
 
 const sidebarNav = [
   { href: "/app/today", label: "Today", key: "today", icon: CalendarDays },
@@ -48,12 +49,12 @@ const moreKeys = new Set(["routines", "stats", "settings", "templates", "more", 
 export function AppShell({
   active,
   children,
-  enableLiveData = true,
 }: {
   active: string;
   children: React.ReactNode;
-  enableLiveData?: boolean;
 }) {
+  const { signedIn } = useAppSession();
+
   // Keyboard shortcuts: n=new, t=today, i=inbox, w=week, f=focus, s=settings
   useEffect(() => {
     function handler(e: KeyboardEvent) {
@@ -69,7 +70,7 @@ export function AppShell({
   }, []);
 
   return (
-    <NowProvider enabled={enableLiveData}>
+    <NowProvider enabled={signedIn}>
     <div className="flex min-h-dvh w-full bg-canvas">
       {/* Skip to content — keyboard accessibility */}
       <a
@@ -136,12 +137,12 @@ export function AppShell({
 
       {/* main */}
       <main id="main-content" className="min-w-0 flex-1 pb-24 md:pb-0">{children}</main>
-      <OfflineShell />
-      <NowStrip active={active} />
+      {signedIn && <OfflineShell />}
+      {signedIn && <NowStrip active={active} />}
       <CelebrationHost />
-      <QuickCapture />
-      <OneThing />
-      <CommandPalette />
+      {signedIn && <QuickCapture />}
+      {signedIn && <OneThing />}
+      {signedIn && <CommandPalette />}
       <ToastHost />
 
       {/* mobile bottom bar */}

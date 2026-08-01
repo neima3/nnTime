@@ -11,6 +11,7 @@
  * session), while every product route gets the right surfaces from first paint.
  */
 import { A11yApply } from "@/components/A11yApply";
+import { AppSessionProvider } from "@/components/AppSessionBoundary";
 import { HourCycleProvider } from "@/lib/use-hour-cycle";
 import { getSession } from "@/server/auth-session";
 import { getPersonalization } from "@/server/services/personalization";
@@ -53,7 +54,13 @@ export default async function AppLayout({
   // Signed out (or settings unreadable) means we have no account preference to
   // apply — and writing defaults here would clobber the local choice the root
   // ThemeScript just restored. Do nothing instead.
-  if (!known) return <HourCycleProvider value="h24">{children}</HourCycleProvider>;
+  if (!known) {
+    return (
+      <AppSessionProvider signedIn={Boolean(session?.userId)}>
+        <HourCycleProvider value="h24">{children}</HourCycleProvider>
+      </AppSessionProvider>
+    );
+  }
 
   // Reconcile <html> against the server's truth before the app paints. Runs
   // after the root ThemeScript (localStorage fast path), so a stored account
@@ -80,13 +87,13 @@ export default async function AppLayout({
   `;
 
   return (
-    <>
+    <AppSessionProvider signedIn={Boolean(session?.userId)}>
       {/* Script = no-flash first paint on a document load; A11yApply = the same
           result when /app is reached by client-side navigation, where React
           never runs an inline script. */}
       <script dangerouslySetInnerHTML={{ __html: code }} />
       <A11yApply tokens={serializeA11yPrefs(prefs)} theme={theme} hourCycle={hourCycle} />
       <HourCycleProvider value={hourCycle}>{children}</HourCycleProvider>
-    </>
+    </AppSessionProvider>
   );
 }
