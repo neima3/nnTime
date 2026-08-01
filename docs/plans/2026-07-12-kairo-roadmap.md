@@ -93,8 +93,9 @@ design work BEFORE the consuming subphase starts.
   - [x] 7F Repository release preflight + signed archive/export capability
         (TestFlight status is release-specific evidence, not implied here)
 - [ ] Phase 8 — iOS surfaces + launch → **85% iOS PARITY GATE**
-  - [x] 8A Read-only widgets + Live Activity/Dynamic Island ship; authenticated
-        extension mutations remain blocked on a secure session bridge
+  - [x] 8A Widgets + Live Activity/Dynamic Island ship; authenticated
+        complete-from-widget and Live Activity pause/complete controls use
+        the server-confirmed/app-process bridges shipped in Rounds 38–39
   - [ ] 8B Google sign-in (web+iOS) and the Apple Reminders exclusion are
         code/documentation-complete. REMAINS: provision the three-value Google
         server contract plus matching iOS public identifiers, then prove

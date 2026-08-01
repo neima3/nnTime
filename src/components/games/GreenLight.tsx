@@ -91,10 +91,10 @@ export function GreenLight({ onExit }: { onExit: () => void }) {
   }, [finish]);
 
   const tap = useCallback(() => {
-    if (stage !== "playing" || tappedRef.current) return;
+    if (stage !== "playing" || !showing || tappedRef.current) return;
     tappedRef.current = true;
     setFlash(goRef.current ? "hit" : "slip");
-  }, [stage]);
+  }, [stage, showing]);
 
   // Space bar plays too.
   useEffect(() => {

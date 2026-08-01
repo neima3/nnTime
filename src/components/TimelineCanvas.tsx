@@ -381,7 +381,8 @@ export function TimelineCanvas({
           return (
             <div
               key={a.id}
-              role="button"
+              role="group"
+              aria-roledescription="timeline activity"
               tabIndex={0}
               aria-label={`${a.title}, ${formatTime(a.start, hourCycle)} to ${formatTime(a.start + a.duration, hourCycle)}, ${fmtDuration(a.duration)}.${
                 usuallyMin != null ? ` Usually runs about ${usuallyMin} minutes.` : ""

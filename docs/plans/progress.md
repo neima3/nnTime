@@ -1,5 +1,23 @@
 # Progress log
 
+## 2026-08-01 — Round 40: other-agent audit + release hardening (Codex)
+
+- **Range independently reviewed.** Audited `a22fc59..73c89dd`: 80 files and
+  8,787 insertions spanning R24–R39 web/native arcade work, accessibility
+  preferences, dependency and DB-test hardening, authenticated widget actions,
+  and Live Activity controls. The full baseline was green before edits.
+- **Two production issues fixed.** Green Light now rejects taps during its
+  blank inter-stimulus gap instead of scoring them against an expired signal.
+  Timeline activities are labelled focusable groups rather than ARIA buttons
+  containing other buttons, so checklist/focus/complete actions remain distinct
+  to assistive technology while keyboard drag/resize/edit remains intact.
+- **Tracker truth repaired.** The Phase 8A and D07 text now reflects R38/R39's
+  server-confirmed widget completion and app-process Live Activity controls;
+  it no longer claims those mutations are blocked.
+- **Evidence.** Release details, exact test counts, CI/deploy SHA, and live
+  probes are recorded in the Round 40 plan and release postscript once the
+  push and production rollout complete.
+
 ## 2026-08-01 — Round 39: Live Activity pause/complete controls (Fable)
 
 - **H04 unblocked.** The Focus Live Activity's "Open Kairo to adjust"
