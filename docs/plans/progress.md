@@ -29,11 +29,20 @@
   Critical, Important, or Minor findings. Desktop and 390px evidence is saved at
   `browser-qa/round54-editor-category-desktop.png` and
   `browser-qa/round54-editor-category-mobile.png` (git-ignored).
-- **Release status.** Commit, exact-SHA CI, Coolify deployment, and live
-  read-only proof are pending this entry's implementation commit. Phase 7B
-  physical-device/provider lifecycle and Phase 8B Google activation remain
-  external evidence gates; no provider configuration or production planner
-  data changed.
+- **Exact release proof.** Implementation SHA
+  `3e964a260367397151988283b04292d0914f77e2` passed GitHub Actions run
+  `30722586630`: hosted build/test (**112 files / 1,059 tests**, excluding the
+  two Apple-only release suites), **24/24** standalone Playwright scenarios,
+  generated/native contracts, **378** app-hosted tests (1 skipped, 0 failures),
+  and the unsigned shipping build. Coolify webhook deployment
+  `vyve5qbroo1fkicv74pgtbq7` finished on that exact SHA. Live migration, DB,
+  AI, and scheduler checks all reported `ok`; landing/editor returned 200 with
+  production security headers; the shipped editor chunk contained the unique
+  `initialCategories` marker; and desktop plus 390px browser passes rendered
+  the signed-out boundary with zero horizontal overflow. The live probe was
+  read-only. Phase 7B physical-device/provider lifecycle and Phase 8B Google
+  activation remain external evidence gates; no provider configuration or
+  production planner data changed.
 
 ## 2026-08-01 — Round 53: atomic Inbox task conversion (Codex)
 

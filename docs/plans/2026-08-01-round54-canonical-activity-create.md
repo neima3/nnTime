@@ -85,10 +85,10 @@ sourceRef?: string;
 
 - [x] Review `git diff --check`, `git status`, the complete diff, sensitive ownership predicates, and route cache/idempotency behavior.
 - [x] Update the Round 54 roadmap/progress entries with exact local counts and evidence paths.
-- [ ] Commit intentionally, push `codex/round54-canonical-create`, fast-forward `main`, and push `main` only after every gate is green.
-- [ ] Wait for the exact pushed SHA's GitHub Actions run and require every job green.
-- [ ] Deploy the exact final SHA through the documented Coolify application, require a finished deployment, and verify live `/api/health`, landing/editor HTTP behavior, exact deployed SHA, and a unique non-mutating shipped-code marker.
-- [ ] Do not mutate the production planner. Record external Google/physical-device activation gates as still pending rather than redefining completion.
+- [x] Commit intentionally, push `codex/round54-canonical-create`, fast-forward `main`, and push `main` only after every gate is green.
+- [x] Wait for the exact pushed SHA's GitHub Actions run and require every job green.
+- [x] Deploy the exact final SHA through the documented Coolify application, require a finished deployment, and verify live `/api/health`, landing/editor HTTP behavior, exact deployed SHA, and a unique non-mutating shipped-code marker.
+- [x] Do not mutate the production planner. Record external Google/physical-device activation gates as still pending rather than redefining completion.
 
 ## Self-review
 
