@@ -5,7 +5,6 @@
  * The ephemeral DB is created from a random name on the server pointed at by
  * TEST_DATABASE_URL (default: local Homebrew pg). Migrations are applied fresh.
  */
-import { execSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -73,20 +72,21 @@ export function rethrowIfMigrationFailure(e: unknown): void {
 export async function createEphemeralDb(): Promise<EphemeralDb> {
   const { base, host, port, maintenanceDb } = parseUrl(ROOT_URL);
   const dbName = `kairo_eph_${randomBytes(4).toString("hex")}`;
-  const socketHost = host === "localhost" ? "/tmp" : host;
 
-  // CREATE DATABASE (idempotent retry — connection via maintenance db).
-  const createSql = `CREATE DATABASE ${dbName};`;
-  const hostFlag = socketHost === "/tmp" ? `-h /tmp` : `-h ${host} -p ${port}`;
+  // CREATE DATABASE via the same TCP path the data connection below uses.
+  // (This used to shell out to psql through the Homebrew /tmp socket for
+  // localhost, which no CI service container provides — every DB integration
+  // test silently skipped in CI while reporting green locally.)
+  const adminUrl = `${base}${maintenanceDb}`;
+  const admin = postgres(adminUrl, { max: 1 });
   try {
-    execSync(
-      `psql ${hostFlag} -d ${maintenanceDb} -v ON_ERROR_STOP=1 -c "${createSql}"`,
-      { stdio: "pipe" },
-    );
+    await admin.unsafe(`CREATE DATABASE ${dbName}`);
   } catch (e) {
     throw new Error(
       `could not create ephemeral DB ${dbName} (is Postgres running at ${host}:${port}?): ${(e as Error).message}`,
     );
+  } finally {
+    await admin.end({ timeout: 5 }).catch(() => {});
   }
 
   const url = `${base}${dbName}`;
@@ -121,13 +121,13 @@ export async function createEphemeralDb(): Promise<EphemeralDb> {
     } catch {
       /* ignore */
     }
+    const dropper = postgres(adminUrl, { max: 1 });
     try {
-      execSync(
-        `psql ${hostFlag} -d ${maintenanceDb} -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS ${dbName};"`,
-        { stdio: "pipe" },
-      );
+      await dropper.unsafe(`DROP DATABASE IF EXISTS ${dbName}`);
     } catch {
       /* best effort */
+    } finally {
+      await dropper.end({ timeout: 5 }).catch(() => {});
     }
   };
 
