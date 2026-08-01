@@ -38,39 +38,50 @@ XcodeGen, xcodebuild, GitHub Actions.
   contract without runtime-only reflection.
 - Modify `ios/UITests/KairoRound23GoogleAuthTour.swift`: replace the immutable
   local `var` with `let`.
+- Modify `scripts/ios-xcodebuild.sh`: fail every wrapped Xcode invocation when
+  a warning originates from a Kairo Swift source path, covering both app-hosted
+  tests and the separate unsigned shipping build.
+- Modify `tests/ci-native-contract.test.ts`: pin the repository-warning gate in
+  the CI source contract.
+- Modify `tests/ios-native-toolchain.test.ts`: execute the wrapper against a
+  fake Kairo-source warning and require a failure.
 - Update `docs/plans/progress.md` with red/green, review, and release evidence.
 
 ### Task 1: Pin the warning red
 
-- [ ] Add a generic `assertSendable<T: Sendable>` compile contract for a real
+- [x] Add a generic `assertSendable<T: Sendable>` compile contract for a real
   `DayCacheStore` value.
-- [ ] Run the focused native test and confirm compilation fails because
-  `DayCacheStore` does not conform to `Sendable`.
-- [ ] Preserve the exact hosted warning from run `30713013689` as baseline
+- [x] Run the strict widget build with warnings-as-errors and confirm compilation
+  fails because `DayCacheStore` does not conform to `Sendable`, then because its
+  stored `FileManager` does not conform.
+- [x] Preserve the exact hosted warning from run `30713013689` as baseline
   evidence and inventory all Kairo-source warnings in that log.
 
 ### Task 2: Add checked value semantics
 
-- [ ] Add explicit `Sendable` conformance to `CachedBlock`, `DayCacheStore`, and
+- [x] Add explicit `Sendable` conformance to `CachedBlock`, `DayCacheStore`, and
   `DayCacheStore.Snapshot` as required by the compiler.
-- [ ] Do not change cache methods, file protection, storage location, or update
+- [x] Do not change cache methods, file protection, storage location, or update
   ordering.
-- [ ] Run focused `DayCacheTests` and `WidgetCompletionServiceTests` green.
+- [x] Run `DayCacheTests` and `WidgetCompletionServiceTests` green inside the
+  app-hosted native gate.
 
 ### Task 3: Close the remaining repository warning
 
-- [ ] Change the non-mutated Google auth tour control local from `var` to `let`.
-- [ ] Regenerate the Xcode project and build/test with fresh derived data.
-- [ ] Require no `warning:` line whose path points into Kairo's Swift sources.
+- [x] Change the non-mutated Google auth tour control local from `var` to `let`.
+- [x] Add source and executable contracts, and make every wrapped Xcode
+  invocation reject warnings originating from Kairo Swift source paths.
+- [x] Regenerate the Xcode project and build/test with fresh derived data.
+- [x] Require no `warning:` line whose path points into Kairo's Swift sources.
 
 ### Task 4: Review and release
 
-- [ ] Run web gates plus generated-client, Apple release, app-hosted native, and
+- [x] Run web gates plus generated-client, Apple release, app-hosted native, and
   unsigned-build gates.
-- [ ] Obtain independent review and resolve every actionable finding.
+- [x] Obtain independent review and resolve every actionable finding.
 - [ ] Fast-forward `main`, rerun merged focused gates, push, and require exact-SHA
   GitHub CI success.
-- [ ] Require the hosted native log to preserve 377-test/Main Thread Checker
+- [ ] Require the hosted native log to preserve 378-test/Main Thread Checker
   proof while removing the targeted Kairo-source warnings.
 - [ ] Require Coolify's exact-SHA deployment and read-only live health proof,
   then record the final handoff and clean both feature worktrees.

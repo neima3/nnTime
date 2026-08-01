@@ -110,6 +110,14 @@ describe("native API contract CI", () => {
       resolve("scripts/ios-main-thread-gate.sh"),
       "utf8",
     );
+    const xcodebuildWrapper = readFileSync(
+      resolve("scripts/ios-xcodebuild.sh"),
+      "utf8",
+    );
+    const dayCache = readFileSync(
+      resolve("ios/Shared/DayCache.swift"),
+      "utf8",
+    );
     const prepareScript = readFileSync(
       resolve("scripts/ios-prepare-project.sh"),
       "utf8",
@@ -122,6 +130,14 @@ describe("native API contract CI", () => {
     expect(prepareScript).toContain("xcodegen generate --spec ios/project.yml");
     expect(unitTestCommand).toContain("./scripts/ios-main-thread-gate.sh");
     expect(mainThreadGate).toContain("-only-testing:KairoUnitTests");
+    expect(xcodebuildWrapper).toContain("Kairo Swift source warning");
+    expect(xcodebuildWrapper).toContain(
+      'grep -F "$PROJECT_ROOT/ios/" "$LOG_FILE"',
+    );
+    expect(xcodebuildWrapper).toContain(
+      "grep -E '\\.swift:[0-9]+:[0-9]+: warning:'",
+    );
+    expect(dayCache).not.toContain("@unchecked Sendable");
     expect(mainThreadGate).toContain(
       '-destination "platform=iOS Simulator,id=$SIMULATOR_ID"',
     );

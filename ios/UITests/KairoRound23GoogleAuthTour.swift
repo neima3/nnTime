@@ -94,7 +94,7 @@ final class KairoRound23GoogleAuthTour: XCTestCase {
 
     func testGoogleLinkReadyLinkingAndLinkedFixtures() {
         var app = launchSettings(googleState: "ready")
-        var control = app.buttons["Connect Google account"]
+        let control = app.buttons["Connect Google account"]
         reveal(control, in: app)
         XCTAssertTrue(control.exists)
         XCTAssertGreaterThanOrEqual(control.frame.height, 44)

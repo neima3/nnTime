@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   chmodSync,
   lstatSync,
@@ -150,6 +150,10 @@ describe("iOS native package toolchain", () => {
     writeFileSync(fakeXcodebuild, "#!/usr/bin/env bash\nprintf '%s\\n' \"$@\"\n");
     chmodSync(fakeXcodebuild, 0o755);
 
+    const countWrapperLogs = () =>
+      readdirSync(tmpdir()).filter((file) => file.startsWith("kairo-xcodebuild."))
+        .length;
+    const logCountBefore = countWrapperLogs();
     const output = execFileSync(
       "bash",
       [
@@ -171,6 +175,55 @@ describe("iOS native package toolchain", () => {
       "-project",
       "Kairo.xcodeproj",
     ]);
+    expect(countWrapperLogs()).toBe(logCountBefore);
+  });
+
+  it("fails every wrapped xcodebuild on a Kairo Swift source warning", () => {
+    const directory = mkdtempSync(join(tmpdir(), "kairo-xcodebuild-warning-"));
+    tempDirs.push(directory);
+    const fakeXcodebuild = join(directory, "xcodebuild");
+    const warningPath = resolve("ios/Shared/DayCache.swift");
+    writeFileSync(
+      fakeXcodebuild,
+      `#!/usr/bin/env bash\nprintf '%s:29:9: warning: fixture warning\\n' '${warningPath}'\n`,
+    );
+    chmodSync(fakeXcodebuild, 0o755);
+
+    const result = spawnSync(
+      "bash",
+      [resolve("scripts/ios-xcodebuild.sh"), "build"],
+      {
+        encoding: "utf8",
+        env: { ...process.env, PATH: `${directory}:${process.env.PATH}` },
+      },
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain("fixture warning");
+    expect(result.stderr).toContain("Kairo Swift source warning");
+  });
+
+  it("fails closed when wrapped xcodebuild output cannot be captured", () => {
+    const directory = mkdtempSync(join(tmpdir(), "kairo-xcodebuild-tee-"));
+    tempDirs.push(directory);
+    const fakeXcodebuild = join(directory, "xcodebuild");
+    const fakeTee = join(directory, "tee");
+    writeFileSync(fakeXcodebuild, "#!/usr/bin/env bash\nprintf 'clean build\\n'\n");
+    writeFileSync(fakeTee, "#!/usr/bin/env bash\nexit 23\n");
+    chmodSync(fakeXcodebuild, 0o755);
+    chmodSync(fakeTee, 0o755);
+
+    const result = spawnSync(
+      "bash",
+      [resolve("scripts/ios-xcodebuild.sh"), "build"],
+      {
+        encoding: "utf8",
+        env: { ...process.env, PATH: `${directory}:${process.env.PATH}` },
+      },
+    );
+
+    expect(result.status).toBe(23);
+    expect(result.stderr).toContain("Unable to capture xcodebuild output");
   });
 
   it("routes every native script through deterministic preparation and build wrappers", () => {

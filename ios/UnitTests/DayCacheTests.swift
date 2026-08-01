@@ -15,6 +15,15 @@ final class DayCacheTests: XCTestCase {
         try? FileManager.default.removeItem(at: directory)
     }
 
+    func testStoreSatisfiesCheckedSendability() {
+        func requireSendable<T: Sendable>(_: T) {}
+        func requireSendableType<T: Sendable>(_: T.Type) {}
+
+        requireSendable(DayCacheStore(directory: directory))
+        requireSendableType(CachedBlock.self)
+        requireSendableType(DayCacheStore.Snapshot.self)
+    }
+
     func testRoundTripRequiresMatchingScopeAndDate() throws {
         try store.write(
             scope: "account-a",

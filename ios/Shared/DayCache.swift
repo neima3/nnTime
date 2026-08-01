@@ -1,6 +1,6 @@
 import Foundation
 
-struct CachedBlock: Codable, Equatable {
+struct CachedBlock: Codable, Equatable, Sendable {
     let title: String
     let emoji: String
     let startMin: Int
@@ -14,7 +14,7 @@ struct CachedBlock: Codable, Equatable {
     var endMin: Int { startMin + durationMin }
 }
 
-struct DayCacheStore {
+struct DayCacheStore: Sendable {
     enum StoreError: Error, Equatable {
         case invalidSnapshot
         case scopeMismatch
@@ -24,7 +24,7 @@ struct DayCacheStore {
         case ambiguousOccurrence
     }
 
-    struct Snapshot: Codable, Equatable {
+    struct Snapshot: Codable, Equatable, Sendable {
         let version: Int
         let scope: String
         let date: String
@@ -39,16 +39,11 @@ struct DayCacheStore {
     let fileURL: URL
     let protection: FileProtectionType =
         .completeUntilFirstUserAuthentication
-    private let fileManager: FileManager
 
-    init(
-        directory: URL,
-        fileManager: FileManager = .default
-    ) {
+    init(directory: URL) {
         fileURL = directory.appending(
             path: "kairo-day-cache-v2.json"
         )
-        self.fileManager = fileManager
     }
 
     func write(
@@ -80,7 +75,7 @@ struct DayCacheStore {
         else {
             throw StoreError.invalidSnapshot
         }
-        try fileManager.createDirectory(
+        try FileManager.default.createDirectory(
             at: fileURL.deletingLastPathComponent(),
             withIntermediateDirectories: true,
             attributes: [
@@ -89,7 +84,7 @@ struct DayCacheStore {
         )
         let data = try JSONEncoder().encode(snapshot)
         try data.write(to: fileURL, options: [.atomic])
-        try fileManager.setAttributes(
+        try FileManager.default.setAttributes(
             [.protectionKey: protection],
             ofItemAtPath: fileURL.path
         )
@@ -196,10 +191,10 @@ struct DayCacheStore {
     }
 
     func clear() throws {
-        guard fileManager.fileExists(atPath: fileURL.path) else {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
             return
         }
-        try fileManager.removeItem(at: fileURL)
+        try FileManager.default.removeItem(at: fileURL)
     }
 
     private static func normalizedHourCycle(
