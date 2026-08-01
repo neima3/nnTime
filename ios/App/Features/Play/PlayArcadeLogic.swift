@@ -236,6 +236,27 @@ enum ArcadeLogic {
         return Array(original.dropFirst()) + [original[0]]
     }
 
+    // MARK: Pattern Tiles (simultaneous spatial recall)
+
+    static let patternGrid = 16
+    static let patternStart = 3
+    static let patternMax = 9
+
+    /// Draw `count` distinct lit tiles on the 4×4 grid, sorted.
+    static func pickPatternTiles(count: Int, random: () -> Double = { Double.random(in: 0..<1) }) -> [Int] {
+        var idx = Array(0..<patternGrid)
+        for i in stride(from: idx.count - 1, to: 0, by: -1) {
+            let j = min(Int(random() * Double(i + 1)), i)
+            idx.swapAt(i, j)
+        }
+        return Array(idx.prefix(min(count, patternGrid))).sorted()
+    }
+
+    /// How long the pattern stays visible before it hides.
+    static func patternShowSeconds(count: Int) -> Double {
+        0.9 + Double(count) * 0.25
+    }
+
     // MARK: Word quizzes (Grammar Snap + Spell Check)
 
     static let quizRounds = 8

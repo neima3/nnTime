@@ -7,7 +7,7 @@ struct PlayView: View {
     @State private var bests: [String: Int] = [:]
     enum Game: String, Identifiable {
         case timeFeel, quickTap, emojiMatch, grammar, spelling, focusFinder, memoryTrail, colorClash, breath,
-             oddOneOut, digitSpan, greenLight, nightSky, letterSoup
+             oddOneOut, digitSpan, greenLight, nightSky, letterSoup, patternTiles
         var id: String { rawValue }
     }
 
@@ -38,6 +38,8 @@ struct PlayView: View {
                          best: bests["memorytrail"].map { "best trail \($0)" }) { active = .memoryTrail }
                     card("🔢", "Digit Span", "Numbers flash, then it's all you.", .kCatPeach,
                          best: bests["digitspan"].map { "best span \($0)" }) { active = .digitSpan }
+                    card("🧩", "Pattern Tiles", "A few tiles flash together. Hold the shape.", .kCatSky,
+                         best: bests["patterntiles"].map { "best pattern \($0)" }) { active = .patternTiles }
 
                     sectionHeader("Wordplay", "Snags and spellings, zero red pens.")
                     card("📝", "Grammar Snap", "60+ classic snags across ten topics — it remembers the ones that get you.", .kCatSky,
@@ -103,6 +105,7 @@ struct PlayView: View {
             case .greenLight: GreenLightGame { active = nil }
             case .nightSky: NightSkyGame { active = nil }
             case .letterSoup: LetterSoupGame { active = nil }
+            case .patternTiles: PatternTilesGame { active = nil }
             case .breath: SteadyBreathGame { active = nil }
             }
         }
@@ -112,7 +115,7 @@ struct PlayView: View {
         var next: [String: Int] = [:]
         for key in ["timefeel", "quicktap", "emojimatch", "grammarsnap", "spellcheck",
                     "focusfinder", "memorytrail", "colorclash", "oddoneout", "digitspan",
-                    "greenlight", "nightsky", "lettersoup"] {
+                    "greenlight", "nightsky", "lettersoup", "patterntiles"] {
             next[key] = PlayScores.best(for: key)
         }
         bests = next

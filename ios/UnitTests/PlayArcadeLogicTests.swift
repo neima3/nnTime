@@ -309,4 +309,35 @@ final class PlayArcadeLogicTests: XCTestCase {
         XCTAssertNotEqual(out.joined(), "candle")
         XCTAssertEqual(out.sorted(), "candle".map(String.init).sorted())
     }
+
+    // MARK: Pattern Tiles
+
+    func testPatternDrawIsDistinctSortedAndInGrid() {
+        for count in [3, 5, 9] {
+            let tiles = ArcadeLogic.pickPatternTiles(count: count)
+            XCTAssertEqual(tiles.count, count)
+            XCTAssertEqual(Set(tiles).count, count)
+            XCTAssertEqual(tiles, tiles.sorted())
+            for t in tiles {
+                XCTAssertTrue((0..<ArcadeLogic.patternGrid).contains(t))
+            }
+        }
+        XCTAssertEqual(ArcadeLogic.pickPatternTiles(count: 99).count, ArcadeLogic.patternGrid)
+    }
+
+    func testPatternDrawIsDeterministicForASeededRNG() {
+        var calls = 0
+        func seeded() -> Double {
+            calls += 1
+            return Double((calls * 31) % 100) / 100
+        }
+        let a = ArcadeLogic.pickPatternTiles(count: 5, random: seeded)
+        calls = 0
+        XCTAssertEqual(ArcadeLogic.pickPatternTiles(count: 5, random: seeded), a)
+    }
+
+    func testPatternShowTimeScalesWithSize() {
+        XCTAssertEqual(ArcadeLogic.patternShowSeconds(count: 3), 1.65, accuracy: 0.001)
+        XCTAssertEqual(ArcadeLogic.patternShowSeconds(count: 9), 3.15, accuracy: 0.001)
+    }
 }
