@@ -1,5 +1,32 @@
 # Progress log
 
+## 2026-08-01 — Round 30: full-surface quality sweep — clean (Fable)
+
+First full sweep since Round 12, after six feature rounds (24–29).
+
+- **Method.** A fresh synthetic tenant on the local dev server
+  (`qa-r30-…@kairo.test`), seeded with a believable five-block day
+  (varied categories and energies) plus two inbox tasks; then **39
+  captures** — 13 routes (every app surface + landing) × desktop-light /
+  desktop-dark / mobile-390 — each with console, failed-request, and
+  horizontal-overflow checks. Script and evidence under ignored
+  `browser-qa/round30-sweep/` (`r30-sweep.mjs`, `report.json`).
+- **Result: zero defects.** No horizontal overflow on any capture, no
+  real console errors, no failed requests except the known sweep-only
+  artifact: better-auth's own limiter returning 429 on `get-session`
+  under 39 fresh contexts in ~3 minutes — the exact behavior Round 12
+  recorded and hardened UserMenu against (an errored probe never claims
+  signed-out). Not user-reachable.
+- **Design review.** Today (desktop + mobile, live now-line and
+  past-block dimming), Week dark (tinted blocks, intentions), Month
+  (today ring + dots), Stats (garden seed, soft streak, mood), the
+  13-game sectioned arcade in dark, Settings dark, and the landing on
+  mobile were all visually inspected: tokens, spacing, and states hold
+  everywhere. No fixes required — the finding IS the record: six feature
+  rounds landed with no visual, console, or layout regressions.
+
+**Release state:** docs-only round; no code changed.
+
 ## 2026-08-01 — Round 29: Night Sky, a wind-down constellation trace (Fable)
 
 Roadmap: `docs/plans/2026-07-31-round29-night-sky.md`.
