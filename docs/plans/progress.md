@@ -1,5 +1,49 @@
 # Progress log
 
+## 2026-07-31 — Round 28: the Daily Brief lands on native Today (Fable)
+
+Roadmap: `docs/plans/2026-07-31-round28-daily-brief-ios.md`.
+
+- **What shipped.** The web's Smart Daily Brief ported to iOS with its
+  contract pinned: a warm butter morning card under the Today header —
+  greeting tier ("Still up" / "Good morning" / "Hello"), "N things on
+  today, M already done" (or "Nothing scheduled yet — a blank, gentle
+  day."), "First up · emoji title at time", and the learned focus-peak
+  tip reusing the peak-hour insight Today already loads. Morning-only,
+  today-only, dismissible for the day; absent on read-only cached days.
+- **Evidence.** `DailyBriefPolicyTests` pin the gate, greeting tiers, and
+  summary copy to `src/components/DailyBrief.tsx`. The Today fixture pins
+  a 9am hour and resets dismissal, and the tour passed **2/2** (brief
+  show → dismiss-for-the-day, plus the Round 27 low-battery journey
+  re-proven on the same state). Screenshots inspected under ignored
+  `browser-qa/round28-daily-brief/ios/`.
+- **Gates.** iOS main-thread gate passed (**355 executed, 1 expected
+  skip, 0 failures**) plus `pnpm ios:release:preflight`. No web files
+  changed.
+
+- **CI found a real (pre-existing) nightly flake — root-caused and
+  fixed.** The `221e232` run's e2e job failed at 23:31 UTC: the auth
+  setup project signed up WITHOUT the suite's America/New_York timezone
+  mock, so the shared account's planning zone followed the runner clock
+  (UTC in CI) while `dayUrl` also sliced dates in UTC. In the nightly
+  23:20–24:00 UTC window, calibration-hint's "40 minutes from now" probe
+  rolled onto the account's next planning day — colliding with
+  core-loop's "isolated" day ("all 1 done" read 1 of 2; the retry's
+  duplicate title then hit strict mode) while the probe's own same-day
+  hint went missing. Round 28's iOS-only commit merely exposed it by
+  being the day's first push after 23:20 UTC. Fix `5fa2b9e`: the setup
+  project signs up under the suite zone and `dayUrl` names days in it.
+  The full local suite passed **12/12 inside the former flake window**.
+
+**Release state:** iOS commit `221e232` pushed to `main` (its CI e2e
+failure was the pre-existing nightly zone flake above — build-test and
+native-contract were green, and the deployed web code was byte-identical
+to the previously verified SHA; live health stayed `ok`). Flake fix
+`5fa2b9e33eaa8025861f04ef9ad2381ad3a1a573` pushed; GitHub Actions run
+`30674088327` on that exact SHA concluded `success` — with the e2e job
+executing around midnight UTC, squarely in the former flake territory.
+The deploy queue drained and live `/api/health` stayed all `ok`.
+
 ## 2026-07-31 — Round 27: low-battery day lands on native Today (Fable)
 
 Roadmap: `docs/plans/2026-07-31-round27-low-battery-ios.md`.
