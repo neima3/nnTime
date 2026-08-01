@@ -36,11 +36,11 @@ _Computed by `node scripts/parity.mjs` — see report for the run that produced 
 | metric | value |
 |---|---|
 | Web parity | 89.74% (70.0 / 78 rows) |
-| iOS parity | 86.36% (76.0 / 88 rows) |
-| Combined parity | 86.36% (76.0 / 88 rows) |
+| iOS parity | 86.93% (76.5 / 88 rows) |
+| Combined parity | 86.93% (76.5 / 88 rows) |
 | Total inventory rows | 98 |
-| planned | 73 |
-| partial | 6 |
+| planned | 74 |
+| partial | 5 |
 | deferred | 9 |
 | excluded | 10 |
 
@@ -119,7 +119,7 @@ their written criteria and zero-credit treatment in the table below.
 | H01 | Home Screen widgets | H | ios | 8A | planned | 1 | SHIPPED (Round 22): small, medium, and large read-only WidgetKit families render timezone-safe current/next activity data with account 12/24-hour preference and Today deep links. |
 | H02 | Lock Screen widgets | H | ios | 8A | planned | 1 | SHIPPED (Round 22): accessory circular, rectangular, and inline families render the protected current/next snapshot with combined VoiceOver labels and Today deep links. |
 | H03 | Interactive widgets | H | ios | 8A | planned | 1 | Complete-from-widget ships (R38): the Better Auth envelope moved into the app-group keychain access group (legacy items migrate on first read) and the widget's done button is a network-first App Intent — the day cache changes only after the server confirms the PATCH, never optimistically. Rows from legacy caches without activity identity render read-only. |
-| H04 | Live Activities / Dynamic Island | H | ios | 8A | partial | 0.5 | Read-only countdown surfaces ship. Mutation buttons now open the authenticated app until the extension has a secure session bridge. |
+| H04 | Live Activities / Dynamic Island | H | ios | 8A | planned | 1 | Pause/resume and complete ship on the lock screen and Dynamic Island (R39): LiveActivityIntents run in the app process and drive the same focus API the Focus screen uses via a registered bridge — no widget-side transport; a failed call leaves the shown state untouched. Read-only countdown + deep link retained. |
 | H05 | Apple Watch app | H | ios | — | deferred | 0 | "watchOS glance = stretch" named deferred in the roadmap (8A) and in the deferred list. |
 | H06 | Watch complications | H | ios | — | excluded | 0 | Research doc marks this a reported gap of Tiimo itself, not a feature to replicate. |
 | I01 | 3,000+ color options | I | both | 5B | partial | 0.5 | Same design decision as B05 (6 semantic categories, not a freeform palette). |

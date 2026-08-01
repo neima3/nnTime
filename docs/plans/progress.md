@@ -1,5 +1,35 @@
 # Progress log
 
+## 2026-08-01 — Round 39: Live Activity pause/complete controls (Fable)
+
+- **H04 unblocked.** The Focus Live Activity's "Open Kairo to adjust"
+  links became real controls: Pause/Resume + Done on the lock-screen
+  banner, the same pair plus a compact open-app link on the Dynamic
+  Island's expanded bottom. `LiveActivityIntent` runs in the **app
+  process**, so the buttons remote-control the exact focus machinery the
+  Focus screen uses — no widget-side transport at all.
+- **Architecture.** `ToggleFocusIntent`/`CompleteFocusIntent` (Shared)
+  dispatch through `FocusIntentBridge`, a handler registry the app fills
+  at launch and the render-only widget process leaves empty.
+  `FocusRemoteControl` (App) hydrates cookies from the keychain envelope
+  when a background launch skipped scene bootstrap, fetches the active
+  session, no-ops stale taps (`command(forState:desiredPaused:)` returns
+  nil when the session is already where the button wanted it), transitions
+  with the session's revision, then reconciles every
+  `Activity<FocusAttributes>` for that session — update on pause/resume,
+  end on complete, mindful minutes recorded exactly like the in-app
+  button. Failures change nothing; an on-screen FocusView re-hydrates via
+  `kairoFocusMutatedExternally`.
+- **Contract kept honest.** The glance audit now requires ≥2 focus-intent
+  buttons on the Live Activity, LiveActivityIntent conformance, bridge
+  dispatch, and no transport in intent files (6 contract tests). The
+  manual-API adoption gate caught an untyped `session` binding in the new
+  executor before push — full local web gates on an iOS round, exactly
+  the R38 lesson.
+- **Evidence.** 377 iOS unit tests (3 new: intent→bridge dispatch and the
+  stale-tap policy matrix), main-thread gate, web 1016 tests + lint +
+  typecheck + build. Parity: H04 0.5 → 1.0, iOS 86.36% → **86.93%**.
+
 ## 2026-08-01 — Round 38: complete-from-widget via a secure session bridge (Fable)
 
 - **H03 unblocked.** The Next Up widget's done button had been withheld
