@@ -6,6 +6,7 @@ type ContractSources = {
   widget: string;
   liveActivity: string;
   completeIntent: string;
+  focusIntents: string;
   widgetCompletion: string;
   sessionEnvelope: string;
   app: string;
@@ -70,6 +71,9 @@ export function auditGlanceSurfaceContract(
         resolve(root, "ios/Widget/CompleteBlockIntent.swift"),
         "utf8",
       ),
+    focusIntents:
+      overrides.focusIntents ??
+      readFileSync(resolve(root, "ios/Shared/FocusIntents.swift"), "utf8"),
     widgetCompletion:
       overrides.widgetCompletion ??
       readFileSync(
@@ -99,22 +103,37 @@ export function auditGlanceSurfaceContract(
     if (pattern.test(extensionUiSource)) failures.push(failure);
   }
 
-  // Every intent button in the UI must be the audited completion intent.
+  // Every intent button in the UI must be one of the audited intents.
   const intentButtons = (
     extensionUiSource.match(/Button\s*\(\s*intent\s*:/g) ?? []
   ).length;
-  const completionButtons = (
+  const auditedButtons = (
     extensionUiSource.match(
+      /Button\s*\(\s*intent\s*:\s*(?:CompleteBlockIntent|ToggleFocusIntent|CompleteFocusIntent)\s*\(/g,
+    ) ?? []
+  ).length;
+  if (intentButtons !== auditedButtons) {
+    failures.push(
+      "Widget intent buttons must all route through audited intents",
+    );
+  }
+  const completionButtons = (
+    sources.widget.match(
       /Button\s*\(\s*intent\s*:\s*CompleteBlockIntent\s*\(/g,
     ) ?? []
   ).length;
-  if (intentButtons !== completionButtons) {
-    failures.push(
-      "Widget intent buttons must all route through CompleteBlockIntent",
-    );
-  }
   if (completionButtons === 0) {
     failures.push("Next Up widget must ship complete-from-widget (H03)");
+  }
+  const focusButtons = (
+    sources.liveActivity.match(
+      /Button\s*\(\s*intent\s*:\s*(?:ToggleFocusIntent|CompleteFocusIntent)\s*\(/g,
+    ) ?? []
+  ).length;
+  if (focusButtons < 2) {
+    failures.push(
+      "Focus Live Activity must ship pause and complete controls (H04)",
+    );
   }
 
   // The intent itself: performs through the shared service, then reloads.
@@ -131,6 +150,18 @@ export function auditGlanceSurfaceContract(
   }
   if (/\bURLSession\b/.test(sources.completeIntent)) {
     failures.push("CompleteBlockIntent must not own transport");
+  }
+
+  // Focus intents run in the app process (LiveActivityIntent) and dispatch
+  // through the bridge — they own no transport of their own.
+  if (!/:\s*LiveActivityIntent\b/.test(sources.focusIntents)) {
+    failures.push("Focus intents must be LiveActivityIntents (app-process)");
+  }
+  if (!sources.focusIntents.includes("FocusIntentBridge.dispatch(")) {
+    failures.push("Focus intents must dispatch through FocusIntentBridge");
+  }
+  if (/\bURLSession\b/.test(sources.focusIntents)) {
+    failures.push("Focus intents must not own transport");
   }
 
   // The service: session isolation, optimistic-concurrency headers, and the

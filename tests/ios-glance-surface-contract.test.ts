@@ -47,7 +47,7 @@ describe("iOS glance surface contract", () => {
     );
   });
 
-  it("detects a widget button bypassing the completion intent", () => {
+  it("detects a widget button bypassing the audited intents", () => {
     const widget = readFileSync(
       resolve(root, "ios/Widget/KairoWidget.swift"),
       "utf8",
@@ -59,7 +59,47 @@ describe("iOS glance surface contract", () => {
 
     expect(result.failures).toEqual(
       expect.arrayContaining([
-        "Widget intent buttons must all route through CompleteBlockIntent",
+        "Widget intent buttons must all route through audited intents",
+      ]),
+    );
+  });
+
+  it("detects the Live Activity losing its focus controls", () => {
+    const liveActivity = readFileSync(
+      resolve(root, "ios/Widget/FocusLiveActivity.swift"),
+      "utf8",
+    );
+
+    const result = auditGlanceSurfaceContract(root, {
+      liveActivity: liveActivity.replaceAll(
+        /Button\(intent: (?:ToggleFocusIntent|CompleteFocusIntent)\(/g,
+        "Button(action: {})(",
+      ),
+    });
+
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        "Focus Live Activity must ship pause and complete controls (H04)",
+      ]),
+    );
+  });
+
+  it("detects focus intents leaving the app-process bridge", () => {
+    const focusIntents = readFileSync(
+      resolve(root, "ios/Shared/FocusIntents.swift"),
+      "utf8",
+    );
+
+    const result = auditGlanceSurfaceContract(root, {
+      focusIntents: focusIntents
+        .replaceAll(": LiveActivityIntent", ": AppIntent")
+        .replaceAll("FocusIntentBridge.dispatch(", "directCall("),
+    });
+
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        "Focus intents must be LiveActivityIntents (app-process)",
+        "Focus intents must dispatch through FocusIntentBridge",
       ]),
     );
   });
