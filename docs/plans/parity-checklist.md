@@ -36,11 +36,11 @@ _Computed by `node scripts/parity.mjs` — see report for the run that produced 
 | metric | value |
 |---|---|
 | Web parity | 89.74% (70.0 / 78 rows) |
-| iOS parity | 85.80% (75.5 / 88 rows) |
-| Combined parity | 85.80% (75.5 / 88 rows) |
+| iOS parity | 86.36% (76.0 / 88 rows) |
+| Combined parity | 86.36% (76.0 / 88 rows) |
 | Total inventory rows | 98 |
-| planned | 72 |
-| partial | 7 |
+| planned | 73 |
+| partial | 6 |
 | deferred | 9 |
 | excluded | 10 |
 
@@ -118,7 +118,7 @@ their written criteria and zero-credit treatment in the table below.
 | G08 | Per-task notification granularity | G | both | — | excluded | 0 | Research doc marks this a user-requested gap not yet available in Tiimo itself ("N/A feature gap"). |
 | H01 | Home Screen widgets | H | ios | 8A | planned | 1 | SHIPPED (Round 22): small, medium, and large read-only WidgetKit families render timezone-safe current/next activity data with account 12/24-hour preference and Today deep links. |
 | H02 | Lock Screen widgets | H | ios | 8A | planned | 1 | SHIPPED (Round 22): accessory circular, rectangular, and inline families render the protected current/next snapshot with combined VoiceOver labels and Today deep links. |
-| H03 | Interactive widgets | H | ios | 8A | partial | 0.5 | Read-only next-up and day-strip widgets ship. Complete-from-widget is intentionally withheld until the extension receives a secure authenticated session bridge; the former control could fail remotely while optimistically changing only the cache. |
+| H03 | Interactive widgets | H | ios | 8A | planned | 1 | Complete-from-widget ships (R38): the Better Auth envelope moved into the app-group keychain access group (legacy items migrate on first read) and the widget's done button is a network-first App Intent — the day cache changes only after the server confirms the PATCH, never optimistically. Rows from legacy caches without activity identity render read-only. |
 | H04 | Live Activities / Dynamic Island | H | ios | 8A | partial | 0.5 | Read-only countdown surfaces ship. Mutation buttons now open the authenticated app until the extension has a secure session bridge. |
 | H05 | Apple Watch app | H | ios | — | deferred | 0 | "watchOS glance = stretch" named deferred in the roadmap (8A) and in the deferred list. |
 | H06 | Watch complications | H | ios | — | excluded | 0 | Research doc marks this a reported gap of Tiimo itself, not a feature to replicate. |

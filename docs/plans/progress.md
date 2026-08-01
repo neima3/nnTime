@@ -1,5 +1,40 @@
 # Progress log
 
+## 2026-08-01 — Round 38: complete-from-widget via a secure session bridge (Fable)
+
+- **H03 unblocked.** The Next Up widget's done button had been withheld
+  until the extension could authenticate its own writes. The Better Auth
+  cookie envelope now lives in the `group.me.neima.kairo` keychain access
+  group (app-group ids are valid keychain groups on iOS — no new
+  entitlements or signing changes); legacy default-group items migrate on
+  first read so no one re-signs-in. `SessionCookieRules` in `Shared/` is
+  now the single definition of cookie filtering + scope hashing for app
+  and widget.
+- **Network-first by contract.** `WidgetCompletionService` PATCHes
+  `/api/v1/activities/{id}` (If-Match, Idempotency-Key, explicit Cookie
+  header on a no-cookie-jar ephemeral session, ADR-002 body with
+  `editScope:"this"` and `completedAt: null` on uncomplete) and only then
+  updates the day cache — including the server's new revision, so a
+  follow-up toggle doesn't 409 against a stale one. Expired session and
+  cache/session scope mismatch fail before any request leaves the device.
+  The rejected optimistic-cache failure mode is structurally impossible.
+- **UI.** `CompleteBlockIntent` (App Intent, widget process) + circle done
+  buttons on the small card and large list rows — rendered only when the
+  cached row carries full identity; legacy rows stay read-only. A thrown
+  intent leaves the timeline untouched and WidgetKit rolls the button
+  back. VoiceOver reaches the button as a custom action on the combined
+  card element.
+- **Evidence.** 374 iOS unit tests (10 new: keychain group + migration
+  semantics against an in-memory client modeling access groups — the
+  simulator keychain ignores them — and the service's contract/rollback
+  against a stub URLProtocol, including scope-mismatch-sends-no-request
+  and 409-leaves-cache-untouched). Main-thread gate passed; web lint
+  clean (no web source changes). Parity: H03 0.5 → 1.0, iOS 85.80% →
+  **86.36%**.
+- **Known limitation (documented).** Repeat toggles on a server-split
+  recurring occurrence can 409 until the app next reconciles — the widget
+  throws, changes nothing, and the app's refetch resolves it.
+
 ## 2026-08-01 — Round 37: arcade lazy-loading — games leave the first-load bundle (Fable)
 
 - **What changed.** All fifteen games in `PlayClient.tsx` moved behind
