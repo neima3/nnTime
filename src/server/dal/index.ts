@@ -17,7 +17,7 @@ import "server-only";
 import dbDefault from "../db";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import * as schema from "../db/schema";
-import { and, eq, isNull, asc, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, asc, sql } from "drizzle-orm";
 
 // Schema-agnostic drizzle client type so both the app instance and ephemeral
 // test DBs are accepted.
@@ -181,6 +181,227 @@ export async function deleteTask(
       }
     }
     await appendChangeLog(tdb, userId, "tasks", id, "delete", updated.revision);
+  });
+}
+
+export async function listChecklistItems(
+  userId: string,
+  parentType: "series" | "task" | "occurrence",
+  parentId: string,
+  opts: { db?: Db } = {},
+) {
+  const db = opts.db ?? dbDefault;
+  return db
+    .select()
+    .from(schema.checklistItems)
+    .where(
+      and(
+        eq(schema.checklistItems.userId, userId),
+        eq(schema.checklistItems.parentType, parentType),
+        eq(schema.checklistItems.parentId, parentId),
+        isNull(schema.checklistItems.deletedAt),
+      ),
+    )
+    .orderBy(asc(schema.checklistItems.sortOrder));
+}
+
+export async function scheduleTask(
+  userId: string,
+  taskId: string,
+  input: {
+    tz: string;
+    dtstartLocal: Date;
+    rrule?: string | null;
+    exdate?: Date[];
+    rdate?: Date[];
+    title: string;
+    emoji?: string;
+    categoryId?: string;
+    durationMin: number;
+    energy?: "low" | "medium" | "high" | null;
+    priority?: "none" | "low" | "high";
+    tags?: string[];
+    notes?: string;
+    source?: "manual" | "routine" | "calendar";
+    sourceRef?: string;
+    checklistTemplate?: unknown[];
+  },
+  opts: { db?: Db } = {},
+) {
+  const db = opts.db ?? dbDefault;
+  return db.transaction(async (tx) => {
+    const tdb = tx as unknown as Db;
+    const seriesId = crypto.randomUUID();
+    const now = new Date();
+    if (input.categoryId) {
+      const [category] = await tdb
+        .select({ id: schema.categories.id })
+        .from(schema.categories)
+        .where(
+          and(
+            eq(schema.categories.id, input.categoryId),
+            eq(schema.categories.userId, userId),
+            isNull(schema.categories.deletedAt),
+          ),
+        )
+        .limit(1);
+      if (!category) throw new NotFoundError("category");
+    }
+    if (input.tags?.length) {
+      const requestedTagIds = [...new Set(input.tags)];
+      const ownedTags = await tdb
+        .select({ id: schema.tags.id })
+        .from(schema.tags)
+        .where(
+          and(
+            inArray(schema.tags.id, requestedTagIds),
+            eq(schema.tags.userId, userId),
+            isNull(schema.tags.deletedAt),
+          ),
+        );
+      if (ownedTags.length !== requestedTagIds.length) {
+        throw new NotFoundError("tag");
+      }
+    }
+    const [task] = await tdb
+      .update(schema.tasks)
+      .set({
+        convertedTo: seriesId,
+        deletedAt: now,
+        updatedAt: now,
+        revision: sql`${schema.tasks.revision} + 1`,
+      })
+      .where(
+        and(
+          eq(schema.tasks.id, taskId),
+          eq(schema.tasks.userId, userId),
+          isNull(schema.tasks.deletedAt),
+          isNull(schema.tasks.convertedTo),
+        ),
+      )
+      .returning();
+    if (!task) throw new NotFoundError("task");
+
+    const taskChecklist = await listChecklistItems(userId, "task", taskId, {
+      db: tdb,
+    });
+    const requestedChecklist = input.checklistTemplate;
+    const checklistTemplate =
+      requestedChecklist ??
+      taskChecklist.map((item) => ({ label: item.label, done: item.done }));
+    const finalChecklistByLabel = new Map<
+      string,
+      { index: number; done: boolean | undefined }[]
+    >();
+    checklistTemplate.forEach((entry, index) => {
+      if (!entry || typeof entry !== "object") return;
+      const label = (entry as { label?: unknown }).label;
+      const done = (entry as { done?: unknown }).done;
+      if (typeof label !== "string") return;
+      const key = label.trim().toLocaleLowerCase();
+      const matches = finalChecklistByLabel.get(key) ?? [];
+      matches.push({
+        index,
+        done: typeof done === "boolean" ? done : undefined,
+      });
+      finalChecklistByLabel.set(key, matches);
+    });
+
+    const [series] = await tdb
+      .insert(schema.activitySeries)
+      .values({
+        id: seriesId,
+        userId,
+        tz: input.tz,
+        dtstartLocal: input.dtstartLocal,
+        rrule: input.rrule ?? null,
+        exdate: input.exdate ?? null,
+        rdate: input.rdate ?? null,
+        title: input.title,
+        emoji: input.emoji ?? null,
+        categoryId: input.categoryId ?? null,
+        durationMin: input.durationMin,
+        checklistTemplate,
+        energy: input.energy ?? null,
+        priority: input.priority ?? "none",
+        tags: input.tags ?? null,
+        notes: input.notes ?? null,
+        source: input.source ?? "manual",
+        sourceRef: input.sourceRef ?? null,
+      })
+      .returning();
+
+    for (const item of taskChecklist) {
+      const finalItems = finalChecklistByLabel.get(
+        item.label.trim().toLocaleLowerCase(),
+      );
+      const finalItem = finalItems?.shift();
+      const [moved] = await tdb
+        .update(schema.checklistItems)
+        .set(
+          finalItem
+            ? {
+                parentType: "series",
+                parentId: seriesId,
+                sortOrder: finalItem.index,
+                done: finalItem.done ?? item.done,
+                revision: item.revision + 1,
+                updatedAt: now,
+              }
+            : {
+                deletedAt: now,
+                revision: item.revision + 1,
+                updatedAt: now,
+              },
+        )
+        .where(
+          and(
+            eq(schema.checklistItems.id, item.id),
+            eq(schema.checklistItems.userId, userId),
+            eq(schema.checklistItems.parentType, "task"),
+            eq(schema.checklistItems.parentId, taskId),
+            isNull(schema.checklistItems.deletedAt),
+          ),
+        )
+        .returning();
+      if (!moved) throw new NotFoundError("checklist_item");
+      await appendChangeLog(
+        tdb,
+        userId,
+        "checklist_items",
+        moved.id,
+        finalItem ? "upsert" : "delete",
+        moved.revision,
+      );
+    }
+
+    await appendChangeLog(
+      tdb,
+      userId,
+      "activity_series",
+      seriesId,
+      "upsert",
+      series!.revision,
+    );
+    await appendChangeLog(
+      tdb,
+      userId,
+      "tasks",
+      taskId,
+      "delete",
+      task.revision,
+    );
+    await tdb.insert(schema.plannerEvents).values({
+      id: crypto.randomUUID(),
+      userId,
+      entityType: "task",
+      entityId: taskId,
+      eventType: "reschedule",
+      payload: { sourceTaskId: taskId, targetSeriesId: seriesId },
+      occurredAt: now,
+      tz: input.tz,
+    });
+    return series!;
   });
 }
 

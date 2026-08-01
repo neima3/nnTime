@@ -6,7 +6,7 @@
  */
 
 import { getStatsCached } from "@/lib/stats-cache";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -20,6 +20,11 @@ import {
 import { localMinutesToInstant } from "@/lib/adapters";
 import { clientToday } from "@/lib/client-date";
 import { sendReplaySafeCreate } from "@/lib/offline-mutation";
+import {
+  buildChecklistTemplate,
+  normalizeEditorSteps,
+  type EditorStepInput,
+} from "@/lib/activity-editor-steps";
 import { toast } from "./Toast";
 
 const CATEGORY_UI = [
@@ -113,16 +118,18 @@ function timeInputToMinutes(t: string) {
 export type ActivityEditorProps = {
   mode: "create" | "edit";
   activityId?: string;
+  sourceTaskId?: string;
   initialTitle?: string;
   initialEmoji?: string;
   initialCategoryKey?: string;
+  initialCategoryId?: string;
   initialDate?: string;
   initialStartMin?: number;
   initialDurationMin?: number;
   initialEnergy?: "low" | "medium" | "high" | null;
   initialPriority?: "none" | "low" | "high";
   initialNotes?: string;
-  initialSteps?: string[];
+  initialSteps?: EditorStepInput[];
   initialRevision?: number;
   initialOccurrenceKey?: string;
   timezone?: string;
@@ -147,7 +154,9 @@ export function ActivityEditor(props: ActivityEditorProps) {
     props.initialPriority ?? "none",
   );
   const [notes, setNotes] = useState(props.initialNotes ?? "");
-  const [steps, setSteps] = useState<string[]>(props.initialSteps ?? []);
+  const [steps, setSteps] = useState(() =>
+    normalizeEditorSteps(props.initialSteps),
+  );
   const [stepDraft, setStepDraft] = useState("");
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [tz, setTz] = useState(
@@ -157,6 +166,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showEmoji, setShowEmoji] = useState(false);
+  const scheduleIdempotencyKey = useRef<string | null>(null);
   const [estimateRatio, setEstimateRatio] = useState<number | null>(null);
   const [repeat, setRepeat] = useState<RepeatKind>("none");
   const [repeatN, setRepeatN] = useState(2);
@@ -229,11 +239,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
       setRepeatN(parsed.n);
       setCustomRrule(parsed.kind === "custom" ? a.rrule : null);
       if (Array.isArray(a.checklistTemplate)) {
-        setSteps(
-          a.checklistTemplate.map((x: { label?: string } | string) =>
-            typeof x === "string" ? x : String(x?.label ?? ""),
-          ),
-        );
+        setSteps(normalizeEditorSteps(a.checklistTemplate));
       }
     })();
     return () => {
@@ -243,8 +249,11 @@ export function ActivityEditor(props: ActivityEditorProps) {
 
   const categoryId = useMemo(() => {
     const row = categories.find((c) => c.key === categoryKey);
-    return row?.id;
-  }, [categories, categoryKey]);
+    if (row) return row.id;
+    return categoryKey === props.initialCategoryKey
+      ? props.initialCategoryId
+      : undefined;
+  }, [categories, categoryKey, props.initialCategoryId, props.initialCategoryKey]);
 
   const close = useCallback(() => {
     if (props.onClose) props.onClose();
@@ -269,55 +278,95 @@ export function ActivityEditor(props: ActivityEditorProps) {
     setError(null);
     try {
       const dtstartLocal = localMinutesToInstant(date, startMin, tz);
-      const checklistTemplate = steps
-        .filter(Boolean)
-        .map((label) => ({ label, done: false }));
+      const checklistTemplate = buildChecklistTemplate(steps);
       const rrule =
         repeat === "custom" ? customRrule : buildRrule(repeat, date, repeatN);
 
       if (props.mode === "create") {
-        const delivery = await sendReplaySafeCreate({
-          path: "/api/v1/activities",
-          body: {
-            tz,
-            dtstartLocal,
-            rrule,
-            title: trimmed,
-            emoji,
-            categoryId,
-            durationMin,
-            energy,
-            priority,
-            notes: notes || undefined,
-            checklistTemplate: checklistTemplate.length
-              ? checklistTemplate
-              : undefined,
-            source: "manual",
-          },
-        });
-        if (delivery.state === "queued") {
-          toast("Saved on this device — it’ll appear when you’re back");
-          router.push(`/app/today?date=${date}`);
-          return;
-        }
-        if (delivery.state === "unavailable") {
-          setError(
-            "You’re offline and this device couldn’t save it. Keep this open and reconnect.",
-          );
-          setSaving(false);
-          return;
-        }
-        const res = delivery.response;
-        if (res.status === 401) {
-          setError("Sign in to save activities.");
-          setSaving(false);
-          return;
-        }
-        if (!res.ok) {
-          const body = await res.json().catch(() => null);
-          setError(body?.error?.message ?? "Couldn't create it — try again");
-          setSaving(false);
-          return;
+        if (props.sourceTaskId) {
+          if (!navigator.onLine) {
+            setError("Task scheduling needs a connection — reconnect and try again.");
+            setSaving(false);
+            return;
+          }
+          const key = scheduleIdempotencyKey.current ?? crypto.randomUUID();
+          scheduleIdempotencyKey.current = key;
+          const res = await fetch(`/api/v1/tasks/${props.sourceTaskId}/schedule`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Idempotency-Key": key,
+            },
+            body: JSON.stringify({
+              tz,
+              dtstartLocal,
+              rrule,
+              title: trimmed,
+              emoji,
+              categoryId,
+              durationMin,
+              energy,
+              priority,
+              notes,
+              checklistTemplate,
+              source: "manual",
+            }),
+          });
+          if (!res.ok) {
+            scheduleIdempotencyKey.current = null;
+            const body = await res.json().catch(() => null);
+            setError(
+              res.status === 404
+                ? "This task was already moved or deleted. Return to Inbox and choose another."
+                : body?.error?.message ?? "Couldn't schedule it — try again",
+            );
+            setSaving(false);
+            return;
+          }
+        } else {
+          const delivery = await sendReplaySafeCreate({
+            path: "/api/v1/activities",
+            body: {
+              tz,
+              dtstartLocal,
+              rrule,
+              title: trimmed,
+              emoji,
+              categoryId,
+              durationMin,
+              energy,
+              priority,
+              notes: notes || undefined,
+              checklistTemplate: checklistTemplate.length
+                ? checklistTemplate
+                : undefined,
+              source: "manual",
+            },
+          });
+          if (delivery.state === "queued") {
+            toast("Saved on this device — it’ll appear when you’re back");
+            router.push(`/app/today?date=${date}`);
+            return;
+          }
+          if (delivery.state === "unavailable") {
+            setError(
+              "You’re offline and this device couldn’t save it. Keep this open and reconnect.",
+            );
+            setSaving(false);
+            return;
+          }
+          const res = delivery.response;
+          if (res.status === 401) {
+            setError("Sign in to save activities.");
+            setSaving(false);
+            return;
+          }
+          if (!res.ok) {
+            const body = await res.json().catch(() => null);
+            setError(body?.error?.message ?? "Couldn't create it — try again");
+            setSaving(false);
+            return;
+          }
         }
       } else {
         if (!props.activityId || revision == null) {
@@ -373,6 +422,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
     steps,
     props.mode,
     props.activityId,
+    props.sourceTaskId,
     emoji,
     categoryId,
     durationMin,
@@ -686,13 +736,39 @@ export function ActivityEditor(props: ActivityEditorProps) {
 
           <Field label="Steps">
             <div className="space-y-1.5">
-              {steps.map((s, i) => (
+              {steps.map((step, i) => (
                 <div
-                  key={`${s}-${i}`}
+                  key={`${step.label}-${i}`}
                   className="flex items-center gap-2 rounded-xl border border-border bg-surface px-2.5 py-2"
                 >
-                  <span className="grid size-5 place-items-center rounded-full border-2 border-border-strong" />
-                  <span className="flex-1 text-[14px] font-medium">{s}</span>
+                  <button
+                    type="button"
+                    aria-label={`${step.done ? "Mark incomplete" : "Mark complete"}: ${step.label}`}
+                    aria-pressed={step.done}
+                    onClick={() =>
+                      setSteps((previous) =>
+                        previous.map((candidate, index) =>
+                          index === i
+                            ? { ...candidate, done: !candidate.done }
+                            : candidate,
+                        ),
+                      )
+                    }
+                    className={`grid size-5 shrink-0 place-items-center rounded-full border-2 ${
+                      step.done
+                        ? "border-iris bg-iris text-ink-inverse"
+                        : "border-border-strong"
+                    }`}
+                  >
+                    {step.done && <Check size={12} strokeWidth={3} />}
+                  </button>
+                  <span
+                    className={`flex-1 text-[14px] font-medium ${
+                      step.done ? "text-ink-soft line-through" : ""
+                    }`}
+                  >
+                    {step.label}
+                  </span>
                   <button
                     type="button"
                     aria-label="Remove step"
@@ -710,7 +786,10 @@ export function ActivityEditor(props: ActivityEditorProps) {
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && stepDraft.trim()) {
                       e.preventDefault();
-                      setSteps((prev) => [...prev, stepDraft.trim()]);
+                      setSteps((prev) => [
+                        ...prev,
+                        { label: stepDraft.trim(), done: false },
+                      ]);
                       setStepDraft("");
                     }
                   }}
@@ -722,7 +801,10 @@ export function ActivityEditor(props: ActivityEditorProps) {
                   className="flex items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-[13px] font-semibold text-ink-soft hover:text-ink"
                   onClick={() => {
                     if (!stepDraft.trim()) return;
-                    setSteps((prev) => [...prev, stepDraft.trim()]);
+                    setSteps((prev) => [
+                      ...prev,
+                      { label: stepDraft.trim(), done: false },
+                    ]);
                     setStepDraft("");
                   }}
                 >
@@ -753,7 +835,12 @@ export function ActivityEditor(props: ActivityEditorProps) {
                       }
                       const next = (data?.steps as string[] | undefined) ?? [];
                       if (next.length) {
-                        setSteps((prev) => [...prev, ...next.filter(Boolean)]);
+                        setSteps((prev) => [
+                          ...prev,
+                          ...next
+                            .filter(Boolean)
+                            .map((label) => ({ label, done: false })),
+                        ]);
                       }
                     } catch {
                       setError("Couldn't reach the AI — add steps by hand for now.");

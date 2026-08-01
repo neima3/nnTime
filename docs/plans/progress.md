@@ -1,5 +1,45 @@
 # Progress log
 
+## 2026-08-01 — Round 53: atomic Inbox task conversion (Codex)
+
+- **Dogfood defect fixed at the identity boundary.** Authenticated synthetic
+  browser testing proved that Inbox **Schedule** created an activity but left
+  the source task active. Inbox now carries the task identity into the editor,
+  and the committed `POST /api/v1/tasks/{id}/schedule` contract has a real
+  handler and DAL operation instead of falling through to generic activity
+  creation.
+- **One owner-scoped, idempotent transaction.** Conversion conditionally claims
+  the active source task, creates the final series, tombstones the task with
+  `convertedTo`, transfers or removes checklist rows, appends sync changes and
+  a `reschedule` history event, and rolls every write back on failure. The
+  canonical recurrence, tag, and source-reference fields are preserved;
+  category/tag references must be active and owned; malformed UUID inputs are
+  rejected; original and replay responses are private/no-store.
+- **Editor semantics survive real timing and clearing paths.** Server prefill
+  preserves title, icon, category UUID, energy, priority, notes, and checklist
+  completion. An immediate save cannot lose the source category while the
+  client category list loads. Completed and duplicate-label steps keep their
+  state and order; explicit remove-all remains `[]`; energy and notes can be
+  cleared. Conversion stays intentionally online-only while ordinary activity
+  creation retains replay-safe offline behavior.
+- **Adversarial review and local proof.** Independent review initially found
+  canonical-field loss, checklist/nullable-field loss, nested-owner gaps,
+  missing edge validation, and an async category race; every Critical/Important
+  finding was fixed and the final verdict was **READY**. Lint, typecheck,
+  production build, `git diff --check`, **111 test files / 1,071 tests**, API/iOS
+  sync and adoption, iOS release preflight, **45** Swift package tests, and the
+  native main-thread gate passed. The app-hosted gate executed **378 tests** (1
+  skipped, 0 failures). The standalone production artifact passed **23/23**
+  Playwright scenarios, including conversion, clearing, remove-all, duplicate
+  prevention, and existing offline/concurrency coverage. Desktop and 390px
+  mobile captures preserved the Soft Focus hierarchy without overflow. Parity
+  remains **89.74% web / 86.93% iOS**.
+- **Release handoff.** Exact-SHA GitHub Actions, Coolify deployment, and
+  read-only live verification follow this implementation commit. Phase 7B
+  physical-device/provider lifecycle and Phase 8B Google consent/client
+  activation remain external evidence gates; no production planner data or
+  provider configuration was changed.
+
 ## 2026-08-01 — Round 52: accurate Postgres CI health probes (Codex)
 
 - **Readiness now targets the real job databases.** The two Postgres service

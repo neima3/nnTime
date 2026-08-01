@@ -46,7 +46,6 @@ const HANDLERS_WITHOUT_OPENAPI = [
  * Keep documented so the contract stays aspirational; remove when shipped.
  */
 const OPENAPI_WITHOUT_HANDLERS = [
-  "/api/v1/tasks/{id}/schedule", // deferred Phase N — schedule helper
   "/api/v1/checklist-items", // deferred Phase N — checklist CRUD surface
   "/api/v1/checklist-items/{id}", // deferred Phase N
   "/api/v1/activities/{seriesId}/occurrences/{occurrenceKey}", // deferred Phase N — key-addressed occurrence

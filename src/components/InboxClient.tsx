@@ -279,6 +279,7 @@ export function InboxClient({
   const scheduleToday = useCallback(
     (item: InboxItem) => {
       const params = new URLSearchParams({
+        taskId: item.id,
         title: item.title,
         date: clientToday(),
         start: String(10 * 60),

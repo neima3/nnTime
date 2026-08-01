@@ -3,6 +3,9 @@ import { SignedInOnly } from "@/components/AppSessionBoundary";
 import { ActivityEditor } from "@/components/ActivityEditor";
 import { SignedOutCard } from "@/components/EmptyState";
 import { CalendarPlus } from "lucide-react";
+import { getSession } from "@/server/auth-session";
+import { getTask, listCategories, listChecklistItems } from "@/server/dal";
+import { buildCategoryMap } from "@/lib/adapters";
 
 /**
  * Activity editor route — create (?start=&date=) or edit (?id=).
@@ -15,9 +18,27 @@ export default async function EditorPage({
 }) {
   const sp = await searchParams;
   const id = typeof sp.id === "string" ? sp.id : undefined;
+  const taskId = typeof sp.taskId === "string" ? sp.taskId : undefined;
   const start = typeof sp.start === "string" ? Number(sp.start) : undefined;
   const date = typeof sp.date === "string" ? sp.date : undefined;
   const title = typeof sp.title === "string" ? sp.title : undefined;
+  const session = taskId ? await getSession() : null;
+  const task =
+    session && taskId
+      ? await getTask(session.userId, taskId).catch(() => null)
+      : null;
+  const [categories, checklist] =
+    session && task
+      ? await Promise.all([
+          listCategories(session.userId).catch(() => []),
+          listChecklistItems(session.userId, "task", task.id).catch(() => []),
+        ])
+      : [[], []];
+  const categoryKey = task?.categoryId
+    ? buildCategoryMap(
+        categories as unknown as Parameters<typeof buildCategoryMap>[0],
+      ).get(task.categoryId)
+    : undefined;
 
   return (
     <AppShell active="today">
@@ -36,11 +57,22 @@ export default async function EditorPage({
         <ActivityEditor
           mode={id ? "edit" : "create"}
           activityId={id}
+          sourceTaskId={id ? undefined : taskId}
           initialStartMin={
             Number.isFinite(start) ? (start as number) : undefined
           }
           initialDate={date}
-          initialTitle={title}
+          initialTitle={task?.title ?? title}
+          initialEmoji={task?.emoji ?? undefined}
+          initialCategoryKey={categoryKey}
+          initialCategoryId={task?.categoryId ?? undefined}
+          initialEnergy={task?.energy ?? undefined}
+          initialPriority={task?.priority ?? undefined}
+          initialNotes={task?.notes ?? undefined}
+          initialSteps={checklist.map((item) => ({
+            label: item.label,
+            done: item.done,
+          }))}
         />
       </SignedInOnly>
     </AppShell>
