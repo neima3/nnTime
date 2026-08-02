@@ -23,8 +23,19 @@
   Critical or Important finding. Required lint, typecheck, 1,168 tests in 121
   files, and production build pass. The complete browser suite passed all 46
   executed checks with one development-only skip. Scripted parity remains
-  89.74% web / 86.93% iOS, and the iOS release contract passes. Exact-SHA CI,
-  deployment, and live production verification remain pending.
+  89.74% web / 86.93% iOS, and the iOS release contract passes.
+- **Exact release proof is green.** Feature commit
+  `0bdd70c516e80fc656ff2bd17783f08a9430c3bd` passed all three lanes in GitHub
+  Actions run `30765672188` (build/test, standalone E2E, and native shipping
+  contract). Coolify deployment `p13lsr9cqnzyljutuz112ajy` finished that exact
+  SHA. Live health reported migrations, database, AI, and scheduler `ok`, and
+  the signed-out Today response retained the expected production security
+  headers. The complete synthetic callback bridge → Better Auth verifier →
+  `INVALID_TOKEN` redirect produced the new recovery state at 1440×1000 and
+  390×844 with a clean `/app/today` sign-in continuation, no sample leak, no
+  overflow, and zero console errors or warnings. Arbitrary query copy stayed on
+  ordinary Today and was not reflected. Visually inspected ignored evidence is
+  under `browser-qa/round71-live/`.
 - **Standing boundaries remain intact.** Phase 7B physical-device provider
   lifecycle proof and Phase 8B Google activation remain external.
 

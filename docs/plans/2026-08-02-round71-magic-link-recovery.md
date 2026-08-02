@@ -28,4 +28,4 @@ recovery action. Ignored evidence lives under `browser-qa/round71-dogfood/`.
 - [x] Implement and visually verify the narrow signed-out boundary.
 - [x] Obtain independent Critical/Important review.
 - [x] Pass local browser, repository, parity, and iOS release gates.
-- [ ] Commit, push, pass exact-SHA CI, deploy exact SHA, and verify live.
+- [x] Commit, push, pass exact-SHA CI, deploy exact SHA, and verify live.
