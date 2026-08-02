@@ -20,7 +20,7 @@ today highlight, empty state, and complete month navigation.
 - [x] Run focused browser tests and core code gates.
 - [x] Verify production-mode desktop/mobile visuals and complete independent
   review.
-- [ ] Update roadmap/progress, run all required gates, commit, push, pass
+- [x] Update roadmap/progress, run all required gates, commit, push, pass
   exact-SHA CI, deploy, and verify the live route.
 
 ## Standing boundaries
