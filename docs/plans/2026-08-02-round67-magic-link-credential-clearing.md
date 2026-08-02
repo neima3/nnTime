@@ -28,4 +28,4 @@ Ignored reproduction evidence lives under `browser-qa/round67-dogfood/`.
 - [x] Implement the smallest client-state fix.
 - [x] Obtain independent Critical/Important review.
 - [x] Pass local browser, repository, parity, and iOS release gates.
-- [ ] Commit, push, pass exact-SHA CI, deploy exact SHA, and verify live.
+- [x] Commit, push, pass exact-SHA CI, deploy exact SHA, and verify live.
