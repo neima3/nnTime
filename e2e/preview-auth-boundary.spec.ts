@@ -410,6 +410,34 @@ test("signed-out PWA quick capture preserves its intent through authentication",
   }
 });
 
+test("an invalid password-reset token becomes an actionable recovery state", async ({
+  page,
+}) => {
+  await page.route("**/api/auth/reset-password", async (route) => {
+    await route.fulfill({
+      status: 400,
+      contentType: "application/json",
+      body: JSON.stringify({ message: "Invalid token", code: "INVALID_TOKEN" }),
+    });
+  });
+
+  await page.goto("/reset-password?token=expired-single-use-token");
+  const password = page.getByRole("textbox", { name: "New password" });
+  await password.fill("NotAReal1");
+  await page.getByRole("button", { name: "Update password" }).click();
+
+  const recoveryHeading = page.getByRole("heading", {
+    name: "This reset link isn’t available",
+  });
+  await expect(recoveryHeading).toBeVisible();
+  await expect(recoveryHeading).toBeFocused();
+  await expect(
+    page.getByRole("link", { name: "Request a new reset link" }),
+  ).toHaveAttribute("href", "/forgot-password");
+  await expect(password).toHaveCount(0);
+  await expect(page.getByText("Invalid token", { exact: true })).toHaveCount(0);
+});
+
 test("unsafe Focus durations normalize before authentication", async ({ page }) => {
   await page.goto("/app/focus?title=Safe&duration=Infinity");
   const href = await page

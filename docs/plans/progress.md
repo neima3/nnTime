@@ -1,5 +1,45 @@
 # Progress log
 
+## 2026-08-02 — Round 65: invalid password-reset recovery (Codex)
+
+- **Fresh production recovery dogfood found one dead end.** A deliberately
+  invalid non-empty reset token rendered the normal new-password form. After a
+  valid-length submission, the form exposed Better Auth's raw **Invalid token**
+  message, retained the attempted password, and offered no direct path to
+  request a replacement link. Missing-token handling, native empty/short input
+  validation, and browser console behavior were otherwise correct. The issue
+  reproduced twice; ignored report, screenshots, and video are under
+  `browser-qa/round65-dogfood/`.
+- **Invalid and consumed links now converge on the safe recovery state.** The
+  client checks Better Auth's stable `INVALID_TOKEN` code, clears the password,
+  and replaces the form with the same branded unavailable-link card already
+  used for missing and malformed links. That card explains the link may be
+  incomplete or expired and offers both **Request a new reset link** and **Back
+  to sign in**. Network and unexpected errors remain retryable on the form;
+  successful resets retain the existing sign-in redirect.
+- **Test-first proof is green.** A browser contract stubs the canonical 400
+  response and first failed because the recovery heading never appeared. It now
+  requires the shared recovery card, exact `/forgot-password` action, removal
+  of the password field, and absence of raw backend copy. Independent review
+  caught that replacing the focused form initially left keyboard and screen
+  reader focus on the document body. A second failing-then-green browser
+  assertion now requires the async recovery heading to receive focus, while the
+  initial server-rendered missing-token state does not steal focus. Focused
+  Playwright, lint, and typecheck pass. Re-review returned **READY** with no
+  remaining Critical or Important finding.
+- **Complete local release proof passed.** Lint, typecheck, production build,
+  `git diff --check`, **121 test files / 1,168 tests**, **40/40** Playwright
+  scenarios plus one expected development-only skip, parity (**89.74% web /
+  86.93% iOS**), and the iOS release contract passed. Desktop 1440×1000 and
+  mobile 390×844 checks confirmed the shared recovery hierarchy, focused
+  heading, replacement-link action, cleared credential, and no horizontal
+  overflow. The only development console entry was the deliberately stubbed
+  400 reset response; there were no page errors. Visually inspected ignored
+  evidence is under `browser-qa/round65-local/`.
+- **Standing boundaries remain intact.** Production checks used a deliberately
+  bogus token only; no real account password changed. Phase 7B physical-device
+  provider lifecycle proof and Phase 8B Google activation remain external.
+
 ## 2026-08-02 — Round 64: resumable PWA quick-capture intent (Codex)
 
 - **Fresh production installability dogfood found one broken high-intent

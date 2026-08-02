@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { resetPassword } from "@/lib/auth-client";
+import { ResetUnavailableCard } from "./ResetUnavailableCard";
 
 export function ResetPasswordForm({ token }: { token: string }) {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [linkUnavailable, setLinkUnavailable] = useState(false);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -22,6 +24,11 @@ export function ResetPasswordForm({ token }: { token: string }) {
         token,
       });
       if (res.error) {
+        if (res.error.code === "INVALID_TOKEN") {
+          setPassword("");
+          setLinkUnavailable(true);
+          return;
+        }
         setError(res.error.message ?? "Couldn't reset your password — try again.");
         setPending(false);
         return;
@@ -31,6 +38,10 @@ export function ResetPasswordForm({ token }: { token: string }) {
       setError("Couldn't reach the server — try again?");
       setPending(false);
     }
+  }
+
+  if (linkUnavailable) {
+    return <ResetUnavailableCard focusOnMount />;
   }
 
   return (

@@ -119,7 +119,9 @@ design work BEFORE the consuming subphase starts.
         eviction for previously installed clients (Round 62, 2026-08-02), and
         point-of-collection privacy-policy discoverability during account
         creation (Round 63, 2026-08-02), plus resumable authentication for the
-        installed app's quick-capture shortcut (Round 64, 2026-08-02)
+        installed app's quick-capture shortcut (Round 64, 2026-08-02), and
+        actionable invalid/consumed password-reset recovery (Round 65,
+        2026-08-02)
   - [x] 8D Privacy/review-prep contract + scripted parity gate
         (App Store upload, processing, and launch are tracked per release)
 
