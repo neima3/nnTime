@@ -17,6 +17,7 @@ describe("Review Today authentication boundary", () => {
     expect(source).toContain('authPageHref("sign-up", "/app/review")');
     expect(source).toContain("Review privately when you’re ready");
     expect(source).toContain("Sign in to review");
+    expect(source).toContain("focus-visible:ring-offset-surface");
     expect(source).not.toContain("disabled={busy || !authed}");
     expect(source).not.toContain('href="/sign-in"');
   });
@@ -29,5 +30,7 @@ describe("Review Today authentication boundary", () => {
     expect(source).toContain('void act("skip")');
     expect(source).toContain("sendRebasedStatusChange({");
     expect(source).toContain('method: "PATCH"');
+    expect(source).toContain('const accepted = await act("complete")');
+    expect(source).toContain("if (accepted) celebrate");
   });
 });
