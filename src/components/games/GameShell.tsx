@@ -5,6 +5,7 @@
  * chip, exit button, and a consistent end-state layout. Games stay ≤2 min
  * with a natural stop — the end state always offers "Back to my day".
  */
+import { useEffect, useId, useRef } from "react";
 import { X } from "lucide-react";
 
 export function GameShell({
@@ -22,14 +23,60 @@ export function GameShell({
   onExit: () => void;
   children: React.ReactNode;
 }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const exitRef = useRef<HTMLButtonElement>(null);
+  const titleId = useId();
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (!dialog.open) dialog.showModal();
+    exitRef.current?.focus();
+    return () => {
+      if (dialog.open) dialog.close();
+    };
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col bg-canvas">
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      onCancel={(event) => {
+        event.preventDefault();
+        onExit();
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== "Tab") return;
+        const focusable = Array.from(
+          event.currentTarget.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+          ),
+        ).filter((element) => element.getClientRects().length > 0);
+        if (focusable.length === 0) {
+          event.preventDefault();
+          event.currentTarget.focus();
+          return;
+        }
+        const first = focusable[0]!;
+        const last = focusable.at(-1)!;
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }}
+      className="m-0 h-dvh max-h-none w-screen max-w-none border-0 bg-canvas p-0 text-ink backdrop:bg-canvas/70 open:flex open:flex-col"
+    >
       <header className="mx-auto flex w-full max-w-2xl items-center gap-3 px-5 pt-5">
         <span className="grid size-11 place-items-center rounded-2xl bg-iris-ghost text-xl" aria-hidden>
           {emoji}
         </span>
         <div className="min-w-0 flex-1">
-          <h1 className="font-display text-lg font-bold leading-tight">{title}</h1>
+          <h1 id={titleId} className="font-display text-lg font-bold leading-tight">
+            {title}
+          </h1>
           <p className="truncate text-[12.5px] font-medium text-ink-soft">{howTo}</p>
         </div>
         {best && (
@@ -38,6 +85,7 @@ export function GameShell({
           </span>
         )}
         <button
+          ref={exitRef}
           type="button"
           aria-label="Exit game"
           onClick={onExit}
@@ -49,7 +97,7 @@ export function GameShell({
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-5 pb-10">
         {children}
       </div>
-    </div>
+    </dialog>
   );
 }
 

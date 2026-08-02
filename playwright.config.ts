@@ -35,12 +35,16 @@ export default defineConfig({
     },
     {
       name: "anonymous",
-      testMatch: /preview-auth-boundary\.spec\.ts/,
+      testMatch: /(preview-auth-boundary|game-dialog)\.spec\.ts/,
       use: { ...devices["Desktop Chrome"] },
     },
     {
       name: "chromium",
-      testIgnore: [/setup\.auth\.ts/, /preview-auth-boundary\.spec\.ts/],
+      testIgnore: [
+        /setup\.auth\.ts/,
+        /preview-auth-boundary\.spec\.ts/,
+        /game-dialog\.spec\.ts/,
+      ],
       dependencies: ["setup"],
       use: {
         ...devices["Desktop Chrome"],

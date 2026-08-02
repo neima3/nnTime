@@ -5,7 +5,7 @@
  * bests only, all client-side. Framed honestly: play that rests the brain —
  * not "training".
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { readBest, type GameId } from "@/lib/games";
 
@@ -195,6 +195,10 @@ const ALL_GAMES = SECTIONS.flatMap((s) => s.games);
 export function PlayClient() {
   const [active, setActive] = useState<GameId | null>(null);
   const [bests, setBests] = useState<Record<string, number | null>>({});
+  const openerId = useRef<GameId | null>(null);
+  const gameButtons = useRef<
+    Partial<Record<GameId, HTMLButtonElement | null>>
+  >({});
 
   const refreshBests = () => {
     const next: Record<string, number | null> = {};
@@ -207,6 +211,21 @@ export function PlayClient() {
     refreshBests();
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
+
+  useEffect(() => {
+    if (active !== null || openerId.current === null) return;
+    const id = openerId.current;
+    const frame = requestAnimationFrame(() => {
+      gameButtons.current[id]?.focus();
+      openerId.current = null;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [active]);
+
+  const openGame = (id: GameId) => {
+    openerId.current = id;
+    setActive(id);
+  };
 
   const exit = () => {
     setActive(null);
@@ -245,8 +264,11 @@ export function PlayClient() {
               return (
                 <button
                   key={g.id}
+                  ref={(button) => {
+                    gameButtons.current[g.id] = button;
+                  }}
                   type="button"
-                  onClick={() => setActive(g.id)}
+                  onClick={() => openGame(g.id)}
                   className="rise-in group rounded-3xl border border-border bg-surface p-5 text-left shadow-card transition-all hover:-translate-y-0.5 hover:shadow-float active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
                 >
                   <div className="flex items-start justify-between">
