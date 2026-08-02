@@ -49,6 +49,7 @@ export default async function EditorPage({
               icon={CalendarPlus}
               title="Plan after you sign in"
               body="Create activities, choose gentle reminders, and keep your plan synced across devices."
+              returnTo="/app/editor"
               headingLevel="h1"
             />
           </div>

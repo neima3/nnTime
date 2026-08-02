@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LogIn, type LucideIcon } from "lucide-react";
+import { authPageHref } from "@/lib/auth-return";
 
 /**
  * Shared signed-out + loading presentation for client screens.
@@ -10,11 +11,13 @@ export function SignedOutCard({
   icon: Icon,
   title,
   body,
+  returnTo,
   headingLevel = "h2",
 }: {
   icon: LucideIcon;
   title: string;
   body: string;
+  returnTo: string;
   headingLevel?: "h1" | "h2";
 }) {
   const Heading = headingLevel;
@@ -27,7 +30,7 @@ export function SignedOutCard({
       <Heading className="mt-4 font-display text-xl font-bold tracking-tight">{title}</Heading>
       <p className="mx-auto mt-1.5 max-w-xs text-[14px] leading-relaxed text-ink-soft">{body}</p>
       <Link
-        href="/sign-in"
+        href={authPageHref("sign-in", returnTo)}
         className="mt-6 inline-flex items-center gap-2 rounded-xl bg-iris px-5 py-2.5 text-[14px] font-semibold text-ink-inverse shadow-card transition-transform hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
       >
         <LogIn size={16} />
@@ -35,7 +38,10 @@ export function SignedOutCard({
       </Link>
       <p className="mt-3 text-[12px] text-ink-faint">
         New here?{" "}
-        <Link href="/sign-up" className="font-semibold text-iris hover:underline">
+        <Link
+          href={authPageHref("sign-up", returnTo)}
+          className="font-semibold text-iris hover:underline"
+        >
           Create an account
         </Link>
       </p>

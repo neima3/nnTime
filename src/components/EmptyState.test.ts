@@ -8,6 +8,7 @@ const copy = {
   icon: Clock,
   title: "Continue after you sign in",
   body: "Your planner stays synced across devices.",
+  returnTo: "/app/today",
 };
 
 describe("SignedOutCard heading contract", () => {

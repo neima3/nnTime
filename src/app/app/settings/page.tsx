@@ -32,6 +32,7 @@ export default async function SettingsPage({
               icon={Palette}
               title="Make Kairo yours"
               body="Theme, quiet notifications, reduced stimulation, calendars — sign in to personalize and sync across your devices."
+              returnTo="/app/settings"
             />
           }
         >

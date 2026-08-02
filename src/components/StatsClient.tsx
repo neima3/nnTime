@@ -126,6 +126,7 @@ export function StatsClient() {
         icon={BarChart3}
         title="See your gentle numbers"
         body="Completions, focus time, soft streaks, and mood — described, never judged. Sign in to start collecting yours."
+        returnTo="/app/stats"
       />
     );
   }

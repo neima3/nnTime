@@ -89,6 +89,7 @@ export default async function RoutinesPage() {
               icon={Repeat2}
               title="Build routines after you sign in"
               body="Turn the preview into your own gentle sequences, play each step, and keep them synced across devices."
+              returnTo="/app/routines"
             />
           </div>
         )}
