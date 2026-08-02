@@ -132,7 +132,9 @@ design work BEFORE the consuming subphase starts.
         callback guidance (Round 72, 2026-08-02), plus fail-closed recovery for
         all stable magic-link verifier errors (Round 73, 2026-08-02), plus safe
         destination continuity through the complete password-reset lifecycle
-        (Round 74, 2026-08-02)
+        (Round 74, 2026-08-02), plus a public-assets-only service-worker cache
+        boundary that evicts prior shared route/auth caches (Round 75,
+        2026-08-02)
   - [x] 8D Privacy/review-prep contract + scripted parity gate
         (App Store upload, processing, and launch are tracked per release)
 

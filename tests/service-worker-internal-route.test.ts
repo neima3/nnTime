@@ -17,7 +17,13 @@ function loadWorker() {
   };
   const caches = {
     delete: vi.fn().mockResolvedValue(true),
-    keys: vi.fn().mockResolvedValue(["kairo-v4-push", "kairo-v5-boundaries"]),
+    keys: vi
+      .fn()
+      .mockResolvedValue([
+        "kairo-v4-push",
+        "kairo-v5-boundaries",
+        "kairo-v6-private-shell",
+      ]),
     match: vi.fn().mockResolvedValue(new Response("offline shell")),
     open: vi.fn().mockResolvedValue(currentCache),
   };
@@ -43,7 +49,7 @@ function loadWorker() {
 }
 
 describe("service worker internal route boundary", () => {
-  it("purges the old navigation cache and the internal route on activation", async () => {
+  it("purges every old shared navigation cache on activation", async () => {
     const { caches, currentCache, listeners } = loadWorker();
     let activation: Promise<unknown> | undefined;
 
@@ -55,11 +61,13 @@ describe("service worker internal route boundary", () => {
     await activation;
 
     expect(caches.delete).toHaveBeenCalledWith("kairo-v4-push");
-    expect(currentCache.delete).toHaveBeenCalledWith("/app/timeline-states");
+    expect(caches.delete).toHaveBeenCalledWith("kairo-v5-boundaries");
+    expect(caches.delete).not.toHaveBeenCalledWith("kairo-v6-private-shell");
+    expect(currentCache.delete).not.toHaveBeenCalled();
   });
 
   it("never stores the internal route as an offline navigation", async () => {
-    const { currentCache, listeners } = loadWorker();
+    const { currentCache, fetch, listeners } = loadWorker();
     let response: Promise<Response> | undefined;
 
     listeners.get("fetch")?.({
@@ -74,6 +82,12 @@ describe("service worker internal route boundary", () => {
     await response;
     await Promise.resolve();
 
+    expect(fetch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "https://time.neima.me/app/timeline-states",
+      }),
+      { cache: "no-store" },
+    );
     expect(currentCache.put).not.toHaveBeenCalled();
   });
 });

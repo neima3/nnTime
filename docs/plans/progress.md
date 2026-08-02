@@ -1,5 +1,40 @@
 # Progress log
 
+## 2026-08-02 — Round 75: service-worker cache privacy (Codex)
+
+- **Production dogfood found private no-store responses persisted by the
+  service worker.** A signed-out visit using a synthetic reset token left the
+  full token-bearing URL and token-containing HTML in the shared
+  `kairo-v5-boundaries` Cache Storage cache even though the response declared
+  `private, no-store`. The same install cache preloaded `/app/today`, and the
+  catch-all asset branch also claimed Next route payloads. The read-only probe
+  made no auth request and changed no account or planner data; ignored evidence
+  is under `browser-qa/round75-dogfood/`.
+- **Cache Storage is now public-only.** `kairo-v6-private-shell` installs only
+  the static landing page, manifest, and icon, and dynamically caches only
+  same-origin GETs under `/_next/static/`. Navigation is network-first with
+  browser caching disabled and the public landing page as its sole offline
+  fallback. APIs remain network-only; auth/reset/callback HTML, `/app/*`
+  routes, RSC payloads, and cross-origin resources bypass Cache Storage. On
+  activation, every prior cache version is deleted wholesale, removing
+  already-persisted route HTML and synthetic reset tokens.
+- **Executable, browser, and independent-review proof is green.** VM-backed
+  tests execute the shipping `public/sw.js` and pin install/activation,
+  navigation/RSC, static/cross-origin, and API behavior. Independent review
+  found one Important stale regression assertion; the legacy internal-route
+  test now checks whole-cache eviction and `cache: "no-store"`, and re-review
+  returned **READY** with no remaining Critical or Important finding. The
+  combined worker suites pass 6/6. In an optimized standalone browser, the new
+  worker retained exactly one cache containing three public shell entries and
+  23 hashed static assets after reset and app navigation; zero reset,
+  `/app/*`, RSC, or API URLs and zero synthetic-token bodies were present.
+  Required lint and typecheck pass; all 1,183 tests in 123 files and the
+  production build pass; the complete browser suite passes 48 executed checks
+  with one development-only skip. Scripted parity remains 89.74% web / 86.93%
+  iOS, and the iOS release contract passes.
+- **Standing boundaries remain intact.** Phase 7B physical-device provider
+  lifecycle proof and Phase 8B Google activation remain external.
+
 ## 2026-08-02 — Round 74: password-reset intent continuity (Codex)
 
 - **Fresh production dogfood found destination loss in password recovery.**

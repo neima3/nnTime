@@ -2,18 +2,24 @@
  * Kairo service worker — Phase 6B (PWA).
  *
  * Responsibilities:
- *  - Cache the app shell for offline use (ADR-002 offline protocol: user-scoped
- *    caches, purge on logout/account switch).
+ *  - Cache only the public shell; account data stays in ADR-002's user-scoped
+ *    IndexedDB stores and is purged on logout/account switch.
  *  - Never cache auth responses.
- *  - Network-first for navigation, stale-while-revalidate for static assets.
+ *  - Network-first for navigation, cache-first for explicit public assets.
  *  - Web Push handlers (Phase 3B notification delivery).
- *
- * This is a minimal SW; the full ADR-002 offline mutation queue lands with 6B's
- * complete enablement.
  */
-const CACHE_VERSION = "kairo-v5-boundaries";
-const APP_SHELL = ["/", "/app/today", "/manifest.json", "/icon-192.png"];
-const INTERNAL_REFERENCE_PATH = "/app/timeline-states";
+const CACHE_VERSION = "kairo-v6-private-shell";
+const APP_SHELL = ["/", "/manifest.json", "/icon-192.png"];
+const PUBLIC_ASSET_PATHS = new Set(["/manifest.json", "/icon-192.png"]);
+
+function isCacheablePublicAsset(request, url) {
+  return (
+    request.method === "GET" &&
+    url.origin === self.location.origin &&
+    (url.pathname.startsWith("/_next/static/") ||
+      PUBLIC_ASSET_PATHS.has(url.pathname))
+  );
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -24,57 +30,48 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then(async (keys) => {
-      await Promise.all(
+    caches.keys().then((keys) =>
+      Promise.all(
         keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k)),
-      );
-      const cache = await caches.open(CACHE_VERSION);
-      await cache.delete(INTERNAL_REFERENCE_PATH);
-    }),
+      ),
+    ),
   );
   self.clients.claim();
 });
 
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
-  // Internal design references must never survive as offline product pages.
-  if (url.pathname === INTERNAL_REFERENCE_PATH) {
-    event.respondWith(
-      fetch(event.request, { cache: "no-store" }).catch(() => caches.match("/")),
-    );
-    return;
-  }
-
   // API/auth data: always network-first, never served from the SW cache.
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(fetch(event.request, { cache: "no-store" }));
     return;
   }
 
-  // Network-first for navigation requests (fresh HTML).
+  // Navigation can contain account data or reset tokens. Honor server no-store
+  // headers and use only the public landing page as an offline fallback.
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_VERSION).then((cache) => cache.put(event.request, clone));
-          return response;
-        })
-        .catch(() => caches.match(event.request).then((r) => r || caches.match("/"))),
+      fetch(event.request, { cache: "no-store" }).catch(() =>
+        caches.match("/", { cacheName: CACHE_VERSION }),
+      ),
     );
     return;
   }
 
-  // Stale-while-revalidate for static assets.
+  // Route payloads, auth resources, and cross-origin requests bypass Cache
+  // Storage. Only same-origin public assets with immutable build URLs are kept.
+  if (!isCacheablePublicAsset(event.request, url)) return;
+
   event.respondWith(
     caches.match(event.request).then((cached) => {
-      const fetchPromise = fetch(event.request).then((response) => {
+      if (cached) return cached;
+      return fetch(event.request).then(async (response) => {
         if (response.ok) {
-          caches.open(CACHE_VERSION).then((cache) => cache.put(event.request, response.clone()));
+          const cache = await caches.open(CACHE_VERSION);
+          await cache.put(event.request, response.clone());
         }
         return response;
       });
-      return cached || fetchPromise;
     }),
   );
 });
