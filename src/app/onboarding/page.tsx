@@ -9,7 +9,7 @@
  *   3. Superpowers — the three things to remember, then into Today
  * Signed-out users are sent to sign-up first (their day needs an account).
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Loader2 } from "lucide-react";
@@ -67,6 +67,7 @@ export default function OnboardingPage() {
   const [createdCount, setCreatedCount] = useState<number | null>(null);
   const [zone, setZone] = useState("UTC");
   const [restored, setRestored] = useState(false);
+  const finished = useRef(false);
   const authed = isPending ? null : Boolean(data?.user);
 
   // Resume where they left off — onboarding survives a refresh or a wandered-off
@@ -83,7 +84,13 @@ export default function OnboardingPage() {
         /* eslint-disable react-hooks/set-state-in-effect */
         if (saved.step && saved.step >= 1 && saved.step <= 2) setStep(saved.step);
         if (typeof saved.name === "string") setName(saved.name);
-        if (Array.isArray(saved.picked)) setPicked(new Set(saved.picked));
+        if (Array.isArray(saved.picked)) {
+          const safePicked = saved.picked.filter(
+            (value): value is number =>
+              Number.isInteger(value) && value >= 0 && value < ANCHORS.length,
+          );
+          setPicked(new Set(safePicked));
+        }
         /* eslint-enable react-hooks/set-state-in-effect */
       }
     } catch {
@@ -95,7 +102,7 @@ export default function OnboardingPage() {
 
   // Persist progress on every change (cleared once anchors are created).
   useEffect(() => {
-    if (!restored) return;
+    if (!restored || finished.current || step === 3) return;
     try {
       localStorage.setItem(
         "kairo:onboarding",
@@ -130,6 +137,14 @@ export default function OnboardingPage() {
     });
   };
 
+  const clearDraftAndFinish = () => {
+    finished.current = true;
+    try {
+      localStorage.removeItem("kairo:onboarding");
+    } catch {}
+    setStep(3);
+  };
+
   const createAnchors = async () => {
     setBusy(true);
     const today = clientToday(zone);
@@ -156,10 +171,7 @@ export default function OnboardingPage() {
     setCreatedCount(created);
     setBusy(false);
     // Reached the finish — onboarding is done, forget the saved progress.
-    try {
-      localStorage.removeItem("kairo:onboarding");
-    } catch {}
-    setStep(3);
+    clearDraftAndFinish();
   };
 
   return (
@@ -286,12 +298,7 @@ export default function OnboardingPage() {
               )}
               <button
                 type="button"
-                onClick={() => {
-                  try {
-                    localStorage.removeItem("kairo:onboarding");
-                  } catch {}
-                  setStep(3);
-                }}
+                onClick={clearDraftAndFinish}
                 className="mt-2 w-full rounded-2xl py-2.5 text-[13px] font-semibold text-ink-faint hover:bg-surface-sunken"
               >
                 Skip — I&apos;ll build my own

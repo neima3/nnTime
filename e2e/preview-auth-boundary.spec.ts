@@ -275,6 +275,17 @@ test("signed-out Today advertises only the preview interactions it supports", as
   expect(protectedRequests).toEqual([]);
 });
 
+test("unsafe Focus durations normalize before authentication", async ({ page }) => {
+  await page.goto("/app/focus?title=Safe&duration=Infinity");
+  const href = await page
+    .getByRole("main")
+    .getByRole("link", { name: "Sign in" })
+    .getAttribute("href");
+  expect(new URL(href!, "https://kairo.test").searchParams.get("next")).toBe(
+    "/app/focus?title=Safe&emoji=%F0%9F%8E%AF&duration=25",
+  );
+});
+
 test("onboarding choices survive account creation", async ({ page }) => {
   await gotoHydrated(page, "/onboarding");
   await page.getByPlaceholder("Just a first name is plenty").fill("Intent QA");
@@ -297,6 +308,47 @@ test("onboarding choices survive account creation", async ({ page }) => {
     "aria-pressed",
     "false",
   );
+  await page.getByRole("button", { name: "Skip — I'll build my own" }).click();
+  await expect(page.getByRole("heading", { name: "You're in." })).toBeVisible();
+  expect(
+    await page.evaluate(() => localStorage.getItem("kairo:onboarding")),
+  ).toBeNull();
+});
+
+test("onboarding discards corrupt saved anchor indices", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "kairo:onboarding",
+      JSON.stringify({ step: 2, name: "Safe", picked: [0, 0, -1, 1.5, 999, "2"] }),
+    );
+  });
+  await gotoHydrated(page, "/onboarding");
+
+  await expect(page.getByRole("heading", { name: "Safe, pick your anchors." })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Morning reset/ })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  for (const name of [
+    /Meds \+ breakfast/,
+    /Deep work block/,
+    /Real lunch, no desk/,
+    /Move a little/,
+    /Wind-down/,
+  ]) {
+    await expect(page.getByRole("button", { name })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  }
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const raw = localStorage.getItem("kairo:onboarding");
+        return raw ? JSON.parse(raw).picked : null;
+      }),
+    )
+    .toEqual([0]);
 });
 
 test("signed-out template actions preserve the selected template", async ({ page }) => {

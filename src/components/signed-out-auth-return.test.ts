@@ -32,4 +32,12 @@ describe("signed-out auth return boundaries", () => {
     expect(source).toContain(`appReturnTo("${returnTo}", {`);
     expect(source).toContain("returnTo={returnTo}");
   });
+
+  it("keeps the lazy game-loading gap modal and cancellable", () => {
+    const source = read("src/components/PlayClient.tsx");
+    expect(source).toContain("GameLoadingExitContext");
+    expect(source).toContain("dialog.showModal()");
+    expect(source).toContain('aria-label="Cancel opening game"');
+    expect(source).toContain("onCancel=");
+  });
 });

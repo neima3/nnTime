@@ -5,17 +5,66 @@
  * bests only, all client-side. Framed honestly: play that rests the brain —
  * not "training".
  */
-import { useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import dynamic from "next/dynamic";
 import { readBest, type GameId } from "@/lib/games";
 
 /* Games load on tap, not with the arcade — the grid stays feather-light
    and each game's chunk (plus the quiz banks) arrives only when chosen. */
+const GameLoadingExitContext = createContext<(() => void) | null>(null);
+
 function GameLoading() {
+  const onExit = useContext(GameLoadingExitContext);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog || !onExit) return;
+    if (!dialog.open) dialog.showModal();
+    cancelRef.current?.focus();
+    return () => {
+      if (dialog.open) dialog.close();
+    };
+  }, [onExit]);
+
+  if (!onExit) return null;
   return (
-    <div className="fixed inset-0 z-[70] grid place-items-center bg-canvas">
-      <p className="text-[14px] font-semibold text-ink-soft">opening…</p>
-    </div>
+    <dialog
+      ref={dialogRef}
+      aria-label="Opening game"
+      onCancel={(event) => {
+        event.preventDefault();
+        onExit();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Tab") {
+          event.preventDefault();
+          cancelRef.current?.focus();
+        }
+      }}
+      className="m-0 h-dvh max-h-none w-screen max-w-none border-0 bg-canvas p-0 text-ink backdrop:bg-canvas/70 open:grid open:place-items-center"
+    >
+      <div className="flex flex-col items-center gap-4 text-center">
+        <p className="text-[14px] font-semibold text-ink-soft">opening…</p>
+        <button
+          ref={cancelRef}
+          type="button"
+          aria-label="Cancel opening game"
+          onClick={onExit}
+          className="rounded-xl border border-border bg-surface px-4 py-2 text-[13px] font-semibold text-ink-soft shadow-card focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+        >
+          Back to games
+        </button>
+      </div>
+    </dialog>
   );
 }
 const TimeFeel = dynamic(() => import("./games/TimeFeel").then((m) => m.TimeFeel), { loading: GameLoading });
@@ -232,21 +281,30 @@ export function PlayClient() {
     refreshBests();
   };
 
-  if (active === "time-feel") return <TimeFeel onExit={exit} />;
-  if (active === "quick-tap") return <QuickTap onExit={exit} />;
-  if (active === "emoji-match") return <EmojiMatch onExit={exit} />;
-  if (active === "steady-breath") return <SteadyBreath onExit={exit} />;
-  if (active === "number-hunt") return <FocusFinder onExit={exit} />;
-  if (active === "memory-trail") return <MemoryTrail onExit={exit} />;
-  if (active === "color-clash") return <ColorClash onExit={exit} />;
-  if (active === "odd-one-out") return <OddOneOut onExit={exit} />;
-  if (active === "digit-span") return <DigitSpan onExit={exit} />;
-  if (active === "green-light") return <GreenLight onExit={exit} />;
-  if (active === "night-sky") return <NightSky onExit={exit} />;
-  if (active === "letter-soup") return <LetterSoup onExit={exit} />;
-  if (active === "pattern-tiles") return <PatternTiles onExit={exit} />;
-  if (active === "grammar-snap") return <GrammarSnap onExit={exit} />;
-  if (active === "spell-check") return <SpellCheckGame onExit={exit} />;
+  let activeGame: ReactNode = null;
+  if (active === "time-feel") activeGame = <TimeFeel onExit={exit} />;
+  else if (active === "quick-tap") activeGame = <QuickTap onExit={exit} />;
+  else if (active === "emoji-match") activeGame = <EmojiMatch onExit={exit} />;
+  else if (active === "steady-breath") activeGame = <SteadyBreath onExit={exit} />;
+  else if (active === "number-hunt") activeGame = <FocusFinder onExit={exit} />;
+  else if (active === "memory-trail") activeGame = <MemoryTrail onExit={exit} />;
+  else if (active === "color-clash") activeGame = <ColorClash onExit={exit} />;
+  else if (active === "odd-one-out") activeGame = <OddOneOut onExit={exit} />;
+  else if (active === "digit-span") activeGame = <DigitSpan onExit={exit} />;
+  else if (active === "green-light") activeGame = <GreenLight onExit={exit} />;
+  else if (active === "night-sky") activeGame = <NightSky onExit={exit} />;
+  else if (active === "letter-soup") activeGame = <LetterSoup onExit={exit} />;
+  else if (active === "pattern-tiles") activeGame = <PatternTiles onExit={exit} />;
+  else if (active === "grammar-snap") activeGame = <GrammarSnap onExit={exit} />;
+  else if (active === "spell-check") activeGame = <SpellCheckGame onExit={exit} />;
+
+  if (activeGame) {
+    return (
+      <GameLoadingExitContext.Provider value={exit}>
+        {activeGame}
+      </GameLoadingExitContext.Provider>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-9">

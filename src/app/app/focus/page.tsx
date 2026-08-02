@@ -3,6 +3,7 @@ import { SignedInOnly } from "@/components/AppSessionBoundary";
 import { SignedOutCard } from "@/components/EmptyState";
 import { FocusClient } from "@/components/FocusClient";
 import { appReturnTo } from "@/lib/auth-return";
+import { normalizeFocusDuration } from "@/lib/focus-duration";
 import { Timer } from "lucide-react";
 
 export default async function FocusPage({
@@ -14,10 +15,7 @@ export default async function FocusPage({
   const title =
     typeof sp.title === "string" ? sp.title : "Deep focus";
   const emoji = typeof sp.emoji === "string" ? sp.emoji : "🎯";
-  const duration =
-    typeof sp.duration === "string" && Number(sp.duration) > 0
-      ? Number(sp.duration)
-      : 25;
+  const duration = normalizeFocusDuration(sp.duration);
   const activityId =
     typeof sp.activityId === "string" ? sp.activityId : undefined;
   const occurrenceKey =
