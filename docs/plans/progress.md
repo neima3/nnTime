@@ -49,11 +49,20 @@
   remediation passes it independently reran 35 focused tests, confirmed the
   web/iOS OpenAPI copies match, and reported no remaining critical or important
   findings.
-- **Release boundary.** Exact implementation SHA, hosted CI, Coolify deployment,
-  and read-only live verification are recorded only after those operations
-  finish. Phase 7B physical-device/provider lifecycle and Phase 8B Google
-  consent/client activation remain external evidence gates; this round does
-  not configure providers or mutate production planner data.
+- **Exact release proof.** Implementation SHA
+  `acc55f14d5dc782ddbcd268ddea3520d47321f81` was fast-forwarded to `main`,
+  pushed, and deployed by Coolify deployment `avy4u1n6172143tg0ikv36ox`, which
+  finished at that exact SHA. GitHub Actions run `30725561374` passed hosted
+  build/test, standalone Playwright, and native-contract jobs. Read-only live
+  verification returned HTTP 200 from `/api/health` with migration, database,
+  AI, and scheduler checks all `ok`; `/app/editor` returned the correct
+  signed-out boundary; production security headers were present; and shipped
+  chunk `/_next/static/chunks/1lyv69d-pzicd.js` contained the round-specific
+  `editScope=all` marker. The live screenshot is git-ignored at
+  `browser-qa/round55-live-editor.png`. Phase 7B physical-device/provider
+  lifecycle and Phase 8B Google consent/client activation remain external
+  evidence gates; this round did not configure providers or mutate production
+  planner data.
 
 ## 2026-08-01 — Round 54: canonical activity creation hardening (Codex)
 

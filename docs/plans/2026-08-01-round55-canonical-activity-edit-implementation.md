@@ -236,22 +236,22 @@ git commit -m "fix: harden canonical activity edits"
 
 ### Task 5: Integrate, release, and verify production
 
-- [ ] **Step 1: Integrate the reviewed commit into `main`**
+- [x] **Step 1: Integrate the reviewed commit into `main`**
 
 Use the repository's existing fast-forward or cherry-pick release flow without overwriting unrelated changes. Re-run the focused tests after integration.
 
-- [ ] **Step 2: Push `main` and wait for exact-SHA CI**
+- [x] **Step 2: Push `main` and wait for exact-SHA CI**
 
 Push to `origin/main`, follow the CI run for the pushed SHA, and require every job to pass.
 
-- [ ] **Step 3: Deploy the exact SHA through Coolify**
+- [x] **Step 3: Deploy the exact SHA through Coolify**
 
 Follow `docs/DEPLOYMENT.md`. Record the Coolify deployment UUID and require the deployment to finish at the same SHA.
 
-- [ ] **Step 4: Verify live health and shipped code**
+- [x] **Step 4: Verify live health and shipped code**
 
 Check `https://time.neima.me/api/health`, signed-out landing/editor status, security headers, and a shipped-JavaScript marker unique to this tranche. Do not mutate Neima's production planner.
 
-- [ ] **Step 5: Commit and push final release evidence**
+- [x] **Step 5: Commit and push final release evidence**
 
 Update `docs/plans/progress.md` with exact CI/deploy/live proof, run documentation checks, commit the evidence, push it, and verify the evidence SHA's CI/deployment if the app bundle changed.
