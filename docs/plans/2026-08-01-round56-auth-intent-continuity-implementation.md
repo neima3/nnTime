@@ -16,7 +16,7 @@
 - Create: `src/lib/auth-return.ts`
 - Create: `src/lib/auth-return.test.ts`
 
-- [ ] **Step 1: Write the failing return-path tests**
+- [x] **Step 1: Write the failing return-path tests**
 
 Create table-driven tests that require `/app`, `/app/inbox`, and
 `/app/today?date=2026-08-01#now` to survive unchanged, while `undefined`, arrays,
@@ -57,13 +57,13 @@ describe("safeAuthReturnTo", () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run: `pnpm vitest run src/lib/auth-return.test.ts`
 
 Expected: FAIL because `./auth-return` does not exist.
 
-- [ ] **Step 3: Implement the pure helper**
+- [x] **Step 3: Implement the pure helper**
 
 Implement a synthetic-base URL parser that accepts only a single string,
 rejects values that do not start with exactly one forward slash or contain a
@@ -108,13 +108,13 @@ export function authPageHref(
 }
 ```
 
-- [ ] **Step 4: Run the focused test and verify GREEN**
+- [x] **Step 4: Run the focused test and verify GREEN**
 
 Run: `pnpm vitest run src/lib/auth-return.test.ts`
 
 Expected: PASS with all accepted/rejected cases pinned.
 
-- [ ] **Step 5: Commit the contract**
+- [x] **Step 5: Commit the contract**
 
 ```bash
 git add src/lib/auth-return.ts src/lib/auth-return.test.ts
