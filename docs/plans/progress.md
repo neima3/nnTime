@@ -26,8 +26,20 @@
   `git diff --check`, **121 test files / 1,168 tests**, **43/43** executed
   Playwright scenarios plus one expected development-only skip, parity
   (**89.74% web / 86.93% iOS**), and the iOS release contract passed.
-- **Exact release proof:** pending exact-SHA CI, deployment, and live production
-  verification.
+- **Exact release proof passed.** Commit
+  `8e4abb2e5f4a767b31ba6b62c66d4670032bf124` passed GitHub Actions run
+  `30762020487`: build/test, all **43/43** executed production browser scenarios,
+  generated-client/release contracts, shipping simulator tests, and the unsigned
+  shipping application build. Coolify deployment
+  `wduma2v899ictws3tuvizwgy` finished on that exact SHA. Live health reported
+  migrations, database, AI, and scheduler healthy; `/onboarding` retained CSP,
+  HSTS, frame denial, and content-type protections.
+- **Live desktop/mobile focus proof passed.** At 1440×1000, activating **Next**
+  focused the committed **Pick your anchors.** heading. At 390×844, activating
+  **Skip — I'll build my own** focused the committed **You're in.** heading.
+  Both settled layouts had no horizontal overflow and production emitted no
+  console or page errors. Visually inspected ignored screenshots and browser
+  output are under `browser-qa/round68-live/`.
 - **Standing boundaries remain intact.** Production checks changed only
   browser-local onboarding draft state; no account or planner data was created.
   Phase 7B physical-device provider lifecycle proof and Phase 8B Google
