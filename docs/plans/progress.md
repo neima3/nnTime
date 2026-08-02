@@ -1,5 +1,39 @@
 # Progress log
 
+## 2026-08-01 — Round 56: truthful Inbox auth continuity (Codex)
+
+- **Signed-out Inbox controls now tell the truth.** The preview retains its six
+  read-only sample rows and `Pick for me`, but no longer presents a writable
+  capture field or disabled AI action that cannot succeed. A calm, token-only
+  boundary now offers `Sign in to capture`, `Create an account`, and
+  `Sign in for AI grouping`; signed-out interaction issues no protected planner
+  request and does not persist or place a draft in the URL.
+- **Authentication returns to the initiating product surface.** Sign-in and
+  sign-up canonicalize `next` once and preserve the safe destination through
+  email/password, magic-link, Google success/error, and auth-mode switching.
+  Settings account linking retains its existing fixed callbacks.
+- **Return paths fail closed across parser layers.** The shared validator only
+  accepts `/app` routes, rejects external/protocol-relative values, literal or
+  recursively encoded path delimiters, traversal, control characters, and
+  malformed percent escapes, while preserving valid encoded query and fragment
+  data. Twenty-four table-driven tests pin the boundary.
+- **Test-first and independent review proof.** Red tests first reproduced the
+  dead-end Inbox controls and missing auth destination. An independent review
+  then found encoded parser-differential inputs and an over-broad first fix;
+  both were corrected, adversarially retested, and re-reviewed **READY** with no
+  remaining Critical, Important, or Minor finding.
+- **Complete local release gates passed.** Lint, typecheck, production build,
+  `git diff --check`, **116 test files / 1,134 tests**, **25/25** standalone
+  Playwright scenarios, parity (**89.74% web / 86.93% iOS**), iOS release
+  preflight, and the native main-thread gate all passed. The app-hosted gate
+  executed **378 tests** (1 skipped, 0 failures). A production standalone build
+  was visually verified at 1440×900 and 390×844 with zero horizontal overflow;
+  the capture CTA reached `/sign-in?next=%2Fapp%2Finbox`. Ignored evidence is
+  under `browser-qa/round56-inbox-auth/`.
+- **Standing boundary preserved.** Phase 7B physical-device/provider lifecycle
+  and Phase 8B Google consent/client activation remain external evidence gates.
+  This round did not configure providers or mutate production planner data.
+
 ## 2026-08-01 — Round 55: canonical activity edit hardening (Codex)
 
 - **Recurrence splits preserve the complete master.** `this_and_future` now

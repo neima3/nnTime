@@ -104,7 +104,9 @@ design work BEFORE the consuming subphase starts.
   - [x] 8C Ongoing hardening: repeated restore drill, E2E suite in CI,
         monitoring, canonical activity-create ownership/field-preservation
         hardening (Round 54), and atomic recurrence-edit/split preservation,
-        ownership, and sync hardening (Round 55, 2026-08-01)
+        ownership, and sync hardening (Round 55), plus capability-truthful
+        signed-out Inbox and fail-closed auth intent continuity (Round 56,
+        2026-08-01)
   - [x] 8D Privacy/review-prep contract + scripted parity gate
         (App Store upload, processing, and launch are tracked per release)
 

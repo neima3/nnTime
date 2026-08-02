@@ -285,7 +285,7 @@ git commit -m "fix: make signed-out Inbox actions truthful"
 - Modify: `docs/plans/progress.md`
 - Modify: `docs/plans/2026-08-01-round56-auth-intent-continuity-implementation.md`
 
-- [ ] **Step 1: Run the focused regression set**
+- [x] **Step 1: Run the focused regression set**
 
 Run:
 
@@ -301,14 +301,14 @@ pnpm vitest run src/lib/auth-return.test.ts \
 
 Expected: all focused tests pass.
 
-- [ ] **Step 2: Perform an independent code review**
+- [x] **Step 2: Perform an independent code review**
 
 Review the complete diff against the design, ADR-003, and ADR-005. Require no
 open critical or important findings. Specifically challenge open-redirect
 bypasses, provider error callback loss, Settings account-link regressions,
 signed-out protected requests, and authenticated Inbox regressions.
 
-- [ ] **Step 3: Run all local gates**
+- [x] **Step 3: Run all local gates**
 
 Run:
 
@@ -326,7 +326,7 @@ git diff --check
 
 Expected: every command exits 0; parity stays at or above both 85% gates.
 
-- [ ] **Step 4: Verify desktop and mobile in a real browser**
+- [x] **Step 4: Verify desktop and mobile in a real browser**
 
 Run the app on port 3456. At 1440×900 and 390×844, verify the signed-out Inbox
 shows sample rows, actionable grouping/capture auth links, exactly one page
@@ -334,7 +334,7 @@ heading, no protected API calls, no console errors, keyboard-visible focus, and
 no horizontal overflow. Save ignored evidence under
 `browser-qa/round56-inbox-auth/`.
 
-- [ ] **Step 5: Record the tranche and commit**
+- [x] **Step 5: Record the tranche and commit**
 
 Add Round 56 to `docs/plans/progress.md` with exact test totals and evidence.
 Extend the 8C roadmap note without changing Phase 7B or Phase 8B. Mark completed
