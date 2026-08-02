@@ -1,5 +1,37 @@
 # Progress log
 
+## 2026-08-02 — Round 73: magic-link provider-error recovery (Codex)
+
+- **Fresh production dogfood found remaining silent callback failures.** The
+  installed Better Auth verifier emits four stable errors. Round 71 handled
+  `INVALID_TOKEN`; a read-only synthetic `failed_to_create_session` query still
+  rendered the signed-out sample planner with no explanation or recovery. No
+  verifier, account, or planner mutation occurred. Ignored evidence and the
+  report are under `browser-qa/round73-dogfood/`.
+- **All installed verifier errors now fail closed to fixed copy.** A pure
+  `ReadonlyMap` allowlists the exact invalid-token, account-creation,
+  signup-disabled, and session-creation codes. Invalid/used links retain their
+  specific guidance; provider-side completion failures share neutral copy.
+  Arrays, unknown strings, and prototype names return `null`, arbitrary text is
+  never reflected, authenticated Today remains unchanged, and recovery uses a
+  clean `/app/today` continuation.
+- **Test-first, visual, and adversarial review proof is green.** Pure and browser
+  contracts first failed on the unhandled provider code. Independent review
+  then found an Important prototype-chain hole in the initial object lookup:
+  `constructor`, `toString`, and `__proto__` could trigger blank recovery. Red
+  unit/browser cases reproduced it; `ReadonlyMap.get` fixed it, and re-review
+  returned **READY** with no remaining Critical or Important finding. Pure
+  mapping tests pass 10/10 and the focused browser boundary passes. Desktop and
+  390px mobile checks show fixed copy, clean CTA, balanced heading rhythm, and
+  no overflow; ignored evidence is under `browser-qa/round73-local/`. Required
+  lint, typecheck, 1,178 tests in 122 files, and production build pass. The
+  complete browser suite passed all 46 executed checks with one development-
+  only skip. Scripted parity remains 89.74% web / 86.93% iOS, and the iOS
+  release contract passes. Exact-SHA CI, deployment, and live production
+  verification remain pending.
+- **Standing boundaries remain intact.** Phase 7B physical-device provider
+  lifecycle proof and Phase 8B Google activation remain external.
+
 ## 2026-08-02 — Round 72: cross-device callback copy (Codex)
 
 - **Fresh production dogfood found a false device claim.** At a 1440×1000

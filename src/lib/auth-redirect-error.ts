@@ -3,6 +3,39 @@ export type AuthRedirectSearchParams = Record<
   string | string[] | undefined
 >;
 
+export type MagicLinkRecoveryCopy = Readonly<{
+  title: string;
+  body: string;
+}>;
+
+const MAGIC_LINK_COMPLETION_ERROR: MagicLinkRecoveryCopy = Object.freeze({
+  title: "Kairo couldn’t complete sign-in",
+  body: "Something went wrong while completing this sign-in link. Sign in to try again or choose another method.",
+});
+
+const MAGIC_LINK_REDIRECT_ERRORS: ReadonlyMap<
+  string,
+  MagicLinkRecoveryCopy
+> = new Map([
+  [
+    "INVALID_TOKEN",
+    Object.freeze({
+      title: "This sign-in link isn’t available",
+      body: "It may be incomplete, expired, or already used. Sign in to request a fresh link.",
+    }),
+  ],
+  ["failed_to_create_user", MAGIC_LINK_COMPLETION_ERROR],
+  ["new_user_signup_disabled", MAGIC_LINK_COMPLETION_ERROR],
+  ["failed_to_create_session", MAGIC_LINK_COMPLETION_ERROR],
+]);
+
+export function getMagicLinkRedirectError(
+  searchParams: AuthRedirectSearchParams,
+): MagicLinkRecoveryCopy | null {
+  if (typeof searchParams.error !== "string") return null;
+  return MAGIC_LINK_REDIRECT_ERRORS.get(searchParams.error) ?? null;
+}
+
 const ACCOUNT_CONFLICT_ERRORS = new Set([
   "account_not_linked",
   "oauth_link_error",

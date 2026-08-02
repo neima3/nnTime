@@ -429,11 +429,22 @@ test("an invalid magic-link callback becomes an actionable signed-out recovery s
     "/app/today",
   );
 
+  await page.goto("/app/today?error=failed_to_create_session");
+  await expect(
+    page.getByRole("heading", { name: "Kairo couldn’t complete sign-in" }),
+  ).toBeVisible();
+  await expect(page.getByText("Sample planner", { exact: true })).toHaveCount(0);
+  await expect(page.getByText(/choose another method/i)).toBeVisible();
+
   await page.goto("/app/today?error=attacker-controlled-copy");
   await expect(page.getByText("Sample planner", { exact: true })).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "This sign-in link isn’t available" }),
   ).toHaveCount(0);
+
+  await page.goto("/app/today?error=constructor");
+  await expect(page.getByText("Sample planner", { exact: true })).toBeVisible();
+  await expect(page.locator("main h1")).toHaveText("A day with Kairo");
 });
 
 test("an invalid password-reset token becomes an actionable recovery state", async ({

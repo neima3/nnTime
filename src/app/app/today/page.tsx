@@ -37,6 +37,7 @@ import { instantToDateStr } from "@/server/temporal/zone";
 import { formatTime, toHourCycle, type HourCycle } from "@/lib/time-format";
 import { SignedOutCard } from "@/components/EmptyState";
 import { appReturnTo } from "@/lib/auth-return";
+import { getMagicLinkRedirectError } from "@/lib/auth-redirect-error";
 
 function shiftDate(dateStr: string, deltaDays: number): string {
   const [y, m, d] = dateStr.split("-").map(Number);
@@ -239,15 +240,15 @@ export default async function TodayPage({
     nowMin,
   } = await loadTodayData(dateParam);
 
-  const invalidMagicLink = sp.error === "INVALID_TOKEN";
-  if (!authed && invalidMagicLink) {
+  const magicLinkError = getMagicLinkRedirectError(sp);
+  if (!authed && magicLinkError) {
     return (
       <AppShell active="today">
         <div className="mx-auto max-w-2xl px-4 py-10 md:px-8">
           <SignedOutCard
             icon={Link2Off}
-            title="This sign-in link isn’t available"
-            body="It may be incomplete, expired, or already used. Sign in to request a fresh link."
+            title={magicLinkError.title}
+            body={magicLinkError.body}
             returnTo="/app/today"
             headingLevel="h1"
           />
