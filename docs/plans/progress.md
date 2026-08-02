@@ -32,6 +32,20 @@
   production build pass; the complete browser suite passes 48 executed checks
   with one development-only skip. Scripted parity remains 89.74% web / 86.93%
   iOS, and the iOS release contract passes.
+- **Exact release and cache-upgrade proof is green.** Commit
+  `05c84b3e7335365e67e9bc940d36cedbabfa9050` passed build/test, 48-check
+  standalone E2E, and native shipping lanes in GitHub Actions run
+  `30770884235`. Coolify deployment `ft1ds5h6unheo2dl7lqmjzrs` finished that
+  exact SHA and settled at `running:healthy`; live health reported migrations,
+  database, AI, and scheduler `ok` with scheduler lag 50 seconds. In an
+  isolated production browser, an intentionally seeded old
+  `kairo-v5-boundaries` cache containing a synthetic token was removed when the
+  live worker reinstalled. After fresh reset and `/app/today` navigation, the
+  sole cache held exactly the three public shell entries and 23 hashed static
+  assets, with no reset, app, RSC, or API URLs and neither synthetic token in
+  any response body. The 390×844 surface had no horizontal overflow and the
+  final page emitted zero console errors or warnings. Visually inspected
+  ignored evidence is under `browser-qa/round75-live/`.
 - **Standing boundaries remain intact.** Phase 7B physical-device provider
   lifecycle proof and Phase 8B Google activation remain external.
 

@@ -32,4 +32,4 @@ never stored and caches are user-scoped. Ignored evidence lives under
 - [x] Implement the explicit public-asset allowlist and privacy cache bump.
 - [x] Obtain independent Critical/Important review.
 - [x] Pass browser, repository, parity, and iOS release gates.
-- [ ] Commit, push, pass exact-SHA CI, deploy exact SHA, and verify live cache eviction.
+- [x] Commit, push, pass exact-SHA CI, deploy exact SHA, and verify live cache eviction.
