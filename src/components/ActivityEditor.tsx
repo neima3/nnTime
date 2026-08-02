@@ -443,7 +443,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
     if (props.mode !== "edit" || !props.activityId || revision == null) return;
     if (!confirm("Delete this activity?")) return;
     setSaving(true);
-    const res = await fetch(`/api/v1/activities/${props.activityId}`, {
+    const res = await fetch(`/api/v1/activities/${props.activityId}?editScope=all`, {
       method: "DELETE",
       headers: { "If-Match": String(revision) },
     });

@@ -15,6 +15,14 @@ async function queueRows(page: import("@playwright/test").Page) {
   return page.evaluate(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open("kairo-offline", 1);
+      request.onupgradeneeded = () => {
+        if (!request.result.objectStoreNames.contains("mutations")) {
+          request.result.createObjectStore("mutations", {
+            keyPath: "id",
+            autoIncrement: true,
+          });
+        }
+      };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
@@ -177,6 +185,14 @@ test("a terminal conflict survives reload and stays dismissed", async ({
     if (!userId) throw new Error("missing remembered queue user");
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open("kairo-offline", 1);
+      request.onupgradeneeded = () => {
+        if (!request.result.objectStoreNames.contains("mutations")) {
+          request.result.createObjectStore("mutations", {
+            keyPath: "id",
+            autoIncrement: true,
+          });
+        }
+      };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });

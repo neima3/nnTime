@@ -205,12 +205,12 @@ export async function listChecklistItems(
     .orderBy(asc(schema.checklistItems.sortOrder));
 }
 
-async function assertOwnedActivityReferences(
+export async function assertOwnedActivityReferences(
   db: Db,
   userId: string,
   categoryId?: string,
   tags?: string[],
-) {
+): Promise<void> {
   if (categoryId) {
     const [category] = await db
       .select({ id: schema.categories.id })
@@ -526,6 +526,19 @@ export async function deleteActivitySeries(
   const db = opts.db ?? dbDefault;
   return db.transaction(async (tx) => {
     const tdb = tx as unknown as Db;
+    const [series] = await tdb
+      .select()
+      .from(schema.activitySeries)
+      .where(and(
+        eq(schema.activitySeries.id, id),
+        eq(schema.activitySeries.userId, userId),
+        isNull(schema.activitySeries.deletedAt),
+      ))
+      .limit(1);
+    if (!series) throw new NotFoundError("activity_series");
+    if (series.source === "calendar") {
+      throw new ConflictError("calendar activity is read-only", series);
+    }
     const [updated] = await tdb
       .update(schema.activitySeries)
       .set({ deletedAt: new Date(), revision: ifMatchRevision + 1 })

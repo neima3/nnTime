@@ -307,6 +307,7 @@ paths:
         - $ref: '#/components/parameters/IdempotencyKey'
         - $ref: '#/components/parameters/IfMatch'
         - $ref: '#/components/parameters/EditScope'
+        - $ref: '#/components/parameters/OccurrenceKeyQuery'
       responses:
         '204': { description: Tombstoned (no body). }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -1185,6 +1186,13 @@ components:
         Edit/delete scope (ADR-001). Defaults to `this`. For `this` and
         `this_and_future`, the request must also identify an occurrence.
       schema: { $ref: '#/components/schemas/EditScope' }
+
+    OccurrenceKeyQuery:
+      name: occurrenceKey
+      in: query
+      required: false
+      description: Stable occurrence identity required for scoped deletes.
+      schema: { type: string, format: date-time }
 
     Cursor:
       name: cursor

@@ -213,6 +213,24 @@ describe("shipping native mutation idempotency", () => {
     expect(stored?.deletedAt).toBeInstanceOf(Date);
   });
 
+  itDb("rejects public tombstones for imported calendar activities", async () => {
+    const userId = await user("calendar-delete-read-only");
+    const activity = await createActivitySeries(userId, {
+      tz: "UTC",
+      dtstartLocal: new Date("2026-08-01T12:00:00.000Z"),
+      title: "Imported calendar event",
+      durationMin: 25,
+      source: "calendar",
+      sourceRef: "provider-event",
+    }, { db: env!.db });
+    await expect(deleteActivitySeries(
+      userId,
+      activity.id,
+      activity.revision,
+      { db: env!.db },
+    )).rejects.toThrow("read-only");
+  });
+
   itDb("replays task DELETE without a second tombstone", async () => {
     const userId = await user("task-delete-idempotency");
     const task = await createTask(

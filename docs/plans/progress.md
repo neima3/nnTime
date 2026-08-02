@@ -1,5 +1,60 @@
 # Progress log
 
+## 2026-08-01 — Round 55: canonical activity edit hardening (Codex)
+
+- **Recurrence splits preserve the complete master.** `this_and_future` now
+  constructs the successor from an explicit snapshot of every canonical
+  series field, overlays only the accepted patch, starts at the selected
+  occurrence, and returns the successor identity/revision to the client.
+  Overrides at and after the split move under the new series while retaining
+  their stable `occurrence_key`.
+- **Finite and exceptional recurrence state stays mathematically sound.** A
+  split reduces an inherited RRULE `COUNT` to the remaining generated count,
+  partitions RDATE values around the split, and rejects arbitrary or
+  EXDATE-excluded occurrence identities using the series wall-clock timezone.
+- **Authorization, concurrency, and sync are atomic.** `all` and
+  `this_and_future` validate category/tag ownership inside the same database
+  transaction as the edit. A stale/deleted predecessor cannot be truncated,
+  and a foreign nested ID rolls the full operation back. Successful splits
+  append revisioned sync entries for both the truncated predecessor and the
+  revision-1 successor. Occurrence-only mutations advance the master revision
+  in the same transaction, so a reused If-Match value conflicts.
+- **Imported calendar blocks remain read-only.** Edits, scoped deletes, and
+  whole-series DAL tombstones reject `source=calendar`; the final independent
+  review verified that no public delete path bypasses the guard.
+- **The activity mutation edge is canonical.** PATCH and DELETE reject
+  malformed or non-positive `If-Match` values and malformed optional
+  idempotency UUIDs before mutation. PATCH converts date-only EXDATE values to
+  midnight UTC database dates and responds with the actual affected master and
+  its ETag, including a newly created split successor. DELETE defaults to the
+  safe single-occurrence scope, requires stable occurrence identity for scoped
+  deletes, and the web editor explicitly requests a whole-series tombstone.
+- **Test-first local proof.** The new PostgreSQL tests first reproduced the
+  missing required split fields and accepted cross-owner reference. The route
+  tests first reproduced the predecessor response and permissive headers.
+  Final local gates passed: lint, typecheck, production build, **114 test files
+  / 1,104 tests**, **24/24** Playwright scenarios, parity (**89.74% web /
+  86.93% iOS**), iOS release preflight, and the native main-thread gate. The
+  app-hosted gate executed **378 tests** (1 skipped, 0 failures). A synthetic
+  desktop and 390px browser flow created, edited, PATCHed (200), reloaded, and
+  retained the recurring activity with no horizontal overflow; ignored
+  evidence is under `browser-qa/round55-activity-edit/`.
+- **Browser proof now waits for server truth.** The keyboard-move regression
+  waits for the `Saved` acknowledgement before reload, and direct offline
+  conflict injection initializes its IndexedDB object store. This removed two
+  timing-dependent false passes/failures without weakening assertions.
+- **Independent review: READY.** The reviewer first blocked release on unsafe
+  delete scope, COUNT/RDATE splitting, incompatible patch fields, occurrence
+  concurrency, calendar mutability, and invalid split identities. After two
+  remediation passes it independently reran 35 focused tests, confirmed the
+  web/iOS OpenAPI copies match, and reported no remaining critical or important
+  findings.
+- **Release boundary.** Exact implementation SHA, hosted CI, Coolify deployment,
+  and read-only live verification are recorded only after those operations
+  finish. Phase 7B physical-device/provider lifecycle and Phase 8B Google
+  consent/client activation remain external evidence gates; this round does
+  not configure providers or mutate production planner data.
+
 ## 2026-08-01 — Round 54: canonical activity creation hardening (Codex)
 
 - **Canonical create no longer loses accepted fields.**

@@ -53,6 +53,9 @@ test("signed-in timeline keeps keyboard move and Enter-to-edit controls", async 
   await expect
     .poll(() => activity.getAttribute("aria-label"), { timeout: 15_000 })
     .not.toBe(beforeMove);
+  // The label changes optimistically. Wait for the PATCH response before
+  // reloading so the navigation cannot abort the mutation under test.
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible({ timeout: 15_000 });
 
   await page.reload();
   await page.waitForSelector('html[data-hydrated="true"]');
