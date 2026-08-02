@@ -438,6 +438,28 @@ test("an invalid password-reset token becomes an actionable recovery state", asy
   await expect(page.getByText("Invalid token", { exact: true })).toHaveCount(0);
 });
 
+test("password reset can reveal and re-mask the new credential", async ({ page }) => {
+  await gotoHydrated(page, "/reset-password?token=synthetic-reset-token");
+  const password = page.getByRole("textbox", { name: "New password" });
+  await password.fill("NotARealPassword1!");
+
+  const visibility = page.getByRole("button", { name: "Show password" });
+  await expect(visibility).toHaveAttribute("aria-pressed", "false");
+  await expect(visibility).toHaveCSS("min-width", "44px");
+  await expect(visibility).toHaveCSS("min-height", "44px");
+
+  await visibility.click();
+  await expect(password).toHaveAttribute("type", "text");
+  await expect(password).toHaveValue("NotARealPassword1!");
+  await expect(visibility).toHaveAttribute("aria-pressed", "true");
+  await expect(visibility).toBeFocused();
+
+  await visibility.click();
+  await expect(password).toHaveAttribute("type", "password");
+  await expect(password).toHaveValue("NotARealPassword1!");
+  await expect(visibility).toHaveAttribute("aria-pressed", "false");
+});
+
 test("password-reset requests keep production confirmation account-neutral", async ({
   page,
 }) => {

@@ -1,5 +1,40 @@
 # Progress log
 
+## 2026-08-02 — Round 70: reset-password visibility parity (Codex)
+
+- **Fresh production dogfood found reset-flow credential drift.** The new
+  password input on `/reset-password` remained permanently masked after the
+  released sign-in/sign-up control, with no keyboard, pointer, or touch reveal
+  path. The issue reproduced at 1440×1000 and 390×844 using only a synthetic
+  invalid token. Ignored evidence and the report are under
+  `browser-qa/round70-dogfood/`.
+- **All credential forms now use one shared password field.** The token-only
+  component preserves controlled value, required/min-length validation,
+  autocomplete, unique label/control IDs, the stable **Show password** name,
+  `aria-pressed` state, and exact 44×44 target. Sign-in, sign-up, and reset now
+  share the same implementation. Invalid/consumed reset links clear and mask
+  the credential before replacing the field with the focused recovery card;
+  magic-link clearing remains intact.
+- **Test-first, visual, and independent review proof is green.** The reset
+  browser contract first failed because no toggle existed. The extracted
+  implementation passed reset, magic-link, sign-in, and sign-up focused tests;
+  independent review returned **READY** with no Critical or Important finding.
+  Desktop light and 390px mobile dark/high-contrast checks confirm value/focus
+  continuity, target size, balanced hierarchy, no overflow, and focused invalid
+  recovery. Chrome's advisory about a missing username is not actionable on a
+  token-only surface that does not know the email; an empty fake username would
+  degrade password-manager data. Visually inspected ignored evidence is under
+  `browser-qa/round70-local/`.
+- **Complete local proof is green.** Required lint, typecheck, 1,168 tests in
+  121 files, and production build passed. The browser suite passed all 45
+  executed checks with one development-only skip. Scripted parity remains
+  89.74% web / 86.93% iOS, and the iOS release contract passed. Exact-SHA CI,
+  deployment, and live production verification remain pending.
+- **Standing boundaries remain intact.** Production checks used only a
+  synthetic invalid token and could not change account or planner data. Phase
+  7B physical-device provider lifecycle proof and Phase 8B Google activation
+  remain external.
+
 ## 2026-08-02 — Round 69: auth password visibility (Codex)
 
 - **Fresh production dogfood found permanently masked auth credentials.** Both

@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useId, useRef, useState } from "react";
-import { ArrowRight, Eye, EyeOff, Loader2, Mail } from "lucide-react";
+import { ArrowRight, Loader2, Mail } from "lucide-react";
 import { signIn, signUp } from "@/lib/auth-client";
 import { detectTimezone } from "@/lib/timezone";
 import type { AuthCapabilities } from "@/server/auth-capabilities";
@@ -18,6 +18,7 @@ import {
   DEFAULT_AUTH_RETURN_TO,
   safeAuthReturnTo,
 } from "@/lib/auth-return";
+import { PasswordField } from "./PasswordField";
 
 type Mode = "sign-in" | "sign-up";
 
@@ -171,16 +172,15 @@ export function AuthForm({
               onChange={setEmail}
               placeholder="you@example.com"
             />
-            <Field
+            <PasswordField
               label="Password"
-              type="password"
               autoComplete={isSignUp ? "new-password" : "current-password"}
               required
               minLength={8}
               value={password}
               onChange={setPassword}
-              passwordVisible={passwordVisible}
-              onTogglePassword={() => setPasswordVisible((visible) => !visible)}
+              visible={passwordVisible}
+              onVisibleChange={setPasswordVisible}
               placeholder={isSignUp ? "At least 8 characters" : "Your password"}
             />
 
@@ -323,23 +323,17 @@ function Field({
   value,
   onChange,
   type,
-  passwordVisible,
-  onTogglePassword,
   ...rest
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   type: React.HTMLInputTypeAttribute;
-  passwordVisible?: boolean;
-  onTogglePassword?: () => void;
 } & Omit<
   React.InputHTMLAttributes<HTMLInputElement>,
   "type" | "value" | "onChange"
 >) {
   const inputId = useId();
-  const hasPasswordToggle =
-    typeof passwordVisible === "boolean" && Boolean(onTogglePassword);
 
   return (
     <div>
@@ -353,29 +347,11 @@ function Field({
         <input
           {...rest}
           id={inputId}
-          type={hasPasswordToggle && passwordVisible ? "text" : type}
+          type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={`w-full rounded-xl border border-border bg-surface-sunken px-3.5 py-2.5 text-[15px] text-ink outline-none transition-colors placeholder:text-ink-faint focus:border-iris focus:bg-surface focus:ring-2 focus:ring-iris/30 ${
-            hasPasswordToggle ? "pr-12" : ""
-          }`}
+          className="w-full rounded-xl border border-border bg-surface-sunken px-3.5 py-2.5 text-[15px] text-ink outline-none transition-colors placeholder:text-ink-faint focus:border-iris focus:bg-surface focus:ring-2 focus:ring-iris/30"
         />
-        {hasPasswordToggle && (
-          <button
-            type="button"
-            aria-label="Show password"
-            aria-pressed={passwordVisible}
-            aria-controls={inputId}
-            onClick={onTogglePassword}
-            className="absolute right-0 top-1/2 grid min-h-11 min-w-11 -translate-y-1/2 place-items-center rounded-r-xl text-ink-faint transition-colors hover:bg-iris-ghost hover:text-ink focus-visible:bg-iris-ghost active:bg-iris-soft"
-          >
-            {passwordVisible ? (
-              <EyeOff size={18} aria-hidden="true" />
-            ) : (
-              <Eye size={18} aria-hidden="true" />
-            )}
-          </button>
-        )}
       </div>
     </div>
   );

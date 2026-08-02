@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { resetPassword } from "@/lib/auth-client";
+import { PasswordField } from "@/components/PasswordField";
 import { ResetUnavailableCard } from "./ResetUnavailableCard";
 
 export function ResetPasswordForm({ token }: { token: string }) {
   const router = useRouter();
   const [password, setPassword] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [linkUnavailable, setLinkUnavailable] = useState(false);
@@ -26,6 +28,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
       if (res.error) {
         if (res.error.code === "INVALID_TOKEN") {
           setPassword("");
+          setPasswordVisible(false);
           setLinkUnavailable(true);
           return;
         }
@@ -51,20 +54,16 @@ export function ResetPasswordForm({ token }: { token: string }) {
       </h1>
       <p className="mt-1.5 text-[14px] text-ink-soft">At least 8 characters.</p>
       <form onSubmit={onSubmit} className="mt-6 space-y-3.5">
-        <label className="block">
-          <span className="mb-1.5 block text-[13px] font-semibold text-ink-soft">
-            New password
-          </span>
-          <input
-            type="password"
-            required
-            minLength={8}
-            autoComplete="new-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-xl border border-border bg-surface-sunken px-3.5 py-2.5 text-[15px] outline-none focus:border-iris focus:ring-2 focus:ring-iris/30"
-          />
-        </label>
+        <PasswordField
+          label="New password"
+          required
+          minLength={8}
+          autoComplete="new-password"
+          value={password}
+          onChange={setPassword}
+          visible={passwordVisible}
+          onVisibleChange={setPasswordVisible}
+        />
         {error && (
           <p role="alert" className="text-[13px] font-semibold text-danger">
             {error}
