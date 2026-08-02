@@ -1,13 +1,42 @@
 export const DEFAULT_AUTH_RETURN_TO = "/app/today";
 
 const AUTH_BASE = "https://kairo.invalid";
+const MALFORMED_PERCENT_ESCAPE = /%(?![0-9a-f]{2})/i;
+const ENCODED_PATH_DELIMITER_OR_CONTROL =
+  /%(?:2f|3f|23|5c|0[0-9a-f]|1[0-9a-f]|7f)/i;
+const CONTROL_OR_BACKSLASH = /[\u0000-\u001f\u007f\\]/;
+const DOT_PATH_SEGMENT = /(?:^|\/)\.{1,2}(?:\/|$)/;
+
+function hasUnsafeEncoding(value: string): boolean {
+  let decoded = value;
+
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (CONTROL_OR_BACKSLASH.test(decoded)) return true;
+
+    const path = decoded.split(/[?#]/, 1)[0];
+    if (path.startsWith("//") || DOT_PATH_SEGMENT.test(path)) return true;
+    if (MALFORMED_PERCENT_ESCAPE.test(decoded)) return true;
+    if (!decoded.includes("%")) return false;
+    if (ENCODED_PATH_DELIMITER_OR_CONTROL.test(path)) return true;
+
+    try {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) return false;
+      decoded = next;
+    } catch {
+      return true;
+    }
+  }
+
+  return decoded.includes("%");
+}
 
 export function safeAuthReturnTo(value: unknown): string {
   if (
     typeof value !== "string" ||
     !value.startsWith("/") ||
     value.startsWith("//") ||
-    value.includes("\\")
+    hasUnsafeEncoding(value)
   ) {
     return DEFAULT_AUTH_RETURN_TO;
   }
