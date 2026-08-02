@@ -34,7 +34,7 @@
 - Modify: `src/lib/auth-return.test.ts`
 - Modify: `src/lib/auth-return.ts`
 
-- [ ] **Step 1: Read the installed Next.js routing guidance**
+- [x] **Step 1: Read the installed Next.js routing guidance**
 
 Run:
 
@@ -45,7 +45,7 @@ sed -n '1,240p' node_modules/next/dist/docs/01-app/03-api-reference/03-file-conv
 
 Expected: the installed Next.js 16 contracts for `Link` and async App Router `searchParams`.
 
-- [ ] **Step 2: Write failing allowlist and query-builder tests**
+- [x] **Step 2: Write failing allowlist and query-builder tests**
 
 Add `/onboarding` to the accepted table, add `/onboarding/`, `/onboarding?next=...`, and encoded lookalikes to the rejected table, and add:
 
@@ -78,13 +78,13 @@ it("drops undefined values and fails unsafe paths closed", () => {
 });
 ```
 
-- [ ] **Step 3: Run the focused unit test and verify RED**
+- [x] **Step 3: Run the focused unit test and verify RED**
 
 Run: `pnpm vitest run src/lib/auth-return.test.ts`
 
 Expected: FAIL because `/onboarding` is rejected and `appReturnTo` is not exported.
 
-- [ ] **Step 4: Implement the narrow allowlist and deterministic builder**
+- [x] **Step 4: Implement the narrow allowlist and deterministic builder**
 
 Keep every existing unsafe-encoding guard. Change only the pathname condition and add:
 
@@ -113,7 +113,7 @@ export function appReturnTo(
 
 Accept exact `/onboarding` only: reject it when `url.search` or `url.hash` is non-empty. `/app/*` continues to preserve safe search and hash values.
 
-- [ ] **Step 5: Run focused verification and commit**
+- [x] **Step 5: Run focused verification and commit**
 
 Run:
 
@@ -140,7 +140,7 @@ Expected: focused tests and typecheck PASS; commit succeeds.
 - Modify: `src/components/StatsClient.tsx`
 - Modify: `src/components/SettingsClient.tsx`
 
-- [ ] **Step 1: Write a failing shared-boundary source contract**
+- [x] **Step 1: Write a failing shared-boundary source contract**
 
 Create a Vitest source contract that reads the shared card and callers:
 
@@ -175,13 +175,13 @@ describe("signed-out auth return boundaries", () => {
 });
 ```
 
-- [ ] **Step 2: Run the contract and verify RED**
+- [x] **Step 2: Run the contract and verify RED**
 
 Run: `pnpm vitest run src/components/signed-out-auth-return.test.ts`
 
 Expected: FAIL because `SignedOutCard` still contains plain auth links.
 
-- [ ] **Step 3: Require and use `returnTo`**
+- [x] **Step 3: Require and use `returnTo`**
 
 Import `authPageHref`, add `returnTo: string` to `SignedOutCard`, and replace the links with:
 
@@ -205,7 +205,7 @@ Pass the canonical route shown in the test table at every call site. Focus and
 Editor initially receive `/app/focus` and `/app/editor`; Task 3 replaces those
 constants with normalized query-bearing values.
 
-- [ ] **Step 4: Run focused tests, typecheck, and commit**
+- [x] **Step 4: Run focused tests, typecheck, and commit**
 
 Run:
 
@@ -225,7 +225,7 @@ Expected: tests and typecheck PASS; commit succeeds.
 - Modify: `src/app/app/focus/page.tsx`
 - Modify: `src/app/app/editor/page.tsx`
 
-- [ ] **Step 1: Strengthen the browser assertions before implementation**
+- [x] **Step 1: Strengthen the browser assertions before implementation**
 
 After the Today Focus click, assert:
 
@@ -247,7 +247,7 @@ expect(new URL(href!, "https://kairo.test").searchParams.get("next"))
   .toBe(expected);
 ```
 
-- [ ] **Step 2: Run the two E2E tests and verify RED**
+- [x] **Step 2: Run the two E2E tests and verify RED**
 
 Run:
 
@@ -257,7 +257,7 @@ pnpm exec playwright test e2e/preview-auth-boundary.spec.ts --project=anonymous 
 
 Expected: FAIL because both links are currently plain `/sign-in`.
 
-- [ ] **Step 3: Build normalized return paths in the server pages**
+- [x] **Step 3: Build normalized return paths in the server pages**
 
 In Focus:
 
@@ -287,7 +287,7 @@ const returnTo = appReturnTo("/app/editor", {
 
 Pass `returnTo={returnTo}` to `SignedOutCard`. Do not copy unknown search parameters.
 
-- [ ] **Step 4: Run focused unit/E2E verification and commit**
+- [x] **Step 4: Run focused unit/E2E verification and commit**
 
 Run:
 
@@ -309,7 +309,7 @@ Expected: focused gates PASS; commit succeeds.
 - Modify: `src/app/app/templates/page.tsx`
 - Modify: `src/components/TemplatesClient.tsx`
 
-- [ ] **Step 1: Add failing anonymous browser contracts**
+- [x] **Step 1: Add failing anonymous browser contracts**
 
 Add an onboarding test that fills the optional name, advances, changes one
 anchor, clicks **Create my planner**, and expects:
@@ -329,7 +329,7 @@ const next = new URL(href!, "https://kairo.test").searchParams.get("next");
 expect(next).toMatch(/^\/app\/templates\?template=/);
 ```
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
 Run:
 
@@ -339,7 +339,7 @@ pnpm exec playwright test e2e/preview-auth-boundary.spec.ts --project=anonymous 
 
 Expected: FAIL because both callers use plain auth URLs.
 
-- [ ] **Step 3: Implement onboarding continuation**
+- [x] **Step 3: Implement onboarding continuation**
 
 Import `authPageHref` and change the CTA to:
 
@@ -351,7 +351,7 @@ Import `authPageHref` and change the CTA to:
 
 Do not alter the existing local-storage payload or create anchors before the authenticated confirmation button is pressed.
 
-- [ ] **Step 4: Implement selected-template return without auto-apply**
+- [x] **Step 4: Implement selected-template return without auto-apply**
 
 Make `TemplatesPage` accept `searchParams`, normalize a string `template`, and pass `selectedTemplateId` only when it matches a known template. In `TemplatesClient`:
 
@@ -417,7 +417,7 @@ const returnTo = appReturnTo("/app/templates", { template: t.id });
 
 On authenticated mount, scroll the selected card into view with reduced-motion-aware behavior and set the status text to `Ready to apply “<title>”.` Do not call `apply` automatically. Unknown IDs render the ordinary gallery.
 
-- [ ] **Step 5: Run focused gates and commit**
+- [x] **Step 5: Run focused gates and commit**
 
 Run:
 
@@ -438,7 +438,7 @@ Expected: focused tests and typecheck PASS; commit succeeds.
 - Modify: `src/components/games/GameShell.tsx`
 - Modify: `src/components/PlayClient.tsx`
 
-- [ ] **Step 1: Write the failing keyboard/browser test**
+- [x] **Step 1: Write the failing keyboard/browser test**
 
 Create a signed-out-safe test:
 
@@ -470,13 +470,13 @@ test("brain-break dialog contains focus and restores its opener", async ({ page 
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `pnpm exec playwright test e2e/game-dialog.spec.ts --project=chromium`
 
 Expected: FAIL because the game overlay has no dialog role, initial focus, containment, or restoration.
 
-- [ ] **Step 3: Implement native dialog semantics**
+- [x] **Step 3: Implement native dialog semantics**
 
 In `GameShell`, use `useEffect`, `useId`, and `useRef<HTMLDialogElement>`:
 
@@ -537,7 +537,7 @@ useEffect(() => {
 
 Keep all existing token classes and game children.
 
-- [ ] **Step 4: Restore opener focus in `PlayClient`**
+- [x] **Step 4: Restore opener focus in `PlayClient`**
 
 Track card elements by game ID and the most recent opener:
 
@@ -562,7 +562,7 @@ const exit = () => {
 
 Attach each button ref to the map and call `openGame(g.id)` from its click handler.
 
-- [ ] **Step 5: Run keyboard, gameplay, and type gates; commit**
+- [x] **Step 5: Run keyboard, gameplay, and type gates; commit**
 
 Run:
 
@@ -581,7 +581,7 @@ Expected: dialog test, game logic tests, and typecheck PASS; commit succeeds.
 **Files:**
 - Evidence only: `browser-qa/round58-release/*` (ignored).
 
-- [ ] **Step 1: Run all required web gates**
+- [x] **Step 1: Run all required web gates**
 
 Run:
 
@@ -596,7 +596,7 @@ node scripts/parity.mjs
 
 Expected: all commands PASS; parity remains at or above both project thresholds.
 
-- [ ] **Step 2: Run Apple release gates**
+- [x] **Step 2: Run Apple release gates**
 
 Run:
 
@@ -607,7 +607,7 @@ pnpm ios:release:preflight
 
 Expected: preflight PASS and the native gate reports its executed test count with zero failures. If no native source changed, record that this verifies the shared release contract rather than claiming new device evidence.
 
-- [ ] **Step 3: Verify the local production build in a real browser**
+- [x] **Step 3: Verify the local production build in a real browser**
 
 Serve the standalone build, then use `agent-browser` at 1440×900 and 390×844 to verify:
 
@@ -620,7 +620,7 @@ Serve the standalone build, then use `agent-browser` at 1440×900 and 390×844 t
 
 Save screenshots and a gameplay/accessibility video under `browser-qa/round58-release/`.
 
-- [ ] **Step 4: Adversarially review the final diff**
+- [x] **Step 4: Adversarially review the final diff**
 
 Run:
 
@@ -639,11 +639,11 @@ Inspect unsafe return variants, duplicate planner mutations, dialog double-close
 - Modify: `docs/plans/progress.md`
 - Modify: `docs/plans/2026-08-02-round58-intent-continuity-game-dialog-implementation.md`
 
-- [ ] **Step 1: Update release ledgers truthfully**
+- [x] **Step 1: Update release ledgers truthfully**
 
 Mark completed plan steps, add Round 58 evidence and exact test counts, and update the roadmap note. Keep physical-device/provider activation and Google consent/client setup explicitly pending.
 
-- [ ] **Step 2: Re-run the required pre-commit gate for documentation**
+- [x] **Step 2: Re-run the required pre-commit gate for documentation**
 
 Run:
 
@@ -657,7 +657,7 @@ git diff --check
 
 Expected: all gates PASS and no whitespace errors.
 
-- [ ] **Step 3: Commit release evidence**
+- [x] **Step 3: Commit release evidence**
 
 Run:
 

@@ -1,5 +1,53 @@
 # Progress log
 
+## 2026-08-02 — Round 58: intent continuity and accessible game dialogs (Codex)
+
+- **Authentication now returns to the work the user actually started.** The
+  shared signed-out boundary requires an explicit safe destination. Routines,
+  Stats, Settings, Planner, Focus, and Editor preserve their canonical routes;
+  Focus and Editor reconstruct only parsed, normalized query fields. The
+  fail-closed validator still rejects external, encoded-path, traversal,
+  malformed, and control-character variants, while allowing exact
+  `/onboarding` without query, fragment, or child paths.
+- **Onboarding and Templates resume without surprise mutations.** The
+  onboarding CTA carries `next=/onboarding`, and a hydration guard prevents the
+  initial persistence effect from overwriting the saved name, step, or anchor
+  choices before restoration. Each signed-out template returns with its known
+  ID; authenticated return highlights and announces the selection but requires
+  the existing explicit **Apply to Today** action. Unknown IDs render the
+  ordinary gallery and no return path auto-creates planner data.
+- **Brain breaks are real modal dialogs.** Every game uses the native dialog
+  top layer with a programmatic name, initial Exit focus, explicit forward and
+  reverse focus wrapping, Escape cancellation, and opener restoration after
+  the dynamically loaded game unmounts. The existing tokenized visual system
+  and game content remain unchanged.
+- **Adversarial review edge cases are closed.** The review identified four
+  Important release gaps: non-finite or excessive Focus durations, onboarding
+  drafts being recreated after completion, corrupt saved anchor indices, and a
+  non-modal lazy-game loading gap, and coercive restoration of a malformed
+  onboarding step. Focus duration is now a bounded positive integer; restored
+  steps, anchors, and indices are strictly validated; finished drafts cannot be
+  persisted again; and the loading state is itself a cancellable native modal
+  with contained focus. The final independent re-review returned **READY**
+  with no remaining Critical or Important finding.
+- **Complete local release proof passed.** Lint, typecheck, production build,
+  `git diff --check`, **119 test files / 1,165 tests**, **33/33** standalone
+  Playwright scenarios, parity (**89.74% web / 86.93% iOS**), iOS release
+  preflight, and the native main-thread gate passed. The app-hosted simulator
+  gate executed **378 tests** (1 skipped, 0 failures) with no Main Thread
+  Checker violation.
+- **Production-mode browser evidence is clean.** At 1440px and 390px, Focus
+  retained its title, emoji, duration, and activity ID; onboarding exposed the
+  exact `/sign-up?next=%2Fonboarding` continuation; Quick Tap was a named dialog
+  with Exit initially focused, repeated Tab containment, Escape closure, and
+  exact opener restoration. No console errors were emitted. Ignored desktop,
+  mobile, and gameplay evidence is under `browser-qa/round58-release/`.
+- **Release status.** Local implementation is ready for exact-SHA CI, Coolify
+  deployment, and read-only production verification. Phase 7B physical-device
+  and provider lifecycle proof and Phase 8B Google consent/client activation
+  remain external evidence gates; this round did not configure either or
+  mutate production planner data.
+
 ## 2026-08-01 — Round 57: truthful Review auth boundary (Codex)
 
 - **Signed-out Review Today is now honest and actionable.** The preview keeps
