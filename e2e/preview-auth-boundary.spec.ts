@@ -410,6 +410,32 @@ test("signed-out PWA quick capture preserves its intent through authentication",
   }
 });
 
+test("an invalid magic-link callback becomes an actionable signed-out recovery state", async ({
+  page,
+}) => {
+  await page.goto("/app/today?error=INVALID_TOKEN");
+  const main = page.getByRole("main");
+
+  await expect(
+    main.getByRole("heading", { name: "This sign-in link isn’t available" }),
+  ).toBeVisible();
+  await expect(main.getByText("Sample planner", { exact: true })).toHaveCount(0);
+  await expect(main.getByText(/expired, or already used/i)).toBeVisible();
+
+  const href = await main
+    .getByRole("link", { name: "Sign in", exact: true })
+    .getAttribute("href");
+  expect(new URL(href!, "https://kairo.test").searchParams.get("next")).toBe(
+    "/app/today",
+  );
+
+  await page.goto("/app/today?error=attacker-controlled-copy");
+  await expect(page.getByText("Sample planner", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "This sign-in link isn’t available" }),
+  ).toHaveCount(0);
+});
+
 test("an invalid password-reset token becomes an actionable recovery state", async ({
   page,
 }) => {

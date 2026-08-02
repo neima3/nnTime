@@ -1,5 +1,33 @@
 # Progress log
 
+## 2026-08-02 — Round 71: invalid magic-link recovery (Codex)
+
+- **Fresh production dogfood found a silent auth failure.** Following the web
+  fallback for a synthetic invalid magic-link token correctly reached Better
+  Auth, then redirected to `/app/today?error=INVALID_TOKEN`. Signed-out Today
+  discarded that stable error and rendered the sample planner with no
+  explanation or recovery action. No account or planner mutation occurred.
+  Ignored evidence and the report are under `browser-qa/round71-dogfood/`.
+- **Invalid links now become an actionable, fail-closed boundary.** Signed-out
+  Today recognizes only the exact `INVALID_TOKEN` string, replaces the sample
+  with a token-only recovery card, and carries a clean `/app/today` destination
+  into sign-in/sign-up so the stale failure cannot replay. Array values and
+  arbitrary query copy continue to the ordinary sample without reflection;
+  authenticated Today remains unchanged.
+- **Test-first, visual, and independent review proof is green.** The new browser
+  contract first failed on the silent sample, then passed alongside normal
+  signed-out Today and PWA capture coverage. It also pins attacker-controlled
+  non-matches. Desktop and 390px mobile checks show a clear hierarchy, semantic
+  heading, clean CTA, and no overflow; ignored evidence is under
+  `browser-qa/round71-local/`. Independent review returned **READY** with no
+  Critical or Important finding. Required lint, typecheck, 1,168 tests in 121
+  files, and production build pass. The complete browser suite passed all 46
+  executed checks with one development-only skip. Scripted parity remains
+  89.74% web / 86.93% iOS, and the iOS release contract passes. Exact-SHA CI,
+  deployment, and live production verification remain pending.
+- **Standing boundaries remain intact.** Phase 7B physical-device provider
+  lifecycle proof and Phase 8B Google activation remain external.
+
 ## 2026-08-02 — Round 70: reset-password visibility parity (Codex)
 
 - **Fresh production dogfood found reset-flow credential drift.** The new

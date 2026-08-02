@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   ChevronLeft,
   ChevronRight,
+  Link2Off,
   ListChecks,
   PenLine,
   Plus,
@@ -237,6 +238,23 @@ export default async function TodayPage({
     isToday,
     nowMin,
   } = await loadTodayData(dateParam);
+
+  const invalidMagicLink = sp.error === "INVALID_TOKEN";
+  if (!authed && invalidMagicLink) {
+    return (
+      <AppShell active="today">
+        <div className="mx-auto max-w-2xl px-4 py-10 md:px-8">
+          <SignedOutCard
+            icon={Link2Off}
+            title="This sign-in link isn’t available"
+            body="It may be incomplete, expired, or already used. Sign in to request a fresh link."
+            returnTo="/app/today"
+            headingLevel="h1"
+          />
+        </div>
+      </AppShell>
+    );
+  }
 
   const captureIntent = sp.capture === "1";
   if (!authed && captureIntent) {

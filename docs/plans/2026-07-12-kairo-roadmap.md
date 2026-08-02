@@ -127,7 +127,8 @@ design work BEFORE the consuming subphase starts.
         heading focus (Round 68, 2026-08-02), plus accessible shared auth
         password visibility (Round 69, 2026-08-02), plus reset-password
         visibility parity through the shared credential field (Round 70,
-        2026-08-02)
+        2026-08-02), plus actionable invalid/expired magic-link browser
+        recovery (Round 71, 2026-08-02)
   - [x] 8D Privacy/review-prep contract + scripted parity gate
         (App Store upload, processing, and launch are tracked per release)
 
