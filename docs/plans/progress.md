@@ -22,8 +22,16 @@
   and typecheck pass. Required lint, typecheck, 1,168 tests in 121 files, and
   production build pass. The complete browser suite passed all 46 executed
   checks with one development-only skip. Scripted parity remains 89.74% web /
-  86.93% iOS, and the iOS release contract passes. Exact-SHA CI, deployment,
-  and live production verification remain pending.
+  86.93% iOS, and the iOS release contract passes.
+- **Exact release proof is green.** Feature commit
+  `99b906f817f70b2c136628d8c54ce76cec7d0375` passed all three lanes in GitHub
+  Actions run `30766766283` (build/test, standalone E2E, and native shipping
+  contract). Coolify deployment `h613ld91oiyt37np205szyno` finished that exact
+  SHA. Live health reported migrations, database, AI, and scheduler `ok`. At
+  1440×1000 and 390×844, the bridge rendered the truthful cross-device copy,
+  omitted the old false phrase, preserved the exact native and browser action
+  URLs, had no overflow, and emitted zero console errors or warnings. Visually
+  inspected ignored evidence is under `browser-qa/round72-live/`.
 - **Standing boundaries remain intact.** Phase 7B physical-device provider
   lifecycle proof and Phase 8B Google activation remain external.
 
