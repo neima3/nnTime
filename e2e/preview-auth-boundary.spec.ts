@@ -459,6 +459,29 @@ test("password-reset requests keep production confirmation account-neutral", asy
   await expect(page.getByText(/local dev|server logs/i)).toHaveCount(0);
 });
 
+test("successful magic-link requests clear an entered password", async ({ page }) => {
+  await page.route("**/api/auth/sign-in/magic-link", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ status: true }),
+    });
+  });
+
+  await page.goto("/sign-in");
+  const email = page.getByRole("textbox", { name: "Email" });
+  const password = page.getByRole("textbox", { name: "Password" });
+  await email.fill("nobody@example.invalid");
+  await password.fill("not-a-real-password");
+  await page.getByRole("button", { name: "Email me a magic link" }).click();
+
+  await expect(page.getByRole("status")).toHaveText(
+    "If that address is valid, a sign-in link is on the way. Check your inbox (and spam).",
+  );
+  await expect(email).toHaveValue("nobody@example.invalid");
+  await expect(password).toHaveValue("");
+});
+
 test("unsafe Focus durations normalize before authentication", async ({ page }) => {
   await page.goto("/app/focus?title=Safe&duration=Infinity");
   const href = await page

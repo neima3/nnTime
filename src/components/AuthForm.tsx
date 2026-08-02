@@ -108,6 +108,7 @@ export function AuthForm({
         setError(res.error.message ?? "Couldn't send that link — try again?");
         return;
       }
+      setPassword("");
       setInfo(
         "If that address is valid, a sign-in link is on the way. Check your inbox (and spam).",
       );

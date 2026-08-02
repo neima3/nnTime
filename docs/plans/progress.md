@@ -1,5 +1,38 @@
 # Progress log
 
+## 2026-08-02 — Round 67: magic-link credential clearing (Codex)
+
+- **Fresh production auth dogfood found stale credential state.** After entering
+  a password and choosing **Email me a magic link**, the production request
+  returned 200 with the correct account-neutral status but left the password
+  populated. The issue reproduced twice with reserved nonexistent
+  `example.invalid` addresses. Ignored report, screenshots, video, and browser
+  output are under `browser-qa/round67-dogfood/`.
+- **Passwordless success now clears the no-longer-needed password.** The client
+  empties password state only after the magic-link request resolves without an
+  error. Email context, validated callback destination, neutral copy, shared
+  request locking, and password-sign-in behavior are unchanged. Missing-email,
+  API-error, and thrown-network paths still preserve retry context.
+- **Test-first, visual, and independent review proof is green.** The browser
+  contract stubs the canonical magic-link endpoint, preserves the submitted
+  email, pins the exact neutral status, and first failed because the password
+  remained populated. It passes after the one-state-transition fix. Independent
+  review returned **READY** with no Critical or Important finding after checking
+  success/error ordering, callback validation, enumeration safety, and lock
+  cleanup. Desktop 1440×1000 and mobile 390×844 checks show an empty password
+  field, balanced layout, and no horizontal overflow. The only console message
+  is Next's documented development-only CSP/eval diagnostic; visually inspected
+  ignored evidence is under `browser-qa/round67-local/`.
+- **Complete local release proof passed.** Lint, typecheck, production build,
+  `git diff --check`, **121 test files / 1,168 tests**, **42/42** executed
+  Playwright scenarios plus one expected development-only skip, parity
+  (**89.74% web / 86.93% iOS**), and the iOS release contract passed.
+- **Exact release proof:** pending exact-SHA CI, deployment, and live production
+  verification.
+- **Standing boundaries remain intact.** Production checks used reserved
+  nonexistent addresses and non-secret test text only. Phase 7B physical-device
+  provider lifecycle proof and Phase 8B Google activation remain external.
+
 ## 2026-08-02 — Round 66: production-safe reset confirmation (Codex)
 
 - **Fresh production recovery dogfood found development copy in public UI.** A
