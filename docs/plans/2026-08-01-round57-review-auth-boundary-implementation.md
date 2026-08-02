@@ -16,7 +16,7 @@
 - Create: `src/components/review-auth-boundary.test.ts`
 - Modify: `e2e/preview-auth-boundary.spec.ts`
 
-- [ ] **Step 1: Write the failing source contract**
+- [x] **Step 1: Write the failing source contract**
 
 Create `src/components/review-auth-boundary.test.ts`:
 
@@ -56,7 +56,7 @@ describe("Review Today authentication boundary", () => {
 });
 ```
 
-- [ ] **Step 2: Add the failing anonymous-browser contract**
+- [x] **Step 2: Add the failing anonymous-browser contract**
 
 Add this test after the Inbox auth-boundary scenario in
 `e2e/preview-auth-boundary.spec.ts`:
@@ -110,7 +110,7 @@ test("signed-out Review Today offers a truthful return path", async ({
 });
 ```
 
-- [ ] **Step 3: Run both focused contracts and verify RED**
+- [x] **Step 3: Run both focused contracts and verify RED**
 
 Run:
 
@@ -123,7 +123,7 @@ Expected: Vitest fails because the auth helper and truthful copy are absent;
 Playwright fails because the three disabled buttons remain and no intent-aware
 link exists.
 
-- [ ] **Step 4: Commit the red contracts**
+- [x] **Step 4: Commit the red contracts**
 
 ```bash
 git add src/components/review-auth-boundary.test.ts \
@@ -136,7 +136,7 @@ git commit -m "test: pin truthful Review auth boundary"
 **Files:**
 - Modify: `src/components/ReviewClient.tsx`
 
-- [ ] **Step 1: Import the shared auth and link primitives**
+- [x] **Step 1: Import the shared auth and link primitives**
 
 Add `Link` and the pure helper beside the current imports:
 
@@ -151,7 +151,7 @@ Extend the icon import with `LogIn`:
 import { ArrowRight, Check, LogIn, SkipForward } from "lucide-react";
 ```
 
-- [ ] **Step 2: Compute constant safe destinations**
+- [x] **Step 2: Compute constant safe destinations**
 
 Inside `ReviewClient`, immediately after `const router = useRouter();`, add:
 
@@ -162,7 +162,7 @@ const signUpHref = authPageHref("sign-up", "/app/review");
 
 Do not add item IDs, titles, dates, or a decision to either URL.
 
-- [ ] **Step 3: Preserve authenticated decisions without auth-driven disabling**
+- [x] **Step 3: Preserve authenticated decisions without auth-driven disabling**
 
 Wrap the current three-button grid in `authed ? (...) : (...)`. In the
 authenticated branch, keep all `onClick` handlers and visual styles, but change
@@ -181,7 +181,7 @@ disabled={busy}
 The mutation handler's existing `if (!current || !authed) return;` remains as
 defense in depth.
 
-- [ ] **Step 4: Add the signed-out auth boundary**
+- [x] **Step 4: Add the signed-out auth boundary**
 
 Use this as the `: (...)` branch and remove the old generic sign-in paragraph:
 
@@ -228,7 +228,7 @@ Use this as the `: (...)` branch and remove the old generic sign-in paragraph:
 </section>
 ```
 
-- [ ] **Step 5: Run focused tests to GREEN**
+- [x] **Step 5: Run focused tests to GREEN**
 
 Run:
 
@@ -242,7 +242,7 @@ pnpm playwright test e2e/preview-auth-boundary.spec.ts --grep "Review Today"
 Expected: all tests pass, the signed-out browser issues no `/api/v1/*` request,
 and the authenticated delivery contract remains present.
 
-- [ ] **Step 6: Commit the implementation**
+- [x] **Step 6: Commit the implementation**
 
 ```bash
 git add src/components/ReviewClient.tsx
@@ -320,13 +320,13 @@ git add docs/plans/2026-07-12-kairo-roadmap.md docs/plans/progress.md \
 git commit -m "docs: record Round 57 Review auth boundary"
 ```
 
-- [ ] **Step 6: Integrate and release the exact SHA**
+- [x] **Step 6: Integrate and release the exact SHA**
 
 Fast-forward the reviewed branch into `main`, rerun the focused tests there,
 push `main`, wait for every exact-SHA GitHub Actions job, and require Coolify to
 finish at the same SHA.
 
-- [ ] **Step 7: Verify production read-only**
+- [x] **Step 7: Verify production read-only**
 
 Check `/api/health`, `/app/review`,
 `/sign-in?next=%2Fapp%2Freview`, production security headers, and a unique

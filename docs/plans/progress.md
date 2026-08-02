@@ -32,6 +32,20 @@
   zero protected planner requests, zero signed-out decision buttons, and the
   exact `/sign-in?next=%2Fapp%2Freview` return path. Ignored screenshots are in
   `browser-qa/round57-review-auth/`.
+- **Exact release proof passed.** Implementation SHA
+  `aa6e022f37be76f640a8566321d64f22cecf5ac1` passed GitHub Actions run
+  `30730205537`: hosted build/test, **27/27** standalone Playwright scenarios,
+  generated/native contracts, the shipping application tests, and the unsigned
+  shipping build all completed successfully. Coolify deployment
+  `dv7g21ayxfza5g2lcb08kltq` finished on that exact SHA. Read-only production
+  verification returned HTTP 200 for `/api/health`, `/app/review`, and
+  `/sign-in?next=%2Fapp%2Freview`; migration, database, AI, and scheduler health
+  were all `ok`; production security headers were present; shipped chunk
+  `/_next/static/chunks/0qeyjw5nf7sgt.js` contained the unique Review auth
+  marker; and live desktop plus 390px dark-mode browser passes had one page
+  heading, no horizontal overflow, no signed-out decision buttons, no protected
+  planner requests, and the exact return-intent navigation. Ignored evidence is
+  under `browser-qa/round57-live/`.
 - **Standing boundary preserved.** Phase 7B physical-device/provider lifecycle
   and Phase 8B Google consent/client activation remain external evidence gates.
   This round did not configure providers or mutate production planner data.
