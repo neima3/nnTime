@@ -21,7 +21,7 @@
   reverse focus wrapping, Escape cancellation, and opener restoration after
   the dynamically loaded game unmounts. The existing tokenized visual system
   and game content remain unchanged.
-- **Adversarial review edge cases are closed.** The review identified four
+- **Adversarial review edge cases are closed.** The review identified five
   Important release gaps: non-finite or excessive Focus durations, onboarding
   drafts being recreated after completion, corrupt saved anchor indices, and a
   non-modal lazy-game loading gap, and coercive restoration of a malformed
@@ -42,11 +42,26 @@
   with Exit initially focused, repeated Tab containment, Escape closure, and
   exact opener restoration. No console errors were emitted. Ignored desktop,
   mobile, and gameplay evidence is under `browser-qa/round58-release/`.
-- **Release status.** Local implementation is ready for exact-SHA CI, Coolify
-  deployment, and read-only production verification. Phase 7B physical-device
-  and provider lifecycle proof and Phase 8B Google consent/client activation
-  remain external evidence gates; this round did not configure either or
-  mutate production planner data.
+- **Exact release proof passed.** SHA
+  `c460b7a9d09409ab9ebd858f5952fe799c7cac14` passed GitHub Actions run
+  `30747028862`: build/test, **33/33** standalone browser scenarios, generated
+  and Apple release contracts, shipping simulator tests, and the unsigned
+  shipping application build all completed successfully. Coolify deployment
+  `i11sfec8y9r4rxfu7tebpnaj` finished on that exact SHA. Live health reported
+  migration, database, AI, and scheduler checks `ok`; `/app/play` returned 200
+  with the production security-header contract; shipped chunk
+  `/_next/static/chunks/1nxpalgzvngkc.js` contained the unique Round 58 loading
+  dialog marker. Desktop and 390px live browser passes confirmed normalized
+  Focus intent, exact onboarding continuation, one heading, no horizontal
+  overflow, Quick Tap dialog naming and initial focus, Escape closure, and
+  opener restoration. Ignored live screenshots are in
+  `browser-qa/round58-live/`.
+- **Standing handoff.** Phase 7B physical-device/provider lifecycle proof and
+  Phase 8B Google consent/client activation remain external evidence gates;
+  this round configured neither and did not mutate production planner data.
+  The next unblocked work stays in ongoing 8C hardening: begin a fresh
+  production-read-only dogfood pass and close the highest-impact demonstrated
+  workflow or accessibility defect with the same test/review/release loop.
 
 ## 2026-08-01 — Round 57: truthful Review auth boundary (Codex)
 

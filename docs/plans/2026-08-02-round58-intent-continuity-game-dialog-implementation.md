@@ -666,14 +666,14 @@ git add docs/plans/2026-07-12-kairo-roadmap.md docs/plans/progress.md docs/plans
 git commit -m "docs: record Round 58 release evidence"
 ```
 
-- [ ] **Step 4: Push and wait for the exact SHA**
+- [x] **Step 4: Push and wait for the exact SHA**
 
 Push `main`, capture `git rev-parse HEAD`, and wait until GitHub `build-test`, `e2e`, and `native-contract` all pass for that exact SHA. Do not infer success from a previous run.
 
-- [ ] **Step 5: Deploy and verify the exact SHA**
+- [x] **Step 5: Deploy and verify the exact SHA**
 
 Follow `docs/DEPLOYMENT.md` to deploy through the correct public Coolify instance. Confirm the deployment reports the exact SHA, then verify live health, security headers, a unique Round 58 bundle marker, desktop/mobile auth continuity, and game-dialog keyboard behavior. Production checks remain read-only.
 
-- [ ] **Step 6: Leave the next production-readiness handoff**
+- [x] **Step 6: Leave the next production-readiness handoff**
 
 Record any remaining external/device work and the next highest-leverage unblocked tranche in `docs/plans/progress.md`. Keep the persistent product goal active unless the full roadmap and external gates are actually complete.
