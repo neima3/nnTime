@@ -473,6 +473,9 @@ test("successful magic-link requests clear an entered password", async ({ page }
   const password = page.getByRole("textbox", { name: "Password" });
   await email.fill("nobody@example.invalid");
   await password.fill("not-a-real-password");
+  const passwordVisibility = page.getByRole("button", { name: "Show password" });
+  await passwordVisibility.click();
+  await expect(password).toHaveAttribute("type", "text");
   await page.getByRole("button", { name: "Email me a magic link" }).click();
 
   await expect(page.getByRole("status")).toHaveText(
@@ -480,6 +483,36 @@ test("successful magic-link requests clear an entered password", async ({ page }
   );
   await expect(email).toHaveValue("nobody@example.invalid");
   await expect(password).toHaveValue("");
+  await expect(password).toHaveAttribute("type", "password");
+  await expect(passwordVisibility).toHaveAttribute("aria-pressed", "false");
+});
+
+test("sign-in and sign-up passwords can be revealed and re-masked", async ({
+  page,
+}) => {
+  for (const path of ["/sign-in", "/sign-up"]) {
+    await gotoHydrated(page, path);
+    const password = page.getByRole("textbox", { name: "Password" });
+    await password.fill("NotARealPassword1!");
+
+    await expect(password).toHaveAttribute("type", "password");
+    const showPassword = page.getByRole("button", { name: "Show password" });
+    await expect(showPassword).toHaveAttribute("aria-pressed", "false");
+    await expect(showPassword).toHaveCSS("min-width", "44px");
+    await expect(showPassword).toHaveCSS("min-height", "44px");
+
+    await showPassword.click();
+    await expect(password).toHaveAttribute("type", "text");
+    await expect(password).toHaveValue("NotARealPassword1!");
+    await expect(showPassword).toHaveAttribute("aria-pressed", "true");
+    await expect(showPassword).toBeFocused();
+
+    await showPassword.click();
+    await expect(password).toHaveAttribute("type", "password");
+    await expect(password).toHaveValue("NotARealPassword1!");
+    await expect(showPassword).toHaveAttribute("aria-pressed", "false");
+    await expect(showPassword).toBeFocused();
+  }
 });
 
 test("unsafe Focus durations normalize before authentication", async ({ page }) => {

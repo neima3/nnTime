@@ -1,5 +1,40 @@
 # Progress log
 
+## 2026-08-02 — Round 69: auth password visibility (Codex)
+
+- **Fresh production dogfood found permanently masked auth credentials.** Both
+  `/sign-in` and `/sign-up` exposed password inputs with no keyboard, pointer,
+  or touch path to verify the entered value. The issue reproduced at 1440×1000
+  and 390×844 without form submission. A separate forgot-password observation
+  was rejected as a false positive because its async confirmation correctly
+  uses `role="status"`. Ignored evidence and the report are under
+  `browser-qa/round69-dogfood/`.
+- **The shared auth field now has an accessible visibility toggle.** Passwords
+  remain masked by default; a token-only Lucide control reveals and re-masks the
+  same controlled value without changing autocomplete, validation, submission,
+  request locking, or return routing. The button has one stable **Show password**
+  accessible name, `aria-pressed` visibility state, `aria-controls`, a native
+  keyboard interaction, and an exact 44×44 target. Successful magic-link
+  requests clear the value and return the field to masked state.
+- **Test-first, visual, and independent review proof is green.** The browser
+  contract first failed because the control did not exist, then caught an
+  Important changing-name plus pressed-state conflict during review. The final
+  stable-name model passed re-review with no remaining Critical or Important
+  finding. Desktop light and 390px mobile dark/high-contrast checks confirm
+  value and focus continuity, pressed state, correct target size, balanced
+  hierarchy, and no overflow. The only console item is Next's documented
+  development-only CSP/eval diagnostic; visually inspected ignored evidence is
+  under `browser-qa/round69-local/`.
+- **Complete local release proof passed.** Lint, typecheck, production build,
+  `git diff --check`, **121 test files / 1,168 tests**, **44/44** executed
+  Playwright scenarios plus one expected development-only skip, parity
+  (**89.74% web / 86.93% iOS**), and the iOS release contract passed.
+- **Exact release proof:** pending exact-SHA CI, deployment, and live production
+  verification.
+- **Standing boundaries remain intact.** Production dogfood did not submit an
+  auth form or create account/planner data. Phase 7B physical-device provider
+  lifecycle proof and Phase 8B Google activation remain external.
+
 ## 2026-08-02 — Round 68: onboarding step focus (Codex)
 
 - **Fresh production onboarding dogfood found a focus dead zone.** Activating

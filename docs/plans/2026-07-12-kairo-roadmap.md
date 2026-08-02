@@ -124,7 +124,8 @@ design work BEFORE the consuming subphase starts.
         2026-08-02), plus production-safe password-reset request confirmation
         copy (Round 66, 2026-08-02), plus magic-link success credential-state
         clearing (Round 67, 2026-08-02), plus transition-scoped onboarding
-        heading focus (Round 68, 2026-08-02)
+        heading focus (Round 68, 2026-08-02), plus accessible shared auth
+        password visibility (Round 69, 2026-08-02)
   - [x] 8D Privacy/review-prep contract + scripted parity gate
         (App Store upload, processing, and launch are tracked per release)
 
