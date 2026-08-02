@@ -36,6 +36,22 @@
   overflow. The only development console entry was the deliberately stubbed
   400 reset response; there were no page errors. Visually inspected ignored
   evidence is under `browser-qa/round65-local/`.
+- **Exact release proof passed.** Feature SHA
+  `6d14a2c06df8a152da0f2f71a188dd5294325e19` passed GitHub Actions run
+  `30757890629`: hosted build/test, **40/40** production-standalone browser
+  scenarios with the development-only internal-reference contract intentionally
+  skipped, generated/native contracts, shipping simulator tests, and the
+  unsigned shipping application build all completed successfully. Coolify
+  deployment `i101e33c200sca0fqxhypka1` finished on that exact SHA. Live health
+  reported migration, database, AI, and scheduler checks `ok`; the reset route
+  returned HTTP 200 with enforcing CSP, HSTS, frame denial, and nosniff. Real
+  bogus-token submissions at desktop 1440×1000 and mobile 390×844 received the
+  expected auth 400, then showed the branded recovery state with the heading
+  focused, the password field and raw backend phrase removed, and the exact
+  `/forgot-password` action present. Both widths had no horizontal overflow or
+  page error; the only console entry was the expected failed 400 network
+  response. Visually inspected ignored evidence is under
+  `browser-qa/round65-live/`.
 - **Standing boundaries remain intact.** Production checks used a deliberately
   bogus token only; no real account password changed. Phase 7B physical-device
   provider lifecycle proof and Phase 8B Google activation remain external.
