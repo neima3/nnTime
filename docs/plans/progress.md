@@ -1,5 +1,32 @@
 # Progress log
 
+## 2026-08-02 — Round 72: cross-device callback copy (Codex)
+
+- **Fresh production dogfood found a false device claim.** At a 1440×1000
+  desktop viewport, the magic-link bridge said “Open Kairo on this iPhone.” The
+  native/browser actions and console were correct, but the current browser was
+  plainly not an iPhone. No verifier action was activated and no account or
+  planner mutation occurred. Ignored evidence and the report are under
+  `browser-qa/round72-dogfood/`.
+- **The bridge is now truthful across devices.** It directs the user to open
+  Kairo on **your iPhone** or continue in **this browser**, preserving the
+  binding two-action behavior, single-use guidance, token encoding, no-auto-
+  verification contract, missing-token recovery, metadata, and token-only
+  styling.
+- **Test-first, visual, and independent review proof is green.** The
+  server-rendered contract first failed on the false current-device copy, then
+  passed 2/2 while retaining all Round 20 action/token assertions. Desktop and
+  390px mobile checks confirm balanced wrapping, unchanged hrefs, and no
+  overflow; ignored evidence is under `browser-qa/round72-local/`. Independent
+  review returned **READY** with no Critical or Important finding. Focused tests
+  and typecheck pass. Required lint, typecheck, 1,168 tests in 121 files, and
+  production build pass. The complete browser suite passed all 46 executed
+  checks with one development-only skip. Scripted parity remains 89.74% web /
+  86.93% iOS, and the iOS release contract passes. Exact-SHA CI, deployment,
+  and live production verification remain pending.
+- **Standing boundaries remain intact.** Phase 7B physical-device provider
+  lifecycle proof and Phase 8B Google activation remain external.
+
 ## 2026-08-02 — Round 71: invalid magic-link recovery (Codex)
 
 - **Fresh production dogfood found a silent auth failure.** Following the web

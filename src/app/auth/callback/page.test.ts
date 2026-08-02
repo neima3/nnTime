@@ -9,6 +9,8 @@ describe("magic-link web fallback", () => {
     });
     const html = renderToStaticMarkup(page);
 
+    expect(html).toContain("Open Kairo on your iPhone");
+    expect(html).not.toContain("this iPhone");
     expect(html).toContain("Open Kairo");
     expect(html).toContain("Continue in browser");
     expect(html).toContain("kairo://auth?token=single-use-token");

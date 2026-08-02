@@ -36,7 +36,7 @@ export default async function MagicLinkCallbackPage({
               Finish signing in
             </h1>
             <p className="mt-2 text-[14px] leading-relaxed text-ink-soft">
-              Open Kairo on this iPhone, or continue securely in this browser.
+              Open Kairo on your iPhone, or continue securely in this browser.
               This link works once.
             </p>
             <div className="mt-6 grid gap-3">
