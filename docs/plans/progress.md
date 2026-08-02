@@ -1,5 +1,39 @@
 # Progress log
 
+## 2026-08-02 — Round 63: sign-up privacy discoverability (Codex)
+
+- **Fresh production dogfood found a trust gap at account creation.** The
+  signed-out `/sign-up` form requested a visitor's name, email address, and
+  password, but exposed only home and sign-in links. Kairo's complete public
+  policy existed at `/privacy` but was not discoverable from the collection
+  surface. The issue reproduced at 1440px and 390px; ignored report and evidence
+  are under `browser-qa/round63-dogfood/`.
+- **The sign-up card now exposes the existing policy without coercive copy.** A
+  quiet, token-only note appears after every enabled account-creation method:
+  **Your planner is personal. Learn how Kairo handles your information in our
+  Privacy Policy.** The link targets `/privacy`, appears only in sign-up mode,
+  and neither invents a terms agreement nor claims that account creation itself
+  constitutes policy consent. Authentication and safe return-intent behavior
+  remain unchanged.
+- **Test-first, visual, and independent review proof is green.** The focused
+  browser contract first failed because the link did not exist, then passed
+  after the narrow shared-auth-form change. Desktop and 390×844 browser checks
+  showed a balanced card, readable hierarchy, exact `/privacy` navigation, and
+  no horizontal overflow; visually inspected ignored evidence is under
+  `browser-qa/round63-local/`. Independent review returned **READY** with no
+  Critical or Important finding after checking semantics, keyboard access,
+  design tokens, wording, mode isolation, and locator robustness.
+- **Complete local release proof passed.** Lint, typecheck, production build,
+  `git diff --check`, **121 test files / 1,168 tests**, **37/37** Playwright
+  scenarios plus one expected development-only skip, parity (**89.74% web /
+  86.93% iOS**), and the iOS release contract passed. The first full-browser
+  invocation encountered a transient stale-process port race before executing
+  tests; the dedicated port was already released on inspection and the clean
+  rerun completed successfully.
+- **Standing boundaries remain intact.** Production verification remains
+  signed-out and read-only. Phase 7B physical-device/provider lifecycle proof
+  and Phase 8B Google consent/client activation remain external gates.
+
 ## 2026-08-02 — Round 62: internal reference production boundary (Codex)
 
 - **Fresh production dogfood found one publicly exposed internal surface.**

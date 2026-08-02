@@ -116,7 +116,9 @@ design work BEFORE the consuming subphase starts.
         signed-out Month sample framing with real-month navigation reserved for
         authenticated calendars (Round 61, 2026-08-02), plus production-only
         removal of the internal timeline-state design reference and PWA cache
-        eviction for previously installed clients (Round 62, 2026-08-02)
+        eviction for previously installed clients (Round 62, 2026-08-02), and
+        point-of-collection privacy-policy discoverability during account
+        creation (Round 63, 2026-08-02)
   - [x] 8D Privacy/review-prep contract + scripted parity gate
         (App Store upload, processing, and launch are tracked per release)
 

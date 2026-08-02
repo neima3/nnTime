@@ -410,6 +410,18 @@ test("onboarding choices survive account creation", async ({ page }) => {
   ).toBeNull();
 });
 
+test("sign-up exposes the privacy policy at the point of collection", async ({
+  page,
+}) => {
+  await gotoHydrated(page, "/sign-up");
+
+  const form = page.getByRole("heading", { name: "Create your planner" }).locator("..");
+  const privacyLink = form.getByRole("link", { name: "Privacy Policy" });
+
+  await expect(privacyLink).toBeVisible();
+  await expect(privacyLink).toHaveAttribute("href", "/privacy");
+});
+
 test("onboarding discards corrupt saved anchor indices", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem(

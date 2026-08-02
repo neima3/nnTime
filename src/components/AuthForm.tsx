@@ -280,6 +280,20 @@ export function AuthForm({
               </button>
             </>
           )}
+
+          {isSignUp && (
+            <p className="mt-4 text-center text-[12px] leading-relaxed text-ink-faint">
+              Your planner is personal. Learn how Kairo handles your information
+              in our{" "}
+              <Link
+                href="/privacy"
+                className="font-semibold text-iris hover:underline"
+              >
+                Privacy Policy
+              </Link>
+              .
+            </p>
+          )}
         </div>
 
         <p className="mt-5 text-center text-[14px] text-ink-soft">
