@@ -1,11 +1,20 @@
 import { expect, test } from "@playwright/test";
-import { gotoHydrated } from "./helpers";
+import { gotoHydrated, signUp } from "./helpers";
 
-test.use({ locale: "en-US", timezoneId: "America/New_York" });
+test.use({
+  locale: "en-US",
+  timezoneId: "America/New_York",
+  storageState: { cookies: [], origins: [] },
+  // The production service worker owns fetches before page.route can observe
+  // them. This contract deliberately stubs a conflict response, so keep the
+  // request on the page interception path.
+  serviceWorkers: "block",
+});
 
 test("authenticated Review decisions persist before celebrating", async ({
   page,
 }) => {
+  await signUp(page, "review-actions");
   const suffix = Date.now();
   const titles = [
     `Review complete ${suffix}`,

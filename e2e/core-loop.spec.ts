@@ -9,27 +9,37 @@
  * planning day (dayUrl offset).
  */
 import { test, expect } from "@playwright/test";
-import { createActivity, dayUrl, gotoHydrated } from "./helpers";
+import { createActivity, dayUrl, gotoHydrated, signUp } from "./helpers";
 
-test.use({ locale: "en-US", timezoneId: "America/New_York" });
+test.use({
+  locale: "en-US",
+  timezoneId: "America/New_York",
+});
 
-test("plan an activity, complete it, and it sticks", async ({ page }) => {
-  const day = dayUrl(1);
-  await createActivity(page, day, "E2E flight check");
+test.describe("isolated completion account", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
 
-  await page.getByRole("button", { name: "Complete E2E flight check" }).click();
-  await expect(
-    page.getByRole("button", { name: "Mark E2E flight check not done" }),
-  ).toBeVisible();
-  // Header progress reflects the server round trip (router.refresh).
-  await expect(page.getByText("all 1 done")).toBeVisible({ timeout: 15_000 });
+  test("plan an activity, complete it, and it sticks", async ({ page }) => {
+    await signUp(page, "core-loop-completion");
+    const day = dayUrl(1);
+    await createActivity(page, day, "E2E flight check");
 
-  // Server truth, not optimistic UI: a fresh document shows it done.
-  await page.reload();
-  await page.waitForSelector('html[data-hydrated="true"]');
-  await expect(
-    page.getByRole("button", { name: "Mark E2E flight check not done" }),
-  ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Complete E2E flight check" })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Mark E2E flight check not done" }),
+    ).toBeVisible();
+    // Header progress reflects the server round trip (router.refresh).
+    await expect(page.getByText("all 1 done")).toBeVisible({ timeout: 15_000 });
+
+    // Server truth, not optimistic UI: a fresh document shows it done.
+    await page.reload();
+    await page.waitForSelector('html[data-hydrated="true"]');
+    await expect(
+      page.getByRole("button", { name: "Mark E2E flight check not done" }),
+    ).toBeVisible();
+  });
 });
 
 test("signed-in timeline keeps keyboard move and Enter-to-edit controls", async ({

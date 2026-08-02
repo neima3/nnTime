@@ -1,5 +1,41 @@
 # Progress log
 
+## 2026-08-01 — Round 57: truthful Review auth boundary (Codex)
+
+- **Signed-out Review Today is now honest and actionable.** The preview keeps
+  the sample unfinished-plan card, but no longer exposes three disabled
+  decision buttons that cannot persist. A token-only boundary explains the
+  private planner requirement and offers `Sign in to review` plus
+  `Create an account`, both preserving `next=/app/review`.
+- **Authenticated decisions celebrate only persisted outcomes.** Complete,
+  move-tomorrow, and skip remain available for signed-in users. Completion now
+  emits its celebration only after the mutation is accepted by the server or
+  safely queued on-device; conflicts, unavailable delivery, and exceptions
+  leave the item in place with an error and no false success signal.
+- **Adversarial review closed every release finding.** Independent review
+  initially found premature celebration, weak authenticated behavior coverage,
+  and a non-tokenized focus offset. The implementation and browser contract
+  were strengthened, then re-reviewed **READY** with no remaining Critical or
+  Important finding.
+- **The production browser suite is isolated from shared state.** The
+  completion and Review contracts use fresh full browser storage instead of
+  cookie-only clearing, and the stubbed conflict test blocks the production
+  service worker so Playwright owns the intercepted request. This removes
+  cross-spec planner rows, stale offline-queue ownership, and retry duplicates
+  without weakening product assertions.
+- **Complete local release proof passed.** Lint, typecheck, production build,
+  `git diff --check`, **117 test files / 1,136 tests**, **27/27** standalone
+  Playwright scenarios, parity (**89.74% web / 86.93% iOS**), iOS release
+  preflight, and the native main-thread gate passed. The app-hosted native gate
+  executed **378 tests** (1 skipped, 0 failures). Production-standalone browser
+  checks at 1440×900 and 390×844 showed one `h1`, zero horizontal overflow,
+  zero protected planner requests, zero signed-out decision buttons, and the
+  exact `/sign-in?next=%2Fapp%2Freview` return path. Ignored screenshots are in
+  `browser-qa/round57-review-auth/`.
+- **Standing boundary preserved.** Phase 7B physical-device/provider lifecycle
+  and Phase 8B Google consent/client activation remain external evidence gates.
+  This round did not configure providers or mutate production planner data.
+
 ## 2026-08-01 — Round 56: truthful Inbox auth continuity (Codex)
 
 - **Signed-out Inbox controls now tell the truth.** The preview retains its six

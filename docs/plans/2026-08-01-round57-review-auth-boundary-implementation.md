@@ -256,7 +256,7 @@ git commit -m "fix: make Review Today auth boundary truthful"
 - Modify: `docs/plans/progress.md`
 - Modify: `docs/plans/2026-08-01-round57-review-auth-boundary-implementation.md`
 
-- [ ] **Step 1: Run the complete focused regression set**
+- [x] **Step 1: Run the complete focused regression set**
 
 Run:
 
@@ -274,7 +274,7 @@ pnpm playwright test e2e/preview-auth-boundary.spec.ts --grep "Review Today|Inbo
 Expected: every focused test passes; the Round 56 Inbox boundary and all auth
 return-intent consumers remain unchanged.
 
-- [ ] **Step 2: Perform an independent adversarial review**
+- [x] **Step 2: Perform an independent adversarial review**
 
 Review the complete branch diff against the design, ADR-003, ADR-005, and the
 binding visual contract. Require no open Critical or Important finding.
@@ -282,7 +282,7 @@ Specifically challenge unsafe return destinations, authenticated action loss,
 celebration before a rejected action, hidden protected requests, duplicate page
 headings, focus visibility, touch targets, and mobile overflow.
 
-- [ ] **Step 3: Run all repository gates**
+- [x] **Step 3: Run all repository gates**
 
 Run:
 
@@ -300,7 +300,7 @@ git diff --check
 
 Expected: every command exits 0; parity remains above both 85% gates.
 
-- [ ] **Step 4: Verify the production artifact in a real browser**
+- [x] **Step 4: Verify the production artifact in a real browser**
 
 Run the production standalone build on port 3456 with a throwaway local
 `BETTER_AUTH_SECRET`. At 1440×900 and 390×844, verify the signed-out Review page
@@ -308,7 +308,7 @@ shows the sample card and auth boundary, contains exactly one `h1`, has no
 horizontal overflow, and reaches `/sign-in?next=%2Fapp%2Freview`. Save ignored
 screenshots under `browser-qa/round57-review-auth/`.
 
-- [ ] **Step 5: Record the tranche and commit**
+- [x] **Step 5: Record the tranche and commit**
 
 Add Round 57 to `docs/plans/progress.md` with exact test totals, review result,
 and evidence. Extend the 8C roadmap note without changing Phase 7B or Phase 8B.
