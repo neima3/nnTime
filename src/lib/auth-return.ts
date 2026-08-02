@@ -43,9 +43,13 @@ export function safeAuthReturnTo(value: unknown): string {
 
   try {
     const url = new URL(value, AUTH_BASE);
+    const isOnboarding =
+      url.pathname === "/onboarding" && url.search === "" && url.hash === "";
     if (
       url.origin !== AUTH_BASE ||
-      (url.pathname !== "/app" && !url.pathname.startsWith("/app/"))
+      (!isOnboarding &&
+        url.pathname !== "/app" &&
+        !url.pathname.startsWith("/app/"))
     ) {
       return DEFAULT_AUTH_RETURN_TO;
     }
@@ -53,6 +57,18 @@ export function safeAuthReturnTo(value: unknown): string {
   } catch {
     return DEFAULT_AUTH_RETURN_TO;
   }
+}
+
+export function appReturnTo(
+  pathname: string,
+  values: Record<string, string | number | undefined> = {},
+): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(values)) {
+    if (value !== undefined) params.set(key, String(value));
+  }
+  const search = params.toString();
+  return safeAuthReturnTo(search ? `${pathname}?${search}` : pathname);
 }
 
 export function authPageHref(

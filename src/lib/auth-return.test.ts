@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { authPageHref, safeAuthReturnTo } from "./auth-return";
+import { appReturnTo, authPageHref, safeAuthReturnTo } from "./auth-return";
 
 describe("safeAuthReturnTo", () => {
   it.each([
@@ -9,6 +9,7 @@ describe("safeAuthReturnTo", () => {
     "/app/inbox?filter=work%2Fhome",
     "/app/inbox?note=why%3Fnow%23later",
     "/app/inbox#section%2Fchild",
+    "/onboarding",
   ])(
     "keeps an internal app destination: %s",
     (value) => expect(safeAuthReturnTo(value)).toBe(value),
@@ -31,6 +32,10 @@ describe("safeAuthReturnTo", () => {
     "/app/%ZZ",
     "/sign-in",
     "/privacy",
+    "/onboarding/",
+    "/onboarding?next=%2Fapp%2Ftoday",
+    "/onboarding#resume",
+    "/onboarding%2fchild",
     "not-a-url",
   ])("fails closed for %j", (value) => {
     expect(safeAuthReturnTo(value)).toBe("/app/today");
@@ -43,5 +48,28 @@ describe("safeAuthReturnTo", () => {
     expect(
       authPageHref("sign-up", "/app/inbox", { provider: "google" }),
     ).toBe("/sign-up?provider=google&next=%2Fapp%2Finbox");
+  });
+
+  it("serializes a normalized app intent deterministically", () => {
+    expect(
+      appReturnTo("/app/focus", {
+        title: "Lunch",
+        emoji: "🍜",
+        duration: 45,
+        activityId: "a5",
+        occurrenceKey: undefined,
+      }),
+    ).toBe(
+      "/app/focus?title=Lunch&emoji=%F0%9F%8D%9C&duration=45&activityId=a5",
+    );
+  });
+
+  it("drops undefined values and fails unsafe paths closed", () => {
+    expect(
+      appReturnTo("/app/editor", { date: "2026-08-02", start: 540 }),
+    ).toBe("/app/editor?date=2026-08-02&start=540");
+    expect(appReturnTo("//evil.example", { value: "x" })).toBe(
+      "/app/today",
+    );
   });
 });
