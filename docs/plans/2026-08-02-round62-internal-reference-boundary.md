@@ -56,8 +56,8 @@ runs the development server.
   gates in roadmap and progress.
 - [x] Run `pnpm lint && pnpm typecheck && pnpm test && pnpm build`.
 - [x] Complete independent review and desktop/mobile production-mode QA.
-- [ ] Commit and push; require exact-SHA GitHub CI success.
-- [ ] Deploy the exact feature SHA through Coolify and verify live health,
+- [x] Commit and push; require exact-SHA GitHub CI success.
+- [x] Deploy the exact feature SHA through Coolify and verify live health,
   `/app/timeline-states` HTTP 404, branded 404 copy, no internal binding copy,
   and an unaffected public product route.
 

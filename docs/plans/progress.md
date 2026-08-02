@@ -32,9 +32,24 @@
   `browser-qa/round62-release/`. Independent re-review returned **READY** with
   no remaining Critical or Important finding after re-running the worker and
   development-route contracts.
-- **Release is pending exact-SHA CI and deployment.** Phase 7B physical-device/
-  provider lifecycle proof and Phase 8B Google consent/client activation remain
-  external gates. Production dogfood made no planner mutation.
+- **Exact release proof passed.** Feature SHA
+  `9a766a98f1a5e06f072170f51e663919396d2467` passed GitHub Actions run
+  `30752712393`: hosted build/test, **36/36** production-standalone browser
+  scenarios with the development-only contract intentionally skipped,
+  generated/native contracts, shipping simulator tests, and the unsigned
+  shipping application build all completed successfully. Coolify deployment
+  `pcx1i7dhmr6ahjakin9r6h2g` finished on that exact SHA. Live health reported
+  migration, database, AI, and scheduler checks `ok`; `/app/timeline-states`
+  returned HTTP 404 with enforcing CSP, HSTS, frame denial, and nosniff; its
+  response contained only the branded recovery markers and no binding copy.
+  The live service worker contained `kairo-v5-boundaries` plus the route purge
+  and network-only rule, while `/app/today` remained 200. Desktop 1440×900 and
+  mobile 390×844 browser passes confirmed one **Lost track of time?** heading,
+  no internal copy, no horizontal overflow, and no console or page errors.
+  Visually inspected ignored evidence is under `browser-qa/round62-live/`.
+- **Standing boundaries remain intact.** Phase 7B physical-device/provider
+  lifecycle proof and Phase 8B Google consent/client activation remain external
+  gates. Production dogfood and verification made no planner mutation.
 
 ## 2026-08-02 — Round 61: truthful signed-out sample month (Codex)
 
