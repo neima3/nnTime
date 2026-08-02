@@ -28,8 +28,19 @@
 - **Complete local proof is green.** Required lint, typecheck, 1,168 tests in
   121 files, and production build passed. The browser suite passed all 45
   executed checks with one development-only skip. Scripted parity remains
-  89.74% web / 86.93% iOS, and the iOS release contract passed. Exact-SHA CI,
-  deployment, and live production verification remain pending.
+  89.74% web / 86.93% iOS, and the iOS release contract passed.
+- **Exact release proof is green.** Feature commit
+  `ff61901de2705c2fbd2592d9e24202e5680bb574` passed all three lanes in GitHub
+  Actions run `30764622036` (build/test, standalone E2E, and native shipping
+  contract). Coolify deployment `xz7oj36x9jkux30eh7chrakt` finished that exact
+  SHA. Live health reported migrations, database, AI, and scheduler `ok`; the
+  reset page returned the expected production security headers. At 1440×1000
+  and 390×844, live reveal/re-mask retained value and focus, exposed the stable
+  pressed state, measured exactly 44×44, and had no horizontal overflow. A safe
+  synthetic invalid-token submission focused the recovery heading and removed
+  the cleared credential and toggle. The only console error was that expected
+  400 response. Visually inspected ignored evidence is under
+  `browser-qa/round70-live/`.
 - **Standing boundaries remain intact.** Production checks used only a
   synthetic invalid token and could not change account or planner data. Phase
   7B physical-device provider lifecycle proof and Phase 8B Google activation

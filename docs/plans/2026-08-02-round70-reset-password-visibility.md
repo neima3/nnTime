@@ -29,4 +29,4 @@ evidence lives under `browser-qa/round70-dogfood/`.
 - [x] Extract and adopt one shared password field.
 - [x] Obtain independent Critical/Important review.
 - [x] Pass local browser, repository, parity, and iOS release gates.
-- [ ] Commit, push, pass exact-SHA CI, deploy exact SHA, and verify live.
+- [x] Commit, push, pass exact-SHA CI, deploy exact SHA, and verify live.
