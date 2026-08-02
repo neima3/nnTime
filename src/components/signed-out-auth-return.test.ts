@@ -18,11 +18,18 @@ describe("signed-out auth return boundaries", () => {
     ["src/app/app/stats/page.tsx", "/app/stats"],
     ["src/app/app/settings/page.tsx", "/app/settings"],
     ["src/app/app/planner/page.tsx", "/app/planner"],
-    ["src/app/app/focus/page.tsx", "/app/focus"],
-    ["src/app/app/editor/page.tsx", "/app/editor"],
     ["src/components/StatsClient.tsx", "/app/stats"],
     ["src/components/SettingsClient.tsx", "/app/settings"],
   ])("pins %s to %s", (path, returnTo) => {
     expect(read(path)).toContain(`returnTo="${returnTo}"`);
+  });
+
+  it.each([
+    ["src/app/app/focus/page.tsx", "/app/focus"],
+    ["src/app/app/editor/page.tsx", "/app/editor"],
+  ])("builds normalized dynamic intent for %s", (path, returnTo) => {
+    const source = read(path);
+    expect(source).toContain(`appReturnTo("${returnTo}", {`);
+    expect(source).toContain("returnTo={returnTo}");
   });
 });

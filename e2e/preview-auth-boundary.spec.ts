@@ -76,10 +76,20 @@ test("signed-out Week creation lands on an actionable auth boundary", async ({
   try {
     await page.goto("/app/week");
     await page.getByRole("link", { name: "+ Add" }).first().click();
+    const main = page.getByRole("main");
     await expect(
-      page.getByRole("heading", { name: "Plan after you sign in" }),
+      main.getByRole("heading", { name: "Plan after you sign in" }),
     ).toBeVisible();
-    await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
+    const editor = new URL(page.url());
+    const href = await main
+      .getByRole("link", { name: "Sign in" })
+      .getAttribute("href");
+    const next = new URL(href!, "https://kairo.test").searchParams.get("next");
+    const returnedEditor = new URL(next!, "https://kairo.test");
+    expect(returnedEditor.pathname).toBe(editor.pathname);
+    expect([...returnedEditor.searchParams.entries()].sort()).toEqual(
+      [...editor.searchParams.entries()].sort(),
+    );
     await page.waitForTimeout(500);
 
     expect(protectedRequests).toEqual([]);
@@ -242,9 +252,21 @@ test("signed-out Today advertises only the preview interactions it supports", as
   const focus = page.getByRole("button", { name: /^Focus on / }).first();
   await expect(focus).toBeVisible();
   await focus.click();
+  const main = page.getByRole("main");
   await expect(
-    page.getByRole("heading", { level: 1, name: "Focus after you sign in" }),
+    main.getByRole("heading", {
+      level: 1,
+      name: "Focus after you sign in",
+    }),
   ).toBeVisible();
+  const focusUrl = new URL(page.url());
+  const expected = `${focusUrl.pathname}${focusUrl.search}`;
+  const href = await main
+    .getByRole("link", { name: "Sign in" })
+    .getAttribute("href");
+  expect(new URL(href!, "https://kairo.test").searchParams.get("next")).toBe(
+    expected,
+  );
   expect(protectedRequests).toEqual([]);
 });
 

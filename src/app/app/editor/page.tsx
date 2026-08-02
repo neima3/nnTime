@@ -6,6 +6,7 @@ import { CalendarPlus } from "lucide-react";
 import { getSession } from "@/server/auth-session";
 import { getTask, listCategories, listChecklistItems } from "@/server/dal";
 import { buildCategoryMap } from "@/lib/adapters";
+import { appReturnTo } from "@/lib/auth-return";
 
 /**
  * Activity editor route — create (?start=&date=) or edit (?id=).
@@ -22,6 +23,13 @@ export default async function EditorPage({
   const start = typeof sp.start === "string" ? Number(sp.start) : undefined;
   const date = typeof sp.date === "string" ? sp.date : undefined;
   const title = typeof sp.title === "string" ? sp.title : undefined;
+  const returnTo = appReturnTo("/app/editor", {
+    id,
+    taskId,
+    start: Number.isFinite(start) ? start : undefined,
+    date,
+    title,
+  });
   const session = await getSession();
   const task =
     session && taskId
@@ -49,7 +57,7 @@ export default async function EditorPage({
               icon={CalendarPlus}
               title="Plan after you sign in"
               body="Create activities, choose gentle reminders, and keep your plan synced across devices."
-              returnTo="/app/editor"
+              returnTo={returnTo}
               headingLevel="h1"
             />
           </div>

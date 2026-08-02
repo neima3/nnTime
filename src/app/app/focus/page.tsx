@@ -2,6 +2,7 @@ import { AppShell } from "@/components/AppShell";
 import { SignedInOnly } from "@/components/AppSessionBoundary";
 import { SignedOutCard } from "@/components/EmptyState";
 import { FocusClient } from "@/components/FocusClient";
+import { appReturnTo } from "@/lib/auth-return";
 import { Timer } from "lucide-react";
 
 export default async function FocusPage({
@@ -21,6 +22,13 @@ export default async function FocusPage({
     typeof sp.activityId === "string" ? sp.activityId : undefined;
   const occurrenceKey =
     typeof sp.occurrenceKey === "string" ? sp.occurrenceKey : undefined;
+  const returnTo = appReturnTo("/app/focus", {
+    title,
+    emoji,
+    duration,
+    activityId,
+    occurrenceKey,
+  });
 
   return (
     <AppShell active="focus">
@@ -31,7 +39,7 @@ export default async function FocusPage({
               icon={Timer}
               title="Focus after you sign in"
               body="Start a session, keep the timer in sync, and return to it from any Kairo screen."
-              returnTo="/app/focus"
+              returnTo={returnTo}
               headingLevel="h1"
             />
           </div>
