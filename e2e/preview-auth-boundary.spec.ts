@@ -15,8 +15,37 @@ const previewRoutes = [
   "/app/review",
   "/app/planner",
   "/app/more",
-  "/app/timeline-states",
 ] as const;
+
+test("production hides the internal timeline reference behind the branded 404", async ({
+  page,
+}) => {
+  test.skip(!process.env.CI, "requires the production standalone server");
+
+  const response = await page.goto("/app/timeline-states");
+
+  expect(response?.status()).toBe(404);
+  await expect(
+    page.getByRole("heading", { name: "Lost track of time?" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Binding reference for edge-case rendering."),
+  ).toHaveCount(0);
+});
+
+test("development retains the internal timeline reference", async ({ page }) => {
+  test.skip(Boolean(process.env.CI), "requires the development server");
+
+  const response = await page.goto("/app/timeline-states");
+
+  expect(response?.status()).toBe(200);
+  await expect(
+    page.getByRole("heading", { name: "Timeline states" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Binding reference for edge-case rendering."),
+  ).toBeVisible();
+});
 
 test("signed-out product previews never call protected planner APIs", async ({
   browser,

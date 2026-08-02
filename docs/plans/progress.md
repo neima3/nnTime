@@ -1,5 +1,41 @@
 # Progress log
 
+## 2026-08-02 — Round 62: internal reference production boundary (Codex)
+
+- **Fresh production dogfood found one publicly exposed internal surface.**
+  Signed-out `/app/timeline-states` returned 200 inside the normal product shell
+  and published binding implementation language such as overlap lane counts,
+  pixel gaps, border widths, and calendar-integration copy. The issue reproduced
+  twice at 390×844 with no link required. The ignored report and evidence are
+  under `browser-qa/round62-dogfood/`.
+- **Production now fails closed while development keeps the living reference.**
+  The page-level environment guard renders Kairo's branded recovery UI, and the
+  production proxy rejects the exact route before the product loading boundary
+  can stream, preserving a real HTTP 404 plus the full security-header contract.
+  Local development still returns 200 with the unchanged timeline reference.
+- **Installed-PWA upgrades cannot retain the old page.** Independent review
+  found that the prior service-worker cache version could preserve a previously
+  visited 200 response offline. The worker now activates `kairo-v5-boundaries`,
+  deletes older caches, explicitly purges `/app/timeline-states`, and never
+  stores that navigation again; an offline request falls back to the cached app
+  shell instead of internal content. Two VM-backed worker regressions failed on
+  the old behavior and pass on the fix.
+- **Test-first local release proof is green.** The visibility unit contract and
+  production-browser contract each failed on the original behavior before the
+  minimal implementation. Final gates passed: lint, typecheck, production build,
+  `git diff --check`, **121 test files / 1,168 tests**, **36/36** production-
+  standalone Playwright scenarios plus one expected development-only skip,
+  parity (**89.74% web / 86.93% iOS**), and the iOS release contract. A separate
+  development-server browser contract passed. Desktop 1440×900 and mobile
+  390×844 visual inspection confirmed the polished branded 404 in production
+  and the full reference in development; ignored evidence is under
+  `browser-qa/round62-release/`. Independent re-review returned **READY** with
+  no remaining Critical or Important finding after re-running the worker and
+  development-route contracts.
+- **Release is pending exact-SHA CI and deployment.** Phase 7B physical-device/
+  provider lifecycle proof and Phase 8B Google consent/client activation remain
+  external gates. Production dogfood made no planner mutation.
+
 ## 2026-08-02 — Round 61: truthful signed-out sample month (Codex)
 
 - **Fresh production dogfood closed the final primary calendar trust gap.** On

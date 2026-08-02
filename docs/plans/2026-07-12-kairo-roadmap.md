@@ -114,7 +114,9 @@ design work BEFORE the consuming subphase starts.
         2026-08-02), plus truthful signed-out Week sample framing and removal of
         fake current-week navigation (Round 60, 2026-08-02), and truthful
         signed-out Month sample framing with real-month navigation reserved for
-        authenticated calendars (Round 61, 2026-08-02)
+        authenticated calendars (Round 61, 2026-08-02), plus production-only
+        removal of the internal timeline-state design reference and PWA cache
+        eviction for previously installed clients (Round 62, 2026-08-02)
   - [x] 8D Privacy/review-prep contract + scripted parity gate
         (App Store upload, processing, and launch are tracked per release)
 

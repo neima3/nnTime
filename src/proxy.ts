@@ -101,6 +101,16 @@ function checkOriginCsrf(request: NextRequest): NextResponse | null {
 }
 
 export function proxy(request: NextRequest): NextResponse {
+  if (
+    process.env.NODE_ENV === "production" &&
+    request.nextUrl.pathname === "/app/timeline-states"
+  ) {
+    return NextResponse.rewrite(
+      new URL("/__kairo-internal-reference-not-found", request.url),
+      { status: 404, headers: SECURITY_HEADERS },
+    );
+  }
+
   const csrfBlock = checkOriginCsrf(request);
   if (csrfBlock) return csrfBlock;
 

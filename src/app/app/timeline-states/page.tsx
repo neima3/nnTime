@@ -1,5 +1,7 @@
 import { Check, Lock } from "lucide-react";
+import { notFound } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
+import { shouldExposeInternalReferenceRoute } from "@/lib/internal-reference-routes";
 
 /* Design addendum as a living screen: timeline edge cases (Phases 2C/5A/5B).
    Executors copy these exact treatments. */
@@ -29,6 +31,10 @@ function Gutter({ times }: { times: string[] }) {
 }
 
 export default function TimelineStatesPage() {
+  if (!shouldExposeInternalReferenceRoute(process.env.NODE_ENV)) {
+    notFound();
+  }
+
   return (
     <AppShell active="today">
       <div className="mx-auto max-w-2xl px-4 py-8 md:px-8">
