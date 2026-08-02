@@ -5,10 +5,12 @@
  */
 
 import { useCallback, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, SkipForward } from "lucide-react";
+import { ArrowRight, Check, LogIn, SkipForward } from "lucide-react";
 import { catClasses, type CategoryId } from "@/lib/mock";
 import { localMinutesToInstant } from "@/lib/adapters";
+import { authPageHref } from "@/lib/auth-return";
 import { sendRebasedStatusChange } from "@/lib/offline-mutation";
 import { celebrate } from "./Celebration";
 import { notifyDayChanged } from "./NowBar";
@@ -39,6 +41,8 @@ export function ReviewClient({
   authed: boolean;
 }) {
   const router = useRouter();
+  const signInHref = authPageHref("sign-in", "/app/review");
+  const signUpHref = authPageHref("sign-up", "/app/review");
   const [items, setItems] = useState(initial);
   const [index] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -195,46 +199,80 @@ export function ReviewClient({
         </p>
       )}
 
-      <div className="mt-6 grid w-full gap-2">
-        <button
-          type="button"
-          disabled={busy || !authed}
-          onClick={(e) => {
-            celebrate(e.clientX, e.clientY);
-            void act("complete");
-          }}
-          className="flex items-center justify-center gap-2 rounded-2xl bg-success-soft py-3.5 text-[15px] font-semibold text-success focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:opacity-50"
+      {authed ? (
+        <div className="mt-6 grid w-full gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={(e) => {
+              celebrate(e.clientX, e.clientY);
+              void act("complete");
+            }}
+            className="flex items-center justify-center gap-2 rounded-2xl bg-success-soft py-3.5 text-[15px] font-semibold text-success focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:opacity-50"
+          >
+            <Check size={18} strokeWidth={3} />
+            I did it
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void act("tomorrow")}
+            className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-surface py-3.5 text-[15px] font-semibold text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:opacity-50"
+          >
+            <ArrowRight size={18} />
+            Move to tomorrow
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void act("skip")}
+            className="flex items-center justify-center gap-2 rounded-2xl py-3.5 text-[15px] font-semibold text-ink-soft hover:bg-surface-sunken focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:opacity-50"
+          >
+            <SkipForward size={18} />
+            Let it go
+          </button>
+        </div>
+      ) : (
+        <section
+          aria-labelledby="review-auth-heading"
+          className="mt-6 w-full rounded-3xl border border-border bg-surface p-5 shadow-card"
         >
-          <Check size={18} strokeWidth={3} />
-          I did it
-        </button>
-        <button
-          type="button"
-          disabled={busy || !authed}
-          onClick={() => void act("tomorrow")}
-          className="flex items-center justify-center gap-2 rounded-2xl border border-border bg-surface py-3.5 text-[15px] font-semibold text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:opacity-50"
-        >
-          <ArrowRight size={18} />
-          Move to tomorrow
-        </button>
-        <button
-          type="button"
-          disabled={busy || !authed}
-          onClick={() => void act("skip")}
-          className="flex items-center justify-center gap-2 rounded-2xl py-3.5 text-[15px] font-semibold text-ink-soft hover:bg-surface-sunken focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:opacity-50"
-        >
-          <SkipForward size={18} />
-          Let it go
-        </button>
-      </div>
-
-      {!authed && (
-        <p className="mt-4 text-[13px] text-ink-soft">
-          <a href="/sign-in" className="font-semibold text-iris">
-            Sign in
-          </a>{" "}
-          to save review actions.
-        </p>
+          <div className="flex items-start gap-3">
+            <span
+              aria-hidden="true"
+              className="grid size-10 shrink-0 place-items-center rounded-2xl bg-iris-soft text-iris"
+            >
+              <LogIn size={18} />
+            </span>
+            <div>
+              <h2
+                id="review-auth-heading"
+                className="font-display text-[16px] font-bold text-ink"
+              >
+                Review privately when you’re ready
+              </h2>
+              <p className="mt-1 text-[13px] leading-relaxed text-ink-soft">
+                Sign in to decide what happens to unfinished plans and keep
+                every choice private and synced.
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
+            <Link
+              href={signInHref}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-iris px-4 text-[14px] font-semibold text-ink-inverse transition-all hover:bg-iris-deep active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-iris focus-visible:ring-offset-2 focus-visible:outline-none"
+            >
+              <LogIn size={17} />
+              Sign in to review
+            </Link>
+            <Link
+              href={signUpHref}
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-border px-4 text-[14px] font-semibold text-ink-soft transition-colors hover:bg-surface-sunken hover:text-ink active:bg-iris-ghost focus-visible:ring-2 focus-visible:ring-iris focus-visible:ring-offset-2 focus-visible:outline-none"
+            >
+              Create an account
+            </Link>
+          </div>
+        </section>
       )}
     </div>
   );
