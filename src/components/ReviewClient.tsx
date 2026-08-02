@@ -53,7 +53,7 @@ export function ReviewClient({
 
   const act = useCallback(
     async (kind: "complete" | "skip" | "tomorrow") => {
-      if (!current || !authed) return;
+      if (!current || !authed) return false;
       setBusy(true);
       setError(null);
       try {
@@ -74,7 +74,7 @@ export function ReviewClient({
               "You’re offline and this device couldn’t save that change. Reconnect and try again.",
             );
             setBusy(false);
-            return;
+            return false;
           }
           if (
             delivery.state === "server" &&
@@ -82,7 +82,7 @@ export function ReviewClient({
           ) {
             setError("Couldn't update it — try again");
             setBusy(false);
-            return;
+            return false;
           }
           if (delivery.state === "queued") {
             toast("Saved on this device — it’ll sync when you’re back");
@@ -112,7 +112,7 @@ export function ReviewClient({
           if (!res.ok) {
             setError("Couldn't reschedule it — try again");
             setBusy(false);
-            return;
+            return false;
           }
         }
         setItems((prev) => prev.filter((x) => x.id !== current.id));
@@ -120,9 +120,11 @@ export function ReviewClient({
         setBusy(false);
         router.refresh();
         notifyDayChanged();
+        return true;
       } catch {
         setError("Couldn't reach the server — try again?");
         setBusy(false);
+        return false;
       }
     },
     [current, authed, date, zone, router],
@@ -204,9 +206,10 @@ export function ReviewClient({
           <button
             type="button"
             disabled={busy}
-            onClick={(e) => {
-              celebrate(e.clientX, e.clientY);
-              void act("complete");
+            onClick={async (e) => {
+              const { clientX, clientY } = e;
+              const accepted = await act("complete");
+              if (accepted) celebrate(clientX, clientY);
             }}
             className="flex items-center justify-center gap-2 rounded-2xl bg-success-soft py-3.5 text-[15px] font-semibold text-success focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:opacity-50"
           >
@@ -260,14 +263,14 @@ export function ReviewClient({
           <div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
             <Link
               href={signInHref}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-iris px-4 text-[14px] font-semibold text-ink-inverse transition-all hover:bg-iris-deep active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-iris focus-visible:ring-offset-2 focus-visible:outline-none"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-iris px-4 text-[14px] font-semibold text-ink-inverse transition-all hover:bg-iris-deep active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-iris focus-visible:ring-offset-2 focus-visible:ring-offset-surface focus-visible:outline-none"
             >
               <LogIn size={17} />
               Sign in to review
             </Link>
             <Link
               href={signUpHref}
-              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-border px-4 text-[14px] font-semibold text-ink-soft transition-colors hover:bg-surface-sunken hover:text-ink active:bg-iris-ghost focus-visible:ring-2 focus-visible:ring-iris focus-visible:ring-offset-2 focus-visible:outline-none"
+              className="inline-flex min-h-11 items-center justify-center rounded-2xl border border-border px-4 text-[14px] font-semibold text-ink-soft transition-colors hover:bg-surface-sunken hover:text-ink active:bg-iris-ghost focus-visible:ring-2 focus-visible:ring-iris focus-visible:ring-offset-2 focus-visible:ring-offset-surface focus-visible:outline-none"
             >
               Create an account
             </Link>

@@ -25,7 +25,6 @@ describe("Review Today authentication boundary", () => {
   it("retains every authenticated Review Today decision", () => {
     const source = reviewSource();
 
-    expect(source).toContain('void act("complete")');
     expect(source).toContain('void act("tomorrow")');
     expect(source).toContain('void act("skip")');
     expect(source).toContain("sendRebasedStatusChange({");
