@@ -346,13 +346,13 @@ git add docs/plans/2026-07-12-kairo-roadmap.md docs/plans/progress.md \
 git commit -m "docs: record Round 56 auth continuity"
 ```
 
-- [ ] **Step 6: Integrate and release exact SHA**
+- [x] **Step 6: Integrate and release exact SHA**
 
 Fast-forward the reviewed branch into `main`, rerun the focused tests there,
 push `main`, wait for every exact-SHA GitHub Actions job, and allow Coolify's
 automatic deployment to finish at the same SHA.
 
-- [ ] **Step 7: Verify production read-only**
+- [x] **Step 7: Verify production read-only**
 
 Check `/api/health`, signed-out `/app/inbox`, the `/sign-in?next=%2Fapp%2Finbox`
 route, security headers, and a unique shipped-JavaScript marker. Capture desktop

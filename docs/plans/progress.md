@@ -30,6 +30,20 @@
   was visually verified at 1440×900 and 390×844 with zero horizontal overflow;
   the capture CTA reached `/sign-in?next=%2Fapp%2Finbox`. Ignored evidence is
   under `browser-qa/round56-inbox-auth/`.
+- **Exact release proof.** Implementation SHA
+  `9bbbbceb52adcc45d9edf841109a8f919e8a586d` passed GitHub Actions run
+  `30727405732`: hosted build/test, **25/25** standalone Playwright scenarios,
+  generated/native contracts, the app-hosted shipping tests, and the unsigned
+  shipping build all completed successfully. Coolify deployment
+  `p129vmfkw1wgaqp9ci8gvfe3` finished on that exact SHA. Read-only production
+  verification returned HTTP 200 for `/app/inbox` and
+  `/sign-in?next=%2Fapp%2Finbox`; migration, database, AI, and scheduler health
+  were all `ok`; production security headers were present; shipped chunk
+  `/_next/static/chunks/3jd_t793rtkcb.js` contained the unique
+  `Sign in for AI grouping` marker; and live 1440×900 plus 390×844 browser
+  passes had one page heading and no horizontal overflow. The CTA reached the
+  intended sign-in URL. Evidence is git-ignored under
+  `browser-qa/round56-live/`.
 - **Standing boundary preserved.** Phase 7B physical-device/provider lifecycle
   and Phase 8B Google consent/client activation remain external evidence gates.
   This round did not configure providers or mutate production planner data.
