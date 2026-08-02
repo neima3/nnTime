@@ -24,10 +24,24 @@
   and 390×844 found the exact sample label, one `h1`, no July 12 copy, no
   horizontal overflow, and no console errors. Ignored screenshots are under
   `browser-qa/round59-release/`.
-- **Release status.** The implementation is ready for exact-SHA CI, Coolify
-  deployment, and read-only live verification. Phase 7B physical-device and
-  provider lifecycle evidence and Phase 8B Google consent/client activation
-  remain external gates.
+- **Exact release proof passed.** SHA
+  `3fb8859cb70fb782ad740610f466ac274e59de2e` passed GitHub Actions run
+  `30748109777`: build/test, **33/33** standalone browser scenarios, generated
+  and Apple release contracts, shipping simulator tests, and the unsigned
+  shipping application build all completed successfully. Coolify deployment
+  `wekfotznni1q0n55myrqkfh3` finished on that exact SHA. Live health reported
+  migration, database, AI, and scheduler checks `ok` with 21 seconds of
+  scheduler lag; `/app/today` returned 200 with the production security-header
+  contract and its server response contained the exact sample copy. Desktop
+  1440×900 and mobile 390×844 live browser passes confirmed one `h1` named
+  **A day with Kairo**, the **Sample planner** eyebrow, no July 12 copy, no
+  horizontal overflow, and no console or page errors. The visually inspected,
+  ignored screenshots are under `browser-qa/round59-live/`.
+- **Standing handoff.** Phase 7B physical-device/provider lifecycle proof and
+  Phase 8B Google consent/client activation remain external gates. Round 59
+  made no production planner mutation. The next unblocked tranche remains a
+  fresh production-read-only 8C dogfood pass followed by the same
+  test/review/release loop for the highest-impact demonstrated issue.
 
 ## 2026-08-02 — Round 58: intent continuity and accessible game dialogs (Codex)
 

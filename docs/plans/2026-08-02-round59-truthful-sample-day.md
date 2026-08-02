@@ -21,7 +21,7 @@ continue to use their real zoned weekday and date.
   production-mode visual QA.
 - [x] Run the full project gates and independent review, then update roadmap and
   progress ledgers.
-- [ ] Commit, push, wait for exact-SHA CI, deploy, and verify the live heading.
+- [x] Commit, push, wait for exact-SHA CI, deploy, and verify the live heading.
 
 ## Standing boundaries
 
