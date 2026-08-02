@@ -68,6 +68,8 @@ export default function OnboardingPage() {
   const [zone, setZone] = useState("UTC");
   const [restored, setRestored] = useState(false);
   const finished = useRef(false);
+  const stepHeading = useRef<HTMLHeadingElement>(null);
+  const focusRequestedStep = useRef(false);
   const authed = isPending ? null : Boolean(data?.user);
 
   // Resume where they left off — onboarding survives a refresh or a wandered-off
@@ -133,6 +135,17 @@ export default function OnboardingPage() {
     );
   }, [data?.user]);
 
+  useEffect(() => {
+    if (!focusRequestedStep.current) return;
+    focusRequestedStep.current = false;
+    stepHeading.current?.focus();
+  }, [step]);
+
+  const moveToStep = (nextStep: number) => {
+    focusRequestedStep.current = true;
+    setStep(nextStep);
+  };
+
   const toggle = (i: number) => {
     setPicked((prev) => {
       const next = new Set(prev);
@@ -147,7 +160,7 @@ export default function OnboardingPage() {
     try {
       localStorage.removeItem("kairo:onboarding");
     } catch {}
-    setStep(3);
+    moveToStep(3);
   };
 
   const createAnchors = async () => {
@@ -194,7 +207,11 @@ export default function OnboardingPage() {
 
           {step === 1 && (
             <div className="rise-in">
-              <h1 className="font-display text-2xl font-bold tracking-tight">
+              <h1
+                ref={stepHeading}
+                tabIndex={-1}
+                className="font-display text-2xl font-bold tracking-tight focus:outline-none"
+              >
                 A minute of setup. Genuinely one minute.
               </h1>
               <p className="mt-2 text-[14.5px] leading-relaxed text-ink-soft">
@@ -221,7 +238,7 @@ export default function OnboardingPage() {
               </p>
               <button
                 type="button"
-                onClick={() => setStep(2)}
+                onClick={() => moveToStep(2)}
                 className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-iris py-3 text-[15px] font-semibold text-ink-inverse shadow-card transition-all hover:bg-iris-deep active:scale-[0.98]"
               >
                 Next <ArrowRight size={16} />
@@ -231,7 +248,11 @@ export default function OnboardingPage() {
 
           {step === 2 && (
             <div className="rise-in">
-              <h1 className="font-display text-2xl font-bold tracking-tight">
+              <h1
+                ref={stepHeading}
+                tabIndex={-1}
+                className="font-display text-2xl font-bold tracking-tight focus:outline-none"
+              >
                 {name.trim() ? `${name.trim()}, pick` : "Pick"} your anchors.
               </h1>
               <p className="mt-2 text-[14.5px] leading-relaxed text-ink-soft">
@@ -313,7 +334,11 @@ export default function OnboardingPage() {
 
           {step === 3 && (
             <div className="rise-in">
-              <h1 className="font-display text-2xl font-bold tracking-tight">
+              <h1
+                ref={stepHeading}
+                tabIndex={-1}
+                className="font-display text-2xl font-bold tracking-tight focus:outline-none"
+              >
                 {createdCount != null && createdCount > 0
                   ? `${createdCount} anchor${createdCount === 1 ? "" : "s"} on your timeline.`
                   : "You're in."}

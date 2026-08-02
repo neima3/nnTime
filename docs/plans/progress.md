@@ -1,5 +1,38 @@
 # Progress log
 
+## 2026-08-02 — Round 68: onboarding step focus (Codex)
+
+- **Fresh production onboarding dogfood found a focus dead zone.** Activating
+  **Next** on Step 1 replaced the panel with Step 2, but the removed button's
+  focus fell back to `BODY`; the new heading was not focused. The issue
+  reproduced twice using browser-local onboarding state only. Ignored report,
+  screenshots, video, and browser output are under
+  `browser-qa/round68-dogfood/`.
+- **User-requested step changes now move focus to the new heading.** A one-shot
+  transition flag focuses the committed `h1` after Step 1→2 and both Step 2→3
+  paths, including asynchronous anchor creation. Restored saved steps continue
+  to call the original state setter directly, so initial load does not steal
+  focus. Draft persistence, auth boundaries, and visual treatment are unchanged.
+- **Test-first, visual, and independent review proof is green.** The browser
+  contract first failed because the Step 2 heading was inactive; it now pins
+  focused headings after both **Next** and **Skip**. Independent review returned
+  **READY** with no Critical or Important finding after checking ref/effect
+  ordering, restored-step behavior, asynchronous completion, persistence, and
+  auth boundaries. Desktop 1440×1000 and mobile 390×844 checks confirm the
+  correct focused heading, balanced layout, and no horizontal overflow. The
+  only console item is Next's documented development-only CSP/eval diagnostic;
+  visually inspected ignored evidence is under `browser-qa/round68-local/`.
+- **Complete local release proof passed.** Lint, typecheck, production build,
+  `git diff --check`, **121 test files / 1,168 tests**, **43/43** executed
+  Playwright scenarios plus one expected development-only skip, parity
+  (**89.74% web / 86.93% iOS**), and the iOS release contract passed.
+- **Exact release proof:** pending exact-SHA CI, deployment, and live production
+  verification.
+- **Standing boundaries remain intact.** Production checks changed only
+  browser-local onboarding draft state; no account or planner data was created.
+  Phase 7B physical-device provider lifecycle proof and Phase 8B Google
+  activation remain external.
+
 ## 2026-08-02 — Round 67: magic-link credential clearing (Codex)
 
 - **Fresh production auth dogfood found stale credential state.** After entering

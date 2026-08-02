@@ -493,6 +493,20 @@ test("unsafe Focus durations normalize before authentication", async ({ page }) 
   );
 });
 
+test("onboarding moves focus to each user-requested step", async ({ page }) => {
+  await gotoHydrated(page, "/onboarding");
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+
+  const anchorsHeading = page.getByRole("heading", { name: "Pick your anchors." });
+  await expect(anchorsHeading).toBeVisible();
+  await expect(anchorsHeading).toBeFocused();
+
+  await page.getByRole("button", { name: "Skip — I'll build my own" }).click();
+  const finishHeading = page.getByRole("heading", { name: "You're in." });
+  await expect(finishHeading).toBeVisible();
+  await expect(finishHeading).toBeFocused();
+});
+
 test("onboarding choices survive account creation", async ({ page }) => {
   await gotoHydrated(page, "/onboarding");
   await page.getByPlaceholder("Just a first name is plenty").fill("Intent QA");
