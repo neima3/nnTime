@@ -127,7 +127,7 @@ export default async function MonthPage({
     month = m! - 1;
   }
 
-  const { days, label } = await loadMonth(year, month);
+  const { days, label, authed } = await loadMonth(year, month);
   // A blank grid with no explanation reads as "broken", not as "free".
   const emptyMonth = days.every((d) => d.otherMonth || d.dots.length === 0);
   const prev = shiftMonth(year, month, -1);
@@ -141,10 +141,10 @@ export default async function MonthPage({
         <header className="mb-6 flex flex-wrap items-center gap-3">
           <div className="mr-auto">
             <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-iris">
-              {year}
+              {authed ? year : "Sample planner"}
             </p>
             <h1 className="font-display text-3xl font-bold tracking-tight">
-              {label}
+              {authed ? label : "A month with Kairo"}
             </h1>
           </div>
           <div className="flex items-center rounded-2xl border border-border bg-surface p-1 shadow-card">
@@ -158,28 +158,36 @@ export default async function MonthPage({
               Month
             </span>
           </div>
-          <div className="flex items-center gap-1 rounded-2xl border border-border bg-surface p-1 shadow-card">
-            <Link
-              href={`/app/month?ym=${prevYm}`}
-              aria-label="Previous month"
-              className="grid size-9 place-items-center rounded-xl text-ink-soft hover:bg-surface-sunken"
-            >
-              <ChevronLeft size={18} />
-            </Link>
-            <Link
-              href="/app/month"
-              className="rounded-xl px-3 py-1.5 text-sm font-semibold text-iris hover:bg-iris-ghost"
-            >
-              This month
-            </Link>
-            <Link
-              href={`/app/month?ym=${nextYm}`}
-              aria-label="Next month"
-              className="grid size-9 place-items-center rounded-xl text-ink-soft hover:bg-surface-sunken"
-            >
-              <ChevronRight size={18} />
-            </Link>
-          </div>
+          {authed ? (
+            <div className="flex items-center gap-1 rounded-2xl border border-border bg-surface p-1 shadow-card">
+              <Link
+                href={`/app/month?ym=${prevYm}`}
+                aria-label="Previous month"
+                className="grid size-9 place-items-center rounded-xl text-ink-soft hover:bg-surface-sunken"
+              >
+                <ChevronLeft size={18} />
+              </Link>
+              <Link
+                href="/app/month"
+                className="rounded-xl px-3 py-1.5 text-sm font-semibold text-iris hover:bg-iris-ghost"
+              >
+                This month
+              </Link>
+              <Link
+                href={`/app/month?ym=${nextYm}`}
+                aria-label="Next month"
+                className="grid size-9 place-items-center rounded-xl text-ink-soft hover:bg-surface-sunken"
+              >
+                <ChevronRight size={18} />
+              </Link>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-border bg-surface p-1 shadow-card">
+              <span className="block rounded-xl bg-iris-soft px-3 py-1.5 text-sm font-semibold text-iris">
+                Sample month
+              </span>
+            </div>
+          )}
         </header>
 
         <div className="grid grid-cols-7 gap-1.5 sm:gap-2">

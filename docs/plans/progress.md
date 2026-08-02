@@ -1,5 +1,38 @@
 # Progress log
 
+## 2026-08-02 — Round 61: truthful signed-out sample month (Codex)
+
+- **Fresh production dogfood closed the final primary calendar trust gap.** On
+  2026-08-02, signed-out Month labeled the view **2026 / August / This month**,
+  filled it with the fictional July density fixture, and gave August 12 the
+  current-day visual treatment. The mismatch reproduced at 390px and 1440px.
+  Ignored report and evidence are under `browser-qa/round61-dogfood/`.
+- **Month is now explicit about demonstration data.** Signed-out Month says
+  **Sample planner / A month with Kairo** and replaces controls that merely
+  relabeled the unchanged fixture with a static **Sample month** badge. The
+  deterministic density grid remains unchanged. Authenticated Month still uses
+  the real calendar month/year, zoned today highlight, empty state, and
+  previous/current/next navigation.
+- **Test-first and browser proof passed.** The new anonymous contract failed on
+  the old framing, then passed after the narrow authenticated-result branch.
+  The complete **17-scenario** signed-out boundary file passed. Production-
+  standalone checks at 1440×900 and 390×844 found one `h1`, exact sample labels,
+  no real-month links, no horizontal overflow, and no console, page, or failed-
+  response errors. A real synthetic sign-up then rendered authenticated
+  **August** with all three month controls and no sample copy. Visually inspected
+  ignored screenshots are under `browser-qa/round61-release/`. Independent
+  review returned **READY** with no Critical or Important finding after
+  re-checking the authenticated data, zoned today, navigation, and empty-state
+  branch.
+- **Complete local release proof passed.** Lint, typecheck, production build,
+  `git diff --check`, **119 test files / 1,165 tests**, **35/35** Playwright
+  scenarios, parity (**89.74% web / 86.93% iOS**), and the iOS release contract
+  passed. Exact-SHA CI, Coolify deployment, and read-only live verification
+  remain before release.
+- **Standing boundaries remain intact.** Phase 7B physical-device/provider
+  lifecycle proof and Phase 8B Google consent/client activation remain external
+  gates. Production dogfood made no planner mutation.
+
 ## 2026-08-02 — Round 60: truthful signed-out sample week (Codex)
 
 - **Fresh production dogfood found the same trust gap on the next planner

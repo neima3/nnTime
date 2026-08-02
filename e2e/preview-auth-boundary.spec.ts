@@ -85,6 +85,35 @@ test("signed-out Week identifies its sample and hides real-week navigation", asy
   }
 });
 
+test("signed-out Month identifies its sample and hides real-month navigation", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    locale: "en-US",
+    timezoneId: "America/New_York",
+    viewport: { width: 390, height: 844 },
+  });
+  await context.clearCookies();
+  const page = await context.newPage();
+
+  try {
+    await page.goto("/app/month");
+    const main = page.getByRole("main");
+
+    await expect(main.getByText("Sample planner", { exact: true })).toBeVisible();
+    await expect(
+      main.getByRole("heading", { name: "A month with Kairo" }),
+    ).toBeVisible();
+    await expect(main.getByText("Sample month", { exact: true })).toBeVisible();
+    await expect(main.getByRole("heading", { name: "August" })).toHaveCount(0);
+    await expect(main.getByRole("link", { name: "Previous month" })).toHaveCount(0);
+    await expect(main.getByRole("link", { name: "This month" })).toHaveCount(0);
+    await expect(main.getByRole("link", { name: "Next month" })).toHaveCount(0);
+  } finally {
+    await context.close();
+  }
+});
+
 test("signed-out Week creation lands on an actionable auth boundary", async ({
   browser,
 }) => {

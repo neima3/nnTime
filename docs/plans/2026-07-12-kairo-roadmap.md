@@ -112,7 +112,9 @@ design work BEFORE the consuming subphase starts.
         and template selection, and modal brain-break focus safety (Round 58,
         2026-08-02), and truthful signed-out Today sample labeling (Round 59,
         2026-08-02), plus truthful signed-out Week sample framing and removal of
-        fake current-week navigation (Round 60, 2026-08-02)
+        fake current-week navigation (Round 60, 2026-08-02), and truthful
+        signed-out Month sample framing with real-month navigation reserved for
+        authenticated calendars (Round 61, 2026-08-02)
   - [x] 8D Privacy/review-prep contract + scripted parity gate
         (App Store upload, processing, and launch are tracked per release)
 
