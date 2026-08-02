@@ -29,8 +29,22 @@
   `git diff --check`, **121 test files / 1,168 tests**, **44/44** executed
   Playwright scenarios plus one expected development-only skip, parity
   (**89.74% web / 86.93% iOS**), and the iOS release contract passed.
-- **Exact release proof:** pending exact-SHA CI, deployment, and live production
-  verification.
+- **Exact release proof passed.** Commit
+  `b960a0c72cb21f2c6d3f07dc1c9aee0f878aaee0` passed GitHub Actions run
+  `30763254589`: build/test, all **44/44** executed production browser scenarios,
+  generated-client/release contracts, shipping simulator tests, and the unsigned
+  shipping application build. Coolify deployment
+  `i5myc9m8af6s9cuaaedfz9ex` finished on that exact SHA. Live health reported
+  migrations, database, AI, and scheduler healthy; `/sign-in` retained CSP,
+  HSTS, frame denial, and content-type protections.
+- **Live desktop/mobile auth proof passed.** Sign-in at 1440×1000 and sign-up at
+  390×844 both started masked with `aria-pressed="false"`, revealed the unchanged
+  value with the same stable-name control focused and `aria-pressed="true"`,
+  used exact 44×44 targets, and re-masked without value loss. The live magic-link
+  success path cleared a revealed password and returned the control to masked,
+  unpressed state. Both layouts had no horizontal overflow and production emitted
+  no console or page errors. Visually inspected ignored screenshots and browser
+  output are under `browser-qa/round69-live/`.
 - **Standing boundaries remain intact.** Production dogfood did not submit an
   auth form or create account/planner data. Phase 7B physical-device provider
   lifecycle proof and Phase 8B Google activation remain external.

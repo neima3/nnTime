@@ -32,4 +32,4 @@ body does not by itself justify a focus-management change.
 - [x] Implement the shared accessible visibility control.
 - [x] Obtain independent Critical/Important review.
 - [x] Pass local browser, repository, parity, and iOS release gates.
-- [ ] Commit, push, pass exact-SHA CI, deploy exact SHA, and verify live.
+- [x] Commit, push, pass exact-SHA CI, deploy exact SHA, and verify live.
