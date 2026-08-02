@@ -27,6 +27,20 @@
   `git diff --check`, **121 test files / 1,168 tests**, **41/41** Playwright
   scenarios plus one expected development-only skip, parity (**89.74% web /
   86.93% iOS**), and the iOS release contract passed.
+- **Exact release proof passed.** Feature SHA
+  `93a22eb14d7a358e62989a6ac260d75913f9dba4` passed GitHub Actions run
+  `30759146396`: hosted build/test, **41/41** production-standalone browser
+  scenarios with the development-only internal-reference contract intentionally
+  skipped, generated/native contracts, shipping simulator tests, and the
+  unsigned shipping application build all completed successfully. Coolify
+  deployment `npyflfx8qxbpjdax20ss7kj1` finished on that exact SHA. Live health
+  reported migration, database, AI, and scheduler checks `ok`;
+  `/forgot-password` returned HTTP 200 with enforcing CSP, HSTS, frame denial,
+  and nosniff. Real reset requests for reserved nonexistent addresses returned
+  200 at desktop 1440×1000 and mobile 390×844, showed the exact account-neutral
+  status, omitted all development/server-log wording, and had no horizontal
+  overflow, console error, or page error. Visually inspected ignored evidence
+  is under `browser-qa/round66-live/`.
 - **Standing boundaries remain intact.** Production checks used reserved
   nonexistent addresses only; no real account email was sent. Phase 7B
   physical-device/provider lifecycle proof and Phase 8B Google activation

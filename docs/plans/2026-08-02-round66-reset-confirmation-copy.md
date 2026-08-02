@@ -26,7 +26,7 @@ hardcoded into the public client component, so it appears in every environment.
 - [x] Remove only the internal instruction.
 - [x] Run focused and full gates, independent review, and desktop/mobile browser
   QA.
-- [ ] Update roadmap/progress, commit, push, pass exact-SHA CI, deploy, and
+- [x] Update roadmap/progress, commit, push, pass exact-SHA CI, deploy, and
   verify the live confirmation with a reserved nonexistent address.
 
 ## Standing boundaries
