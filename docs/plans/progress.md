@@ -28,9 +28,13 @@
   wrapping, and no overflow; ignored evidence is under
   `browser-qa/round74-local/`. Required lint, typecheck, 1,179 tests in 122
   files, and production build pass. The complete browser suite passed all 48
-  executed checks with one development-only skip. Scripted parity remains
-  89.74% web / 86.93% iOS, and the iOS release contract passes. Exact-SHA CI,
-  deployment, and live verification remain pending.
+  executed checks with one development-only skip. Initial exact-SHA CI then
+  exposed that the production service worker owned the mocked reset request
+  before Playwright routing could inspect it; the payload contract now uses an
+  isolated service-worker-blocked context and passes against the standalone
+  production server. Scripted parity remains 89.74% web / 86.93% iOS, and the
+  iOS release contract passes. Final exact-SHA CI remains pending; the first
+  exact-SHA deployment and read-only live verification are green.
 - **Standing boundaries remain intact.** Phase 7B physical-device provider
   lifecycle proof and Phase 8B Google activation remain external.
 
