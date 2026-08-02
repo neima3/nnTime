@@ -1,5 +1,39 @@
 # Progress log
 
+## 2026-08-02 — Round 60: truthful signed-out sample week (Codex)
+
+- **Fresh production dogfood found the same trust gap on the next planner
+  surface.** Signed-out Week displayed the fixed fixture as **July 7 – 13**,
+  highlighted Saturday the 12th, and offered **This week** plus previous/next
+  controls on 2026-08-02. The behavior reproduced at 390px and 1440px, with
+  and without `preview=1`; those controls changed the URL but the signed-out
+  fixture remained fixed. Ignored report and evidence are under
+  `browser-qa/round60-dogfood/`.
+- **The fixed week is now explicitly a sample.** Signed-out Week says
+  **Sample planner / A week with Kairo**, counts **7 sample activities**, and
+  replaces misleading calendar controls with a static **Sample week** badge.
+  The deterministic activity cards and their editor/auth continuation links
+  are unchanged. Authenticated Week still derives the real zoned range and
+  retains previous, current, and next navigation.
+- **Test-first and browser proof passed.** The new anonymous contract failed on
+  the old copy, then passed after the narrow preview branch. The complete
+  16-scenario signed-out boundary file passed. Production-standalone checks at
+  1440×900 and 390×844 found one `h1`, exact sample labels, no real-week links,
+  no horizontal overflow, and no console, page, or failed-response errors.
+  A real synthetic sign-up then rendered the authenticated range
+  **07/27 – 08/02** with all three week controls and no sample labels. Visually
+  inspected ignored screenshots are under `browser-qa/round60-release/`.
+  Independent review returned **READY** with no Critical or Important finding
+  after re-running the Week sample and editor/auth-continuation contracts.
+- **Complete local release proof passed.** Lint, typecheck, production build,
+  `git diff --check`, **119 test files / 1,165 tests**, **34/34** Playwright
+  scenarios, parity (**89.74% web / 86.93% iOS**), and the iOS release contract
+  passed. Exact-SHA CI, Coolify deployment, and read-only live verification
+  remain before this tranche is complete.
+- **Standing boundaries remain intact.** Phase 7B physical-device/provider
+  lifecycle proof and Phase 8B Google consent/client activation remain external
+  gates. Production dogfood made no planner mutation.
+
 ## 2026-08-02 — Round 59: truthful signed-out sample day (Codex)
 
 - **Fresh production dogfood found one demonstrated content/UX defect.** On

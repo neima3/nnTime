@@ -55,6 +55,36 @@ test("signed-out product previews never call protected planner APIs", async ({
   }
 });
 
+test("signed-out Week identifies its sample and hides real-week navigation", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    locale: "en-US",
+    timezoneId: "America/New_York",
+    viewport: { width: 390, height: 844 },
+  });
+  await context.clearCookies();
+  const page = await context.newPage();
+
+  try {
+    await page.goto("/app/week");
+    const main = page.getByRole("main");
+
+    await expect(main.getByText("Sample planner", { exact: true })).toBeVisible();
+    await expect(
+      main.getByRole("heading", { name: "A week with Kairo" }),
+    ).toBeVisible();
+    await expect(main.getByText("7 sample activities", { exact: true })).toBeVisible();
+    await expect(main.getByText("Sample week", { exact: true })).toBeVisible();
+    await expect(main.getByRole("heading", { name: "July 7 – 13" })).toHaveCount(0);
+    await expect(main.getByRole("link", { name: "Previous week" })).toHaveCount(0);
+    await expect(main.getByRole("link", { name: "This week" })).toHaveCount(0);
+    await expect(main.getByRole("link", { name: "Next week" })).toHaveCount(0);
+  } finally {
+    await context.close();
+  }
+});
+
 test("signed-out Week creation lands on an actionable auth boundary", async ({
   browser,
 }) => {

@@ -107,7 +107,14 @@ function mondayOf(dateStr: string): string {
 
 async function loadWeek(weekParam?: string) {
   const session = await getSession();
-  if (!session) return { days: mockWeek, label: "July 7 – 13", weekStart: "2026-07-07" };
+  if (!session) {
+    return {
+      days: mockWeek,
+      label: "July 7 – 13",
+      weekStart: "2026-07-07",
+      isPreview: true,
+    };
+  }
 
   const settings = await getOrCreateSettings(session.userId);
   const zone = settings.timezone;
@@ -157,7 +164,7 @@ async function loadWeek(weekParam?: string) {
 
   const end = shiftDate(weekStart, 6);
   const label = `${weekStart.slice(5).replace("-", "/")} – ${end.slice(5).replace("-", "/")}`;
-  return { days, label, weekStart };
+  return { days, label, weekStart, isPreview: false };
 }
 
 export default async function WeekPage({
@@ -167,7 +174,7 @@ export default async function WeekPage({
 }) {
   const sp = await searchParams;
   const weekParam = typeof sp.week === "string" ? sp.week : undefined;
-  const { days, label, weekStart } = await loadWeek(weekParam);
+  const { days, label, weekStart, isPreview } = await loadWeek(weekParam);
   const prev = shiftDate(weekStart, -7);
   const next = shiftDate(weekStart, 7);
 
@@ -177,13 +184,14 @@ export default async function WeekPage({
         <header className="mb-6 flex flex-wrap items-center gap-3">
           <div className="mr-auto">
             <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-iris">
-              Week
+              {isPreview ? "Sample planner" : "Week"}
             </p>
             <h1 className="font-display text-3xl font-bold tracking-tight">
-              {label}
+              {isPreview ? "A week with Kairo" : label}
             </h1>
             <p className="tnum mt-0.5 text-[13px] font-medium text-ink-soft">
-              {days.reduce((n, d) => n + d.blocks.length, 0)} planned this week
+              {days.reduce((n, d) => n + d.blocks.length, 0)}{" "}
+              {isPreview ? "sample activities" : "planned this week"}
             </p>
           </div>
           <div className="flex items-center rounded-2xl border border-border bg-surface p-1 shadow-card">
@@ -197,28 +205,36 @@ export default async function WeekPage({
               Month
             </Link>
           </div>
-          <div className="flex items-center gap-1 rounded-2xl border border-border bg-surface p-1 shadow-card">
-            <Link
-              href={`/app/week?week=${prev}`}
-              aria-label="Previous week"
-              className="grid size-9 place-items-center rounded-xl text-ink-soft hover:bg-surface-sunken focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
-            >
-              <ChevronLeft size={18} />
-            </Link>
-            <Link
-              href="/app/week"
-              className="rounded-xl px-3 py-1.5 text-sm font-semibold text-iris hover:bg-iris-ghost focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
-            >
-              This week
-            </Link>
-            <Link
-              href={`/app/week?week=${next}`}
-              aria-label="Next week"
-              className="grid size-9 place-items-center rounded-xl text-ink-soft hover:bg-surface-sunken focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
-            >
-              <ChevronRight size={18} />
-            </Link>
-          </div>
+          {isPreview ? (
+            <div className="rounded-2xl border border-border bg-surface p-1 shadow-card">
+              <span className="block rounded-xl bg-iris-soft px-3 py-1.5 text-sm font-semibold text-iris">
+                Sample week
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1 rounded-2xl border border-border bg-surface p-1 shadow-card">
+              <Link
+                href={`/app/week?week=${prev}`}
+                aria-label="Previous week"
+                className="grid size-9 place-items-center rounded-xl text-ink-soft hover:bg-surface-sunken focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+              >
+                <ChevronLeft size={18} />
+              </Link>
+              <Link
+                href="/app/week"
+                className="rounded-xl px-3 py-1.5 text-sm font-semibold text-iris hover:bg-iris-ghost focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+              >
+                This week
+              </Link>
+              <Link
+                href={`/app/week?week=${next}`}
+                aria-label="Next week"
+                className="grid size-9 place-items-center rounded-xl text-ink-soft hover:bg-surface-sunken focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+              >
+                <ChevronRight size={18} />
+              </Link>
+            </div>
+          )}
         </header>
 
         <SignedInOnly>
