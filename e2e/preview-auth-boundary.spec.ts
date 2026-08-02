@@ -218,7 +218,11 @@ test("signed-out Routines stays read-only and offers an auth path", async ({
     ).toBeVisible();
     await expect(main.getByRole("button", { name: "Play" })).toHaveCount(0);
     await main.getByRole("link", { name: "Sign in" }).click();
-    await expect(page).toHaveURL(/\/sign-in$/);
+    await expect(page).toHaveURL(
+      (url) =>
+        url.pathname === "/sign-in" &&
+        url.searchParams.get("next") === "/app/routines",
+    );
     await page.waitForTimeout(500);
 
     expect(protectedRequests).toEqual([]);
@@ -274,7 +278,7 @@ test("signed-out Today advertises only the preview interactions it supports", as
 test("onboarding choices survive account creation", async ({ page }) => {
   await gotoHydrated(page, "/onboarding");
   await page.getByPlaceholder("Just a first name is plenty").fill("Intent QA");
-  await page.getByRole("button", { name: "Next" }).click();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
   const morning = page.getByRole("button", { name: /Morning reset/ });
   await morning.click();
   await expect(morning).toHaveAttribute("aria-pressed", "false");
