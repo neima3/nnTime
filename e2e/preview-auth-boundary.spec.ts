@@ -134,6 +134,53 @@ test("signed-out Inbox mutations lead directly to sign in", async ({
   }
 });
 
+test("signed-out Review Today offers a truthful return path", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    locale: "en-US",
+    timezoneId: "America/New_York",
+    viewport: { width: 390, height: 844 },
+  });
+  await context.clearCookies();
+  const page = await context.newPage();
+  const protectedRequests: string[] = [];
+
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname.startsWith("/api/v1/")) {
+      protectedRequests.push(`${request.method()} ${url.pathname}`);
+    }
+  });
+
+  try {
+    await page.goto("/app/review");
+    for (const name of ["I did it", "Move to tomorrow", "Let it go"]) {
+      await expect(page.getByRole("button", { name })).toHaveCount(0);
+    }
+
+    const signIn = page.getByRole("link", { name: "Sign in to review" });
+    await expect(signIn).toHaveAttribute(
+      "href",
+      "/sign-in?next=%2Fapp%2Freview",
+    );
+    await expect(
+      page.getByRole("link", { name: "Create an account" }),
+    ).toHaveAttribute("href", "/sign-up?next=%2Fapp%2Freview");
+
+    await signIn.click();
+    await expect(page).toHaveURL((url) => {
+      return (
+        url.pathname === "/sign-in" &&
+        url.searchParams.get("next") === "/app/review"
+      );
+    });
+    expect(protectedRequests).toEqual([]);
+  } finally {
+    await context.close();
+  }
+});
+
 test("signed-out Routines stays read-only and offers an auth path", async ({
   browser,
 }) => {
