@@ -63,8 +63,7 @@ export default function ForgotPasswordPage() {
               className="mt-6 rounded-xl bg-iris-soft px-3.5 py-3 text-[13px] font-medium leading-relaxed text-iris"
             >
               If an account exists for that address, a reset link is on the way.
-              Check spam too. In local dev without email configured, the link is
-              printed in the server logs.
+              Check spam too.
             </p>
           ) : (
             <form onSubmit={onSubmit} className="mt-6 space-y-3.5">

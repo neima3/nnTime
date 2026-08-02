@@ -1,5 +1,37 @@
 # Progress log
 
+## 2026-08-02 — Round 66: production-safe reset confirmation (Codex)
+
+- **Fresh production recovery dogfood found development copy in public UI.** A
+  generic password-reset request correctly protected account existence, then
+  appended **In local dev without email configured, the link is printed in the
+  server logs.** The hardcoded instruction appeared on every production success
+  and made the public recovery flow look unfinished. It reproduced three times
+  with reserved nonexistent `example.invalid` addresses; ignored report,
+  screenshots, and video are under `browser-qa/round66-dogfood/`.
+- **The confirmation is now visitor-only and account-neutral.** The status ends
+  after the existing conditional delivery and spam-folder guidance. No
+  environment branch was added: local delivery diagnostics remain outside the
+  public UI. Request behavior, enumeration safety, error handling, and the
+  polite status-region semantics are unchanged.
+- **Test-first, visual, and independent review proof is green.** The browser
+  contract stubs the canonical reset-request endpoint and first failed on the
+  exact leaked sentence. It now pins the complete neutral status and rejects
+  both local-development and server-log copy. Desktop 1440×1000 and mobile
+  390×844 checks confirmed balanced layout, no horizontal overflow, and no
+  console or page errors; visually inspected ignored evidence is under
+  `browser-qa/round66-local/`. Independent review returned **READY** with no
+  Critical or Important finding after checking privacy, status semantics,
+  request isolation, and regression scope.
+- **Complete local release proof passed.** Lint, typecheck, production build,
+  `git diff --check`, **121 test files / 1,168 tests**, **41/41** Playwright
+  scenarios plus one expected development-only skip, parity (**89.74% web /
+  86.93% iOS**), and the iOS release contract passed.
+- **Standing boundaries remain intact.** Production checks used reserved
+  nonexistent addresses only; no real account email was sent. Phase 7B
+  physical-device/provider lifecycle proof and Phase 8B Google activation
+  remain external gates.
+
 ## 2026-08-02 — Round 65: invalid password-reset recovery (Codex)
 
 - **Fresh production recovery dogfood found one dead end.** A deliberately

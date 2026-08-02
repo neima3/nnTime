@@ -438,6 +438,27 @@ test("an invalid password-reset token becomes an actionable recovery state", asy
   await expect(page.getByText("Invalid token", { exact: true })).toHaveCount(0);
 });
 
+test("password-reset requests keep production confirmation account-neutral", async ({
+  page,
+}) => {
+  await page.route("**/api/auth/request-password-reset", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ status: true }),
+    });
+  });
+
+  await page.goto("/forgot-password");
+  await page.getByRole("textbox", { name: "Email" }).fill("nobody@example.invalid");
+  await page.getByRole("button", { name: "Send reset link" }).click();
+
+  await expect(page.getByRole("status")).toHaveText(
+    "If an account exists for that address, a reset link is on the way. Check spam too.",
+  );
+  await expect(page.getByText(/local dev|server logs/i)).toHaveCount(0);
+});
+
 test("unsafe Focus durations normalize before authentication", async ({ page }) => {
   await page.goto("/app/focus?title=Safe&duration=Infinity");
   const href = await page
