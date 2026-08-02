@@ -88,6 +88,52 @@ test("signed-out Week creation lands on an actionable auth boundary", async ({
   }
 });
 
+test("signed-out Inbox mutations lead directly to sign in", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    locale: "en-US",
+    timezoneId: "America/New_York",
+    viewport: { width: 390, height: 844 },
+  });
+  await context.clearCookies();
+  const page = await context.newPage();
+  const protectedRequests: string[] = [];
+
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname.startsWith("/api/v1/")) {
+      protectedRequests.push(`${request.method()} ${url.pathname}`);
+    }
+  });
+
+  try {
+    await page.goto("/app/inbox");
+    await expect(
+      page.getByRole("textbox", { name: "Get it out of your head…" }),
+    ).toHaveCount(0);
+    const capture = page.getByRole("link", { name: "Sign in to capture" });
+    await expect(capture).toHaveAttribute(
+      "href",
+      "/sign-in?next=%2Fapp%2Finbox",
+    );
+    await expect(
+      page.getByRole("link", { name: "Sign in for AI grouping" }),
+    ).toHaveAttribute("href", "/sign-in?next=%2Fapp%2Finbox");
+
+    await capture.click();
+    await expect(page).toHaveURL((url) => {
+      return (
+        url.pathname === "/sign-in" &&
+        url.searchParams.get("next") === "/app/inbox"
+      );
+    });
+    expect(protectedRequests).toEqual([]);
+  } finally {
+    await context.close();
+  }
+});
+
 test("signed-out Routines stays read-only and offers an auth path", async ({
   browser,
 }) => {

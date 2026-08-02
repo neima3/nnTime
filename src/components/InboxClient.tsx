@@ -5,11 +5,13 @@
  */
 
 import { useCallback, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   CalendarPlus,
   Flag,
+  LogIn,
   Plus,
   Sparkles,
   Sun,
@@ -17,6 +19,7 @@ import {
 } from "lucide-react";
 import { catClasses, type CategoryId } from "@/lib/mock";
 import { clientToday } from "@/lib/client-date";
+import { authPageHref } from "@/lib/auth-return";
 import { sendReplaySafeCreate } from "@/lib/offline-mutation";
 import { toast } from "./Toast";
 import { PickForMe, type PickCandidate } from "./PickForMe";
@@ -74,6 +77,8 @@ export function InboxClient({
   };
   const [error, setError] = useState<string | null>(null);
   const [groupMsg, setGroupMsg] = useState<string | null>(null);
+  const signInHref = authPageHref("sign-in", "/app/inbox");
+  const signUpHref = authPageHref("sign-up", "/app/inbox");
 
   const groupByPriority = useCallback(async () => {
     if (!authed) {
@@ -121,10 +126,7 @@ export function InboxClient({
   const create = useCallback(async () => {
     const title = draft.trim();
     if (!title) return;
-    if (!authed) {
-      setError("Sign in to save your thoughts.");
-      return;
-    }
+    if (!authed) return;
     setBusy("create");
     setError(null);
     try {
@@ -300,17 +302,27 @@ export function InboxClient({
 
   return (
     <>
-      <div className="mb-3 flex justify-end gap-2">
+      <div className="mb-3 flex flex-wrap justify-end gap-2">
         <PickForMe candidates={pickCandidates} />
-        <button
-          type="button"
-          disabled={!authed || busy === "group" || items.length === 0}
-          onClick={() => void groupByPriority()}
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[13px] font-semibold text-iris transition-colors hover:bg-iris-ghost disabled:opacity-50"
-        >
-          <Sparkles size={14} />
-          {busy === "group" ? "Grouping…" : "Group by priority"}
-        </button>
+        {authed ? (
+          <button
+            type="button"
+            disabled={busy === "group" || items.length === 0}
+            onClick={() => void groupByPriority()}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[13px] font-semibold text-iris transition-all hover:bg-iris-ghost focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iris active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Sparkles size={14} />
+            {busy === "group" ? "Grouping…" : "Group by priority"}
+          </button>
+        ) : (
+          <Link
+            href={signInHref}
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-[13px] font-semibold text-iris transition-all hover:bg-iris-ghost focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iris active:scale-[0.98]"
+          >
+            <Sparkles size={14} />
+            Sign in for AI grouping
+          </Link>
+        )}
       </div>
       {groupMsg && (
         <p className="mb-2 text-[13px] font-medium text-ink-soft">{groupMsg}</p>
@@ -379,30 +391,63 @@ export function InboxClient({
           </div>
         </div>
       )}
-      <div className="mt-5 flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3 shadow-card focus-within:ring-2 focus-within:ring-iris">
-        <Plus size={18} className="shrink-0 text-ink-faint" />
-        <input
-          className="w-full bg-transparent text-[15px] font-medium outline-none placeholder:text-ink-faint"
-          placeholder="Get it out of your head…"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              void create();
-            }
-          }}
-          disabled={busy === "create"}
-        />
-        <button
-          type="button"
-          onClick={() => void create()}
-          disabled={!draft.trim() || busy === "create"}
-          className="shrink-0 rounded-lg bg-iris px-2.5 py-1 text-[12px] font-bold text-ink-inverse disabled:opacity-40"
-        >
-          Add
-        </button>
-      </div>
+      {authed ? (
+        <div className="mt-5 flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3 shadow-card focus-within:ring-2 focus-within:ring-iris">
+          <Plus size={18} className="shrink-0 text-ink-faint" />
+          <input
+            aria-label="Get it out of your head…"
+            className="w-full bg-transparent text-[15px] font-medium outline-none placeholder:text-ink-faint"
+            placeholder="Get it out of your head…"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void create();
+              }
+            }}
+            disabled={busy === "create"}
+          />
+          <button
+            type="button"
+            onClick={() => void create()}
+            disabled={!draft.trim() || busy === "create"}
+            className="shrink-0 rounded-lg bg-iris px-2.5 py-1 text-[12px] font-bold text-ink-inverse transition-all hover:bg-iris-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iris active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Add
+          </button>
+        </div>
+      ) : (
+        <section className="mt-5 rounded-2xl border border-border bg-surface p-4 shadow-card">
+          <div className="flex items-start gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-iris-ghost text-iris">
+              <Plus size={18} aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-[15px] font-bold">Clear your head when you’re ready</h2>
+              <p className="mt-1 text-[13px] leading-relaxed text-ink-soft">
+                Sign in to keep each thought private, saved, and synced across
+                your devices.
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <Link
+              href={signInHref}
+              className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-iris px-4 py-2.5 text-[14px] font-semibold text-ink-inverse shadow-card transition-all hover:bg-iris-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iris active:scale-[0.98]"
+            >
+              <LogIn size={16} aria-hidden="true" />
+              Sign in to capture
+            </Link>
+            <Link
+              href={signUpHref}
+              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-[14px] font-semibold text-ink-soft transition-all hover:bg-surface-sunken hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-iris active:scale-[0.98]"
+            >
+              Create an account
+            </Link>
+          </div>
+        </section>
+      )}
 
       {error && (
         <p role="alert" className="mt-3 text-[13px] font-semibold text-danger">

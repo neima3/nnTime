@@ -223,7 +223,7 @@ git commit -m "feat: preserve safe intent through authentication"
 - Create: `src/components/inbox-auth-boundary.test.ts`
 - Modify: `e2e/preview-auth-boundary.spec.ts`
 
-- [ ] **Step 1: Add failing Inbox source and browser contracts**
+- [x] **Step 1: Add failing Inbox source and browser contracts**
 
 Create a source contract that requires `authPageHref("sign-in", "/app/inbox")`,
 the labels `Sign in for AI grouping` and `Sign in to capture`, and a signed-out
@@ -243,7 +243,7 @@ await expect(page).toHaveURL(/\/sign-in\?next=%2Fapp%2Finbox$/);
 expect(protectedRequests).toEqual([]);
 ```
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run:
 `pnpm vitest run src/components/inbox-auth-boundary.test.ts && pnpm playwright test e2e/preview-auth-boundary.spec.ts --grep "Inbox"`
@@ -251,7 +251,7 @@ Run:
 Expected: FAIL because the current signed-out page renders an editable input
 and a disabled AI button.
 
-- [ ] **Step 3: Implement the signed-out presentation**
+- [x] **Step 3: Implement the signed-out presentation**
 
 Import `Link`, `LogIn`, and `authPageHref`. Compute sign-in and sign-up URLs once.
 Render `PickForMe` for both states. Render the current AI button only when
@@ -263,14 +263,14 @@ otherwise render a token-only locked row with calm supporting copy and primary
 Do not store the draft, call `create`, or issue any protected request while
 signed out. Keep sample rows read-only as they are today.
 
-- [ ] **Step 4: Run focused tests and verify GREEN**
+- [x] **Step 4: Run focused tests and verify GREEN**
 
 Run:
 `pnpm vitest run src/components/inbox-auth-boundary.test.ts src/components/inbox-schedule-contract.test.ts src/lib/offline-mutation-adoption.test.ts && pnpm playwright test e2e/preview-auth-boundary.spec.ts --grep "Inbox"`
 
 Expected: PASS with zero protected requests and actionable auth links.
 
-- [ ] **Step 5: Commit the Inbox boundary**
+- [x] **Step 5: Commit the Inbox boundary**
 
 ```bash
 git add src/components/InboxClient.tsx \
