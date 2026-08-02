@@ -351,6 +351,26 @@ test("onboarding discards corrupt saved anchor indices", async ({ page }) => {
     .toEqual([0]);
 });
 
+test("onboarding falls back safely from a corrupt saved step", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "kairo:onboarding",
+      JSON.stringify({ step: "2", name: "Safe", picked: [0] }),
+    );
+  });
+  await gotoHydrated(page, "/onboarding");
+
+  await expect(
+    page.getByRole("heading", { name: "A minute of setup. Genuinely one minute." }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(() => {
+      const raw = localStorage.getItem("kairo:onboarding");
+      return raw ? JSON.parse(raw).step : null;
+    }),
+  ).toBe(1);
+});
+
 test("signed-out template actions preserve the selected template", async ({ page }) => {
   await page.goto("/app/templates");
 

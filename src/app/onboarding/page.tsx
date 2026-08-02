@@ -82,7 +82,12 @@ export default function OnboardingPage() {
           picked?: number[];
         };
         /* eslint-disable react-hooks/set-state-in-effect */
-        if (saved.step && saved.step >= 1 && saved.step <= 2) setStep(saved.step);
+        if (
+          Number.isInteger(saved.step) &&
+          (saved.step === 1 || saved.step === 2)
+        ) {
+          setStep(saved.step);
+        }
         if (typeof saved.name === "string") setName(saved.name);
         if (Array.isArray(saved.picked)) {
           const safePicked = saved.picked.filter(
