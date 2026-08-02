@@ -8,7 +8,6 @@ import {
 import { AppShell } from "@/components/AppShell";
 import {
   activities as mockActivities,
-  DAY,
   inbox as mockInbox,
   NOW_MIN,
   type Activity,
@@ -66,8 +65,8 @@ async function loadTodayData(dateParam?: string) {
     return {
       activities: mockActivities,
       inbox: mockInbox.map((t) => ({ ...t, revision: 1 })),
-      dayLabel: DAY.label,
-      dayDate: DAY.date,
+      dayLabel: "Sample planner",
+      dayDate: "A day with Kairo",
       date: "mock",
       // Empty zone → live now-line falls back to the visitor's browser clock
       // (a fixed zone would show the demo's "now" at the wrong time of day).

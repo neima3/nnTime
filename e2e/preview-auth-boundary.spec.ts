@@ -243,6 +243,13 @@ test("signed-out Today advertises only the preview interactions it supports", as
   });
 
   await page.goto("/app/today?preview=1");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "A day with Kairo" }),
+  ).toBeVisible();
+  await expect(page.getByText("Sample planner", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "July 12" }),
+  ).toHaveCount(0);
   const activities = page.locator(
     '[role="group"][aria-roledescription="timeline activity"]',
   );

@@ -1,5 +1,34 @@
 # Progress log
 
+## 2026-08-02 — Round 59: truthful signed-out sample day (Codex)
+
+- **Fresh production dogfood found one demonstrated content/UX defect.** On
+  2026-08-02, signed-out Today called the fixed fixture **Saturday, July 12**
+  while the active navigation called it **Today**, making Kairo's primary
+  product surface appear stale. The mismatch reproduced at 390px and 1440px,
+  with and without `preview=1`. Ignored report and evidence are under
+  `browser-qa/round59-dogfood/`.
+- **The preview is now explicitly truthful.** Signed-out Today says
+  **Sample planner / A day with Kairo**. The deterministic fixture activities,
+  timeline clock, completion state, focus entry points, and navigation remain
+  unchanged. Authenticated days still derive their real weekday and calendar
+  date from the account's resolved planning zone.
+- **Test-first and review proof passed.** The focused anonymous browser
+  assertion first failed on the stale heading, then passed after the narrow
+  signed-out fallback change. Independent review returned **READY** with no
+  Critical or Important finding.
+- **Complete local release proof passed.** Lint, typecheck, production build,
+  `git diff --check`, **119 test files / 1,165 tests**, **33/33** standalone
+  Playwright scenarios, parity (**89.74% web / 86.93% iOS**), and the iOS
+  release contract passed. Production-standalone browser checks at 1440×900
+  and 390×844 found the exact sample label, one `h1`, no July 12 copy, no
+  horizontal overflow, and no console errors. Ignored screenshots are under
+  `browser-qa/round59-release/`.
+- **Release status.** The implementation is ready for exact-SHA CI, Coolify
+  deployment, and read-only live verification. Phase 7B physical-device and
+  provider lifecycle evidence and Phase 8B Google consent/client activation
+  remain external gates.
+
 ## 2026-08-02 — Round 58: intent continuity and accessible game dialogs (Codex)
 
 - **Authentication now returns to the work the user actually started.** The

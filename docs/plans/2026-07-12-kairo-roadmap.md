@@ -110,6 +110,7 @@ design work BEFORE the consuming subphase starts.
         persistence-confirmed celebration semantics (Round 57, 2026-08-01),
         plus route- and query-complete auth continuation, resumable onboarding
         and template selection, and modal brain-break focus safety (Round 58,
+        2026-08-02), and truthful signed-out Today sample labeling (Round 59,
         2026-08-02)
   - [x] 8D Privacy/review-prep contract + scripted parity gate
         (App Store upload, processing, and launch are tracked per release)
