@@ -370,6 +370,46 @@ test("signed-out Today advertises only the preview interactions it supports", as
   expect(protectedRequests).toEqual([]);
 });
 
+test("signed-out PWA quick capture preserves its intent through authentication", async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    locale: "en-US",
+    timezoneId: "America/New_York",
+    viewport: { width: 390, height: 844 },
+  });
+  await context.clearCookies();
+  const page = await context.newPage();
+  const protectedRequests: string[] = [];
+
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.pathname.startsWith("/api/v1/")) {
+      protectedRequests.push(`${request.method()} ${url.pathname}`);
+    }
+  });
+
+  try {
+    await page.goto("/app/today?capture=1");
+    const main = page.getByRole("main");
+
+    await expect(
+      main.getByRole("heading", { name: "Capture after you sign in" }),
+    ).toBeVisible();
+    await expect(main.getByText("Sample planner", { exact: true })).toHaveCount(0);
+    const href = await main
+      .getByRole("link", { name: "Sign in", exact: true })
+      .getAttribute("href");
+    expect(new URL(href!, "https://kairo.test").searchParams.get("next")).toBe(
+      "/app/today?capture=1",
+    );
+    await page.waitForTimeout(500);
+    expect(protectedRequests).toEqual([]);
+  } finally {
+    await context.close();
+  }
+});
+
 test("unsafe Focus durations normalize before authentication", async ({ page }) => {
   await page.goto("/app/focus?title=Safe&duration=Infinity");
   const href = await page

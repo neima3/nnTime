@@ -1,5 +1,39 @@
 # Progress log
 
+## 2026-08-02 — Round 64: resumable PWA quick-capture intent (Codex)
+
+- **Fresh production installability dogfood found one broken high-intent
+  shortcut.** Chromium reported no manifest or installability errors, both
+  opaque maskable icons matched their declared dimensions, and the root service
+  worker was active. However, the manifest's system-level **Quick capture**
+  shortcut targeted `/app/today?capture=1`, while a signed-out visitor received
+  the ordinary sample day with no capture field, explanation, or authentication
+  boundary. The query remained stranded in the URL. Ignored report and evidence
+  are under `browser-qa/round64-dogfood/`.
+- **Exact capture intent now survives authentication.** Signed-out exact
+  `capture=1` requests render a focused **Capture after you sign in** card whose
+  sign-in and account-creation actions preserve `/app/today?capture=1` through
+  the existing fail-closed return validator. Authenticated requests retain the
+  existing direct-open blank Quick Capture dialog. Missing, array-shaped, or
+  other capture values continue to render the normal signed-out sample day.
+- **Test-first, visual, and independent review proof is green.** The signed-out
+  browser contract first failed on the sample day, while the authenticated
+  contract proved the existing dialog behavior; both pass after the narrow
+  Today branch. Desktop 1440×1000 and mobile 390×844 checks confirmed the calm
+  token-only card, exact encoded continuation, one `h1`, and no horizontal
+  overflow. Visually inspected ignored evidence is under
+  `browser-qa/round64-local/`. Independent review returned **READY** with no
+  Critical or Important finding after checking strict query handling, auth
+  safety, protected-request silence, continuation, semantics, and regression
+  coverage.
+- **Complete local release proof passed.** Lint, typecheck, production build,
+  `git diff --check`, **121 test files / 1,168 tests**, **39/39** Playwright
+  scenarios plus one expected development-only skip, parity (**89.74% web /
+  86.93% iOS**), and the iOS release contract passed.
+- **Standing boundaries remain intact.** Production dogfood was signed-out and
+  read-only. Phase 7B physical-device/provider lifecycle proof and Phase 8B
+  Google consent/client activation remain external gates.
+
 ## 2026-08-02 — Round 63: sign-up privacy discoverability (Codex)
 
 - **Fresh production dogfood found a trust gap at account creation.** The

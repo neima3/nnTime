@@ -3,6 +3,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ListChecks,
+  PenLine,
   Plus,
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
@@ -33,6 +34,8 @@ import { AmbientSounds } from "@/components/AmbientSounds";
 import { AnytimeRail } from "@/components/AnytimeRail";
 import { instantToDateStr } from "@/server/temporal/zone";
 import { formatTime, toHourCycle, type HourCycle } from "@/lib/time-format";
+import { SignedOutCard } from "@/components/EmptyState";
+import { appReturnTo } from "@/lib/auth-return";
 
 function shiftDate(dateStr: string, deltaDays: number): string {
   const [y, m, d] = dateStr.split("-").map(Number);
@@ -234,6 +237,23 @@ export default async function TodayPage({
     isToday,
     nowMin,
   } = await loadTodayData(dateParam);
+
+  const captureIntent = sp.capture === "1";
+  if (!authed && captureIntent) {
+    return (
+      <AppShell active="today">
+        <div className="mx-auto max-w-2xl px-4 py-10 md:px-8">
+          <SignedOutCard
+            icon={PenLine}
+            title="Capture after you sign in"
+            body="Sign in, and Kairo will bring you straight back to a blank quick capture."
+            returnTo={appReturnTo("/app/today", { capture: 1 })}
+            headingLevel="h1"
+          />
+        </div>
+      </AppShell>
+    );
+  }
 
   const emptyDay = authed && activities.length === 0;
   const prevDate = date !== "mock" ? shiftDate(date, -1) : undefined;

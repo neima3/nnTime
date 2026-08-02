@@ -99,6 +99,18 @@ test("a captured thought lands in the inbox", async ({ page }) => {
   await expect(page.getByText("E2E captured thought")).toBeVisible();
 });
 
+test("the installed quick-capture shortcut opens a blank focused dialog", async ({
+  page,
+}) => {
+  await gotoHydrated(page, "/app/today?capture=1");
+
+  const dialog = page.getByRole("dialog", { name: "Quick capture" });
+  await expect(dialog).toBeVisible();
+  const box = dialog.getByRole("textbox");
+  await expect(box).toBeFocused();
+  await expect(box).toHaveValue("");
+});
+
 test("hour cycle changes every clock, including the SSR payload, and persists", async ({
   page,
 }) => {
