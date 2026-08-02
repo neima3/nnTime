@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { gotoHydrated, signUp, uniqueEmail } from "./helpers";
 
 const previewRoutes = [
   "/app/today?preview=1",
@@ -270,14 +271,69 @@ test("signed-out Today advertises only the preview interactions it supports", as
   expect(protectedRequests).toEqual([]);
 });
 
-test("signed-out template actions lead directly to sign in", async ({ page }) => {
+test("onboarding choices survive account creation", async ({ page }) => {
+  await gotoHydrated(page, "/onboarding");
+  await page.getByPlaceholder("Just a first name is plenty").fill("Intent QA");
+  await page.getByRole("button", { name: "Next" }).click();
+  const morning = page.getByRole("button", { name: /Morning reset/ });
+  await morning.click();
+  await expect(morning).toHaveAttribute("aria-pressed", "false");
+
+  await page.getByRole("link", { name: "Create my planner" }).click();
+  await page.waitForURL(/\/sign-up\?/);
+  expect(new URL(page.url()).searchParams.get("next")).toBe("/onboarding");
+  await page.getByPlaceholder("What should we call you?").fill("Intent QA");
+  await page.getByPlaceholder("you@example.com").fill(uniqueEmail("onboarding-return"));
+  await page.getByPlaceholder("At least 8 characters").fill("kairo-e2e-secret");
+  await page.getByRole("button", { name: "Create planner" }).click();
+
+  await page.waitForURL(/\/onboarding$/, { timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: "Intent QA, pick your anchors." })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Morning reset/ })).toHaveAttribute(
+    "aria-pressed",
+    "false",
+  );
+});
+
+test("signed-out template actions preserve the selected template", async ({ page }) => {
   await page.goto("/app/templates");
 
   const authLinks = page.getByRole("link", { name: "Sign in to apply" });
   await expect(authLinks.first()).toBeVisible();
   expect(await authLinks.count()).toBeGreaterThan(0);
   await expect(page.getByRole("button", { name: "Apply to Today" })).toHaveCount(0);
-  await expect(authLinks.first()).toHaveAttribute("href", "/sign-in");
+  const href = await authLinks.first().getAttribute("href");
+  expect(new URL(href!, "https://kairo.test").searchParams.get("next")).toBe(
+    "/app/templates?template=tp1",
+  );
+});
+
+test("returned template intent highlights without applying", async ({ page }) => {
+  await signUp(page, "template-return");
+  const writes: string[] = [];
+  page.on("request", (request) => {
+    if (
+      request.method() === "POST" &&
+      new URL(request.url()).pathname === "/api/v1/activities"
+    ) {
+      writes.push(request.url());
+    }
+  });
+
+  await gotoHydrated(page, "/app/templates?template=tp1");
+  await expect(page.getByRole("status")).toContainText(
+    "Gentle morning” is ready when you are",
+  );
+  await expect(page.locator("#template-tp1")).toHaveClass(/border-iris/);
+  await expect(
+    page.locator("#template-tp1").getByRole("button", { name: "Apply to Today" }),
+  ).toBeVisible();
+  expect(writes).toEqual([]);
+
+  await gotoHydrated(page, "/app/templates?template=not-a-template");
+  await expect(page.getByRole("status")).toHaveCount(0);
+  await expect(page.locator("article.border-iris")).toHaveCount(0);
+  expect(writes).toEqual([]);
 });
 
 for (const [route, title] of [

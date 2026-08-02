@@ -3,7 +3,19 @@ import { TemplatesClient } from "@/components/TemplatesClient";
 import { templates as mockTemplates } from "@/lib/mock";
 import { getSession } from "@/server/auth-session";
 
-export default async function TemplatesPage() {
+export default async function TemplatesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const requestedTemplate =
+    typeof params.template === "string" ? params.template : undefined;
+  const selectedTemplateId = mockTemplates.some(
+    (template) => template.id === requestedTemplate,
+  )
+    ? requestedTemplate
+    : undefined;
   const session = await getSession();
   return (
     <AppShell active="templates">
@@ -20,6 +32,7 @@ export default async function TemplatesPage() {
         <TemplatesClient
           templates={mockTemplates}
           authed={Boolean(session)}
+          selectedTemplateId={selectedTemplateId}
         />
       </div>
     </AppShell>

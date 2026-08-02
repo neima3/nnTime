@@ -17,6 +17,7 @@ import { detectTimezone } from "@/lib/timezone";
 import { clientToday } from "@/lib/client-date";
 import { localMinutesToInstant } from "@/lib/adapters";
 import { useSession } from "@/lib/auth-client";
+import { authPageHref } from "@/lib/auth-return";
 
 interface Anchor {
   emoji: string;
@@ -65,6 +66,7 @@ export default function OnboardingPage() {
   const [busy, setBusy] = useState(false);
   const [createdCount, setCreatedCount] = useState<number | null>(null);
   const [zone, setZone] = useState("UTC");
+  const [restored, setRestored] = useState(false);
   const authed = isPending ? null : Boolean(data?.user);
 
   // Resume where they left off — onboarding survives a refresh or a wandered-off
@@ -72,29 +74,35 @@ export default function OnboardingPage() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem("kairo:onboarding");
-      if (!raw) return;
-      const saved = JSON.parse(raw) as {
-        step?: number;
-        name?: string;
-        picked?: number[];
-      };
-      /* eslint-disable react-hooks/set-state-in-effect */
-      if (saved.step && saved.step >= 1 && saved.step <= 2) setStep(saved.step);
-      if (typeof saved.name === "string") setName(saved.name);
-      if (Array.isArray(saved.picked)) setPicked(new Set(saved.picked));
-      /* eslint-enable react-hooks/set-state-in-effect */
-    } catch {}
+      if (raw) {
+        const saved = JSON.parse(raw) as {
+          step?: number;
+          name?: string;
+          picked?: number[];
+        };
+        /* eslint-disable react-hooks/set-state-in-effect */
+        if (saved.step && saved.step >= 1 && saved.step <= 2) setStep(saved.step);
+        if (typeof saved.name === "string") setName(saved.name);
+        if (Array.isArray(saved.picked)) setPicked(new Set(saved.picked));
+        /* eslint-enable react-hooks/set-state-in-effect */
+      }
+    } catch {
+      // A malformed draft should never block onboarding.
+    } finally {
+      setRestored(true);
+    }
   }, []);
 
   // Persist progress on every change (cleared once anchors are created).
   useEffect(() => {
+    if (!restored) return;
     try {
       localStorage.setItem(
         "kairo:onboarding",
         JSON.stringify({ step, name, picked: [...picked] }),
       );
     } catch {}
-  }, [step, name, picked]);
+  }, [step, name, picked, restored]);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
@@ -253,7 +261,7 @@ export default function OnboardingPage() {
                     You&apos;ll need a (free) planner to save these:
                   </p>
                   <Link
-                    href="/sign-up"
+                    href={authPageHref("sign-up", "/onboarding")}
                     className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-iris py-3 text-[15px] font-semibold text-ink-inverse shadow-card transition-all hover:bg-iris-deep"
                   >
                     Create my planner <ArrowRight size={16} />

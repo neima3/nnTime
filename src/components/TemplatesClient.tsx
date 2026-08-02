@@ -4,12 +4,13 @@
  * Apply built-in templates → real activity series (10× Phase 13).
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { catClasses, type CategoryId } from "@/lib/mock";
 import { localMinutesToInstant } from "@/lib/adapters";
 import { clientToday } from "@/lib/client-date";
+import { appReturnTo, authPageHref } from "@/lib/auth-return";
 
 export type TemplateCard = {
   id: string;
@@ -24,13 +25,35 @@ export type TemplateCard = {
 export function TemplatesClient({
   templates,
   authed,
+  selectedTemplateId,
 }: {
   templates: TemplateCard[];
   authed: boolean;
+  selectedTemplateId?: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
+  const selectedTemplate = templates.find(
+    (template) => template.id === selectedTemplateId,
+  );
   const [msg, setMsg] = useState<string | null>(null);
+  const resumeMsg =
+    authed && selectedTemplate
+      ? `Welcome back — “${selectedTemplate.title}” is ready when you are.`
+      : null;
+  const visibleMsg = msg ?? resumeMsg;
+  const selectedRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!selectedTemplate || !selectedRef.current) return;
+    const reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    selectedRef.current.scrollIntoView({
+      block: "center",
+      behavior: reducedMotion ? "auto" : "smooth",
+    });
+  }, [selectedTemplate]);
 
   async function apply(t: TemplateCard) {
     if (!authed) {
@@ -82,9 +105,9 @@ export function TemplatesClient({
 
   return (
     <div>
-      {msg && (
+      {visibleMsg && (
         <p role="status" className="mb-4 text-[13px] font-semibold text-iris">
-          {msg}
+          {visibleMsg}
         </p>
       )}
       <div className="grid gap-3 sm:grid-cols-2">
@@ -93,7 +116,13 @@ export function TemplatesClient({
           return (
             <article
               key={t.id}
-              className="flex flex-col rounded-3xl border border-border bg-surface p-5 shadow-card"
+              id={`template-${t.id}`}
+              ref={t.id === selectedTemplateId ? selectedRef : undefined}
+              className={`flex flex-col rounded-3xl border bg-surface p-5 shadow-card ${
+                t.id === selectedTemplateId
+                  ? "border-iris ring-2 ring-iris/30"
+                  : "border-border"
+              }`}
             >
               <div className="flex items-start gap-3">
                 <span
@@ -127,7 +156,10 @@ export function TemplatesClient({
                 </button>
               ) : (
                 <Link
-                  href="/sign-in"
+                  href={authPageHref(
+                    "sign-in",
+                    appReturnTo("/app/templates", { template: t.id }),
+                  )}
                   className="mt-4 inline-flex items-center gap-1.5 self-start rounded-xl bg-iris-soft px-4 py-2 text-[13px] font-semibold text-iris transition-colors hover:bg-iris hover:text-ink-inverse focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
                 >
                   Sign in to apply
