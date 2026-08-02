@@ -28,8 +28,21 @@
 - **Complete local release proof passed.** Lint, typecheck, production build,
   `git diff --check`, **119 test files / 1,165 tests**, **34/34** Playwright
   scenarios, parity (**89.74% web / 86.93% iOS**), and the iOS release contract
-  passed. Exact-SHA CI, Coolify deployment, and read-only live verification
-  remain before this tranche is complete.
+  passed.
+- **Exact release proof passed.** SHA
+  `050cad585416ec1e15a1911892b14a28e0f29ffb` passed GitHub Actions run
+  `30749384402`: build/test, **34/34** standalone browser scenarios, generated
+  and Apple release contracts, shipping simulator tests, and the unsigned
+  shipping application build all completed successfully. Coolify deployment
+  `e13b54tgog4log9g6e26mlgx` finished on that exact SHA. Live health reported
+  migration, database, AI, and scheduler checks `ok` with 31 seconds of
+  scheduler lag; `/app/week` returned 200 with the production security-header
+  contract and its server response contained the unique sample copy. Desktop
+  1440×900 and mobile 390×844 live browser passes confirmed one `h1`, exact
+  **Sample planner / A week with Kairo / Sample week** labels, no real-week
+  links, no horizontal overflow, and no console, page, or failed-response
+  errors. Visually inspected ignored screenshots are under
+  `browser-qa/round60-live/`.
 - **Standing boundaries remain intact.** Phase 7B physical-device/provider
   lifecycle proof and Phase 8B Google consent/client activation remain external
   gates. Production dogfood made no planner mutation.

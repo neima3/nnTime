@@ -21,7 +21,7 @@ highlighted current day, and complete week navigation.
 - [x] Run the focused browser test and core code gates.
 - [x] Verify production-mode desktop/mobile visuals and complete an independent
   code review.
-- [ ] Update roadmap/progress, run every required gate, commit, push, pass
+- [x] Update roadmap/progress, run every required gate, commit, push, pass
   exact-SHA CI, deploy, and verify the live route.
 
 ## Standing boundaries
