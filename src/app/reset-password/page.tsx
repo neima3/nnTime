@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ResetPasswordForm } from "./ResetPasswordForm";
 import { ResetUnavailableCard } from "./ResetUnavailableCard";
+import { safeAuthReturnTo } from "@/lib/auth-return";
 
 export const metadata: Metadata = {
   title: "Choose a new password · Kairo",
@@ -19,9 +20,14 @@ function resetToken(value: string | string[] | undefined): string | null {
 export default async function ResetPasswordPage({
   searchParams,
 }: {
-  searchParams: Promise<{ token?: string | string[] }>;
+  searchParams: Promise<{
+    token?: string | string[];
+    next?: string | string[];
+  }>;
 }) {
-  const token = resetToken((await searchParams).token);
+  const params = await searchParams;
+  const token = resetToken(params.token);
+  const returnTo = safeAuthReturnTo(params.next);
 
   return (
     <main className="grid min-h-dvh place-items-center bg-canvas px-5 py-10">
@@ -32,7 +38,11 @@ export default async function ResetPasswordPage({
           </span>
           <span className="font-display text-xl font-bold tracking-tight">Kairo</span>
         </Link>
-        {token ? <ResetPasswordForm token={token} /> : <ResetUnavailableCard />}
+        {token ? (
+          <ResetPasswordForm token={token} returnTo={returnTo} />
+        ) : (
+          <ResetUnavailableCard returnTo={returnTo} />
+        )}
       </div>
     </main>
   );

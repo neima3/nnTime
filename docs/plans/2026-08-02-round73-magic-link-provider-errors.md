@@ -31,4 +31,4 @@ planner with no explanation or recovery. Ignored evidence lives under
 - [x] Implement and visually verify the fixed-copy allowlist.
 - [x] Obtain independent Critical/Important review.
 - [x] Pass local browser, repository, parity, and iOS release gates.
-- [ ] Commit, push, pass exact-SHA CI, deploy exact SHA, and verify live.
+- [x] Commit, push, pass exact-SHA CI, deploy exact SHA, and verify live.

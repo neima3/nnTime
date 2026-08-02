@@ -470,9 +470,87 @@ test("an invalid password-reset token becomes an actionable recovery state", asy
   await expect(recoveryHeading).toBeFocused();
   await expect(
     page.getByRole("link", { name: "Request a new reset link" }),
-  ).toHaveAttribute("href", "/forgot-password");
+  ).toHaveAttribute("href", "/forgot-password?next=%2Fapp%2Ftoday");
   await expect(password).toHaveCount(0);
   await expect(page.getByText("Invalid token", { exact: true })).toHaveCount(0);
+});
+
+test("password recovery preserves safe destination intent end to end", async ({
+  page,
+}) => {
+  let resetRedirectTo: string | undefined;
+
+  await page.route("**/api/auth/request-password-reset", async (route) => {
+    resetRedirectTo = route.request().postDataJSON().redirectTo;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ status: true }),
+    });
+  });
+  await page.route("**/api/auth/reset-password**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ status: true }),
+    });
+  });
+
+  await gotoHydrated(page, "/sign-in?next=%2Fapp%2Finbox%3Ffilter%3Dsoon");
+  const forgotPassword = page.getByRole("link", { name: "Forgot password?" });
+  await expect(forgotPassword).toHaveAttribute(
+    "href",
+    "/forgot-password?next=%2Fapp%2Finbox%3Ffilter%3Dsoon",
+  );
+  await forgotPassword.click();
+  await expect(page).toHaveURL(
+    /\/forgot-password\?next=%2Fapp%2Finbox%3Ffilter%3Dsoon$/,
+  );
+  await expect(page.getByRole("link", { name: "Back to sign in" })).toHaveAttribute(
+    "href",
+    "/sign-in?next=%2Fapp%2Finbox%3Ffilter%3Dsoon",
+  );
+
+  await page.getByRole("textbox", { name: "Email" }).fill("nobody@example.invalid");
+  await page.getByRole("button", { name: "Send reset link" }).click();
+  await expect(page.getByRole("status")).toBeVisible();
+  expect(resetRedirectTo).toBe(
+    "/reset-password?next=%2Fapp%2Finbox%3Ffilter%3Dsoon",
+  );
+
+  await gotoHydrated(
+    page,
+    "/reset-password?token=synthetic-reset-token&next=%2Fapp%2Finbox%3Ffilter%3Dsoon",
+  );
+  await page.getByRole("textbox", { name: "New password" }).fill("NotARealPassword1!");
+  await page.getByRole("button", { name: "Update password" }).click();
+  await expect(page).toHaveURL(
+    /\/sign-in\?next=%2Fapp%2Finbox%3Ffilter%3Dsoon$/,
+  );
+});
+
+test("password recovery fails hostile and ambiguous destinations closed", async ({
+  page,
+}) => {
+  await gotoHydrated(
+    page,
+    "/forgot-password?next=https%3A%2F%2Fevil.example%2Fapp%2Finbox&next=%2Fapp%2Finbox",
+  );
+  await expect(page.getByRole("link", { name: "Back to sign in" })).toHaveAttribute(
+    "href",
+    "/sign-in?next=%2Fapp%2Ftoday",
+  );
+
+  await page.goto(
+    "/reset-password?error=INVALID_TOKEN&next=https%3A%2F%2Fevil.example%2Fsteal",
+  );
+  await expect(
+    page.getByRole("link", { name: "Request a new reset link" }),
+  ).toHaveAttribute("href", "/forgot-password?next=%2Fapp%2Ftoday");
+  await expect(page.getByRole("link", { name: "Back to sign in" })).toHaveAttribute(
+    "href",
+    "/sign-in?next=%2Fapp%2Ftoday",
+  );
 });
 
 test("password reset can reveal and re-mask the new credential", async ({ page }) => {

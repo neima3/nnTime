@@ -1,5 +1,39 @@
 # Progress log
 
+## 2026-08-02 — Round 74: password-reset intent continuity (Codex)
+
+- **Fresh production dogfood found destination loss in password recovery.**
+  Starting at `/sign-in?next=/app/inbox`, **Forgot password?** pointed to bare
+  `/forgot-password`; the recovery page then linked back to bare `/sign-in`.
+  The user's safe destination was discarded before any request could begin.
+  No form was submitted and no account, token, or planner data was touched.
+  Ignored evidence and the report are under `browser-qa/round74-dogfood/`.
+- **One safe intent now survives the complete reset lifecycle.** Sign-in,
+  forgot-password, Better Auth's callback URL, valid and invalid reset states,
+  fresh-link recovery, and post-reset sign-in all carry the same normalized
+  destination. Nested app query intent is encoded once by shared helpers;
+  external URLs, malformed input, arrays, and duplicate query values fail
+  closed to `/app/today`. Reset single-use behavior and account-neutral request
+  confirmation are unchanged. The forgot-password page now resolves async
+  search params in its Next 16 server boundary and passes only the normalized
+  value into the interactive client form.
+- **Test-first, visual, and independent review proof is green.** The new pure
+  helper and both browser contracts first failed on the missing links. Focused
+  server/pure tests pass 44/44, and focused browser checks cover safe nested
+  intent, request payload, successful reset routing, invalid-token recovery,
+  and hostile/ambiguous fail-closed behavior. Independent review returned
+  **READY** with no Critical or Important finding after confirming the installed
+  Better Auth callback preserves existing `next` while adding `token` or
+  `error`. Desktop and 390px mobile checks show unchanged hierarchy, clean
+  wrapping, and no overflow; ignored evidence is under
+  `browser-qa/round74-local/`. Required lint, typecheck, 1,179 tests in 122
+  files, and production build pass. The complete browser suite passed all 48
+  executed checks with one development-only skip. Scripted parity remains
+  89.74% web / 86.93% iOS, and the iOS release contract passes. Exact-SHA CI,
+  deployment, and live verification remain pending.
+- **Standing boundaries remain intact.** Phase 7B physical-device provider
+  lifecycle proof and Phase 8B Google activation remain external.
+
 ## 2026-08-02 — Round 73: magic-link provider-error recovery (Codex)
 
 - **Fresh production dogfood found remaining silent callback failures.** The
@@ -27,8 +61,18 @@
   lint, typecheck, 1,178 tests in 122 files, and production build pass. The
   complete browser suite passed all 46 executed checks with one development-
   only skip. Scripted parity remains 89.74% web / 86.93% iOS, and the iOS
-  release contract passes. Exact-SHA CI, deployment, and live production
-  verification remain pending.
+  release contract passes.
+- **Exact release proof is green.** Feature commit
+  `b05e0eead6d8c70154b0d8d5eec8a7c713ec36a3` passed all three lanes in GitHub
+  Actions run `30768139753` (build/test, standalone E2E, and native shipping
+  contract). Coolify deployment `bv1rfvf5xu1hcnh4escyui67` finished that exact
+  SHA. Live health reported migrations, database, AI, and scheduler `ok` with
+  scheduler lag 30 seconds. At 1440×1000 and 390×844, all four installed
+  verifier errors rendered their fixed recovery state with clean `/app/today`
+  continuation, no sample-planner leak, and no overflow. Prototype-chain names,
+  arrays, and unknown values stayed on ordinary signed-out Today; the console
+  emitted zero errors or warnings. Visually inspected ignored evidence is under
+  `browser-qa/round73-live/`.
 - **Standing boundaries remain intact.** Phase 7B physical-device provider
   lifecycle proof and Phase 8B Google activation remain external.
 

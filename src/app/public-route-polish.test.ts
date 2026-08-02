@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import ForgotPasswordPage from "./forgot-password/page";
@@ -15,8 +14,11 @@ describe("public route polish", () => {
     expect(metadata.title).toBe(title);
   });
 
-  it("keeps password recovery inside the branded auth shell", () => {
-    const html = renderToStaticMarkup(createElement(ForgotPasswordPage));
+  it("keeps password recovery inside the branded auth shell", async () => {
+    const page = await ForgotPasswordPage({
+      searchParams: Promise.resolve({}),
+    });
+    const html = renderToStaticMarkup(page);
 
     expect(html).toContain('href="/"');
     expect(html).toContain(">Kairo</span>");

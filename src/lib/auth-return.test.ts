@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { appReturnTo, authPageHref, safeAuthReturnTo } from "./auth-return";
+import {
+  appReturnTo,
+  authPageHref,
+  passwordRecoveryHref,
+  safeAuthReturnTo,
+} from "./auth-return";
 
 describe("safeAuthReturnTo", () => {
   it.each([
@@ -48,6 +53,20 @@ describe("safeAuthReturnTo", () => {
     expect(
       authPageHref("sign-up", "/app/inbox", { provider: "google" }),
     ).toBe("/sign-up?provider=google&next=%2Fapp%2Finbox");
+  });
+
+  it("builds password-recovery links from the same safe destination policy", () => {
+    expect(
+      passwordRecoveryHref(
+        "forgot-password",
+        "/app/inbox?filter=work%2Fhome",
+      ),
+    ).toBe(
+      "/forgot-password?next=%2Fapp%2Finbox%3Ffilter%3Dwork%252Fhome",
+    );
+    expect(
+      passwordRecoveryHref("reset-password", "https://evil.example/steal"),
+    ).toBe("/reset-password?next=%2Fapp%2Ftoday");
   });
 
   it("serializes a normalized app intent deterministically", () => {

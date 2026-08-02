@@ -82,3 +82,13 @@ export function authPageHref(
   });
   return `/${mode}?${params}`;
 }
+
+export function passwordRecoveryHref(
+  step: "forgot-password" | "reset-password",
+  returnTo: unknown,
+): string {
+  const params = new URLSearchParams({
+    next: safeAuthReturnTo(returnTo),
+  });
+  return `/${step}?${params}`;
+}

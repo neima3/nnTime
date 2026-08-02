@@ -19,7 +19,9 @@ describe("reset password recovery states", () => {
       const html = renderToStaticMarkup(page);
 
       expect(html).toContain("This reset link isn’t available");
-      expect(html).toContain('href="/forgot-password"');
+      expect(html).toContain(
+        'href="/forgot-password?next=%2Fapp%2Ftoday"',
+      );
       expect(html).not.toContain("Choose a new password");
       expect(html).not.toContain('type="password"');
     },

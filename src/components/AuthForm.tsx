@@ -16,6 +16,7 @@ import { signInWithGoogle } from "./google-auth-integration";
 import {
   authPageHref,
   DEFAULT_AUTH_RETURN_TO,
+  passwordRecoveryHref,
   safeAuthReturnTo,
 } from "@/lib/auth-return";
 import { PasswordField } from "./PasswordField";
@@ -187,7 +188,7 @@ export function AuthForm({
             {!isSignUp && (
               <div className="flex justify-end">
                 <Link
-                  href="/forgot-password"
+                  href={passwordRecoveryHref("forgot-password", safeReturnTo)}
                   className="text-[13px] font-semibold text-iris hover:underline"
                 >
                   Forgot password?

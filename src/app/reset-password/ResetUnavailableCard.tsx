@@ -2,13 +2,22 @@
 
 import Link from "next/link";
 import { useEffect, useRef } from "react";
+import {
+  authPageHref,
+  DEFAULT_AUTH_RETURN_TO,
+  passwordRecoveryHref,
+  safeAuthReturnTo,
+} from "@/lib/auth-return";
 
 export function ResetUnavailableCard({
+  returnTo = DEFAULT_AUTH_RETURN_TO,
   focusOnMount = false,
 }: {
+  returnTo?: string;
   focusOnMount?: boolean;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const safeReturnTo = safeAuthReturnTo(returnTo);
 
   useEffect(() => {
     if (focusOnMount) headingRef.current?.focus();
@@ -28,13 +37,13 @@ export function ResetUnavailableCard({
         and try again.
       </p>
       <Link
-        href="/forgot-password"
+        href={passwordRecoveryHref("forgot-password", safeReturnTo)}
         className="mt-6 block rounded-2xl bg-iris px-4 py-3 text-[15px] font-semibold text-ink-inverse shadow-card transition-colors hover:bg-iris-deep"
       >
         Request a new reset link
       </Link>
       <Link
-        href="/sign-in"
+        href={authPageHref("sign-in", safeReturnTo)}
         className="mt-3 block text-[13px] font-semibold text-iris hover:underline"
       >
         Back to sign in

@@ -7,9 +7,17 @@ import { Loader2 } from "lucide-react";
 import { resetPassword } from "@/lib/auth-client";
 import { PasswordField } from "@/components/PasswordField";
 import { ResetUnavailableCard } from "./ResetUnavailableCard";
+import { authPageHref, safeAuthReturnTo } from "@/lib/auth-return";
 
-export function ResetPasswordForm({ token }: { token: string }) {
+export function ResetPasswordForm({
+  token,
+  returnTo,
+}: {
+  token: string;
+  returnTo: string;
+}) {
   const router = useRouter();
+  const safeReturnTo = safeAuthReturnTo(returnTo);
   const [password, setPassword] = useState("");
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [pending, setPending] = useState(false);
@@ -36,7 +44,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
         setPending(false);
         return;
       }
-      router.push("/sign-in");
+      router.push(authPageHref("sign-in", safeReturnTo));
     } catch {
       setError("Couldn't reach the server — try again?");
       setPending(false);
@@ -44,7 +52,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
   }
 
   if (linkUnavailable) {
-    return <ResetUnavailableCard focusOnMount />;
+    return <ResetUnavailableCard returnTo={safeReturnTo} focusOnMount />;
   }
 
   return (
@@ -78,7 +86,10 @@ export function ResetPasswordForm({ token }: { token: string }) {
         </button>
       </form>
       <p className="mt-4 text-center text-[13px] text-ink-soft">
-        <Link href="/sign-in" className="font-semibold text-iris hover:underline">
+        <Link
+          href={authPageHref("sign-in", safeReturnTo)}
+          className="font-semibold text-iris hover:underline"
+        >
           Back to sign in
         </Link>
       </p>
