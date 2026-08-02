@@ -30,6 +30,20 @@
   invocation encountered a transient stale-process port race before executing
   tests; the dedicated port was already released on inspection and the clean
   rerun completed successfully.
+- **Exact release proof passed.** Feature SHA
+  `fb0f37fb8ba9168167a7310e32db5fa44f79a2ee` passed GitHub Actions run
+  `30754170462`: hosted build/test, **37/37** production-standalone browser
+  scenarios with the development-only internal-reference contract intentionally
+  skipped, generated/native contracts, shipping simulator tests, and the
+  unsigned shipping application build all completed successfully. Coolify
+  deployment `ckx84yfxai8q2q36qpj485sj` finished on that exact SHA. Live health
+  reported migration, database, AI, and scheduler checks `ok`; `/sign-up`
+  returned HTTP 200 with enforcing CSP, HSTS, frame denial, and nosniff; its
+  server response contained the unique trust note and exact `/privacy` link.
+  Desktop 1440×1000 and mobile 390×844 browser passes confirmed the sign-up
+  heading, one visible **Privacy Policy** link, exact navigation to the live
+  privacy heading, no horizontal overflow, and no console or page errors.
+  Visually inspected ignored evidence is under `browser-qa/round63-live/`.
 - **Standing boundaries remain intact.** Production verification remains
   signed-out and read-only. Phase 7B physical-device/provider lifecycle proof
   and Phase 8B Google consent/client activation remain external gates.

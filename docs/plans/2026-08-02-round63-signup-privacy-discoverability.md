@@ -32,7 +32,7 @@ agreement.
 - [x] Verify desktop and 390px sign-up visuals in a real browser and capture
   evidence.
 - [x] Complete independent code review and required full gates.
-- [ ] Update roadmap/progress, commit, push, pass exact-SHA CI, deploy, and
+- [x] Update roadmap/progress, commit, push, pass exact-SHA CI, deploy, and
   verify the live route.
 
 ## Standing boundaries
