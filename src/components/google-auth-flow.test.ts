@@ -112,6 +112,7 @@ describe("Google authentication web flow", () => {
 
     const first = startGoogleSignIn({
       mode: "sign-in",
+      returnTo: "/app/inbox",
       invoke,
       lock,
       setPending: (pending) => pendingStates.push(pending),
@@ -119,6 +120,7 @@ describe("Google authentication web flow", () => {
     });
     const second = startGoogleSignIn({
       mode: "sign-in",
+      returnTo: "/app/inbox",
       invoke,
       lock,
       setPending: (pending) => pendingStates.push(pending),
@@ -128,8 +130,8 @@ describe("Google authentication web flow", () => {
     expect(invoke).toHaveBeenCalledTimes(1);
     expect(invoke).toHaveBeenCalledWith({
       provider: "google",
-      callbackURL: "/app/today",
-      errorCallbackURL: "/sign-in?provider=google",
+      callbackURL: "/app/inbox",
+      errorCallbackURL: "/sign-in?provider=google&next=%2Fapp%2Finbox",
     });
     expect(lock.current).toBe(true);
     expect(pendingStates).toEqual([true]);
@@ -145,6 +147,7 @@ describe("Google authentication web flow", () => {
 
     await startGoogleSignIn({
       mode: "sign-up",
+      returnTo: "/app/inbox",
       invoke: vi.fn().mockResolvedValue({
         error: { message: "oauth payload: client_secret=do-not-show" },
       }),
@@ -164,6 +167,7 @@ describe("Google authentication web flow", () => {
 
     await startGoogleSignIn({
       mode: "sign-up",
+      returnTo: "/app/inbox",
       invoke,
       lock: { current: false },
       setPending: vi.fn(),
@@ -172,10 +176,29 @@ describe("Google authentication web flow", () => {
 
     expect(invoke).toHaveBeenCalledWith({
       provider: "google",
-      callbackURL: "/app/today",
-      errorCallbackURL: "/sign-up?provider=google",
+      callbackURL: "/app/inbox",
+      errorCallbackURL: "/sign-up?provider=google&next=%2Fapp%2Finbox",
     });
   });
+
+  it.each(["sign-in", "sign-up"] as const)(
+    "preserves the destination in the %s mode switch",
+    (mode) => {
+      const html = renderToStaticMarkup(
+        createElement(AuthForm, {
+          mode,
+          capabilities: unavailable,
+          returnTo: "/app/inbox",
+        }),
+      );
+
+      expect(html).toContain(
+        mode === "sign-in"
+          ? 'href="/sign-up?next=%2Fapp%2Finbox"'
+          : 'href="/sign-in?next=%2Fapp%2Finbox"',
+      );
+    },
+  );
 });
 
 describe("connected sign-in methods", () => {

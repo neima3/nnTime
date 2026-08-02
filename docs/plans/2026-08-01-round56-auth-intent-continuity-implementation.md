@@ -132,7 +132,7 @@ git commit -m "feat: validate internal auth return paths"
 - Modify: `src/components/google-auth-flow.test.ts`
 - Modify: `src/components/google-auth-integration.test.ts`
 
-- [ ] **Step 1: Add failing page and provider-flow assertions**
+- [x] **Step 1: Add failing page and provider-flow assertions**
 
 Extend `auth-pages-google.test.ts` to prove both pages map a valid
 `next=/app/inbox` to `element.props.returnTo === "/app/inbox"` and map
@@ -152,14 +152,14 @@ Update the concrete integration test to require the same values from
 `signIn.social`. Add static-render assertions that the mode-switch link retains
 `next=%2Fapp%2Finbox`.
 
-- [ ] **Step 2: Run the focused auth tests and verify RED**
+- [x] **Step 2: Run the focused auth tests and verify RED**
 
 Run:
 `pnpm vitest run src/app/auth-pages-google.test.ts src/components/google-auth-flow.test.ts src/components/google-auth-integration.test.ts`
 
 Expected: FAIL because auth pages and flows still hard-code `/app/today`.
 
-- [ ] **Step 3: Parse once at the server page boundary**
+- [x] **Step 3: Parse once at the server page boundary**
 
 In both auth pages, await `searchParams` once, use it for the existing Google
 error mapping, normalize `params.next` with `safeAuthReturnTo`, and pass
@@ -172,7 +172,7 @@ const returnTo = safeAuthReturnTo(params.next);
 return <AuthForm ... initialError={initialError} returnTo={returnTo} />;
 ```
 
-- [ ] **Step 4: Thread the destination through `AuthForm`**
+- [x] **Step 4: Thread the destination through `AuthForm`**
 
 Add `returnTo?: string` with `/app/today` as the default. After successful
 email/password auth, call `router.push(returnTo)`. Use `returnTo` as the magic
@@ -193,20 +193,20 @@ export function AuthForm({
 }) { /* existing form */ }
 ```
 
-- [ ] **Step 5: Make Google sign-in destination-aware without changing linking**
+- [x] **Step 5: Make Google sign-in destination-aware without changing linking**
 
 Require `returnTo` in `startGoogleSignIn`, use it for `callbackURL`, and create
 the error URL through `authPageHref(mode, returnTo, { provider: "google" })`.
 Leave `startGoogleLink` and its Settings callbacks unchanged.
 
-- [ ] **Step 6: Run focused auth tests and verify GREEN**
+- [x] **Step 6: Run focused auth tests and verify GREEN**
 
 Run:
 `pnpm vitest run src/lib/auth-return.test.ts src/app/auth-pages-google.test.ts src/components/google-auth-flow.test.ts src/components/google-auth-integration.test.ts`
 
 Expected: PASS; account-linking assertions remain unchanged.
 
-- [ ] **Step 7: Commit auth propagation**
+- [x] **Step 7: Commit auth propagation**
 
 ```bash
 git add src/app/sign-in/page.tsx src/app/sign-up/page.tsx \

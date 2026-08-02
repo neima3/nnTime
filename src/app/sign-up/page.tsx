@@ -4,6 +4,7 @@ import {
   getGoogleAuthRedirectError,
   type AuthRedirectSearchParams,
 } from "@/lib/auth-redirect-error";
+import { safeAuthReturnTo } from "@/lib/auth-return";
 import { getAuthCapabilities } from "@/server/auth-capabilities";
 
 export const metadata: Metadata = { title: "Create your planner · Kairo" };
@@ -13,13 +14,16 @@ export default async function SignUpPage({
 }: {
   searchParams: Promise<AuthRedirectSearchParams>;
 }) {
-  const initialError = getGoogleAuthRedirectError(await searchParams);
+  const params = await searchParams;
+  const initialError = getGoogleAuthRedirectError(params);
+  const returnTo = safeAuthReturnTo(params.next);
 
   return (
     <AuthForm
       mode="sign-up"
       capabilities={getAuthCapabilities(process.env)}
       initialError={initialError}
+      returnTo={returnTo}
     />
   );
 }

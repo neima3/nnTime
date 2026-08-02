@@ -13,6 +13,11 @@ import {
   releaseAuthRequest,
 } from "./auth-request-guard";
 import { signInWithGoogle } from "./google-auth-integration";
+import {
+  authPageHref,
+  DEFAULT_AUTH_RETURN_TO,
+  safeAuthReturnTo,
+} from "@/lib/auth-return";
 
 type Mode = "sign-in" | "sign-up";
 
@@ -25,10 +30,12 @@ export function AuthForm({
   mode,
   capabilities,
   initialError = null,
+  returnTo = DEFAULT_AUTH_RETURN_TO,
 }: {
   mode: Mode;
   capabilities: AuthCapabilities;
   initialError?: string | null;
+  returnTo?: string;
 }) {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -42,6 +49,7 @@ export function AuthForm({
 
   const isSignUp = mode === "sign-up";
   const authBusy = busyAction !== null;
+  const safeReturnTo = safeAuthReturnTo(returnTo);
 
   function finishAuthRequest() {
     releaseAuthRequest(authLock);
@@ -74,7 +82,7 @@ export function AuthForm({
           headers: { "x-timezone": detectTimezone() },
         });
       } catch {}
-      router.push("/app/today");
+      router.push(safeReturnTo);
       router.refresh();
     } catch {
       setError("Couldn't reach the server — try again?");
@@ -94,7 +102,7 @@ export function AuthForm({
     try {
       const res = await signIn.magicLink({
         email: email.trim(),
-        callbackURL: "/app/today",
+        callbackURL: safeReturnTo,
       });
       if (res.error) {
         setError(res.error.message ?? "Couldn't send that link — try again?");
@@ -113,6 +121,7 @@ export function AuthForm({
   function onGoogleSignIn() {
     void signInWithGoogle({
       mode,
+      returnTo: safeReturnTo,
       lock: authLock,
       setPending: (pending) => setBusyAction(pending ? "google" : null),
       setError,
@@ -276,7 +285,10 @@ export function AuthForm({
         <p className="mt-5 text-center text-[14px] text-ink-soft">
           {isSignUp ? "Already have a planner? " : "New to Kairo? "}
           <Link
-            href={isSignUp ? "/sign-in" : "/sign-up"}
+            href={authPageHref(
+              isSignUp ? "sign-in" : "sign-up",
+              safeReturnTo,
+            )}
             className="font-semibold text-iris hover:underline"
           >
             {isSignUp ? "Sign in" : "Create one"}

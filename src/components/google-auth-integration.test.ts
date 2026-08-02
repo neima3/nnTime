@@ -56,6 +56,7 @@ describe("concrete Google auth client integration", () => {
     async (mode) => {
       await signInWithGoogle({
         mode,
+        returnTo: "/app/inbox",
         lock: { current: false },
         setPending: vi.fn(),
         setError: vi.fn(),
@@ -64,8 +65,8 @@ describe("concrete Google auth client integration", () => {
       expect(authMocks.signInSocial).toHaveBeenCalledOnce();
       expect(authMocks.signInSocial).toHaveBeenCalledWith({
         provider: "google",
-        callbackURL: "/app/today",
-        errorCallbackURL: `/${mode}?provider=google`,
+        callbackURL: "/app/inbox",
+        errorCallbackURL: `/${mode}?provider=google&next=%2Fapp%2Finbox`,
       });
     },
   );
@@ -83,6 +84,7 @@ describe("concrete Google auth client integration", () => {
     expect(acquireAuthRequest(lock)).toBe(true);
     await signInWithGoogle({
       mode: "sign-in",
+      returnTo: "/app/inbox",
       lock,
       setPending: vi.fn(),
       setError: vi.fn(),
@@ -103,6 +105,9 @@ describe("concrete Google auth client integration", () => {
     expect(authForm.match(/disabled=\{authBusy\}/g)).toHaveLength(3);
     expect(authForm.match(/acquireAuthRequest\(authLock\)/g)).toHaveLength(2);
     expect(authForm).toContain("lock: authLock");
+    expect(authForm).toContain("router.push(safeReturnTo)");
+    expect(authForm).toContain("callbackURL: safeReturnTo");
+    expect(authForm).toContain("returnTo: safeReturnTo");
     expect(authForm).not.toContain("googleLock");
   });
 });

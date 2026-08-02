@@ -37,6 +37,26 @@ describe("auth pages Google capability", () => {
   });
 
   it.each([
+    ["sign-in", SignInPage],
+    ["sign-up", SignUpPage],
+  ] as const)(
+    "passes only a safe internal return destination to %s",
+    async (_name, Page) => {
+      const internal = await Page({
+        searchParams: Promise.resolve({ next: "/app/inbox" }),
+      });
+      const external = await Page({
+        searchParams: Promise.resolve({
+          next: "https://evil.example/app/inbox",
+        }),
+      });
+
+      expect(internal.props.returnTo).toBe("/app/inbox");
+      expect(external.props.returnTo).toBe("/app/today");
+    },
+  );
+
+  it.each([
     {
       query: {
         provider: "google",

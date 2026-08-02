@@ -4,6 +4,7 @@ import {
   releaseAuthRequest,
   type AuthRequestLock,
 } from "./auth-request-guard";
+import { authPageHref, safeAuthReturnTo } from "@/lib/auth-return";
 
 type FlowLock = AuthRequestLock;
 
@@ -64,16 +65,21 @@ async function runGoogleAction({
 
 export function startGoogleSignIn({
   mode,
+  returnTo,
   ...input
 }: GoogleActionInput & {
   mode: "sign-in" | "sign-up";
+  returnTo: string;
 }): Promise<void> {
+  const callbackURL = safeAuthReturnTo(returnTo);
   return runGoogleAction({
     ...input,
     options: {
       provider: "google",
-      callbackURL: "/app/today",
-      errorCallbackURL: `/${mode}?provider=google`,
+      callbackURL,
+      errorCallbackURL: authPageHref(mode, callbackURL, {
+        provider: "google",
+      }),
     },
     errorMessage: GOOGLE_SIGN_IN_ERROR,
   });
