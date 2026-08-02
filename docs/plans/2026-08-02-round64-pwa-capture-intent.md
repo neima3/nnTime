@@ -37,7 +37,7 @@ validator, and design tokens. It performs no production mutation.
   or authenticated planner.
 - [x] Run focused and full gates, independent review, and desktop/mobile browser
   QA.
-- [ ] Update roadmap/progress, commit, push, pass exact-SHA CI, deploy, and
+- [x] Update roadmap/progress, commit, push, pass exact-SHA CI, deploy, and
   verify the live shortcut boundary and authenticated contract.
 
 ## Standing boundaries

@@ -30,6 +30,22 @@
   `git diff --check`, **121 test files / 1,168 tests**, **39/39** Playwright
   scenarios plus one expected development-only skip, parity (**89.74% web /
   86.93% iOS**), and the iOS release contract passed.
+- **Exact release proof passed.** Feature SHA
+  `3ee189ac1c06c6022313439d8b42a6a24bb17f3e` passed GitHub Actions run
+  `30756053546`: hosted build/test, **39/39** production-standalone browser
+  scenarios with the development-only internal-reference contract intentionally
+  skipped, generated/native contracts, shipping simulator tests, and the
+  unsigned shipping application build all completed successfully. Coolify
+  deployment `gpqo75rxty32qzc4nicwx6xh` finished on that exact SHA. Live health
+  reported migration, database, AI, and scheduler checks `ok`; the exact
+  capture-intent route returned HTTP 200 with enforcing CSP, HSTS, frame denial,
+  and nosniff. Desktop 1440×1000 and mobile 390×844 browser passes confirmed the
+  focused heading, exact safe sign-in continuation, absence of the sample-day
+  label, no protected planner requests, no horizontal overflow, and no console
+  or page errors. `capture=2` retained the ordinary **A day with Kairo** preview.
+  Visually inspected ignored evidence is under `browser-qa/round64-live/`.
+  Authenticated live mutation was intentionally avoided; the exact-SHA
+  production-standalone browser lane proved the blank focused capture dialog.
 - **Standing boundaries remain intact.** Production dogfood was signed-out and
   read-only. Phase 7B physical-device/provider lifecycle proof and Phase 8B
   Google consent/client activation remain external gates.
