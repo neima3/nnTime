@@ -33,8 +33,18 @@
   before Playwright routing could inspect it; the payload contract now uses an
   isolated service-worker-blocked context and passes against the standalone
   production server. Scripted parity remains 89.74% web / 86.93% iOS, and the
-  iOS release contract passes. Final exact-SHA CI remains pending; the first
-  exact-SHA deployment and read-only live verification are green.
+  iOS release contract passes.
+- **Exact release proof is green.** Final release commit
+  `8be908f2f4c6000e0f45f025fd22b12f9bf8cfa3` passed all three lanes in GitHub
+  Actions run `30769498270` (build/test, 48-check standalone E2E, and native
+  shipping contract). Coolify deployment `te149357lfb87wwhjl2lsmtd` finished
+  that exact SHA. Live health reported migrations, database, AI, and scheduler
+  `ok` with scheduler lag 10 seconds. After final-SHA cutover, production at
+  390×844 preserved nested Inbox query intent across sign-in and
+  forgot-password, preserved it in unavailable-reset recovery links, failed an
+  external destination closed to `/app/today`, had no horizontal overflow, and
+  emitted zero console errors or warnings. The final screenshot and supporting
+  desktop/mobile evidence are under `browser-qa/round74-live/`.
 - **Standing boundaries remain intact.** Phase 7B physical-device provider
   lifecycle proof and Phase 8B Google activation remain external.
 

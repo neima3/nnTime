@@ -31,4 +31,4 @@ Ignored evidence lives under `browser-qa/round74-dogfood/`.
 - [x] Implement safe end-to-end intent continuity.
 - [x] Obtain independent Critical/Important review.
 - [x] Pass visual, repository, browser, parity, and iOS release gates.
-- [ ] Commit, push, pass exact-SHA CI, deploy exact SHA, and verify live.
+- [x] Commit, push, pass exact-SHA CI, deploy exact SHA, and verify live.
