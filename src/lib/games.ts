@@ -603,6 +603,158 @@ export function patternShowMs(count: number): number {
   return 900 + count * 250;
 }
 
+/* ---- Proof It (find the wrong word) -------------------------------------- */
+
+export interface ProofItem {
+  /** Topic key (reuses QUIZ_TOPIC_LABELS where it overlaps). */
+  topic: string;
+  /** The sentence; exactly one space-separated word is wrong. */
+  text: string;
+  /** Index into text.split(" ") of the wrong word. */
+  errorIndex: number;
+  /**
+   * What the wrong word should have been (with its punctuation, if any).
+   * Empty string = the word shouldn't be there at all (doubled words).
+   */
+  fix: string;
+  /** One-line memory hook, zero red-pen energy. */
+  note: string;
+}
+
+export const PROOF_ROUNDS = 8;
+
+/**
+ * Proof It bank — 44 sentences, each hiding exactly one wrong word:
+ * sound-alikes, spelling slips, tense wobbles, agreement misses, doubled
+ * words, and apostrophe trouble. Editing as play, not punishment.
+ */
+export const PROOF_BANK: ProofItem[] = [
+  /* -- sound-alikes -- */
+  { topic: "homophones", text: "Their heading to the park after lunch.", errorIndex: 0, fix: "They're", note: "They're = they are. Their owns things; it can't head anywhere." },
+  { topic: "homophones", text: "Grab you're coat — the rain looks serious.", errorIndex: 1, fix: "your", note: "Your owns the coat. You're = you are." },
+  { topic: "homophones", text: "The dog wagged it's tail at every stranger.", errorIndex: 3, fix: "its", note: "Its owns the tail. It's always means it is." },
+  { topic: "homophones", text: "We drove passed the bakery without stopping.", errorIndex: 2, fix: "past", note: "Past = beyond a place. Passed is the verb pass, done." },
+  { topic: "homophones", text: "This backpack is to heavy for a day hike.", errorIndex: 3, fix: "too", note: "Too = excessively. To points somewhere." },
+  { topic: "homophones", text: "The news had a big affect on the plan.", errorIndex: 5, fix: "effect", note: "Effect is the noun; affect is (usually) the verb." },
+  { topic: "homophones", text: "My knew headphones cancel every distraction.", errorIndex: 1, fix: "new", note: "New = not old. Knew is the past of know." },
+  { topic: "homophones", text: "There car is parked across two spaces.", errorIndex: 0, fix: "Their", note: "Their owns the car. There is a place." },
+  { topic: "homophones", text: "I can't except another meeting this week.", errorIndex: 2, fix: "accept", note: "Accept = take in. Except = leave out." },
+  { topic: "homophones", text: "The advise she gave me actually worked.", errorIndex: 1, fix: "advice", note: "Advice is the noun you get; advise is the verb you do." },
+  { topic: "homophones", text: "Take a peak at the schedule before nine.", errorIndex: 2, fix: "peek", note: "Peek = a quick look. Peak = the top of a mountain." },
+  { topic: "homophones", text: "The whether ruined our picnic plans again.", errorIndex: 1, fix: "weather", note: "Weather rains on picnics. Whether weighs choices." },
+  /* -- spelling -- */
+  { topic: "spelling", text: "She is definately coming to the party.", errorIndex: 2, fix: "definitely", note: "Definitely has finite inside it — no a anywhere." },
+  { topic: "spelling", text: "That was a wierd way to end a meeting.", errorIndex: 3, fix: "weird", note: "Weird is weird — it breaks the i-before-e rule." },
+  { topic: "spelling", text: "Thanks — I really appriciate the reminder.", errorIndex: 4, fix: "appreciate", note: "Appreciate: to get its e's right, think of getting a price." },
+  { topic: "spelling", text: "Seperate the laundry before you start.", errorIndex: 0, fix: "Separate", note: "There's a rat in separate." },
+  { topic: "spelling", text: "It happend again right after the reset.", errorIndex: 1, fix: "happened", note: "Happened keeps the full -ened. Happen + ed." },
+  { topic: "spelling", text: "The enviroment here is great for focus.", errorIndex: 1, fix: "environment", note: "Environment hides iron in the middle: env-iron-ment." },
+  { topic: "spelling", text: "Tomorow is fully booked with appointments.", errorIndex: 0, fix: "Tomorrow", note: "Tomorrow: one m, two r's. Borrow an r, not an m." },
+  { topic: "spelling", text: "Which restaraunt did you end up choosing?", errorIndex: 1, fix: "restaurant", note: "Restaurant keeps the French -aur-: rest-au-rant." },
+  /* -- tense -- */
+  { topic: "tense", text: "Yesterday she run the whole loop twice.", errorIndex: 2, fix: "ran", note: "Yesterday pushes run into the past: ran." },
+  { topic: "tense", text: "He has went home early every day this week.", errorIndex: 2, fix: "gone", note: "After has, go becomes gone. Went stands alone." },
+  { topic: "tense", text: "We seen that movie at the drive-in.", errorIndex: 1, fix: "saw", note: "Saw stands alone; seen needs a helper (have seen)." },
+  { topic: "tense", text: "They had already ate when we arrived.", errorIndex: 3, fix: "eaten", note: "After had, eat becomes eaten. Ate stands alone." },
+  { topic: "tense", text: "I should have wrote that reminder down.", errorIndex: 3, fix: "written", note: "After have, write becomes written. Wrote stands alone." },
+  { topic: "tense", text: "The package come this morning after all.", errorIndex: 2, fix: "came", note: "This morning is past — come becomes came." },
+  /* -- agreement -- */
+  { topic: "agreement", text: "The list of chores were longer than expected.", errorIndex: 4, fix: "was", note: "The list was long — one list, even with many chores on it." },
+  { topic: "agreement", text: "Each of the players have a favorite warm-up.", errorIndex: 4, fix: "has", note: "Each is singular, no matter how many players follow it." },
+  { topic: "agreement", text: "She don't usually plan this far ahead.", errorIndex: 1, fix: "doesn't", note: "She doesn't. Don't belongs to I, you, we, and they." },
+  { topic: "agreement", text: "There is three reminders set for tonight.", errorIndex: 1, fix: "are", note: "Three reminders are. Is would need just one." },
+  { topic: "agreement", text: "Neither of the routes are faster at rush hour.", errorIndex: 4, fix: "is", note: "Neither is singular — neither one is faster." },
+  { topic: "agreement", text: "The team have picked its new captain.", errorIndex: 2, fix: "has", note: "The team acts as one thing here: the team has." },
+  /* -- doubled words -- */
+  { topic: "word-choice", text: "Meet me at at the corner around noon.", errorIndex: 3, fix: "", note: "A doubled little word — the eye skates right over it." },
+  { topic: "word-choice", text: "I think that that plan needs one more step.", errorIndex: 3, fix: "", note: "One that too many. Reading aloud catches these." },
+  { topic: "word-choice", text: "She said the the meeting moved to Thursday.", errorIndex: 3, fix: "", note: "Double the — the most-missed typo in proofreading." },
+  /* -- word choice -- */
+  { topic: "word-choice", text: "Can you borrow me a pen for the form?", errorIndex: 2, fix: "lend", note: "You lend out; you borrow in. The pen travels lend-ward." },
+  { topic: "word-choice", text: "Lay down for twenty minutes before the call.", errorIndex: 0, fix: "Lie", note: "Lie down yourself; lay down an object." },
+  { topic: "word-choice", text: "The sunset last night was very unique.", errorIndex: 5, fix: "truly", note: "Unique can't be very — it's already one of a kind." },
+  { topic: "word-choice", text: "Irregardless of the score, we play again Friday.", errorIndex: 0, fix: "Regardless", note: "Regardless already means without regard — the ir- doubles the negative." },
+  { topic: "word-choice", text: "I could of finished it with ten more minutes.", errorIndex: 2, fix: "have", note: "Could have — could've just sounds like could of." },
+  /* -- apostrophes -- */
+  { topic: "apostrophes", text: "The Smiths dog knows everyone on the street.", errorIndex: 1, fix: "Smiths'", note: "The dog belongs to the Smiths: Smiths' (whole-family possessive)." },
+  { topic: "apostrophes", text: "Fresh bagel's are half price after four.", errorIndex: 1, fix: "bagels", note: "Plain plural, no apostrophe — the bagels own nothing." },
+  { topic: "apostrophes", text: "Whos turn is it to water the plants?", errorIndex: 0, fix: "Whose", note: "Whose owns the turn. Who's = who is." },
+  { topic: "apostrophes", text: "The teams jerseys arrived a size too small.", errorIndex: 1, fix: "team's", note: "The jerseys belong to the team: team's." },
+];
+
+/** The sentence as tappable word chips. */
+export function proofWords(item: ProofItem): string[] {
+  return item.text.split(" ");
+}
+
+/** The sentence with the wrong word corrected (or dropped, for doubles). */
+export function proofCorrected(item: ProofItem): string {
+  const words = proofWords(item);
+  if (item.fix === "") {
+    words.splice(item.errorIndex, 1);
+  } else {
+    words[item.errorIndex] = item.fix;
+  }
+  return words.join(" ");
+}
+
+/**
+ * Whether a tapped word index counts as finding the error. For doubled words
+ * the two twins are indistinguishable chips — tapping either is a find.
+ */
+export function isProofHit(item: ProofItem, tapped: number): boolean {
+  if (tapped === item.errorIndex) return true;
+  const words = proofWords(item);
+  return (
+    Math.abs(tapped - item.errorIndex) === 1 &&
+    words[tapped] === words[item.errorIndex]
+  );
+}
+
+/**
+ * Pick N proof rounds: seeded shuffle with the same topic-spread pass as the
+ * quizzes (at most `maxPerTopic` per topic, refill on shortfall). Word order
+ * inside a sentence is fixed by the sentence itself, so no per-item shuffle.
+ */
+export function pickProofRounds(
+  bank: ProofItem[],
+  n: number = PROOF_ROUNDS,
+  random: () => number = Math.random,
+  opts: { maxPerTopic?: number } = {},
+): ProofItem[] {
+  const maxPerTopic = opts.maxPerTopic ?? 2;
+  const idx = bank.map((_, i) => i);
+  for (let i = idx.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [idx[i], idx[j]] = [idx[j]!, idx[i]!];
+  }
+
+  const want = Math.min(n, bank.length);
+  const taken: number[] = [];
+  const perTopic = new Map<string, number>();
+  for (const i of idx) {
+    if (taken.length >= want) break;
+    const topic = bank[i]!.topic;
+    if ((perTopic.get(topic) ?? 0) >= maxPerTopic) continue;
+    perTopic.set(topic, (perTopic.get(topic) ?? 0) + 1);
+    taken.push(i);
+  }
+  for (const i of idx) {
+    if (taken.length >= want) break;
+    if (!taken.includes(i)) taken.push(i);
+  }
+
+  return taken.map((i) => bank[i]!);
+}
+
+/** Proof items whose texts are on the missed list (practice pool). */
+export function proofMissedItems(
+  bank: ProofItem[],
+  misses: string[],
+): ProofItem[] {
+  return bank.filter((item) => misses.includes(item.text));
+}
+
 /* ---- localStorage bests -------------------------------------------------- */
 
 export type GameId =
@@ -620,7 +772,8 @@ export type GameId =
   | "green-light"
   | "night-sky"
   | "letter-soup"
-  | "pattern-tiles";
+  | "pattern-tiles"
+  | "proof-it";
 
 const KEY = (id: GameId) => `kairo-play-best-${id}`;
 

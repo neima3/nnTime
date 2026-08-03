@@ -1,5 +1,32 @@
 # Progress log
 
+## 2026-08-03 — Round 77: "Proof It" editing game — web (Fable)
+
+- **The requested editing game, phase 1 of the 10× push**
+  (`docs/plans/2026-08-03-10x-games-adhd-roadmap.md`). Proof It: each round
+  shows one sentence hiding exactly one wrong word — sound-alikes, spelling
+  slips, tense wobbles, agreement misses, doubled words, apostrophe trouble
+  — and you tap the word that's wrong. Eight rounds, corrected sentence +
+  one-line memory hook on every answer, zero red-pen energy. Misses are
+  remembered for "my slippery ones" practice runs, same as the quizzes.
+- **Logic.** 44-sentence `PROOF_BANK` + seeded topic-spread picker +
+  `proofCorrected`/`isProofHit` in `src/lib/games.ts`. The bank-integrity
+  test caught a real modeling bug during development: doubled-word entries
+  need deletion, not replacement — `fix: ""` now means "this word shouldn't
+  be there", the corrected sentence drops one twin, and tapping either
+  identical twin counts as the find (exact index otherwise). 8 new unit
+  tests; suite 1,183 → **1,191**, all passing.
+- **UI.** `ProofIt.tsx` renders the sentence as tappable word chips
+  (GameShell pattern, lazy-loaded card in the Wordplay section — 16 games
+  on web). Browser-verified end-to-end on :3456: correct tap (success chip
+  + corrected sentence + hook), wrong tap (butter on the tapped word, error
+  revealed, "That one's fine — the sneaky one is highlighted."),
+  doubled-word round with twin chips, full run to the end screen, "best
+  2/8" chip persisting across exit/reopen, and the practice chooser
+  ("My slippery ones (8)") appearing once misses piled up.
+- **Gates.** Lint, typecheck, 1,191 tests, production build all green.
+- **Next.** Phase 2: iOS parity (ArcadeLogic mirror + SwiftUI view).
+
 ## 2026-08-03 — Round 76: iOS day-ruler hour-cycle fix (Codex)
 
 - **Fixed the remaining 24-hour-only label in native Today.** The timeline's

@@ -82,6 +82,7 @@ const LetterSoup = dynamic(() => import("./games/LetterSoup").then((m) => m.Lett
 const PatternTiles = dynamic(() => import("./games/PatternTiles").then((m) => m.PatternTiles), { loading: GameLoading });
 const GrammarSnap = dynamic(() => import("./games/GrammarSnap").then((m) => m.GrammarSnap), { loading: GameLoading });
 const SpellCheckGame = dynamic(() => import("./games/SpellCheckGame").then((m) => m.SpellCheckGame), { loading: GameLoading });
+const ProofIt = dynamic(() => import("./games/ProofIt").then((m) => m.ProofIt), { loading: GameLoading });
 
 interface GameCard {
   id: GameId;
@@ -205,6 +206,14 @@ const SECTIONS: { label: string; blurb: string; games: GameCard[] }[] = [
         tint: "bg-cat-butter",
         bestLabel: (v) => `best ${v}/8`,
       },
+      {
+        id: "proof-it",
+        emoji: "✏️",
+        title: "Proof It",
+        hook: "One word in each sentence is wrong. Trust your eye.",
+        tint: "bg-cat-mint",
+        bestLabel: (v) => `best ${v}/8`,
+      },
     ],
   },
   {
@@ -297,6 +306,7 @@ export function PlayClient() {
   else if (active === "pattern-tiles") activeGame = <PatternTiles onExit={exit} />;
   else if (active === "grammar-snap") activeGame = <GrammarSnap onExit={exit} />;
   else if (active === "spell-check") activeGame = <SpellCheckGame onExit={exit} />;
+  else if (active === "proof-it") activeGame = <ProofIt onExit={exit} />;
 
   if (activeGame) {
     return (

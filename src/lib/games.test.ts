@@ -16,6 +16,13 @@ import {
   pickConstellation,
   extendTrail,
   GRAMMAR_BANK,
+  PROOF_BANK,
+  PROOF_ROUNDS,
+  isProofHit,
+  pickProofRounds,
+  proofCorrected,
+  proofMissedItems,
+  proofWords,
   makeSpan,
   MATCH_EMOJI,
   missedItems,
@@ -843,5 +850,104 @@ describe("pattern tiles", () => {
   it("scales visible time with the pattern size", () => {
     expect(patternShowMs(3)).toBe(1650);
     expect(patternShowMs(9)).toBe(3150);
+  });
+});
+
+describe("proof it (find the wrong word)", () => {
+  it("bank integrity: exactly one in-range, fixable error per sentence", () => {
+    const seen = new Set<string>();
+    for (const item of PROOF_BANK) {
+      const words = proofWords(item);
+      expect(words.length).toBeGreaterThanOrEqual(5);
+      expect(item.errorIndex).toBeGreaterThanOrEqual(0);
+      expect(item.errorIndex).toBeLessThan(words.length);
+      expect(words[item.errorIndex]).not.toBe(item.fix);
+      if (item.fix === "") {
+        // Deletion entries are doubled words — the twin sits right before.
+        expect(words[item.errorIndex - 1]).toBe(words[item.errorIndex]);
+      }
+      expect(item.note.trim().length).toBeGreaterThan(0);
+      expect(seen.has(item.text)).toBe(false);
+      seen.add(item.text);
+    }
+    expect(PROOF_BANK.length).toBeGreaterThanOrEqual(40);
+  });
+
+  it("corrects the sentence by swapping only the wrong word", () => {
+    const item = PROOF_BANK[0]!;
+    const corrected = proofCorrected(item).split(" ");
+    const original = proofWords(item);
+    expect(corrected).toHaveLength(original.length);
+    expect(corrected[item.errorIndex]).toBe(item.fix);
+    for (let i = 0; i < original.length; i++) {
+      if (i !== item.errorIndex) expect(corrected[i]).toBe(original[i]);
+    }
+  });
+
+  it("corrects doubled words by dropping one twin", () => {
+    const doubled = PROOF_BANK.filter((i) => i.fix === "");
+    expect(doubled.length).toBeGreaterThanOrEqual(3);
+    for (const item of doubled) {
+      const corrected = proofCorrected(item).split(" ");
+      expect(corrected).toHaveLength(proofWords(item).length - 1);
+      expect(corrected.join(" ")).not.toContain(
+        `${corrected[item.errorIndex - 1]} ${corrected[item.errorIndex - 1]}`,
+      );
+    }
+  });
+
+  it("counts either twin as a hit, exact index otherwise", () => {
+    const doubled = PROOF_BANK.find((i) => i.fix === "")!;
+    expect(isProofHit(doubled, doubled.errorIndex)).toBe(true);
+    expect(isProofHit(doubled, doubled.errorIndex - 1)).toBe(true);
+    expect(isProofHit(doubled, doubled.errorIndex + 1)).toBe(false);
+    const plain = PROOF_BANK[0]!;
+    expect(isProofHit(plain, plain.errorIndex)).toBe(true);
+    expect(isProofHit(plain, plain.errorIndex + 1)).toBe(false);
+  });
+
+  it("picks 8 rounds with at most two per topic", () => {
+    let calls = 0;
+    const seeded = () => {
+      calls += 1;
+      return (calls * 0.137) % 1;
+    };
+    const rounds = pickProofRounds(PROOF_BANK, PROOF_ROUNDS, seeded);
+    expect(rounds).toHaveLength(PROOF_ROUNDS);
+    const perTopic = new Map<string, number>();
+    for (const r of rounds) {
+      perTopic.set(r.topic, (perTopic.get(r.topic) ?? 0) + 1);
+    }
+    for (const count of perTopic.values()) {
+      expect(count).toBeLessThanOrEqual(2);
+    }
+    expect(new Set(rounds.map((r) => r.text)).size).toBe(PROOF_ROUNDS);
+  });
+
+  it("is deterministic for a seeded RNG", () => {
+    let calls = 0;
+    const seeded = () => {
+      calls += 1;
+      return (calls * 0.271) % 1;
+    };
+    const a = pickProofRounds(PROOF_BANK, PROOF_ROUNDS, seeded).map((r) => r.text);
+    calls = 0;
+    const b = pickProofRounds(PROOF_BANK, PROOF_ROUNDS, seeded).map((r) => r.text);
+    expect(b).toEqual(a);
+  });
+
+  it("lifts the topic cap when the pool is small (practice runs)", () => {
+    const pool = PROOF_BANK.filter((i) => i.topic === "spelling");
+    const rounds = pickProofRounds(pool, 4, Math.random, { maxPerTopic: 99 });
+    expect(rounds).toHaveLength(4);
+  });
+
+  it("filters the practice pool by missed texts", () => {
+    const misses = [PROOF_BANK[0]!.text, PROOF_BANK[5]!.text, "not-in-bank"];
+    const pool = proofMissedItems(PROOF_BANK, misses);
+    expect(pool.map((i) => i.text)).toEqual([
+      PROOF_BANK[0]!.text,
+      PROOF_BANK[5]!.text,
+    ]);
   });
 });
