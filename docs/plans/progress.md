@@ -1,5 +1,25 @@
 # Progress log
 
+## 2026-08-03 — Round 76: iOS day-ruler hour-cycle fix (Codex)
+
+- **Fixed the remaining 24-hour-only label in native Today.** The timeline's
+  hourly ruler rendered `"\(hour):00"` directly even though block metadata,
+  the now marker, widgets, and other surfaces already used the shared
+  preference-aware formatter. Hour marks now route through `KTime.hourLabel`,
+  so Settings → Formatting → 12-hour produces labels such as `2 AM` while
+  24-hour mode retains labels such as `13:00`.
+- **Test-first proof covers the reported surface.** The new timeline-specific
+  regression test first failed because the ruler had no preference-aware
+  presentation boundary, then passed for both `h12` and `h24`. Focused time
+  formatting passed 9/9 tests. The complete iOS main-thread gate passed 379
+  tests with one skip, zero failures, and no Main Thread Checker violations.
+- **Visual and repository gates are green.** The deterministic native Today
+  fixture was launched in 12-hour mode on an iPhone 17 Pro simulator and the
+  captured day ruler visibly rendered `2 AM`, `3 AM`, and `4 AM` alongside
+  matching 12-hour block and now-line times. Lint, typecheck, all 1,183 web
+  tests, and the production build passed. Evidence remains git-ignored at
+  `/tmp/kairo-h12-day.png`.
+
 ## 2026-08-02 — Round 75: service-worker cache privacy (Codex)
 
 - **Production dogfood found private no-store responses persisted by the

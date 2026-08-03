@@ -16,6 +16,17 @@ final class TimeFormatTests: XCTestCase {
         XCTAssertEqual(KTime.hourLabel(25, hourCycle: "h24"), "1:00")
     }
 
+    func testTimelineHourMarksHonorTheSavedHourCycle() {
+        XCTAssertEqual(
+            TimelineCanvas.hourMark(for: 13 * 60, hourCycle: "h12"),
+            "1 PM"
+        )
+        XCTAssertEqual(
+            TimelineCanvas.hourMark(for: 13 * 60, hourCycle: "h24"),
+            "13:00"
+        )
+    }
+
     func test24HourIsUnchanged() {
         XCTAssertEqual(KTime.hhmm(9 * 60, hourCycle: "h24"), "9:00")
         XCTAssertEqual(KTime.hhmm(13 * 60 + 30, hourCycle: "h24"), "13:30")

@@ -1057,6 +1057,13 @@ struct TimelineCanvas: View {
 
     private let ptPerMin: CGFloat = 1.7
 
+    static func hourMark(
+        for minutes: Int,
+        hourCycle: String? = nil
+    ) -> String {
+        KTime.hourLabel(minutes / 60, hourCycle: hourCycle)
+    }
+
     private var dayStart: Int {
         min(7 * 60, blocks.map { ($0.startMin / 60) * 60 }.min() ?? 7 * 60)
     }
@@ -1074,7 +1081,7 @@ struct TimelineCanvas: View {
             // Hour rules
             ForEach(Array(stride(from: dayStart, through: dayEnd, by: 60)), id: \.self) { h in
                 HStack(alignment: .top, spacing: 10) {
-                    Text("\(h / 60):00")
+                    Text(Self.hourMark(for: h))
                         .font(.kMono(11, weight: .medium))
                         .foregroundStyle(Color.kInkFaint)
                         .frame(width: 40, alignment: .trailing)
