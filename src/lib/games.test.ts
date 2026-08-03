@@ -942,6 +942,25 @@ describe("proof it (find the wrong word)", () => {
     expect(rounds).toHaveLength(4);
   });
 
+
+  it("cross-platform seeded pin — iOS ArcadeLogic must match this exact draw", () => {
+    let calls = 0;
+    const seeded = () => {
+      calls += 1;
+      return (calls * 0.137) % 1;
+    };
+    expect(pickProofRounds(PROOF_BANK, PROOF_ROUNDS, seeded).map((r) => r.text)).toEqual([
+      "I could of finished it with ten more minutes.",
+      "Whos turn is it to water the plants?",
+      "That was a wierd way to end a meeting.",
+      "I think that that plan needs one more step.",
+      "Neither of the routes are faster at rush hour.",
+      "The dog wagged it's tail at every stranger.",
+      "It happend again right after the reset.",
+      "The Smiths dog knows everyone on the street.",
+    ]);
+  });
+
   it("filters the practice pool by missed texts", () => {
     const misses = [PROOF_BANK[0]!.text, PROOF_BANK[5]!.text, "not-in-bank"];
     const pool = proofMissedItems(PROOF_BANK, misses);

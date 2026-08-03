@@ -340,4 +340,88 @@ final class PlayArcadeLogicTests: XCTestCase {
         XCTAssertEqual(ArcadeLogic.patternShowSeconds(count: 3), 1.65, accuracy: 0.001)
         XCTAssertEqual(ArcadeLogic.patternShowSeconds(count: 9), 3.15, accuracy: 0.001)
     }
+
+    // MARK: Proof It (find the wrong word) — mirrors src/lib/games.test.ts
+
+    func testProofBankIntegrity() {
+        var seen = Set<String>()
+        for item in ProofBank.sentences {
+            let words = ArcadeLogic.proofWords(item)
+            XCTAssertGreaterThanOrEqual(words.count, 5)
+            XCTAssertGreaterThanOrEqual(item.errorIndex, 0)
+            XCTAssertLessThan(item.errorIndex, words.count)
+            XCTAssertNotEqual(words[item.errorIndex], item.fix)
+            if item.fix.isEmpty {
+                // Deletion entries are doubled words — the twin sits right before.
+                XCTAssertEqual(words[item.errorIndex - 1], words[item.errorIndex])
+            }
+            XCTAssertFalse(item.note.trimmingCharacters(in: .whitespaces).isEmpty)
+            XCTAssertFalse(seen.contains(item.text))
+            seen.insert(item.text)
+        }
+        XCTAssertGreaterThanOrEqual(ProofBank.sentences.count, 44)
+    }
+
+    func testProofCorrectedSwapsOnlyTheWrongWord() {
+        let item = ProofBank.sentences[0]
+        let corrected = ArcadeLogic.proofCorrected(item).components(separatedBy: " ")
+        let original = ArcadeLogic.proofWords(item)
+        XCTAssertEqual(corrected.count, original.count)
+        XCTAssertEqual(corrected[item.errorIndex], item.fix)
+    }
+
+    func testProofCorrectedDropsOneTwinForDoubledWords() {
+        let doubled = ProofBank.sentences.filter { $0.fix.isEmpty }
+        XCTAssertGreaterThanOrEqual(doubled.count, 3)
+        for item in doubled {
+            let corrected = ArcadeLogic.proofCorrected(item)
+            XCTAssertEqual(
+                corrected.components(separatedBy: " ").count,
+                ArcadeLogic.proofWords(item).count - 1
+            )
+        }
+    }
+
+    func testProofHitAcceptsEitherTwinExactIndexOtherwise() {
+        let doubled = ProofBank.sentences.first { $0.fix.isEmpty }!
+        XCTAssertTrue(ArcadeLogic.isProofHit(doubled, tapped: doubled.errorIndex))
+        XCTAssertTrue(ArcadeLogic.isProofHit(doubled, tapped: doubled.errorIndex - 1))
+        XCTAssertFalse(ArcadeLogic.isProofHit(doubled, tapped: doubled.errorIndex + 1))
+        let plain = ProofBank.sentences[0]
+        XCTAssertTrue(ArcadeLogic.isProofHit(plain, tapped: plain.errorIndex))
+        XCTAssertFalse(ArcadeLogic.isProofHit(plain, tapped: plain.errorIndex + 1))
+    }
+
+    func testProofPickHonorsTopicSpread() {
+        var calls = 0
+        let rounds = ArcadeLogic.pickProofRounds(ProofBank.sentences, random: {
+            calls += 1
+            return (Double(calls) * 0.271).truncatingRemainder(dividingBy: 1)
+        })
+        XCTAssertEqual(rounds.count, ArcadeLogic.proofRounds)
+        var perTopic: [String: Int] = [:]
+        for r in rounds { perTopic[r.topic] = (perTopic[r.topic] ?? 0) + 1 }
+        for count in perTopic.values { XCTAssertLessThanOrEqual(count, 2) }
+        XCTAssertEqual(Set(rounds.map(\.text)).count, ArcadeLogic.proofRounds)
+    }
+
+    func testProofSeededDrawMatchesWebPin() {
+        // The exact draw pinned by src/lib/games.test.ts "cross-platform
+        // seeded pin" — both platforms must produce this list.
+        var calls = 0
+        let rounds = ArcadeLogic.pickProofRounds(ProofBank.sentences, random: {
+            calls += 1
+            return (Double(calls) * 0.137).truncatingRemainder(dividingBy: 1)
+        })
+        XCTAssertEqual(rounds.map(\.text), [
+            "I could of finished it with ten more minutes.",
+            "Whos turn is it to water the plants?",
+            "That was a wierd way to end a meeting.",
+            "I think that that plan needs one more step.",
+            "Neither of the routes are faster at rush hour.",
+            "The dog wagged it's tail at every stranger.",
+            "It happend again right after the reset.",
+            "The Smiths dog knows everyone on the street.",
+        ])
+    }
 }

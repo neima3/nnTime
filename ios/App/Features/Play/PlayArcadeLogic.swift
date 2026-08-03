@@ -300,6 +300,67 @@ enum ArcadeLogic {
                 answer: item.answer, note: item.note)
         }
     }
+
+    // MARK: Proof It (find the wrong word)
+
+    static let proofRounds = 8
+
+    static func proofWords(_ item: ProofItem) -> [String] {
+        item.text.components(separatedBy: " ")
+    }
+
+    /// The sentence with the wrong word corrected (or dropped, for doubles —
+    /// an empty fix means "this word shouldn't be there").
+    static func proofCorrected(_ item: ProofItem) -> String {
+        var words = proofWords(item)
+        if item.fix.isEmpty {
+            words.remove(at: item.errorIndex)
+        } else {
+            words[item.errorIndex] = item.fix
+        }
+        return words.joined(separator: " ")
+    }
+
+    /// Whether a tapped word index counts as finding the error. Doubled-word
+    /// twins are indistinguishable chips, so tapping either one is a find.
+    static func isProofHit(_ item: ProofItem, tapped: Int) -> Bool {
+        if tapped == item.errorIndex { return true }
+        let words = proofWords(item)
+        guard tapped >= 0, tapped < words.count else { return false }
+        return abs(tapped - item.errorIndex) == 1
+            && words[tapped] == words[item.errorIndex]
+    }
+
+    /// Seeded shuffle + topic-spread pass, mirroring the web's
+    /// pickProofRounds RNG call sequence exactly (no per-item shuffle —
+    /// word order is fixed by the sentence).
+    static func pickProofRounds(
+        _ bank: [ProofItem],
+        count: Int = proofRounds,
+        maxPerTopic: Int = 2,
+        random: () -> Double = { Double.random(in: 0..<1) }
+    ) -> [ProofItem] {
+        var idx = Array(bank.indices)
+        for i in stride(from: idx.count - 1, to: 0, by: -1) {
+            let j = min(Int(random() * Double(i + 1)), i)
+            idx.swapAt(i, j)
+        }
+        let want = min(count, bank.count)
+        var taken: [Int] = []
+        var perTopic: [String: Int] = [:]
+        for i in idx {
+            if taken.count >= want { break }
+            let topic = bank[i].topic
+            if (perTopic[topic] ?? 0) >= maxPerTopic { continue }
+            perTopic[topic] = (perTopic[topic] ?? 0) + 1
+            taken.append(i)
+        }
+        for i in idx {
+            if taken.count >= want { break }
+            if !taken.contains(i) { taken.append(i) }
+        }
+        return taken.map { bank[$0] }
+    }
 }
 
 // MARK: - Missed-item practice ("your tricky ones") — same semantics as web.

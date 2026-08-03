@@ -7,7 +7,7 @@ struct PlayView: View {
     @State private var bests: [String: Int] = [:]
     enum Game: String, Identifiable {
         case timeFeel, quickTap, emojiMatch, grammar, spelling, focusFinder, memoryTrail, colorClash, breath,
-             oddOneOut, digitSpan, greenLight, nightSky, letterSoup, patternTiles
+             oddOneOut, digitSpan, greenLight, nightSky, letterSoup, patternTiles, proofIt
         var id: String { rawValue }
     }
 
@@ -48,6 +48,8 @@ struct PlayView: View {
                          best: bests["spellcheck"].map { "best \($0)/8" }) { active = .spelling }
                     card("🍲", "Letter Soup", "Everyday words, gently scrambled.", .kCatButter,
                          best: bests["lettersoup"].map { "best \($0)/8" }) { active = .letterSoup }
+                    card("✏️", "Proof It", "One word in each sentence is wrong. Trust your eye.", .kCatMint,
+                         best: bests["proofit"].map { "best \($0)/8" }) { active = .proofIt }
 
                     sectionHeader("Slow down", "For spinning heads and racing clocks.")
                     card("⏳", "Time Feel", "Your brain vs. the clock — no peeking.", .kCatLilac,
@@ -106,6 +108,7 @@ struct PlayView: View {
             case .nightSky: NightSkyGame { active = nil }
             case .letterSoup: LetterSoupGame { active = nil }
             case .patternTiles: PatternTilesGame { active = nil }
+            case .proofIt: ProofItGame { active = nil }
             case .breath: SteadyBreathGame { active = nil }
             }
         }
@@ -115,7 +118,7 @@ struct PlayView: View {
         var next: [String: Int] = [:]
         for key in ["timefeel", "quicktap", "emojimatch", "grammarsnap", "spellcheck",
                     "focusfinder", "memorytrail", "colorclash", "oddoneout", "digitspan",
-                    "greenlight", "nightsky", "lettersoup", "patterntiles"] {
+                    "greenlight", "nightsky", "lettersoup", "patterntiles", "proofit"] {
             next[key] = PlayScores.best(for: key)
         }
         bests = next
