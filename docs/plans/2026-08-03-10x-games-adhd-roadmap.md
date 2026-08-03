@@ -19,7 +19,7 @@ verify exact-SHA CI + deployment drain + live `/api/health`.
 ## Progress tracker
 
 - [x] Phase 1: "Proof It" editing game — web (shipped R77)
-- [ ] Phase 2: "Proof It" — iOS parity
+- [x] Phase 2: "Proof It" — iOS parity (shipped R78)
 - [ ] Phase 3: "Number Ladder" mental-math game — web + iOS
 - [ ] Phase 4: Daily Three — choice-paralysis-free arcade rotation (web + iOS)
 - [ ] Phase 5: Estimate Reality — time-blindness insight (web + API)

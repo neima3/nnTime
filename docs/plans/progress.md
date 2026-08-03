@@ -1,5 +1,31 @@
 # Progress log
 
+## 2026-08-03 — Round 78: "Proof It" on iOS — 16/16 games at parity (Fable)
+
+- **Phase 2 of the 10× push.** The editing game lands natively:
+  `ProofBank.swift` (44 sentences, transcribed by a subagent and verified
+  by a field-level diff of all four fields across all 44 entries — text
+  SHA-256 matched the TS source exactly), `ArcadeLogic.pickProofRounds` /
+  `proofWords` / `proofCorrected` / `isProofHit` mirroring the web RNG
+  call sequence, `ProofItGame.swift` (word chips in a new center-aligned
+  `ProofFlowLayout`, corrected-sentence box, "my slippery ones" practice),
+  and the mint card in PlayView's Wordplay section (bests key "proofit").
+- **Parity is pinned, not assumed.** A cross-platform seeded pin now
+  exists on BOTH sides: `games.test.ts` and `PlayArcadeLogicTests` each
+  assert the identical 8-sentence draw for the same seeded RNG — if
+  either implementation drifts, its suite fails. Plus bank integrity,
+  doubled-word deletion, and either-twin hit tests natively (385 iOS
+  tests, was 379).
+- **Gates.** iOS unit tests "Executed 385 tests, 0 failures"; main-thread
+  gate passed; full web gates re-run green over the iOS-touched tree
+  (1,192 web tests); XCUITest tour `KairoRound78ProofItTour` captures the
+  round + feedback states.
+- **Live.** Proof It verified on time.neima.me post-deploy: card in
+  Wordplay, game opens through the lazy boundary, tapped "come" in "The
+  package come this morning after all." → "Sharp eye." + corrected
+  sentence + hook. Exact SHA `55f130f` CI run `30860322940` all green;
+  deploy drained; health all `ok`.
+
 ## 2026-08-03 — Round 77: "Proof It" editing game — web (Fable)
 
 - **The requested editing game, phase 1 of the 10× push**
