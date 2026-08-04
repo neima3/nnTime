@@ -337,8 +337,8 @@ export function PlayClient() {
     <div className="flex flex-col gap-9">
       {dailyGames.length === 3 && (
         <section aria-label="Today's three">
-          <div className="flex items-baseline gap-2.5">
-            <h2 className="text-[12.5px] font-bold uppercase tracking-[0.14em] text-iris">
+          <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+            <h2 className="whitespace-nowrap text-[12.5px] font-bold uppercase tracking-[0.14em] text-iris">
               Today&apos;s three
             </h2>
             <p className="text-[12.5px] text-ink-faint">
@@ -374,8 +374,8 @@ export function PlayClient() {
       )}
       {SECTIONS.map((section) => (
         <section key={section.label}>
-          <div className="flex items-baseline gap-2.5">
-            <h2 className="text-[12.5px] font-bold uppercase tracking-[0.14em] text-ink-faint">
+          <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+            <h2 className="whitespace-nowrap text-[12.5px] font-bold uppercase tracking-[0.14em] text-ink-faint">
               {section.label}
             </h2>
             <p className="text-[12.5px] text-ink-faint">{section.blurb}</p>

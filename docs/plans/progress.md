@@ -1,5 +1,35 @@
 # Progress log
 
+## 2026-08-03 — Round 81: 10× push consolidation — polish, QA, release (Fable)
+
+- **Phases 5–7 verified pre-existing, not rebuilt.** The roadmap's
+  Estimate Reality (stats calibration module) and hyperfocus guard were
+  found already shipped on BOTH platforms by earlier rounds
+  (`computeEstimateCalibration` + StatsClient/StatsView "time truth"
+  cards; FocusClient overtime + "Good stopping point?/Wrap up";
+  FocusView "STILL GOING" + Live Activity). Roadmap updated with file
+  evidence instead of duplicating work.
+- **Phase 8 design pass (Fable, live site).** Mobile + desktop, light +
+  dark screenshots of the Daily Three strip and both new games. Number
+  Ladder and Proof It pass in every combination. One real defect found:
+  the strip and section headers wrapped into a broken two-column layout
+  on narrow viewports — fixed with flex-wrap + nowrap labels so blurbs
+  drop below their label gracefully. Light-mode strip re-verified via a
+  Playwright capture (`browser-qa/round80-daily-three/`).
+- **Phase 9 QA/a11y.** 49-spec E2E suite green (includes the game-dialog
+  focus-trap spec, now exercising a 17-game grid, and the new Daily
+  Three spec). New iOS views carry VoiceOver labels ("Play X, one of
+  today's three"; Proof It announces the wrong word after resolve).
+  Parity recomputed: 89.74% web / 86.93% iOS — unchanged, gates pass
+  (arcade rows were already full credit). AGENTS.md arcade count
+  refreshed to 17.
+- **Phase 10 release.** Final full gates + exact-SHA CI + deploy drain +
+  live spot-checks. The 10-phase roadmap
+  (`2026-08-03-10x-games-adhd-roadmap.md`) is fully ticked: Rounds 77–81
+  delivered Proof It (web+iOS), Number Ladder (web+iOS), Daily Three
+  (web+iOS), the polish/QA sweeps, and this consolidation. Remaining
+  user-gated items are unchanged (7B/8B).
+
 ## 2026-08-03 — Round 80: Daily Three — the arcade picks for you (Fable)
 
 - **Phase 4 of the 10× push, an ADHD choice-paralysis fix.** A 17-game

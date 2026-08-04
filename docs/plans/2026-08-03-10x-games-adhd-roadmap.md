@@ -22,12 +22,12 @@ verify exact-SHA CI + deployment drain + live `/api/health`.
 - [x] Phase 2: "Proof It" — iOS parity (shipped R78)
 - [x] Phase 3: "Number Ladder" mental-math game — web + iOS (shipped R79; placed in "Hold it in mind" for section balance)
 - [x] Phase 4: Daily Three — choice-paralysis-free arcade rotation (web + iOS, shipped R80)
-- [ ] Phase 5: Estimate Reality — time-blindness insight (web + API)
-- [ ] Phase 6: Estimate Reality — iOS parity
-- [ ] Phase 7: Hyperfocus guard — gentle overtime nudge (web + iOS)
-- [ ] Phase 8: Visual polish sweep over everything new (DESIGN-SENSITIVE)
-- [ ] Phase 9: Full QA + accessibility sweep, parity recompute, checklist
-- [ ] Phase 10: Consolidation release — docs, handoff, release audit
+- [x] Phase 5: Estimate Reality — VERIFIED PRE-EXISTING (shipped by an earlier round: `computeEstimateCalibration` in stats service, `estimate` block in /api/v1/stats, module in StatsClient.tsx:213)
+- [x] Phase 6: Estimate Reality iOS — VERIFIED PRE-EXISTING (timeTruthCard in StatsView.swift:32/159 renders the same calibration copy)
+- [x] Phase 7: Hyperfocus guard — VERIFIED PRE-EXISTING (web FocusClient overtime count-up + "Good stopping point?" with Wrap up at FocusClient.tsx:751-790; iOS FocusView "STILL GOING" overtime + Live Activity update at FocusView.swift:246-263)
+- [x] Phase 8: Visual polish sweep — DONE (Fable, R81): live mobile+desktop, light+dark screenshots of strip + both new games; one real defect found and fixed (strip/section header wrap on narrow viewports)
+- [x] Phase 9: QA + a11y — DONE (R81): 49-spec E2E incl. focus-trap + strip specs; new iOS views carry VoiceOver labels; parity recomputed 89.74/86.93 (rows already full credit); AGENTS.md game count refreshed
+- [x] Phase 10: Consolidation release — DONE (R81): final gates, exact-SHA CI, deploy drained, live spot-checks of all new surfaces, progress.md entries R77-R81
 
 ## Phase 1 — "Proof It" editing game (web)
 

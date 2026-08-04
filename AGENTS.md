@@ -35,7 +35,7 @@ If you were given no other instructions: execute `docs/plans/kairo-agent-prompt.
   review, planner) on live `/api/v1/*` data. **Keep the visual quality — the
   design bar is the product.**
 - `src/components/` — shared UI (AppShell, feature clients); `games/` holds the
-  14-game brain-breaks arcade whose pure logic lives in `src/lib/games.ts` and
+  17-game brain-breaks arcade whose pure logic lives in `src/lib/games.ts` and
   is mirrored verbatim by iOS `ArcadeLogic` (both sides unit-pinned).
 - `ios/` — native SwiftUI app (XcodeGen; `ios/App/Features/*`). Debug tour
   fixtures: `-kairoOfflineFixture`, `-kairoTodayFixture`,
