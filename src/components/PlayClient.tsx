@@ -14,7 +14,7 @@ import {
   type ReactNode,
 } from "react";
 import dynamic from "next/dynamic";
-import { readBest, type GameId } from "@/lib/games";
+import { dailyThree, dailyThreeKey, readBest, type GameId } from "@/lib/games";
 
 /* Games load on tap, not with the arcade — the grid stays feather-light
    and each game's chunk (plus the quiz banks) arrives only when chosen. */
@@ -262,6 +262,8 @@ const ALL_GAMES = SECTIONS.flatMap((s) => s.games);
 export function PlayClient() {
   const [active, setActive] = useState<GameId | null>(null);
   const [bests, setBests] = useState<Record<string, number | null>>({});
+  // Client-only: hangs on the local date, so it must wait for hydration.
+  const [daily, setDaily] = useState<GameId[]>([]);
   const openerId = useRef<GameId | null>(null);
   const gameButtons = useRef<
     Partial<Record<GameId, HTMLButtonElement | null>>
@@ -276,6 +278,7 @@ export function PlayClient() {
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
     refreshBests();
+    setDaily(dailyThree(dailyThreeKey()));
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
@@ -326,8 +329,49 @@ export function PlayClient() {
     );
   }
 
+  const dailyGames = daily
+    .map((id) => ALL_GAMES.find((g) => g.id === id))
+    .filter((g): g is GameCard => g != null);
+
   return (
     <div className="flex flex-col gap-9">
+      {dailyGames.length === 3 && (
+        <section aria-label="Today's three">
+          <div className="flex items-baseline gap-2.5">
+            <h2 className="text-[12.5px] font-bold uppercase tracking-[0.14em] text-iris">
+              Today&apos;s three
+            </h2>
+            <p className="text-[12.5px] text-ink-faint">
+              Picked for today — no choosing required.
+            </p>
+          </div>
+          <div className="mt-3 grid gap-2.5 sm:grid-cols-3">
+            {dailyGames.map((g) => (
+              <button
+                key={`daily-${g.id}`}
+                type="button"
+                onClick={() => openGame(g.id)}
+                className="rise-in group flex items-center gap-3 rounded-2xl border border-iris/25 bg-surface px-4 py-3 text-left shadow-card transition-all hover:-translate-y-0.5 hover:shadow-float active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+              >
+                <span
+                  className={`grid size-9 shrink-0 place-items-center rounded-xl text-lg ${g.tint}`}
+                  aria-hidden
+                >
+                  {g.emoji}
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate font-display text-[15px] font-bold">
+                    {g.title}
+                  </span>
+                  <span className="block text-[11.5px] font-bold text-iris opacity-0 transition-opacity group-hover:opacity-100">
+                    Play →
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
       {SECTIONS.map((section) => (
         <section key={section.label}>
           <div className="flex items-baseline gap-2.5">

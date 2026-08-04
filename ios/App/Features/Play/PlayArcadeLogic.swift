@@ -417,6 +417,47 @@ enum ArcadeLogic {
         }
         return Ladder(start: start, steps: steps)
     }
+
+    // MARK: Daily Three (choice-paralysis-free rotation)
+
+    /// Mood pools in display order — mirrors MOOD_GAMES in src/lib/games.ts
+    /// (web GameIds; PlayView maps them to native cases).
+    static let moodGames: [[String]] = [
+        ["quick-tap", "number-hunt", "odd-one-out", "color-clash", "green-light"],
+        ["emoji-match", "memory-trail", "digit-span", "pattern-tiles", "number-ladder"],
+        ["grammar-snap", "spell-check", "letter-soup", "proof-it"],
+        ["time-feel", "steady-breath", "night-sky"],
+    ]
+
+    /// Three games for the day from the local date key (YYYY-MM-DD) —
+    /// bit-exact mirror of the web's FNV-1a + remix pick.
+    static func dailyThree(dateKey: String) -> [String] {
+        var h: UInt32 = 2_166_136_261
+        for byte in dateKey.utf8 {
+            h ^= UInt32(byte)
+            h = h &* 16_777_619
+        }
+        let skip = Int(h % UInt32(moodGames.count))
+        var picks: [String] = []
+        var x = h
+        for m in 0..<moodGames.count {
+            if m == skip { continue }
+            x = x ^ (x >> 15)
+            x = x &* 2_246_822_519
+            let pool = moodGames[m]
+            picks.append(pool[Int(x % UInt32(pool.count))])
+        }
+        return picks
+    }
+
+    /// The local date key the daily pick hangs on.
+    static func dailyThreeKey(now: Date = Date(), zone: TimeZone = .current) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = zone
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: now)
+    }
 }
 
 // MARK: - Missed-item practice ("your tricky ones") — same semantics as web.

@@ -21,6 +21,8 @@ import {
   isProofHit,
   buildLadder,
   LADDER_STEPS,
+  MOOD_GAMES,
+  dailyThree,
   pickProofRounds,
   proofCorrected,
   proofMissedItems,
@@ -1030,6 +1032,49 @@ describe("number ladder", () => {
     expect(ladder.steps.map((s) => s.result)).toEqual([9, 18, 16, 7, 14, 20]);
     expect(ladder.steps.map((s) => s.options)).toEqual([
       [9, 11, 6], [18, 16, 20], [16, 15, 17], [8, 6, 7], [17, 11, 14], [22, 20, 17],
+    ]);
+  });
+});
+
+describe("daily three", () => {
+  const moodOf = new Map<string, number>();
+  MOOD_GAMES.forEach((pool, i) => pool.forEach((g) => moodOf.set(g, i)));
+
+  it("covers every game id exactly once across the mood pools", () => {
+    const all = MOOD_GAMES.flat();
+    expect(new Set(all).size).toBe(all.length);
+    expect(all.length).toBe(17);
+  });
+
+  it("picks three distinct games from three distinct moods, deterministically", () => {
+    const d = new Date(2026, 0, 1);
+    for (let i = 0; i < 60; i++) {
+      const key = d.toLocaleDateString("en-CA");
+      const picks = dailyThree(key);
+      expect(picks).toHaveLength(3);
+      expect(new Set(picks).size).toBe(3);
+      expect(new Set(picks.map((g) => moodOf.get(g))).size).toBe(3);
+      expect(dailyThree(key)).toEqual(picks);
+      d.setDate(d.getDate() + 1);
+    }
+  });
+
+  it("reaches every game across a year of dates", () => {
+    const seen = new Set<string>();
+    const d = new Date(2026, 0, 1);
+    for (let i = 0; i < 400; i++) {
+      for (const g of dailyThree(d.toLocaleDateString("en-CA"))) seen.add(g);
+      d.setDate(d.getDate() + 1);
+    }
+    expect(seen.size).toBe(17);
+  });
+
+  it("cross-platform pin — iOS ArcadeLogic must match these dates", () => {
+    expect(dailyThree("2026-08-03")).toEqual([
+      "number-ladder", "spell-check", "time-feel",
+    ]);
+    expect(dailyThree("2026-08-04")).toEqual([
+      "color-clash", "spell-check", "time-feel",
     ]);
   });
 });

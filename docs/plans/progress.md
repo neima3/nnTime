@@ -1,5 +1,29 @@
 # Progress log
 
+## 2026-08-03 — Round 80: Daily Three — the arcade picks for you (Fable)
+
+- **Phase 4 of the 10× push, an ADHD choice-paralysis fix.** A 17-game
+  arcade is its own decision tax, so /app/play now opens with "Today's
+  three": three games picked deterministically from the local date — one
+  mood dropped, one game drawn from each remaining mood (FNV-1a hash +
+  32-bit remix, `dailyThree` in `games.ts`). No streaks, no state, purely
+  local; over 400 consecutive dates every game appears.
+- **Bit-exact on both platforms.** The Swift mirror uses the same
+  unsigned-32 arithmetic, and pin tests on both sides assert the same
+  picks for the same date keys ("2026-08-03" → number-ladder, spell-check,
+  time-feel on web AND iOS). Web suite → **1,200** tests; iOS → **391**.
+- **UI.** Web: an iris-accented strip above the sections with three
+  compact emoji cards (hidden until hydration so the date is
+  client-local). iOS: matching strip atop PlayView routing through the
+  existing fullScreenCover. New Playwright spec pins the behavior in a
+  real browser (strip visible, exactly 3 distinct picks, tap opens a game
+  dialog, Escape restores) — full E2E suite **49 passed** with it.
+- **Gates.** Full web gates + iOS unit tests + main-thread gate green;
+  shipped and live-verified on time.neima.me. (Verification footnote: the
+  in-app browser pane intermittently fails to hydrate React dev builds —
+  CSP blocks dev-mode eval — which is why the strip's browser evidence
+  moved to Playwright.)
+
 ## 2026-08-03 — Round 79: Number Ladder — 17/17 games both platforms (Fable)
 
 - **Phase 3 of the 10× push.** A six-rung mental-math climb for the "Hold

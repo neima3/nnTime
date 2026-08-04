@@ -19,6 +19,8 @@ struct PlayView: View {
                     Text("Two minutes of play counts as rest. No streaks, no scores that matter — just your own bests.")
                         .font(.kBody(14)).foregroundStyle(Color.kInkSoft).padding(.bottom, 4)
 
+                    dailyThreeStrip
+
                     sectionHeader("Sharp & fast", "Eyes and reflexes on sprint duty.")
                     card("⚡", "Quick Tap", "Purple means go. How fast are you today?", .kCatButter,
                          best: bests["quicktap"].map { "best \($0) ms" }) { active = .quickTap }
@@ -115,6 +117,67 @@ struct PlayView: View {
             case .breath: SteadyBreathGame { active = nil }
             }
         }
+    }
+
+    /// Web GameId → native case + display meta, for the Daily Three strip.
+    private static let webIdMeta: [String: (game: Game, emoji: String, title: String)] = [
+        "quick-tap": (.quickTap, "⚡", "Quick Tap"),
+        "number-hunt": (.focusFinder, "🔍", "Focus Finder"),
+        "odd-one-out": (.oddOneOut, "🕵️", "Odd One Out"),
+        "color-clash": (.colorClash, "🎨", "Color Clash"),
+        "green-light": (.greenLight, "🚦", "Green Light"),
+        "emoji-match": (.emojiMatch, "🃏", "Emoji Match"),
+        "memory-trail": (.memoryTrail, "🐾", "Memory Trail"),
+        "digit-span": (.digitSpan, "🔢", "Digit Span"),
+        "pattern-tiles": (.patternTiles, "🧩", "Pattern Tiles"),
+        "number-ladder": (.numberLadder, "🪜", "Number Ladder"),
+        "grammar-snap": (.grammar, "📝", "Grammar Snap"),
+        "spell-check": (.spelling, "🔤", "Spell Check"),
+        "letter-soup": (.letterSoup, "🍲", "Letter Soup"),
+        "proof-it": (.proofIt, "✏️", "Proof It"),
+        "time-feel": (.timeFeel, "⏳", "Time Feel"),
+        "steady-breath": (.breath, "🫧", "Steady Breath"),
+        "night-sky": (.nightSky, "🌌", "Night Sky"),
+    ]
+
+    private var dailyThreeStrip: some View {
+        let picks = ArcadeLogic.dailyThree(dateKey: ArcadeLogic.dailyThreeKey())
+            .compactMap { Self.webIdMeta[$0] }
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("TODAY'S THREE")
+                    .font(.kBody(11.5, weight: .bold)).kerning(1.4)
+                    .foregroundStyle(Color.kIris)
+                Text("Picked for today — no choosing required.")
+                    .font(.kBody(11.5)).foregroundStyle(Color.kInkFaint)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+            ForEach(picks, id: \.title) { pick in
+                Button {
+                    active = pick.game
+                } label: {
+                    HStack(spacing: 10) {
+                        Text(pick.emoji)
+                            .font(.system(size: 17))
+                            .frame(width: 34, height: 34)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Color.kSurfaceSunken))
+                        Text(pick.title)
+                            .font(.kDisplay(15)).foregroundStyle(Color.kInk)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.kInkFaint)
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 9)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Color.kSurface))
+                    .overlay(RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.kIris.opacity(0.25), lineWidth: 1))
+                }
+                .accessibilityLabel("Play \(pick.title), one of today's three")
+            }
+        }
+        .padding(.bottom, 4)
     }
 
     private func refreshBests() {

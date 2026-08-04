@@ -21,7 +21,7 @@ verify exact-SHA CI + deployment drain + live `/api/health`.
 - [x] Phase 1: "Proof It" editing game — web (shipped R77)
 - [x] Phase 2: "Proof It" — iOS parity (shipped R78)
 - [x] Phase 3: "Number Ladder" mental-math game — web + iOS (shipped R79; placed in "Hold it in mind" for section balance)
-- [ ] Phase 4: Daily Three — choice-paralysis-free arcade rotation (web + iOS)
+- [x] Phase 4: Daily Three — choice-paralysis-free arcade rotation (web + iOS, shipped R80)
 - [ ] Phase 5: Estimate Reality — time-blindness insight (web + API)
 - [ ] Phase 6: Estimate Reality — iOS parity
 - [ ] Phase 7: Hyperfocus guard — gentle overtime nudge (web + iOS)

@@ -479,4 +479,41 @@ final class PlayArcadeLogicTests: XCTestCase {
             [9, 11, 6], [18, 16, 20], [16, 15, 17], [8, 6, 7], [17, 11, 14], [22, 20, 17],
         ])
     }
+
+    // MARK: Daily Three — mirrors src/lib/games.test.ts
+
+    func testDailyThreeMoodPoolsCoverAllSeventeenGamesOnce() {
+        let all = ArcadeLogic.moodGames.flatMap { $0 }
+        XCTAssertEqual(all.count, 17)
+        XCTAssertEqual(Set(all).count, all.count)
+    }
+
+    func testDailyThreePicksThreeDistinctMoodsDeterministically() {
+        var moodOf: [String: Int] = [:]
+        for (i, pool) in ArcadeLogic.moodGames.enumerated() {
+            for g in pool { moodOf[g] = i }
+        }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/New_York")!
+        var date = calendar.date(from: DateComponents(year: 2026, month: 1, day: 1))!
+        for _ in 0..<60 {
+            let key = ArcadeLogic.dailyThreeKey(now: date, zone: calendar.timeZone)
+            let picks = ArcadeLogic.dailyThree(dateKey: key)
+            XCTAssertEqual(picks.count, 3)
+            XCTAssertEqual(Set(picks).count, 3)
+            XCTAssertEqual(Set(picks.map { moodOf[$0]! }).count, 3)
+            XCTAssertEqual(ArcadeLogic.dailyThree(dateKey: key), picks)
+            date = calendar.date(byAdding: .day, value: 1, to: date)!
+        }
+    }
+
+    func testDailyThreeSeededPinMatchesWeb() {
+        // Pinned by src/lib/games.test.ts — both platforms must agree.
+        XCTAssertEqual(ArcadeLogic.dailyThree(dateKey: "2026-08-03"), [
+            "number-ladder", "spell-check", "time-feel",
+        ])
+        XCTAssertEqual(ArcadeLogic.dailyThree(dateKey: "2026-08-04"), [
+            "color-clash", "spell-check", "time-feel",
+        ])
+    }
 }

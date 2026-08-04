@@ -815,6 +815,50 @@ export function buildLadder(random: () => number = Math.random): Ladder {
   return { start, steps };
 }
 
+/* ---- Daily Three (choice-paralysis-free rotation) ------------------------ */
+
+/**
+ * The arcade's moods, in display order: sharp & fast, hold it in mind,
+ * wordplay, slow down. Kept here (not in the UI) so the widget-free pick
+ * logic and the iOS mirror share one source of truth.
+ */
+export const MOOD_GAMES: readonly (readonly GameId[])[] = [
+  ["quick-tap", "number-hunt", "odd-one-out", "color-clash", "green-light"],
+  ["emoji-match", "memory-trail", "digit-span", "pattern-tiles", "number-ladder"],
+  ["grammar-snap", "spell-check", "letter-soup", "proof-it"],
+  ["time-feel", "steady-breath", "night-sky"],
+];
+
+/**
+ * Three games for the day, picked deterministically from the local date key
+ * (YYYY-MM-DD): drop one of the four moods, then one game from each
+ * remaining mood. FNV-1a over the key plus a xorshift-style remix per mood —
+ * 32-bit unsigned throughout so the Swift mirror is bit-exact.
+ */
+export function dailyThree(dateKey: string): GameId[] {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < dateKey.length; i++) {
+    h = (h ^ dateKey.charCodeAt(i)) >>> 0;
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  const skip = h % MOOD_GAMES.length;
+  const picks: GameId[] = [];
+  let x = h;
+  for (let m = 0; m < MOOD_GAMES.length; m++) {
+    if (m === skip) continue;
+    x = (x ^ (x >>> 15)) >>> 0;
+    x = Math.imul(x, 2246822519) >>> 0;
+    const pool = MOOD_GAMES[m]!;
+    picks.push(pool[x % pool.length]!);
+  }
+  return picks;
+}
+
+/** The local date key the daily pick hangs on (planning-zone honest). */
+export function dailyThreeKey(now: Date = new Date()): string {
+  return now.toLocaleDateString("en-CA");
+}
+
 /* ---- localStorage bests -------------------------------------------------- */
 
 export type GameId =
