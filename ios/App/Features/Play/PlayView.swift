@@ -7,7 +7,7 @@ struct PlayView: View {
     @State private var bests: [String: Int] = [:]
     enum Game: String, Identifiable {
         case timeFeel, quickTap, emojiMatch, grammar, spelling, focusFinder, memoryTrail, colorClash, breath,
-             oddOneOut, digitSpan, greenLight, nightSky, letterSoup, patternTiles, proofIt
+             oddOneOut, digitSpan, greenLight, nightSky, letterSoup, patternTiles, proofIt, numberLadder
         var id: String { rawValue }
     }
 
@@ -40,6 +40,8 @@ struct PlayView: View {
                          best: bests["digitspan"].map { "best span \($0)" }) { active = .digitSpan }
                     card("🧩", "Pattern Tiles", "A few tiles flash together. Hold the shape.", .kCatSky,
                          best: bests["patterntiles"].map { "best pattern \($0)" }) { active = .patternTiles }
+                    card("🪜", "Number Ladder", "Start small. Climb one sum at a time — no paper allowed.", .kCatPeach,
+                         best: bests["numberladder"].map { "best \($0)/6" }) { active = .numberLadder }
 
                     sectionHeader("Wordplay", "Snags and spellings, zero red pens.")
                     card("📝", "Grammar Snap", "60+ classic snags across ten topics — it remembers the ones that get you.", .kCatSky,
@@ -109,6 +111,7 @@ struct PlayView: View {
             case .letterSoup: LetterSoupGame { active = nil }
             case .patternTiles: PatternTilesGame { active = nil }
             case .proofIt: ProofItGame { active = nil }
+            case .numberLadder: NumberLadderGame { active = nil }
             case .breath: SteadyBreathGame { active = nil }
             }
         }
@@ -118,7 +121,8 @@ struct PlayView: View {
         var next: [String: Int] = [:]
         for key in ["timefeel", "quicktap", "emojimatch", "grammarsnap", "spellcheck",
                     "focusfinder", "memorytrail", "colorclash", "oddoneout", "digitspan",
-                    "greenlight", "nightsky", "lettersoup", "patterntiles", "proofit"] {
+                    "greenlight", "nightsky", "lettersoup", "patterntiles", "proofit",
+                    "numberladder"] {
             next[key] = PlayScores.best(for: key)
         }
         bests = next

@@ -361,6 +361,62 @@ enum ArcadeLogic {
         }
         return taken.map { bank[$0] }
     }
+
+    // MARK: Number Ladder (mental-math chain)
+
+    struct LadderStep: Equatable {
+        let op: String
+        let result: Int
+        let options: [Int]
+    }
+
+    struct Ladder: Equatable {
+        let start: Int
+        let steps: [LadderStep]
+    }
+
+    static let ladderSteps = 6
+
+    /// Six-rung mental-math ladder mirroring the web's buildLadder RNG call
+    /// sequence exactly (1 start roll + 6 per rung; branches never skip a
+    /// consumed roll).
+    static func buildLadder(
+        random: () -> Double = { Double.random(in: 0..<1) }
+    ) -> Ladder {
+        let start = 3 + min(Int(random() * 10), 9)
+        var value = start
+        var steps: [LadderStep] = []
+        for _ in 0..<ladderSteps {
+            let opRoll = random()
+            let amtRoll = random()
+            let amt = 2 + min(Int(amtRoll * 8), 7)
+            let op: String
+            let result: Int
+            if opRoll < 0.2 && value * 2 <= 99 && value >= 2 {
+                op = "\u{00D7}2"
+                result = value * 2
+            } else if (opRoll < 0.6 && value + amt <= 99) || value - amt < 0 {
+                op = "+\(amt)"
+                result = value + amt
+            } else {
+                op = "\u{2212}\(amt)"
+                result = value - amt
+            }
+            let d1Roll = random()
+            let d2Roll = random()
+            let d1 = result + 1 + min(Int(d1Roll * 3), 2)
+            var d2 = result - (1 + min(Int(d2Roll * 3), 2))
+            if d2 < 0 || d2 == result { d2 = d1 + 2 }
+            var options = [result, d1, d2]
+            for i in stride(from: options.count - 1, to: 0, by: -1) {
+                let j = min(Int(random() * Double(i + 1)), i)
+                options.swapAt(i, j)
+            }
+            steps.append(LadderStep(op: op, result: result, options: options))
+            value = result
+        }
+        return Ladder(start: start, steps: steps)
+    }
 }
 
 // MARK: - Missed-item practice ("your tricky ones") — same semantics as web.

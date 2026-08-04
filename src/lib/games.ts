@@ -755,6 +755,66 @@ export function proofMissedItems(
   return bank.filter((item) => misses.includes(item.text));
 }
 
+/* ---- Number Ladder (mental-math chain) ----------------------------------- */
+
+export const LADDER_STEPS = 6;
+
+export interface LadderStep {
+  /** Display operation, e.g. "+7", "−4", "×2". */
+  op: string;
+  /** The correct running value after applying the op. */
+  result: number;
+  /** Three choices including the result, seeded order. */
+  options: number[];
+}
+
+export interface Ladder {
+  start: number;
+  steps: LadderStep[];
+}
+
+/**
+ * Build a 6-rung mental-math ladder. Values stay inside 0–99, every rung has
+ * exactly one correct option and two near-miss decoys. The RNG call sequence
+ * is fixed (1 start + 6 per rung) so the iOS mirror stays in lockstep: any
+ * branching uses rolls that are always consumed.
+ */
+export function buildLadder(random: () => number = Math.random): Ladder {
+  const start = 3 + Math.floor(random() * 10);
+  let value = start;
+  const steps: LadderStep[] = [];
+  for (let s = 0; s < LADDER_STEPS; s++) {
+    const opRoll = random();
+    const amtRoll = random();
+    const amt = 2 + Math.floor(amtRoll * 8);
+    let op: string;
+    let result: number;
+    if (opRoll < 0.2 && value * 2 <= 99 && value >= 2) {
+      op = "×2";
+      result = value * 2;
+    } else if ((opRoll < 0.6 && value + amt <= 99) || value - amt < 0) {
+      op = `+${amt}`;
+      result = value + amt;
+    } else {
+      op = `−${amt}`;
+      result = value - amt;
+    }
+    const d1Roll = random();
+    const d2Roll = random();
+    const d1 = result + 1 + Math.floor(d1Roll * 3);
+    let d2 = result - (1 + Math.floor(d2Roll * 3));
+    if (d2 < 0 || d2 === result) d2 = d1 + 2;
+    const options = [result, d1, d2];
+    for (let i = options.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [options[i], options[j]] = [options[j]!, options[i]!];
+    }
+    steps.push({ op, result, options });
+    value = result;
+  }
+  return { start, steps };
+}
+
 /* ---- localStorage bests -------------------------------------------------- */
 
 export type GameId =
@@ -773,7 +833,8 @@ export type GameId =
   | "night-sky"
   | "letter-soup"
   | "pattern-tiles"
-  | "proof-it";
+  | "proof-it"
+  | "number-ladder";
 
 const KEY = (id: GameId) => `kairo-play-best-${id}`;
 

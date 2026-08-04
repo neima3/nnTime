@@ -424,4 +424,59 @@ final class PlayArcadeLogicTests: XCTestCase {
             "The Smiths dog knows everyone on the street.",
         ])
     }
+
+    // MARK: Number Ladder — mirrors src/lib/games.test.ts
+
+    private func ladderSeed(_ mult: Double) -> () -> Double {
+        var calls = 0
+        return {
+            calls += 1
+            return (Double(calls) * mult).truncatingRemainder(dividingBy: 1)
+        }
+    }
+
+    func testLadderChainAndBoundsHold() {
+        for mult in [0.137, 0.271, 0.319, 0.457, 0.611, 0.733] {
+            let ladder = ArcadeLogic.buildLadder(random: ladderSeed(mult))
+            XCTAssertEqual(ladder.steps.count, ArcadeLogic.ladderSteps)
+            XCTAssertGreaterThanOrEqual(ladder.start, 3)
+            XCTAssertLessThanOrEqual(ladder.start, 12)
+            var value = ladder.start
+            for step in ladder.steps {
+                XCTAssertGreaterThanOrEqual(step.result, 0)
+                XCTAssertLessThanOrEqual(step.result, 99)
+                XCTAssertEqual(step.options.count, 3)
+                XCTAssertTrue(step.options.contains(step.result))
+                XCTAssertEqual(Set(step.options).count, 3)
+                for opt in step.options { XCTAssertGreaterThanOrEqual(opt, 0) }
+                if step.op == "\u{00D7}2" {
+                    XCTAssertEqual(step.result, value * 2)
+                } else if step.op.hasPrefix("+") {
+                    XCTAssertEqual(step.result, value + Int(step.op.dropFirst())!)
+                } else {
+                    XCTAssertEqual(step.result, value - Int(step.op.dropFirst())!)
+                }
+                value = step.result
+            }
+        }
+    }
+
+    func testLadderIsDeterministicForASeededRNG() {
+        let a = ArcadeLogic.buildLadder(random: ladderSeed(0.271))
+        XCTAssertEqual(ArcadeLogic.buildLadder(random: ladderSeed(0.271)), a)
+    }
+
+    func testLadderSeededDrawMatchesWebPin() {
+        // The exact ladder pinned by src/lib/games.test.ts — both platforms
+        // must produce it for the same seeded RNG.
+        let ladder = ArcadeLogic.buildLadder(random: ladderSeed(0.137))
+        XCTAssertEqual(ladder.start, 4)
+        XCTAssertEqual(ladder.steps.map(\.op), [
+            "+5", "\u{00D7}2", "\u{2212}2", "\u{2212}9", "+7", "+6",
+        ])
+        XCTAssertEqual(ladder.steps.map(\.result), [9, 18, 16, 7, 14, 20])
+        XCTAssertEqual(ladder.steps.map(\.options), [
+            [9, 11, 6], [18, 16, 20], [16, 15, 17], [8, 6, 7], [17, 11, 14], [22, 20, 17],
+        ])
+    }
 }

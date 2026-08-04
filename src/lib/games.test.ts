@@ -19,6 +19,8 @@ import {
   PROOF_BANK,
   PROOF_ROUNDS,
   isProofHit,
+  buildLadder,
+  LADDER_STEPS,
   pickProofRounds,
   proofCorrected,
   proofMissedItems,
@@ -967,6 +969,67 @@ describe("proof it (find the wrong word)", () => {
     expect(pool.map((i) => i.text)).toEqual([
       PROOF_BANK[0]!.text,
       PROOF_BANK[5]!.text,
+    ]);
+  });
+});
+
+describe("number ladder", () => {
+  const seeded = (mult: number) => {
+    let calls = 0;
+    return () => {
+      calls += 1;
+      return (calls * mult) % 1;
+    };
+  };
+
+  it("builds 6 rungs with the correct running chain", () => {
+    for (const mult of [0.137, 0.271, 0.319, 0.457, 0.611]) {
+      const ladder = buildLadder(seeded(mult));
+      expect(ladder.steps).toHaveLength(LADDER_STEPS);
+      let value = ladder.start;
+      for (const step of ladder.steps) {
+        if (step.op === "\u00d72") expect(step.result).toBe(value * 2);
+        else if (step.op.startsWith("+"))
+          expect(step.result).toBe(value + Number(step.op.slice(1)));
+        else expect(step.result).toBe(value - Number(step.op.slice(1)));
+        value = step.result;
+      }
+    }
+  });
+
+  it("keeps every value inside 0..99 with exactly one correct option", () => {
+    for (const mult of [0.137, 0.271, 0.319, 0.457, 0.611, 0.733]) {
+      const ladder = buildLadder(seeded(mult));
+      expect(ladder.start).toBeGreaterThanOrEqual(3);
+      expect(ladder.start).toBeLessThanOrEqual(12);
+      for (const step of ladder.steps) {
+        expect(step.result).toBeGreaterThanOrEqual(0);
+        expect(step.result).toBeLessThanOrEqual(99);
+        expect(step.options).toHaveLength(3);
+        expect(step.options).toContain(step.result);
+        expect(new Set(step.options).size).toBe(3);
+        for (const opt of step.options) {
+          expect(opt).toBeGreaterThanOrEqual(0);
+        }
+      }
+    }
+  });
+
+  it("is deterministic for a seeded RNG", () => {
+    const a = buildLadder(seeded(0.271));
+    const b = buildLadder(seeded(0.271));
+    expect(b).toEqual(a);
+  });
+
+  it("cross-platform seeded pin — iOS ArcadeLogic must match this ladder", () => {
+    const ladder = buildLadder(seeded(0.137));
+    expect(ladder.start).toBe(4);
+    expect(ladder.steps.map((s) => s.op)).toEqual([
+      "+5", "\u00d72", "\u22122", "\u22129", "+7", "+6",
+    ]);
+    expect(ladder.steps.map((s) => s.result)).toEqual([9, 18, 16, 7, 14, 20]);
+    expect(ladder.steps.map((s) => s.options)).toEqual([
+      [9, 11, 6], [18, 16, 20], [16, 15, 17], [8, 6, 7], [17, 11, 14], [22, 20, 17],
     ]);
   });
 });

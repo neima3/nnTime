@@ -1,5 +1,27 @@
 # Progress log
 
+## 2026-08-03 — Round 79: Number Ladder — 17/17 games both platforms (Fable)
+
+- **Phase 3 of the 10× push.** A six-rung mental-math climb for the "Hold
+  it in mind" mood (placed there over the roadmap's original Sharp & fast
+  for section balance — 5/5/4/3): the current value plus one small
+  operation per rung (+2..9, −2..9, ×2, values pinned to 0–99), three
+  choices with near-miss decoys, no timers. Wrong picks show the answer
+  and the climb continues; best = rungs right out of 6.
+- **Deterministic by construction.** `buildLadder` uses a fixed RNG call
+  sequence (1 start roll + 6 per rung — branches never skip a consumed
+  roll) so the Swift mirror stays in lockstep. Cross-platform pin tests on
+  both sides assert the identical seeded ladder (start, ops, results, and
+  option order). Web suite 1,192 → **1,196**; iOS 385 → **388**.
+- **UI.** `NumberLadder.tsx` + `NumberLadderGame.swift` — big running
+  value, peach op chip, three tnum option pills, kind wrong-pick copy
+  ("It's 16 — the ladder keeps going."). Browser play-through: correct
+  path ("Climbing."), wrong path with correction, full run to the end
+  screen with a new-best celebration.
+- **Gates.** Full web gates + iOS unit tests ("Executed 388 tests, 0
+  failures") + main-thread gate green. Shipped and live-verified on
+  time.neima.me.
+
 ## 2026-08-03 — Round 78: "Proof It" on iOS — 16/16 games at parity (Fable)
 
 - **Phase 2 of the 10× push.** The editing game lands natively:
