@@ -222,9 +222,15 @@ afterEach(() => {
 });
 
 describe("generated iOS client adoption", () => {
-  it("validates the package product and target semantically", () => {
-    expect(validatePackageDump(readPackageDump())).toEqual([]);
-  });
+  // `swift package dump-package` compiles the manifest; CI runners have
+  // blown the default 60s on cold toolchains (run 31102763326).
+  it(
+    "validates the package product and target semantically",
+    { timeout: 180_000 },
+    () => {
+      expect(validatePackageDump(readPackageDump())).toEqual([]);
+    },
+  );
 
   it("rejects a source path borrowed from a different package target", () => {
     const malformedDump: PackageDump = {
