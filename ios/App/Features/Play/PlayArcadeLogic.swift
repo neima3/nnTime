@@ -418,13 +418,65 @@ enum ArcadeLogic {
         return Ladder(start: start, steps: steps)
     }
 
+    // MARK: In Order (rebuild the how-to)
+
+    static let orderRounds = 5
+
+    /// Scrambled step order: one seeded Fisher-Yates pass (fixed RNG call
+    /// count, mirrors the web), then rotate-by-one if it landed on identity.
+    static func scrambleOrder(
+        count: Int,
+        random: () -> Double = { Double.random(in: 0..<1) }
+    ) -> [Int] {
+        var idx = Array(0..<count)
+        for i in stride(from: idx.count - 1, to: 0, by: -1) {
+            let j = min(Int(random() * Double(i + 1)), i)
+            idx.swapAt(i, j)
+        }
+        if count > 1 && idx == Array(0..<count) {
+            let first = idx.removeFirst()
+            idx.append(first)
+        }
+        return idx
+    }
+
+    /// Seeded pick with the quizzes' topic-spread pass (default one per
+    /// topic per run) — mirrors the web's pickOrderRounds RNG sequence.
+    static func pickOrderRounds(
+        _ bank: [OrderItem],
+        count: Int = orderRounds,
+        maxPerTopic: Int = 1,
+        random: () -> Double = { Double.random(in: 0..<1) }
+    ) -> [OrderItem] {
+        var idx = Array(bank.indices)
+        for i in stride(from: idx.count - 1, to: 0, by: -1) {
+            let j = min(Int(random() * Double(i + 1)), i)
+            idx.swapAt(i, j)
+        }
+        let want = min(count, bank.count)
+        var taken: [Int] = []
+        var perTopic: [String: Int] = [:]
+        for i in idx {
+            if taken.count >= want { break }
+            let topic = bank[i].topic
+            if (perTopic[topic] ?? 0) >= maxPerTopic { continue }
+            perTopic[topic] = (perTopic[topic] ?? 0) + 1
+            taken.append(i)
+        }
+        for i in idx {
+            if taken.count >= want { break }
+            if !taken.contains(i) { taken.append(i) }
+        }
+        return taken.map { bank[$0] }
+    }
+
     // MARK: Daily Three (choice-paralysis-free rotation)
 
     /// Mood pools in display order — mirrors MOOD_GAMES in src/lib/games.ts
     /// (web GameIds; PlayView maps them to native cases).
     static let moodGames: [[String]] = [
         ["quick-tap", "number-hunt", "odd-one-out", "color-clash", "green-light"],
-        ["emoji-match", "memory-trail", "digit-span", "pattern-tiles", "number-ladder"],
+        ["emoji-match", "memory-trail", "digit-span", "pattern-tiles", "number-ladder", "in-order"],
         ["grammar-snap", "spell-check", "letter-soup", "proof-it"],
         ["time-feel", "steady-breath", "night-sky"],
     ]

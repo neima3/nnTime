@@ -84,6 +84,7 @@ const GrammarSnap = dynamic(() => import("./games/GrammarSnap").then((m) => m.Gr
 const SpellCheckGame = dynamic(() => import("./games/SpellCheckGame").then((m) => m.SpellCheckGame), { loading: GameLoading });
 const ProofIt = dynamic(() => import("./games/ProofIt").then((m) => m.ProofIt), { loading: GameLoading });
 const NumberLadder = dynamic(() => import("./games/NumberLadder").then((m) => m.NumberLadder), { loading: GameLoading });
+const InOrder = dynamic(() => import("./games/InOrder").then((m) => m.InOrder), { loading: GameLoading });
 
 interface GameCard {
   id: GameId;
@@ -184,6 +185,14 @@ const SECTIONS: { label: string; blurb: string; games: GameCard[] }[] = [
         hook: "Start small. Climb one sum at a time — no paper allowed.",
         tint: "bg-cat-peach",
         bestLabel: (v) => `best ${v}/6`,
+      },
+      {
+        id: "in-order",
+        emoji: "🧭",
+        title: "In Order",
+        hook: "Five everyday how-tos, steps shuffled. Rebuild them.",
+        tint: "bg-cat-lilac",
+        bestLabel: (v) => `best ${v}/5 clean`,
       },
     ],
   },
@@ -320,6 +329,7 @@ export function PlayClient() {
   else if (active === "spell-check") activeGame = <SpellCheckGame onExit={exit} />;
   else if (active === "proof-it") activeGame = <ProofIt onExit={exit} />;
   else if (active === "number-ladder") activeGame = <NumberLadder onExit={exit} />;
+  else if (active === "in-order") activeGame = <InOrder onExit={exit} />;
 
   if (activeGame) {
     return (

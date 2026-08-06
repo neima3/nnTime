@@ -815,6 +815,130 @@ export function buildLadder(random: () => number = Math.random): Ladder {
   return { start, steps };
 }
 
+/* ---- In Order (rebuild the how-to) --------------------------------------- */
+
+export interface OrderItem {
+  /** Topic key for run spread (kitchen, morning, errands…). */
+  topic: string;
+  /** What's being done, shown as the round title. */
+  title: string;
+  /** The steps in their one defensible order (4–5 entries). */
+  steps: string[];
+}
+
+export const ORDER_ROUNDS = 5;
+
+/**
+ * In Order bank — 40 everyday how-tos with exactly one sensible step order.
+ * Sequencing is executive-function work dressed as trivia; every entry is
+ * deliberately mundane so the order is knowledge-free and argument-free.
+ */
+export const ORDER_BANK: OrderItem[] = [
+  /* -- kitchen -- */
+  { topic: "kitchen", title: "A cup of tea", steps: ["Fill the kettle", "Boil the water", "Pour over the tea bag", "Let it steep", "Add a splash of milk"] },
+  { topic: "kitchen", title: "Morning toast", steps: ["Slice the bread", "Drop it in the toaster", "Wait for the pop", "Spread the butter"] },
+  { topic: "kitchen", title: "A pot of pasta", steps: ["Boil salted water", "Add the pasta", "Stir now and then", "Drain it", "Toss with sauce"] },
+  { topic: "kitchen", title: "Pancakes", steps: ["Mix the batter", "Heat the pan", "Pour a circle", "Flip at the bubbles", "Stack and serve"] },
+  { topic: "kitchen", title: "Fried egg", steps: ["Heat a little oil", "Crack the egg in", "Wait for the edges to set", "Slide onto the plate"] },
+  { topic: "kitchen", title: "French press coffee", steps: ["Grind the beans", "Add grounds to the press", "Pour in hot water", "Wait four minutes", "Press and pour"] },
+  { topic: "kitchen", title: "Grilled cheese", steps: ["Butter the bread", "Add the cheese between slices", "Grill until golden", "Flip once", "Cut diagonally"] },
+  { topic: "kitchen", title: "A smoothie", steps: ["Add fruit to the blender", "Pour in the liquid", "Blend until smooth", "Taste and adjust", "Pour into a glass"] },
+  /* -- morning -- */
+  { topic: "morning", title: "Out the door", steps: ["Wake up", "Get dressed", "Grab keys and phone", "Lock the door behind you"] },
+  { topic: "morning", title: "Brushing teeth", steps: ["Wet the brush", "Add the toothpaste", "Brush for two minutes", "Rinse and done"] },
+  { topic: "morning", title: "A proper shower", steps: ["Run the water warm", "Step in", "Shampoo and rinse", "Towel off", "Hang the towel up"] },
+  { topic: "morning", title: "Making the bed", steps: ["Pull off the pillows", "Straighten the sheet", "Smooth the duvet", "Pillows back on top"] },
+  { topic: "morning", title: "Packing a lunch", steps: ["Pick the container", "Make the sandwich", "Add a snack", "Zip the bag", "Into the fridge till you leave"] },
+  /* -- laundry -- */
+  { topic: "laundry", title: "A load of laundry", steps: ["Sort the colors", "Load the machine", "Add the detergent", "Start the cycle", "Move it to the dryer"] },
+  { topic: "laundry", title: "Ironing a shirt", steps: ["Heat the iron", "Lay the shirt flat", "Press collar and cuffs", "Hang it up warm"] },
+  { topic: "laundry", title: "Folding a fitted sheet", steps: ["Find the corners", "Tuck corner into corner", "Fold into a rectangle", "Stack it in the closet"] },
+  { topic: "laundry", title: "A stain rescue", steps: ["Blot, don't rub", "Rinse from the back", "Dab on stain remover", "Wash as usual", "Check before drying"] },
+  /* -- tech -- */
+  { topic: "tech", title: "A software update", steps: ["Back up first", "Download the update", "Install it", "Restart the machine"] },
+  { topic: "tech", title: "A video call", steps: ["Check camera and mic", "Join the meeting", "Unmute to talk", "Wave goodbye", "Leave the call"] },
+  { topic: "tech", title: "New phone setup", steps: ["Insert the SIM", "Power it on", "Sign in to your account", "Restore the backup", "Set the wallpaper"] },
+  { topic: "tech", title: "Posting a photo", steps: ["Take a few shots", "Pick the best one", "Crop and brighten", "Write a caption", "Hit share"] },
+  /* -- errands -- */
+  { topic: "errands", title: "Grocery run", steps: ["Write the list", "Grab the bags", "Shop the aisles", "Pay at the till", "Unpack at home"] },
+  { topic: "errands", title: "Mailing a package", steps: ["Box it up", "Tape it shut", "Address the label", "Pay the postage", "Hand it over"] },
+  { topic: "errands", title: "Filling the tank", steps: ["Pull up to the pump", "Pop the fuel door", "Pump the gas", "Hang up the nozzle", "Twist the cap back on"] },
+  { topic: "errands", title: "Library visit", steps: ["Return the old books", "Browse the shelves", "Pick your stack", "Check them out"] },
+  { topic: "errands", title: "A haircut", steps: ["Book the slot", "Arrive and check in", "Sit for the cut", "Approve the mirror check", "Tip on the way out"] },
+  /* -- home -- */
+  { topic: "home", title: "Watering the plants", steps: ["Fill the can", "Check the soil first", "Water the dry ones", "Empty the saucers"] },
+  { topic: "home", title: "Changing a bulb", steps: ["Switch the light off", "Let it cool", "Twist the old one out", "Twist the new one in", "Flip the switch to test"] },
+  { topic: "home", title: "Hanging a picture", steps: ["Mark the spot", "Drive the nail", "Hang the frame", "Nudge it level"] },
+  { topic: "home", title: "Taking out the trash", steps: ["Tie the bag", "Lift it out", "Drop in a fresh liner", "Bin it outside"] },
+  { topic: "home", title: "Washing dishes", steps: ["Scrape the plates", "Fill the sink with suds", "Wash glasses first", "Rinse everything", "Rack it to dry"] },
+  { topic: "home", title: "Sweeping the floor", steps: ["Clear the chairs", "Sweep into a pile", "Pan the pile up", "Chairs back in place"] },
+  /* -- out and about -- */
+  { topic: "out", title: "Catching a flight", steps: ["Check in online", "Drop the bag", "Clear security", "Find the gate", "Board when called"] },
+  { topic: "out", title: "A picnic", steps: ["Pack the basket", "Pick a shady spot", "Spread the blanket", "Eat the good stuff", "Pack out the trash"] },
+  { topic: "out", title: "Renting a bike", steps: ["Find a docking station", "Unlock with the app", "Adjust the seat", "Ride your loop", "Dock it back"] },
+  { topic: "out", title: "A trip to the pool", steps: ["Pack towel and suit", "Change at the lockers", "Shower before the water", "Swim your laps", "Dry off and head home"] },
+  { topic: "out", title: "Movie night out", steps: ["Pick the film", "Buy the tickets", "Claim your seats", "Silence the phone", "Watch the show"] },
+  /* -- winding down -- */
+  { topic: "evening", title: "Winding down", steps: ["Dim the lights", "Screens away", "Read a few pages", "Lights out"] },
+  { topic: "evening", title: "Tomorrow's launchpad", steps: ["Check tomorrow's plan", "Lay out clothes", "Pack the bag", "Keys by the door"] },
+  { topic: "evening", title: "A bath", steps: ["Start the water", "Add the bubbles", "Soak a while", "Drain the tub", "Wrap up warm"] },
+];
+
+/**
+ * Scrambled step order for a round: one seeded Fisher-Yates pass (fixed RNG
+ * call count for the iOS mirror), then a rotate-by-one if the shuffle came
+ * back identical — deterministic, and never shows the answer for free.
+ */
+export function scrambleOrder(
+  count: number,
+  random: () => number = Math.random,
+): number[] {
+  const idx = Array.from({ length: count }, (_, i) => i);
+  for (let i = idx.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [idx[i], idx[j]] = [idx[j]!, idx[i]!];
+  }
+  if (idx.every((v, i) => v === i) && count > 1) {
+    idx.push(idx.shift()!);
+  }
+  return idx;
+}
+
+/**
+ * Pick N how-tos: seeded shuffle with the quizzes' topic-spread pass
+ * (default at most one per topic per run — the bank has eight topics).
+ */
+export function pickOrderRounds(
+  bank: OrderItem[],
+  n: number = ORDER_ROUNDS,
+  random: () => number = Math.random,
+  opts: { maxPerTopic?: number } = {},
+): OrderItem[] {
+  const maxPerTopic = opts.maxPerTopic ?? 1;
+  const idx = bank.map((_, i) => i);
+  for (let i = idx.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [idx[i], idx[j]] = [idx[j]!, idx[i]!];
+  }
+
+  const want = Math.min(n, bank.length);
+  const taken: number[] = [];
+  const perTopic = new Map<string, number>();
+  for (const i of idx) {
+    if (taken.length >= want) break;
+    const topic = bank[i]!.topic;
+    if ((perTopic.get(topic) ?? 0) >= maxPerTopic) continue;
+    perTopic.set(topic, (perTopic.get(topic) ?? 0) + 1);
+    taken.push(i);
+  }
+  for (const i of idx) {
+    if (taken.length >= want) break;
+    if (!taken.includes(i)) taken.push(i);
+  }
+
+  return taken.map((i) => bank[i]!);
+}
+
 /* ---- Daily Three (choice-paralysis-free rotation) ------------------------ */
 
 /**
@@ -824,7 +948,7 @@ export function buildLadder(random: () => number = Math.random): Ladder {
  */
 export const MOOD_GAMES: readonly (readonly GameId[])[] = [
   ["quick-tap", "number-hunt", "odd-one-out", "color-clash", "green-light"],
-  ["emoji-match", "memory-trail", "digit-span", "pattern-tiles", "number-ladder"],
+  ["emoji-match", "memory-trail", "digit-span", "pattern-tiles", "number-ladder", "in-order"],
   ["grammar-snap", "spell-check", "letter-soup", "proof-it"],
   ["time-feel", "steady-breath", "night-sky"],
 ];
@@ -878,7 +1002,8 @@ export type GameId =
   | "letter-soup"
   | "pattern-tiles"
   | "proof-it"
-  | "number-ladder";
+  | "number-ladder"
+  | "in-order";
 
 const KEY = (id: GameId) => `kairo-play-best-${id}`;
 

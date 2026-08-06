@@ -1,5 +1,30 @@
 # Progress log
 
+## 2026-08-06 — Round 82: In Order — sequencing joins the arcade, 18/18 (Fable)
+
+- **A genuinely new mechanic: step sequencing.** In Order shows one
+  everyday how-to per round ("A pot of pasta", "Out the door") with its
+  steps shuffled; tap them in the order they belong. Right picks lock
+  into a numbered green plan, wrong picks wobble (butter flash) and stay.
+  Five rounds; best = clean rebuilds out of 5. Sequencing is
+  executive-function work dressed as trivia — the 40-sequence
+  `ORDER_BANK` is deliberately mundane so every order is knowledge-free
+  and argument-free.
+- **Deterministic + mirrored.** `scrambleOrder` (fixed-call Fisher-Yates
+  with a rotate-by-one identity escape — never shows the answer for
+  free) and `pickOrderRounds` (one topic per round, eight topics) are
+  mirrored bit-exact in ArcadeLogic; cross-platform pins on both sides
+  assert the same seeded titles and scramble. Bank transcription by
+  subagent, field-diffed 40/40. Adding the game to the Daily Three pool
+  changed the pinned picks for the pinned dates — both platforms'
+  pins updated in lockstep (2026-08-03 → pattern-tiles, spell-check,
+  time-feel), coverage re-proven 18/18 games over 400 dates.
+- **Evidence.** New permanent Playwright spec drives a real browser
+  through a clean rebuild (bank-driven taps, locked list, "Clean
+  rebuild" copy) and a deliberate wobble ("Rebuilt with 1 wobble").
+  Web suite → **1,205** tests; iOS → **395**; main-thread gate passed.
+  Shipped + live-verified on time.neima.me.
+
 ## 2026-08-03 — Round 81: 10× push consolidation — polish, QA, release (Fable)
 
 - **Phases 5–7 verified pre-existing, not rebuilt.** The roadmap's

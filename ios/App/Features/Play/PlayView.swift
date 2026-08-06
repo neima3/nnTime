@@ -7,7 +7,7 @@ struct PlayView: View {
     @State private var bests: [String: Int] = [:]
     enum Game: String, Identifiable {
         case timeFeel, quickTap, emojiMatch, grammar, spelling, focusFinder, memoryTrail, colorClash, breath,
-             oddOneOut, digitSpan, greenLight, nightSky, letterSoup, patternTiles, proofIt, numberLadder
+             oddOneOut, digitSpan, greenLight, nightSky, letterSoup, patternTiles, proofIt, numberLadder, inOrder
         var id: String { rawValue }
     }
 
@@ -44,6 +44,8 @@ struct PlayView: View {
                          best: bests["patterntiles"].map { "best pattern \($0)" }) { active = .patternTiles }
                     card("🪜", "Number Ladder", "Start small. Climb one sum at a time — no paper allowed.", .kCatPeach,
                          best: bests["numberladder"].map { "best \($0)/6" }) { active = .numberLadder }
+                    card("🧭", "In Order", "Five everyday how-tos, steps shuffled. Rebuild them.", .kCatLilac,
+                         best: bests["inorder"].map { "best \($0)/5 clean" }) { active = .inOrder }
 
                     sectionHeader("Wordplay", "Snags and spellings, zero red pens.")
                     card("📝", "Grammar Snap", "60+ classic snags across ten topics — it remembers the ones that get you.", .kCatSky,
@@ -114,6 +116,7 @@ struct PlayView: View {
             case .patternTiles: PatternTilesGame { active = nil }
             case .proofIt: ProofItGame { active = nil }
             case .numberLadder: NumberLadderGame { active = nil }
+            case .inOrder: InOrderGame { active = nil }
             case .breath: SteadyBreathGame { active = nil }
             }
         }
@@ -131,6 +134,7 @@ struct PlayView: View {
         "digit-span": (.digitSpan, "🔢", "Digit Span"),
         "pattern-tiles": (.patternTiles, "🧩", "Pattern Tiles"),
         "number-ladder": (.numberLadder, "🪜", "Number Ladder"),
+        "in-order": (.inOrder, "🧭", "In Order"),
         "grammar-snap": (.grammar, "📝", "Grammar Snap"),
         "spell-check": (.spelling, "🔤", "Spell Check"),
         "letter-soup": (.letterSoup, "🍲", "Letter Soup"),
@@ -185,7 +189,7 @@ struct PlayView: View {
         for key in ["timefeel", "quicktap", "emojimatch", "grammarsnap", "spellcheck",
                     "focusfinder", "memorytrail", "colorclash", "oddoneout", "digitspan",
                     "greenlight", "nightsky", "lettersoup", "patterntiles", "proofit",
-                    "numberladder"] {
+                    "numberladder", "inorder"] {
             next[key] = PlayScores.best(for: key)
         }
         bests = next

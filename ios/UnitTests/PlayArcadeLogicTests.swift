@@ -484,7 +484,7 @@ final class PlayArcadeLogicTests: XCTestCase {
 
     func testDailyThreeMoodPoolsCoverAllSeventeenGamesOnce() {
         let all = ArcadeLogic.moodGames.flatMap { $0 }
-        XCTAssertEqual(all.count, 17)
+        XCTAssertEqual(all.count, 18)
         XCTAssertEqual(Set(all).count, all.count)
     }
 
@@ -510,10 +510,61 @@ final class PlayArcadeLogicTests: XCTestCase {
     func testDailyThreeSeededPinMatchesWeb() {
         // Pinned by src/lib/games.test.ts — both platforms must agree.
         XCTAssertEqual(ArcadeLogic.dailyThree(dateKey: "2026-08-03"), [
-            "number-ladder", "spell-check", "time-feel",
+            "pattern-tiles", "spell-check", "time-feel",
         ])
         XCTAssertEqual(ArcadeLogic.dailyThree(dateKey: "2026-08-04"), [
             "color-clash", "spell-check", "time-feel",
         ])
+    }
+
+    // MARK: In Order — mirrors src/lib/games.test.ts
+
+    private func orderSeed(_ mult: Double) -> () -> Double {
+        var calls = 0
+        return {
+            calls += 1
+            return (Double(calls) * mult).truncatingRemainder(dividingBy: 1)
+        }
+    }
+
+    func testOrderBankIntegrity() {
+        var titles = Set<String>()
+        for item in OrderBank.sequences {
+            XCTAssertGreaterThanOrEqual(item.steps.count, 4)
+            XCTAssertLessThanOrEqual(item.steps.count, 5)
+            XCTAssertEqual(Set(item.steps).count, item.steps.count)
+            XCTAssertFalse(titles.contains(item.title))
+            titles.insert(item.title)
+        }
+        XCTAssertGreaterThanOrEqual(OrderBank.sequences.count, 40)
+    }
+
+    func testScrambleIsAPermutationAndNeverIdentity() {
+        for mult in [0.137, 0.271, 0.319, 0.457, 0.611, 0.733, 0.999] {
+            for count in [4, 5] {
+                let order = ArcadeLogic.scrambleOrder(count: count, random: orderSeed(mult))
+                XCTAssertEqual(order.sorted(), Array(0..<count))
+                XCTAssertNotEqual(order, Array(0..<count))
+            }
+        }
+    }
+
+    func testOrderPickSpreadsTopicsDeterministically() {
+        let rounds = ArcadeLogic.pickOrderRounds(OrderBank.sequences, random: orderSeed(0.271))
+        XCTAssertEqual(rounds.count, ArcadeLogic.orderRounds)
+        XCTAssertEqual(Set(rounds.map(\.topic)).count, ArcadeLogic.orderRounds)
+        XCTAssertEqual(ArcadeLogic.pickOrderRounds(OrderBank.sequences, random: orderSeed(0.271)), rounds)
+    }
+
+    func testOrderSeededPinsMatchWeb() {
+        // Pinned by src/lib/games.test.ts — both platforms must agree.
+        XCTAssertEqual(
+            ArcadeLogic.pickOrderRounds(OrderBank.sequences, random: orderSeed(0.137)).map(\.title),
+            ["Packing a lunch", "Changing a bulb", "Ironing a shirt", "Renting a bike", "A bath"]
+        )
+        XCTAssertEqual(
+            ArcadeLogic.scrambleOrder(count: 5, random: orderSeed(0.137)),
+            [4, 2, 3, 1, 0]
+        )
     }
 }

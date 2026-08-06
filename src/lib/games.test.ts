@@ -22,6 +22,10 @@ import {
   buildLadder,
   LADDER_STEPS,
   MOOD_GAMES,
+  ORDER_BANK,
+  ORDER_ROUNDS,
+  pickOrderRounds,
+  scrambleOrder,
   dailyThree,
   pickProofRounds,
   proofCorrected,
@@ -1043,7 +1047,7 @@ describe("daily three", () => {
   it("covers every game id exactly once across the mood pools", () => {
     const all = MOOD_GAMES.flat();
     expect(new Set(all).size).toBe(all.length);
-    expect(all.length).toBe(17);
+    expect(all.length).toBe(18);
   });
 
   it("picks three distinct games from three distinct moods, deterministically", () => {
@@ -1066,15 +1070,82 @@ describe("daily three", () => {
       for (const g of dailyThree(d.toLocaleDateString("en-CA"))) seen.add(g);
       d.setDate(d.getDate() + 1);
     }
-    expect(seen.size).toBe(17);
+    expect(seen.size).toBe(18);
   });
 
   it("cross-platform pin — iOS ArcadeLogic must match these dates", () => {
     expect(dailyThree("2026-08-03")).toEqual([
-      "number-ladder", "spell-check", "time-feel",
+      "pattern-tiles", "spell-check", "time-feel",
     ]);
     expect(dailyThree("2026-08-04")).toEqual([
       "color-clash", "spell-check", "time-feel",
     ]);
+  });
+});
+
+describe("in order (rebuild the how-to)", () => {
+  const seeded = (mult: number) => {
+    let calls = 0;
+    return () => {
+      calls += 1;
+      return (calls * mult) % 1;
+    };
+  };
+
+  it("bank integrity: 4-5 distinct steps, unique titles, 40+ entries", () => {
+    const titles = new Set<string>();
+    for (const item of ORDER_BANK) {
+      expect(item.steps.length).toBeGreaterThanOrEqual(4);
+      expect(item.steps.length).toBeLessThanOrEqual(5);
+      expect(new Set(item.steps).size).toBe(item.steps.length);
+      expect(item.title.trim().length).toBeGreaterThan(0);
+      expect(titles.has(item.title)).toBe(false);
+      titles.add(item.title);
+    }
+    expect(ORDER_BANK.length).toBeGreaterThanOrEqual(40);
+  });
+
+  it("scramble is a permutation and never the identity", () => {
+    for (const mult of [0.137, 0.271, 0.319, 0.457, 0.611, 0.733, 0.999]) {
+      for (const count of [4, 5]) {
+        const order = scrambleOrder(count, seeded(mult));
+        expect([...order].sort((a, b) => a - b)).toEqual(
+          Array.from({ length: count }, (_, i) => i),
+        );
+        expect(order.every((v, i) => v === i)).toBe(false);
+      }
+    }
+  });
+
+  it("rotates when the seeded shuffle lands on the identity", () => {
+    // A generator that always swaps back to identity: random() = i/(i+1)
+    // keeps every element in place (j === i each pass).
+    let i = 5;
+    const identityRng = () => {
+      i -= 1;
+      return i / (i + 1);
+    };
+    const order = scrambleOrder(5, identityRng);
+    expect(order.every((v, k) => v === k)).toBe(false);
+  });
+
+  it("picks 5 rounds from 5 different topics, deterministically", () => {
+    const rounds = pickOrderRounds(ORDER_BANK, ORDER_ROUNDS, seeded(0.271));
+    expect(rounds).toHaveLength(ORDER_ROUNDS);
+    expect(new Set(rounds.map((r) => r.topic)).size).toBe(ORDER_ROUNDS);
+    expect(pickOrderRounds(ORDER_BANK, ORDER_ROUNDS, seeded(0.271))).toEqual(rounds);
+  });
+
+  it("cross-platform seeded pin — iOS ArcadeLogic must match", () => {
+    expect(
+      pickOrderRounds(ORDER_BANK, ORDER_ROUNDS, seeded(0.137)).map((r) => r.title),
+    ).toEqual([
+      "Packing a lunch",
+      "Changing a bulb",
+      "Ironing a shirt",
+      "Renting a bike",
+      "A bath",
+    ]);
+    expect(scrambleOrder(5, seeded(0.137))).toEqual([4, 2, 3, 1, 0]);
   });
 });
