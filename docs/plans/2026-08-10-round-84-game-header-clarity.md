@@ -139,7 +139,8 @@ Expected: PASS with the full two-or-more-line instruction, visible `best 4/6`, 4
 Run:
 
 ```bash
-pnpm exec playwright test e2e/game-dialog.spec.ts e2e/daily-three.spec.ts e2e/in-order.spec.ts --project=chromium
+pnpm exec playwright test e2e/daily-three.spec.ts e2e/in-order.spec.ts --project=chromium
+pnpm exec playwright test e2e/game-dialog.spec.ts --project=anonymous
 ```
 
 Expected: all setup and selected game specs pass; focus trapping, Escape closure, opener restoration, daily picks, and In Order remain intact.
