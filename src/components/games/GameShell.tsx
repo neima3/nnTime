@@ -69,27 +69,31 @@ export function GameShell({
       }}
       className="m-0 h-dvh max-h-none w-screen max-w-none border-0 bg-canvas p-0 text-ink backdrop:bg-canvas/70 open:flex open:flex-col"
     >
-      <header className="mx-auto flex w-full max-w-2xl items-center gap-3 px-5 pt-5">
-        <span className="grid size-11 place-items-center rounded-2xl bg-iris-ghost text-xl" aria-hidden>
+      <header className="mx-auto flex w-full max-w-2xl items-start gap-3 px-5 pt-5">
+        <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-iris-ghost text-xl" aria-hidden>
           {emoji}
         </span>
         <div className="min-w-0 flex-1">
-          <h1 id={titleId} className="font-display text-lg font-bold leading-tight">
-            {title}
-          </h1>
-          <p className="truncate text-[12.5px] font-medium text-ink-soft">{howTo}</p>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <h1 id={titleId} className="font-display text-lg font-bold leading-tight">
+              {title}
+            </h1>
+            {best && (
+              <span className="tnum shrink-0 rounded-xl bg-surface-sunken px-2.5 py-1.5 text-[12px] font-bold text-ink-soft">
+                best {best}
+              </span>
+            )}
+          </div>
+          <p className="mt-0.5 text-pretty text-[12.5px] font-medium leading-snug text-ink-soft">
+            {howTo}
+          </p>
         </div>
-        {best && (
-          <span className="tnum shrink-0 rounded-xl bg-surface-sunken px-2.5 py-1.5 text-[12px] font-bold text-ink-soft">
-            best {best}
-          </span>
-        )}
         <button
           ref={exitRef}
           type="button"
           aria-label="Exit game"
           onClick={onExit}
-          className="grid size-10 shrink-0 place-items-center rounded-2xl border border-border bg-surface text-ink-soft shadow-card hover:text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+          className="grid size-11 shrink-0 place-items-center rounded-2xl border border-border bg-surface text-ink-soft shadow-card hover:text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
         >
           <X size={17} />
         </button>
