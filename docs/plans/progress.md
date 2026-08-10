@@ -19,12 +19,19 @@
   delivery capability while intercepting every request, so configured-flow
   coverage remains truthful without contacting a provider. Independent review
   found no actionable issues.
-- **Verification.** Web lint/typecheck passed; **123 files / 1,208 tests**
+- **Verification.** Web lint/typecheck passed; **123 files / 1,209 tests**
   passed; production build passed. iOS main-thread gate passed with **395 tests,
   1 skipped, 0 failures**; iOS release preflight passed. Parity remains
   **89.74% web / 86.93% iOS**. Desktop and mobile browser screenshots confirm
   both corrected routes. The externally gated 7B/8B credential and physical
   lifecycle boxes remain open.
+- **CI uncovered and closed an independent arcade race.** In Order initialized
+  its round content and first scramble from two separate random picks. When
+  those picks had different step counts, a required button could never render;
+  CI reproduced it with different missing final-step labels. `prepareOrderRun`
+  now creates both values atomically from one picked run, a pure regression test
+  pins the permutation length to that exact first round, and the focused real-
+  browser game spec passes. The web suite is now **1,209 tests**.
 
 ## 2026-08-06 — Round 82: In Order — sequencing joins the arcade, 18/18 (Fable)
 

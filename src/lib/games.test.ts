@@ -24,6 +24,7 @@ import {
   MOOD_GAMES,
   ORDER_BANK,
   ORDER_ROUNDS,
+  prepareOrderRun,
   pickOrderRounds,
   scrambleOrder,
   dailyThree,
@@ -1134,6 +1135,18 @@ describe("in order (rebuild the how-to)", () => {
     expect(rounds).toHaveLength(ORDER_ROUNDS);
     expect(new Set(rounds.map((r) => r.topic)).size).toBe(ORDER_ROUNDS);
     expect(pickOrderRounds(ORDER_BANK, ORDER_ROUNDS, seeded(0.271))).toEqual(rounds);
+  });
+
+  it("prepares the first scramble from the exact first picked round", () => {
+    for (const mult of [0.137, 0.271, 0.457, 0.733]) {
+      const run = prepareOrderRun(ORDER_BANK, seeded(mult));
+      const first = run.rounds[0]!;
+
+      expect(run.scramble).toHaveLength(first.steps.length);
+      expect([...run.scramble].sort((a, b) => a - b)).toEqual(
+        Array.from({ length: first.steps.length }, (_, i) => i),
+      );
+    }
   });
 
   it("cross-platform seeded pin — iOS ArcadeLogic must match", () => {

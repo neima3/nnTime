@@ -32,6 +32,15 @@ generic success after a request that cannot deliver email.
 5. Update the handoff log, commit, push, deploy, and verify the exact behavior
    on `time.neima.me` while leaving the externally gated 7B/8B boxes open.
 
+## CI closure
+
+The first corrected CI rerun exposed a separate In Order initialization race:
+the component picked its rounds twice, once for content and again to size the
+first scramble. When those random picks had different step counts, the browser
+could never render one required step. Prepare each run atomically from one pick,
+pin that invariant in pure tests, and rerun the focused game browser spec before
+final release verification.
+
 ## Executor prompt
 
 Execute this plan test-first. Do not enable or fake Resend, Apple, or Google.

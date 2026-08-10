@@ -939,6 +939,17 @@ export function pickOrderRounds(
   return taken.map((i) => bank[i]!);
 }
 
+export function prepareOrderRun(
+  bank: OrderItem[],
+  random: () => number = Math.random,
+): { rounds: OrderItem[]; scramble: number[] } {
+  const rounds = pickOrderRounds(bank, ORDER_ROUNDS, random);
+  return {
+    rounds,
+    scramble: scrambleOrder(rounds[0]?.steps.length ?? 0, random),
+  };
+}
+
 /* ---- Daily Three (choice-paralysis-free rotation) ------------------------ */
 
 /**

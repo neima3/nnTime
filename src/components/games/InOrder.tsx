@@ -11,7 +11,7 @@ import { useRef, useState } from "react";
 import {
   ORDER_BANK,
   ORDER_ROUNDS,
-  pickOrderRounds,
+  prepareOrderRun,
   readBest,
   recordResult,
   scrambleOrder,
@@ -23,13 +23,10 @@ import { GameEnd, GameShell } from "./GameShell";
 const ID = "in-order";
 
 export function InOrder({ onExit }: { onExit: () => void }) {
-  const [rounds, setRounds] = useState<OrderItem[]>(() =>
-    pickOrderRounds(ORDER_BANK),
-  );
+  const [run, setRun] = useState(() => prepareOrderRun(ORDER_BANK));
+  const rounds: OrderItem[] = run.rounds;
   const [roundIdx, setRoundIdx] = useState(0);
-  const [scramble, setScramble] = useState<number[]>(() =>
-    scrambleOrder(pickOrderRounds(ORDER_BANK)[0]!.steps.length),
-  );
+  const [scramble, setScramble] = useState<number[]>(run.scramble);
   const [placed, setPlaced] = useState(0);
   const [misses, setMisses] = useState(0);
   const [cleanCount, setCleanCount] = useState(0);
@@ -43,10 +40,10 @@ export function InOrder({ onExit }: { onExit: () => void }) {
   const roundDone = item != null && placed >= item.steps.length;
 
   const start = () => {
-    const next = pickOrderRounds(ORDER_BANK);
-    setRounds(next);
+    const next = prepareOrderRun(ORDER_BANK);
+    setRun(next);
     setRoundIdx(0);
-    setScramble(scrambleOrder(next[0]!.steps.length));
+    setScramble(next.scramble);
     setPlaced(0);
     setMisses(0);
     setCleanCount(0);
