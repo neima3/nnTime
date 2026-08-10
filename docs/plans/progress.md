@@ -1,5 +1,36 @@
 # Progress log
 
+## 2026-08-10 — Round 85: truthful signed-out Review preview (Codex)
+
+- **Production dogfood found personal-looking sample data presented as real.**
+  Signed-out `/app/review` opened with “3 things didn’t happen” and a pharmacy
+  activity without identifying either as a fixture. The production repro and
+  screenshots are preserved under the git-ignored
+  `browser-qa/round-85-production-dogfood/` directory.
+- **Review now frames the fixture before any personal-looking detail.** The
+  signed-out route says `Sample planner`, uses the single heading `A review
+  with Kairo`, and labels the card `Sample activity`; authenticated counts,
+  decisions, persistence, and safe auth continuation remain unchanged. The
+  decorative progress dots are hidden from assistive technology rather than
+  announcing misleading shrinking ordinals.
+- **Same-surface accessibility blockers were closed.** The shared desktop
+  shortcut legend moved from `text-ink-faint` (measured 4.23:1) to
+  `text-ink-soft`, with a source regression. Fresh local and live WCAG A/AA
+  audits report **0 violations**; three paint-overlap contrast checks remain
+  incomplete and were inspected in the rendered evidence. Independent review
+  found and verified the progress-announcement and release-scope corrections
+  before commit.
+- **Verification and release.** Lint, typecheck, production build, and **124
+  files / 1,210 tests** passed; full E2E passed with **51 passed, 1 expected
+  skip**. The iOS main-thread gate passed with **395 tests, 1 skipped, 0
+  failures**, release preflight passed, and parity remains **89.74% web /
+  86.93% iOS**. Source SHA `a2757c9` passed exact-SHA CI run `31425259133` and
+  deployed through Coolify as `d71ixyx03nkoslum53o45afs`. Live 320 px and
+  desktop checks prove the unique sample copy, one `h1`, zero decision
+  buttons, safe auth continuation, exact viewport widths, empty console/page-
+  error logs, `running:healthy`, and every `/api/health` check `ok`. External
+  credential and physical-device lifecycle gates 7B/8B remain open.
+
 ## 2026-08-10 — Round 84: complete mobile game instructions (Codex)
 
 - **Production dogfood found shared game guidance clipped on phones.** At

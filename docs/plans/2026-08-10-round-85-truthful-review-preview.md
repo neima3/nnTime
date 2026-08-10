@@ -169,7 +169,7 @@ remain incomplete for manual rendered inspection.
 - Modify: `docs/plans/progress.md`
 - Modify: `docs/plans/2026-08-10-round-85-truthful-review-preview.md`
 
-- [ ] **Step 1: Add the Round 85 handoff entry**
+- [x] **Step 1: Add the Round 85 handoff entry**
 
 Record the production repro, selected design, TDD red/green evidence, local
 screenshots and accessibility result, independent review, exact gate counts,
@@ -219,14 +219,14 @@ accuracy, and truthful evidence.
 **Files:**
 - No additional source files expected
 
-- [ ] **Step 1: Commit the reviewed implementation**
+- [x] **Step 1: Commit the reviewed implementation**
 
 ```bash
 git add src/components/ReviewClient.tsx src/components/review-auth-boundary.test.ts src/components/AppShell.tsx src/components/app-shell-accessibility.test.ts e2e/preview-auth-boundary.spec.ts docs/plans/2026-08-10-round-85-truthful-review-preview.md docs/plans/progress.md
 git commit -m "polish(review): label the signed-out sample"
 ```
 
-- [ ] **Step 2: Push `main` and wait for exact-SHA CI**
+- [x] **Step 2: Push `main` and wait for exact-SHA CI**
 
 ```bash
 git push origin main
@@ -235,12 +235,12 @@ git push origin main
 Expected: GitHub `build-test`, `e2e`, and `native-contract` jobs pass for the
 exact new SHA.
 
-- [ ] **Step 3: Verify Coolify and health**
+- [x] **Step 3: Verify Coolify and health**
 
 Confirm the Kairo deployment finishes at the exact pushed SHA, the application
 reports `running:healthy`, and `/api/health` reports every check `ok`.
 
-- [ ] **Step 4: Verify the live UI**
+- [x] **Step 4: Verify the live UI**
 
 At `https://time.neima.me/app/review`, repeat the 320 × 568 and 1440 × 1000
 signed-out checks. Confirm the unique sample strings, one `h1`, no decision
