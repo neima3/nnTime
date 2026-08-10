@@ -15,7 +15,10 @@
   generic anti-enumeration responses remain unchanged.
 - **Regression coverage and review.** Two sign-in rendering tests pin both
   configured and unavailable states; the public-route suite pins the direct
-  recovery fallback. Independent review found no actionable issues.
+  recovery fallback. The synthetic E2E job now explicitly enables email
+  delivery capability while intercepting every request, so configured-flow
+  coverage remains truthful without contacting a provider. Independent review
+  found no actionable issues.
 - **Verification.** Web lint/typecheck passed; **123 files / 1,208 tests**
   passed; production build passed. iOS main-thread gate passed with **395 tests,
   1 skipped, 0 failures**; iOS release preflight passed. Parity remains

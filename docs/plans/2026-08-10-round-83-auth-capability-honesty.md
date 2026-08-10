@@ -26,6 +26,8 @@ generic success after a request that cannot deliver email.
    server-derived `magicLink` capability. Keep password sign-in and sign-up
    unchanged.
 3. Run focused tests, full web gates, iOS gates, and parity scoring.
+   Keep configured-flow browser coverage explicit by enabling the synthetic
+   E2E capability while continuing to intercept every delivery request.
 4. Recheck the affected sign-in UI in desktop and mobile browsers.
 5. Update the handoff log, commit, push, deploy, and verify the exact behavior
    on `time.neima.me` while leaving the externally gated 7B/8B boxes open.
