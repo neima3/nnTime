@@ -1,5 +1,41 @@
 # Progress log
 
+## 2026-08-10 — Round 84: complete mobile game instructions (Codex)
+
+- **Production dogfood found shared game guidance clipped on phones.** At
+  390 px and 320 px, the common `GameShell` header forced every game's
+  `howTo` copy into a single truncated line, hiding essential instructions.
+  The signed-out production repro and report are preserved under the
+  git-ignored `browser-qa/round-84-production-dogfood/` directory.
+- **Fixed once in the shared shell.** Instructions now wrap naturally, the
+  optional best chip lives with the flexible title content, and the emoji and
+  exit control remain stable non-shrinking columns. The exit target is now
+  44 px. No raw colors or game-specific exceptions were introduced.
+- **The failure is pinned at the narrowest supported width.** The new 320 ×
+  568 Playwright regression first failed with the old instruction measuring
+  330 px inside roughly 90 px of visible space. It now asserts complete
+  multi-line copy, a visible `best 4/6`, a 44 px exit target, and zero dialog
+  overflow. Existing daily-three, In Order, focus-trap, Escape, and opener-
+  restoration regressions remain green. Independent review found no
+  implementation issues and its one documentation-only project-selection
+  correction was applied.
+- **Rendered and accessibility evidence.** Light and dark 320 px Number
+  Ladder, 390 px Digit Span, and desktop captures verify the responsive
+  hierarchy. Live production captures under `browser-qa/round-84-live/`
+  prove complete three-line and two-line instructions, 44 px exit controls,
+  and body/dialog widths exactly matching the viewport. The live axe WCAG
+  A/AA audit reports **0 violations** (one contrast check was inconclusive
+  because the element overlaps other painted content), and the production
+  console and page-error logs are empty.
+- **Verification and release.** Lint, typecheck, production build, and **123
+  files / 1,209 tests** passed; full E2E passed with **51 passed, 1 expected
+  skip**. The iOS main-thread gate passed with **395 tests, 1 skipped, 0
+  failures**, release preflight passed, and parity remains **89.74% web /
+  86.93% iOS**. Implementation SHA `4acb52f` passed exact-SHA CI run
+  `31418666504`, deployed through Coolify as `fxonb1mfzxllyuxk7spept0o`, and
+  was live-verified `running:healthy` with every `/api/health` check `ok`.
+  External credential and physical-device lifecycle gates 7B/8B remain open.
+
 ## 2026-08-10 — Round 83: auth capability honesty (Codex)
 
 - **Production dogfood found a false-success path.** The live capability
