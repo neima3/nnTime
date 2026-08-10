@@ -1,4 +1,5 @@
 import { safeAuthReturnTo } from "@/lib/auth-return";
+import { getAuthCapabilities } from "@/server/auth-capabilities";
 import { ForgotPasswordForm } from "./ForgotPasswordForm";
 
 export default async function ForgotPasswordPage({
@@ -8,5 +9,10 @@ export default async function ForgotPasswordPage({
 }) {
   const returnTo = safeAuthReturnTo((await searchParams).next);
 
-  return <ForgotPasswordForm returnTo={returnTo} />;
+  return (
+    <ForgotPasswordForm
+      returnTo={returnTo}
+      emailDeliveryAvailable={getAuthCapabilities(process.env).magicLink}
+    />
+  );
 }

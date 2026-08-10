@@ -1,5 +1,28 @@
 # Progress log
 
+## 2026-08-10 — Round 83: auth capability honesty (Codex)
+
+- **Production dogfood found a false-success path.** The live capability
+  endpoint correctly reported `magicLink: false`, but `/sign-in` still offered
+  magic-link and password-recovery actions; a synthetic `.invalid` request then
+  claimed an email was on the way. The same dead end was reachable directly at
+  `/forgot-password`. Evidence and a full repro are preserved under the
+  git-ignored `browser-qa/round-83-production-dogfood/` directory.
+- **Fixed at the capability boundary.** `AuthForm` now gates magic-link and
+  forgot-password affordances on the existing server-derived capability.
+  The direct recovery route receives the same capability and renders a calm,
+  honest unavailable state while keeping password sign-in intact. Server-side
+  generic anti-enumeration responses remain unchanged.
+- **Regression coverage and review.** Two sign-in rendering tests pin both
+  configured and unavailable states; the public-route suite pins the direct
+  recovery fallback. Independent review found no actionable issues.
+- **Verification.** Web lint/typecheck passed; **123 files / 1,208 tests**
+  passed; production build passed. iOS main-thread gate passed with **395 tests,
+  1 skipped, 0 failures**; iOS release preflight passed. Parity remains
+  **89.74% web / 86.93% iOS**. Desktop and mobile browser screenshots confirm
+  both corrected routes. The externally gated 7B/8B credential and physical
+  lifecycle boxes remain open.
+
 ## 2026-08-06 — Round 82: In Order — sequencing joins the arcade, 18/18 (Fable)
 
 - **A genuinely new mechanic: step sequencing.** In Order shows one

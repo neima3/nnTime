@@ -24,9 +24,8 @@ import { PasswordField } from "./PasswordField";
 type Mode = "sign-in" | "sign-up";
 
 /**
- * Email + password auth (ADR-003). Magic link optional.
- * Without Resend: reset/magic still accept and return generic success
- * (no account enumeration); server logs the URL in non-production.
+ * Email + password auth (ADR-003). Email-delivery actions are offered only
+ * when the server reports that its mail provider is configured.
  */
 export function AuthForm({
   mode,
@@ -185,7 +184,7 @@ export function AuthForm({
               placeholder={isSignUp ? "At least 8 characters" : "Your password"}
             />
 
-            {!isSignUp && (
+            {!isSignUp && capabilities.magicLink && (
               <div className="flex justify-end">
                 <Link
                   href={passwordRecoveryHref("forgot-password", safeReturnTo)}
@@ -229,7 +228,7 @@ export function AuthForm({
             </button>
           </form>
 
-          {!isSignUp && (
+          {!isSignUp && capabilities.magicLink && (
             <button
               type="button"
               disabled={authBusy}

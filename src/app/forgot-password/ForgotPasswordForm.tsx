@@ -10,7 +10,13 @@ import {
   safeAuthReturnTo,
 } from "@/lib/auth-return";
 
-export function ForgotPasswordForm({ returnTo }: { returnTo: string }) {
+export function ForgotPasswordForm({
+  returnTo,
+  emailDeliveryAvailable,
+}: {
+  returnTo: string;
+  emailDeliveryAvailable: boolean;
+}) {
   const safeReturnTo = safeAuthReturnTo(returnTo);
   const [email, setEmail] = useState("");
   const [pending, setPending] = useState(false);
@@ -58,11 +64,21 @@ export function ForgotPasswordForm({ returnTo }: { returnTo: string }) {
           <h1 className="font-display text-2xl font-bold tracking-tight">
             Reset password
           </h1>
-          <p className="mt-1.5 text-[14px] text-ink-soft">
-            We&apos;ll send a reset link if that email has a Kairo account.
-          </p>
+          {emailDeliveryAvailable ? (
+            <p className="mt-1.5 text-[14px] text-ink-soft">
+              We&apos;ll send a reset link if that email has a Kairo account.
+            </p>
+          ) : (
+            <p
+              role="status"
+              className="mt-4 rounded-xl bg-iris-soft px-3.5 py-3 text-[13px] font-medium leading-relaxed text-iris"
+            >
+              Password reset is temporarily unavailable. You can still sign in
+              with your password.
+            </p>
+          )}
 
-          {done ? (
+          {!emailDeliveryAvailable ? null : done ? (
             <p
               role="status"
               className="mt-6 rounded-xl bg-iris-soft px-3.5 py-3 text-[13px] font-medium leading-relaxed text-iris"

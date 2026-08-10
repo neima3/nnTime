@@ -42,6 +42,10 @@ const googleAvailable = Object.freeze({
   ...unavailable,
   google: true,
 });
+const emailDeliveryAvailable = Object.freeze({
+  ...unavailable,
+  magicLink: true,
+});
 
 describe("Google authentication web flow", () => {
   beforeEach(() => {
@@ -57,6 +61,30 @@ describe("Google authentication web flow", () => {
     );
 
     expect(html).not.toContain("Continue with Google");
+  });
+
+  it("omits email-delivery actions when magic links are unavailable", () => {
+    const html = renderToStaticMarkup(
+      createElement(AuthForm, {
+        mode: "sign-in",
+        capabilities: unavailable,
+      }),
+    );
+
+    expect(html).not.toContain("Email me a magic link");
+    expect(html).not.toContain("Forgot password?");
+  });
+
+  it("offers email-delivery actions when magic links are configured", () => {
+    const html = renderToStaticMarkup(
+      createElement(AuthForm, {
+        mode: "sign-in",
+        capabilities: emailDeliveryAvailable,
+      }),
+    );
+
+    expect(html).toContain("Email me a magic link");
+    expect(html).toContain("Forgot password?");
   });
 
   it.each(["sign-in", "sign-up"] as const)(

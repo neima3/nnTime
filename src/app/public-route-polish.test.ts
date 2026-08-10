@@ -1,8 +1,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import ForgotPasswordPage from "./forgot-password/page";
+import { ForgotPasswordForm } from "./forgot-password/ForgotPasswordForm";
 import { metadata as forgotPasswordMetadata } from "./forgot-password/layout";
 import { metadata as onboardingMetadata } from "./onboarding/layout";
 
@@ -22,6 +24,19 @@ describe("public route polish", () => {
 
     expect(html).toContain('href="/"');
     expect(html).toContain(">Kairo</span>");
+  });
+
+  it("does not promise password email when delivery is unavailable", () => {
+    const html = renderToStaticMarkup(
+      createElement(ForgotPasswordForm, {
+        returnTo: "/app/today",
+        emailDeliveryAvailable: false,
+      }),
+    );
+
+    expect(html).toContain("Password reset is temporarily unavailable");
+    expect(html).not.toContain("Send reset link");
+    expect(html).not.toContain("a reset link is on the way");
   });
 
   it("does not probe protected settings until onboarding has a session", () => {
