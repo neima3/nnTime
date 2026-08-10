@@ -18,6 +18,15 @@ describe("Review Today authentication boundary", () => {
     expect(source).toContain("Review privately when you’re ready");
     expect(source).toContain("Sign in to review");
     expect(source).toContain("focus-visible:ring-offset-surface");
+    expect(source).toContain('authed ? "Review today" : "Sample planner"');
+    expect(source).toContain("!authed && (");
+    expect(source).toContain("Sample activity");
+    expect(source).toContain('"A review with Kairo"');
+    expect(source).toContain("`${remaining} ${remaining === 1");
+    expect(source).toContain(
+      '<div aria-hidden="true" className="mt-5 flex items-center gap-2">',
+    );
+    expect(source).not.toContain('role="status"');
     expect(source).not.toContain("disabled={busy || !authed}");
     expect(source).not.toContain('href="/sign-in"');
   });

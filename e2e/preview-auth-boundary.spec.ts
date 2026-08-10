@@ -254,6 +254,17 @@ test("signed-out Review Today offers a truthful return path", async ({
 
   try {
     await page.goto("/app/review");
+    const main = page.getByRole("main");
+    await expect(
+      main.getByText("Sample planner", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      main.getByRole("heading", { name: "A review with Kairo", level: 1 }),
+    ).toBeVisible();
+    await expect(
+      main.getByText("Sample activity", { exact: true }),
+    ).toBeVisible();
+    await expect(main.getByRole("heading", { level: 1 })).toHaveCount(1);
     for (const name of ["I did it", "Move to tomorrow", "Let it go"]) {
       await expect(page.getByRole("button", { name })).toHaveCount(0);
     }

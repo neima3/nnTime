@@ -175,7 +175,7 @@ export function AppShell({
 
 export function ShortcutsHint() {
   return (
-    <div className="rounded-2xl border border-border bg-surface-sunken p-3 text-[11px] text-ink-faint">
+    <div className="rounded-2xl border border-border bg-surface-sunken p-3 text-[11px] text-ink-soft">
       <p className="font-semibold uppercase tracking-wide">Shortcuts</p>
       <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-0.5">
         <span><kbd className="rounded bg-surface px-1 font-mono">N</kbd> New</span>

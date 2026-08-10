@@ -151,20 +151,21 @@ export function ReviewClient({
 
   return (
     <div className="mx-auto flex max-w-lg flex-col items-center px-4 py-10">
-      <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
-        Review today
+      <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-iris">
+        {authed ? "Review today" : "Sample planner"}
       </p>
-      <h1 className="mt-1 font-display text-3xl font-bold tracking-tight">
-        {`${remaining} ${remaining === 1 ? "thing" : "things"} didn’t happen`}
+      <h1 className="mt-1 text-center text-pretty font-display text-3xl font-bold tracking-tight">
+        {authed
+          ? `${remaining} ${remaining === 1 ? "thing" : "things"} didn’t happen`
+          : "A review with Kairo"}
       </h1>
-      <p className="mt-1.5 text-[14px] text-ink-soft">
-        Totally fine. Let&apos;s decide what they become.
+      <p className="mt-1.5 text-center text-pretty text-[14px] text-ink-soft">
+        {authed
+          ? "Totally fine. Let’s decide what they become."
+          : "See how unfinished plans can move forward without guilt."}
       </p>
 
-      <div
-        className="mt-5 flex items-center gap-2"
-        aria-label={`Thing ${index + 1} of ${items.length + index}`}
-      >
+      <div aria-hidden="true" className="mt-5 flex items-center gap-2">
         {items.map((_, i) => (
           <span
             key={i}
@@ -185,6 +186,11 @@ export function ReviewClient({
             {current.emoji}
           </span>
           <div className="min-w-0">
+            {!authed && (
+              <p className="mb-0.5 text-[11px] font-bold uppercase tracking-[0.12em] text-ink-soft">
+                Sample activity
+              </p>
+            )}
             <p className={`truncate font-display text-xl font-bold ${cat.ink}`}>
               {current.title}
             </p>

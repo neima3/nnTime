@@ -16,7 +16,7 @@
 - Modify: `e2e/preview-auth-boundary.spec.ts`
 - Modify: `src/components/review-auth-boundary.test.ts`
 
-- [ ] **Step 1: Extend the signed-out browser contract**
+- [x] **Step 1: Extend the signed-out browser contract**
 
 Inside `signed-out Review Today offers a truthful return path`, after
 `page.goto("/app/review")`, add:
@@ -34,7 +34,7 @@ await expect(main.getByRole("heading", { level: 1 })).toHaveCount(1);
 The existing decision-button, safe-link, and protected-request assertions stay
 unchanged.
 
-- [ ] **Step 2: Extend the source-level boundary contract**
+- [x] **Step 2: Extend the source-level boundary contract**
 
 In the first `review-auth-boundary.test.ts` test, add:
 
@@ -49,7 +49,7 @@ expect(source).toContain("`${remaining} ${remaining === 1");
 This pins both the signed-out branch and preservation of authenticated dynamic
 counts.
 
-- [ ] **Step 3: Run the focused tests and confirm RED**
+- [x] **Step 3: Run the focused tests and confirm RED**
 
 Run:
 
@@ -66,7 +66,7 @@ render the sample framing.
 **Files:**
 - Modify: `src/components/ReviewClient.tsx`
 
-- [ ] **Step 1: Replace the shared heading copy with authoritative branches**
+- [x] **Step 1: Replace the shared heading copy with authoritative branches**
 
 Replace the existing eyebrow, `h1`, and supporting paragraph with:
 
@@ -89,7 +89,7 @@ Replace the existing eyebrow, `h1`, and supporting paragraph with:
 The iris eyebrow matches signed-out Today/Week/Month; `text-pretty` and centered
 copy stabilize wrapping at 320 px without new tokens.
 
-- [ ] **Step 2: Label the fixture card visibly**
+- [x] **Step 2: Label the fixture card visibly**
 
 Inside the card text column, before the title, add:
 
@@ -103,7 +103,7 @@ Inside the card text column, before the title, add:
 
 Do not change the title, time, category styling, or authenticated card.
 
-- [ ] **Step 3: Run focused tests and confirm GREEN**
+- [x] **Step 3: Run focused tests and confirm GREEN**
 
 Run:
 
@@ -119,22 +119,24 @@ review decisions all pass.
 ### Task 3: Verify visual hierarchy, accessibility, and interaction safety
 
 **Files:**
+- Create: `src/components/app-shell-accessibility.test.ts`
+- Modify: `src/components/AppShell.tsx`
 - Evidence only: `browser-qa/round-85-review-preview/` (git-ignored)
 
-- [ ] **Step 1: Capture mobile light and dark evidence**
+- [x] **Step 1: Capture mobile light and dark evidence**
 
 Run the app and open `/app/review` signed out at 320 × 568 and 390 × 844.
 Capture light and dark screenshots showing `Sample planner`, `A review with
 Kairo`, `Sample activity`, the complete auth boundary, and no horizontal
 overflow.
 
-- [ ] **Step 2: Capture desktop evidence**
+- [x] **Step 2: Capture desktop evidence**
 
 At 1440 × 1000, verify the preview remains centered and compact, the sample
 labels are subordinate but immediately visible, and the sign-in CTA remains the
 only primary action.
 
-- [ ] **Step 3: Verify semantic and keyboard behavior**
+- [x] **Step 3: Verify semantic and keyboard behavior**
 
 In a real browser:
 
@@ -146,11 +148,20 @@ In a real browser:
 - production-style console and page-error logs are empty
 ```
 
-- [ ] **Step 4: Run the focused WCAG audit**
+- [x] **Step 4: Run the focused WCAG audit**
 
 Run axe WCAG A/AA against the open signed-out review page. Expected: zero
 critical or serious violations; inspect any incomplete contrast result against
 the rendered light and dark evidence.
+
+- [x] **Step 5: Close any same-surface WCAG blocker test-first**
+
+The audit exposed the shared desktop shortcut legend at 4.23:1, below the
+required 4.5:1 for its 11 px text. Add a source contract requiring
+`text-ink-soft` on the `ShortcutsHint` container, confirm it fails, replace only
+the existing `text-ink-faint` token there, rerun the contract, and repeat the
+full-page axe audit. Expected: zero violations; icon/overlap contrast checks may
+remain incomplete for manual rendered inspection.
 
 ### Task 4: Record the round and run release gates
 
@@ -165,7 +176,7 @@ screenshots and accessibility result, independent review, exact gate counts,
 source commit, exact-SHA CI, deployment UUID, live verification, and the still-
 open external 7B/8B gates.
 
-- [ ] **Step 2: Run the complete web gate**
+- [x] **Step 2: Run the complete web gate**
 
 Run:
 
@@ -177,7 +188,7 @@ BETTER_AUTH_SECRET=round85-local-verification-secret-32chars RESEND_API_KEY=loca
 Expected: lint, typecheck, all unit/integration tests, production build, and the
 complete Playwright suite pass.
 
-- [ ] **Step 3: Run native and parity gates**
+- [x] **Step 3: Run native and parity gates**
 
 Run:
 
@@ -190,7 +201,7 @@ node scripts/parity.mjs
 Expected: the app-hosted iOS suite/Main Thread Checker, release preflight, and
 both ≥85% parity gates pass with no native behavior change.
 
-- [ ] **Step 4: Review the final diff**
+- [x] **Step 4: Review the final diff**
 
 Run:
 
@@ -199,9 +210,9 @@ git diff --check
 git status --short
 ```
 
-Review `ReviewClient.tsx`, both focused tests, both Round 85 docs, and the
-progress entry for scope, design-token compliance, copy accuracy, and truthful
-evidence.
+Review `ReviewClient.tsx`, `AppShell.tsx`, all three focused tests, both Round
+85 docs, and the progress entry for scope, design-token compliance, copy
+accuracy, and truthful evidence.
 
 ### Task 5: Publish and prove the exact revision
 
@@ -211,7 +222,7 @@ evidence.
 - [ ] **Step 1: Commit the reviewed implementation**
 
 ```bash
-git add src/components/ReviewClient.tsx src/components/review-auth-boundary.test.ts e2e/preview-auth-boundary.spec.ts docs/plans/2026-08-10-round-85-truthful-review-preview.md docs/plans/progress.md
+git add src/components/ReviewClient.tsx src/components/review-auth-boundary.test.ts src/components/AppShell.tsx src/components/app-shell-accessibility.test.ts e2e/preview-auth-boundary.spec.ts docs/plans/2026-08-10-round-85-truthful-review-preview.md docs/plans/progress.md
 git commit -m "polish(review): label the signed-out sample"
 ```
 
