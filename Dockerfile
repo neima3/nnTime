@@ -12,11 +12,10 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-# NEXT_PUBLIC_* is inlined into the client bundle at BUILD time, so a runtime
-# env var in Coolify cannot supply it. Without this the bundle ships `undefined`
-# and PushReminders silently disables itself (`!!undefined === false`).
-ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY
-ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY
+# No NEXT_PUBLIC_* build args needed: the VAPID public key is read at request
+# time on the server and passed to the client (see app/app/settings/page.tsx).
+# It used to be a NEXT_PUBLIC_ var inlined at build time, which silently shipped
+# as `undefined` here and quietly disabled push reminders in the image.
 RUN pnpm build
 
 FROM node:24-alpine AS runner

@@ -14,6 +14,15 @@ export default async function SettingsPage({
   searchParams: Promise<AuthRedirectSearchParams>;
 }) {
   const initialLinkError = getGoogleLinkRedirectError(await searchParams);
+  // Read at request time on the server. NEXT_PUBLIC_* is inlined at BUILD time,
+  // so it silently shipped as `undefined` whenever the builder lacked the value
+  // (the Docker image had no build arg for it) and push quietly disabled itself.
+  // The VAPID public key is public by definition, so handing it to the client is
+  // safe — and this way a runtime env var is enough on any host.
+  const vapidPublicKey =
+    process.env.VAPID_PUBLIC_KEY ??
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ??
+    null;
 
   return (
     <AppShell active="settings">
@@ -36,7 +45,10 @@ export default async function SettingsPage({
             />
           }
         >
-          <SettingsClient initialLinkError={initialLinkError} />
+          <SettingsClient
+            initialLinkError={initialLinkError}
+            vapidPublicKey={vapidPublicKey}
+          />
         </SignedInOnly>
       </div>
     </AppShell>

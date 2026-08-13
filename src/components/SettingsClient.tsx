@@ -361,8 +361,10 @@ function applyTheme(theme: Settings["theme"]) {
 
 export function SettingsClient({
   initialLinkError = null,
+  vapidPublicKey = null,
 }: {
   initialLinkError?: string | null;
+  vapidPublicKey?: string | null;
 }) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -918,7 +920,7 @@ export function SettingsClient({
           onChange={(nextPrefs) => void patch({ notificationPrefs: nextPrefs })}
         />
         <div className="px-5 py-4">
-          <PushReminders />
+          <PushReminders vapidPublicKey={vapidPublicKey} />
         </div>
       </Section>
 

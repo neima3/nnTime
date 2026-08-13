@@ -128,7 +128,7 @@ describe("flushQueue", () => {
   });
 
   it("never replays another user's mutations", async () => {
-    const fetchMock = vi.fn((_url: string, _init?: RequestInit) => ok());
+    const fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(() => ok());
     vi.stubGlobal("fetch", fetchMock);
 
     await queueCapture("user-1", "mine");

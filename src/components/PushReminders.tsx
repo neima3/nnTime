@@ -19,7 +19,7 @@ function urlBase64ToUint8Array(base64: string): Uint8Array {
   return out;
 }
 
-export function PushReminders() {
+export function PushReminders({ vapidPublicKey }: { vapidPublicKey: string | null }) {
   const [supported, setSupported] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -29,7 +29,7 @@ export function PushReminders() {
       typeof window !== "undefined" &&
       "serviceWorker" in navigator &&
       "PushManager" in window &&
-      !!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      !!vapidPublicKey;
     /* eslint-disable react-hooks/set-state-in-effect */
     setSupported(ok);
     /* eslint-enable react-hooks/set-state-in-effect */
@@ -38,7 +38,7 @@ export function PushReminders() {
       .then((reg) => reg.pushManager.getSubscription())
       .then((sub) => setSubscribed(!!sub))
       .catch(() => {});
-  }, []);
+  }, [vapidPublicKey]);
 
   async function enable() {
     setBusy(true);
@@ -53,7 +53,7 @@ export function PushReminders() {
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(
-          process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+          vapidPublicKey!,
         ) as BufferSource,
       });
       const json = sub.toJSON();
