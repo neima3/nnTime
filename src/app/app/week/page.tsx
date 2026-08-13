@@ -281,27 +281,40 @@ export default async function WeekPage({
                 const cat = catClasses[b.category];
                 // id is `${seriesId}:${occurrenceKey}`; editor needs series UUID only.
                 const seriesId = b.id.split(":")[0]!;
+                const [clock, meridiem] = b.time.split(" ");
                 return (
                   <Link
                     key={b.id}
                     href={`/app/editor?id=${seriesId}&date=${d.dateStr}`}
-                    className={`flex items-center gap-2 rounded-xl px-2.5 py-2 ${cat.fill} focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none`}
+                    className={`block rounded-xl px-2.5 py-2 ${cat.fill} focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none`}
                   >
-                    <span className="text-sm" aria-hidden>
-                      {b.emoji}
+                    {/* Emoji and start time share the top line so the title
+                        keeps the chip's full width — sharing a row with them
+                        left it barely 35px. As the columns narrow, the top
+                        line sheds the meridiem (four-column band) and then the
+                        emoji (seven columns beside the sidebar), rather than
+                        ellipsing the clock. */}
+                    <span className="flex items-center gap-1">
+                      <span
+                        className="hidden shrink-0 text-[13px] leading-none max-lg:inline xl:inline"
+                        aria-hidden
+                      >
+                        {b.emoji}
+                      </span>
+                      <span
+                        className={`tnum min-w-0 truncate text-[11px] font-medium ${cat.ink} opacity-70`}
+                      >
+                        {clock}
+                        {meridiem && (
+                          <span className="hidden max-md:inline xl:inline"> {meridiem}</span>
+                        )}
+                      </span>
                     </span>
-                    <div className="min-w-0">
-                      <p
-                        className={`truncate text-[12.5px] font-semibold leading-tight ${cat.ink}`}
-                      >
-                        {b.title}
-                      </p>
-                      <p
-                        className={`tnum text-[11px] font-medium ${cat.ink} opacity-70`}
-                      >
-                        {b.time}
-                      </p>
-                    </div>
+                    <span
+                      className={`mt-0.5 block truncate text-[12.5px] font-semibold leading-tight ${cat.ink}`}
+                    >
+                      {b.title}
+                    </span>
                   </Link>
                 );
               })}

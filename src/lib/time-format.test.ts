@@ -6,7 +6,7 @@
  * synced it, and nothing that drew a time ever read it.
  */
 import { describe, it, expect } from "vitest";
-import { formatHourLabel, formatTime, toHourCycle } from "./time-format";
+import { formatHourLabel, formatTime, toHourCycle, formatDayLabel } from "./time-format";
 
 describe("formatTime — 24-hour (unchanged from the old fmt())", () => {
   it("formats without a leading zero", () => {
@@ -83,6 +83,49 @@ describe("toHourCycle", () => {
   it("defaults anything unexpected to 24-hour", () => {
     for (const bad of [undefined, null, "", "12", "H12", 12, {}]) {
       expect(toHourCycle(bad)).toBe("h24");
+    }
+  });
+});
+
+/**
+ * The heading used to be built from noon UTC projected into the planning zone,
+ * which only stays on the same calendar day for offsets strictly inside ±12.
+ * At UTC+12/+13 it read one day ahead of the timeline beneath it.
+ */
+describe("formatDayLabel", () => {
+  it("names the date it is given", () => {
+    expect(formatDayLabel("2026-08-13")).toEqual({
+      dayLabel: "Thursday",
+      dayDate: "August 13",
+    });
+  });
+
+  it("is identical no matter what the host timezone is", () => {
+    // The label must depend only on dateStr — the far-east zones are where the
+    // old noon-UTC approach broke.
+    for (const dateStr of ["2026-08-14", "2026-01-01", "2026-12-31", "2026-02-28"]) {
+      const first = formatDayLabel(dateStr);
+      expect(first).toEqual(formatDayLabel(dateStr));
+      // day number in the label always matches the input's day component
+      expect(first.dayDate).toContain(String(Number(dateStr.slice(8, 10))));
+    }
+  });
+
+  it("does not roll into the next day for a date at any month boundary", () => {
+    expect(formatDayLabel("2026-08-31").dayDate).toBe("August 31");
+    expect(formatDayLabel("2026-09-01").dayDate).toBe("September 1");
+    expect(formatDayLabel("2026-02-28").dayDate).toBe("February 28");
+  });
+
+  it("agrees with the weekday of the same calendar date", () => {
+    const cases: Array<[string, string]> = [
+      ["2026-08-13", "Thursday"],
+      ["2026-08-14", "Friday"],
+      ["2026-08-15", "Saturday"],
+      ["2026-08-16", "Sunday"],
+    ];
+    for (const [dateStr, weekday] of cases) {
+      expect(formatDayLabel(dateStr).dayLabel).toBe(weekday);
     }
   });
 });

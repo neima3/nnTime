@@ -19,6 +19,52 @@ export interface PlannerEventLike {
   eventType: string;
   occurredAt: Date;
   payload: unknown;
+  /** Series id — needed to pair a `complete` with the `uncomplete` that undoes it. */
+  entityId?: string | null;
+}
+
+/**
+ * Reduce the raw event log to the completions that still stand.
+ *
+ * `planner_events` is append-only, so un-completing an activity appends an
+ * `uncomplete` row rather than removing the `complete`. Counting raw `complete`
+ * events therefore inflated every number: complete → undo → complete read as 2,
+ * and each further mis-tap-and-correct added another. Insights, Totals, the
+ * soft streak and the reward garden all sit on this count.
+ *
+ * Walking chronologically, a `complete` marks its occurrence done and an
+ * `uncomplete` clears it, so an occurrence contributes at most once — on the
+ * date of its most recent `complete`.
+ */
+export function netCompletions<T extends PlannerEventLike>(events: T[]): T[] {
+  const occurrenceKeyOf = (ev: T) =>
+    (ev.payload as { occurrenceKey?: string } | null)?.occurrenceKey ?? "";
+  const keyOf = (ev: T) =>
+    `${ev.entityId ?? ""}|${occurrenceKeyOf(ev)}`;
+
+  const live = new Map<string, T>();
+  const ordered = [...events].sort(
+    (a, b) => a.occurredAt.getTime() - b.occurredAt.getTime(),
+  );
+
+  for (const ev of ordered) {
+    if (ev.eventType === "complete") {
+      live.set(keyOf(ev), ev);
+    } else if (ev.eventType === "uncomplete") {
+      const occurrenceKey = occurrenceKeyOf(ev);
+      if (occurrenceKey) {
+        live.delete(keyOf(ev));
+      } else {
+        // Legacy rows carried an empty payload; clear every occurrence of the
+        // series so old data still nets out instead of staying stuck counted.
+        const prefix = `${ev.entityId ?? ""}|`;
+        for (const key of [...live.keys()]) {
+          if (key.startsWith(prefix)) live.delete(key);
+        }
+      }
+    }
+  }
+  return [...live.values()];
 }
 
 /**
@@ -45,6 +91,10 @@ export async function getStats(
         lte(schema.plannerEvents.occurredAt, range.to),
       ),
     );
+
+  // Completions that still stand (see netCompletions) — undone ones must not
+  // keep counting toward Insights, Totals, the streak or the garden.
+  const liveCompletions = netCompletions(events);
 
   // "Your focus hours" always looks at a fixed 30-day window, independent of
   // the requested `range` (which may be as short as 1 day) — pull it
@@ -87,7 +137,7 @@ export async function getStats(
   const patternStart = new Date(now.getTime() - ENERGY_PATTERN_WINDOW_DAYS * 86400000);
   const preloaded =
     range.from <= patternStart && range.to >= now
-      ? events.filter((e) => e.eventType === "complete")
+      ? liveCompletions
       : null;
   const patternInput = await loadEnergyCompletions(db, userId, zone, now, preloaded);
 
@@ -95,7 +145,7 @@ export async function getStats(
     byDate,
     streak,
     energyBalance: energyCounts,
-    totalCompleted: events.filter((e) => e.eventType === "complete").length,
+    totalCompleted: liveCompletions.length,
     totalFocusMin: events
       .filter((e) => e.eventType === "focus_stop")
       .reduce((sum, e) => sum + ((e.payload as { durationMin?: number })?.durationMin ?? 0), 0),
@@ -121,7 +171,6 @@ export function bucketEventsByZoneDate(
   for (const ev of events) {
     const dateStr = instantToDateStr(ev.occurredAt, zone);
     if (!byDate[dateStr]) byDate[dateStr] = { completed: 0, focusMin: 0, mood: null };
-    if (ev.eventType === "complete") byDate[dateStr].completed++;
     if (ev.eventType === "focus_stop") {
       const payload = ev.payload as { durationMin?: number };
       if (payload?.durationMin) byDate[dateStr].focusMin += payload.durationMin;
@@ -130,6 +179,13 @@ export function bucketEventsByZoneDate(
       const payload = ev.payload as { mood?: string };
       byDate[dateStr].mood = payload?.mood ?? null;
     }
+  }
+  // Completions are tallied from the netted set, so an undone one stops
+  // counting and re-completing does not add a second.
+  for (const ev of netCompletions(events)) {
+    const dateStr = instantToDateStr(ev.occurredAt, zone);
+    if (!byDate[dateStr]) byDate[dateStr] = { completed: 0, focusMin: 0, mood: null };
+    byDate[dateStr].completed++;
   }
   return byDate;
 }

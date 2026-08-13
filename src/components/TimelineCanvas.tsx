@@ -19,7 +19,7 @@ import { Check, Timer } from "lucide-react";
 import { catClasses, fmtDuration, type Activity } from "@/lib/mock";
 import { LiveNowLine, useLiveNowMin } from "./LiveNowLine";
 import { celebrate } from "./Celebration";
-import { formatHourLabel, formatTime } from "@/lib/time-format";
+import { formatHourLabel, formatTime, type HourCycle } from "@/lib/time-format";
 import { calibratedDurationMin } from "@/lib/insights";
 import { useHourCycle } from "@/lib/use-hour-cycle";
 
@@ -27,6 +27,33 @@ const DAY_START_DEFAULT = 7 * 60; // 07:00
 const DAY_END_DEFAULT = 23 * 60; // 23:00
 const PX_PER_MIN = 1.7;
 const SNAP_MIN = 15; // 15-minute snap
+/** Below this height the stacked title + meta cannot fit; the block goes to one row. */
+const MICRO_PX = 42;
+/** Below this height the block drops the checklist and uses the tighter type scale. */
+const COMPACT_PX = 76;
+
+/** Wall clock without the meridiem the hour gutter already spells out. */
+function bareTime(min: number, hourCycle: HourCycle): string {
+  return formatTime(min, hourCycle).replace(/\s?[AP]M$/, "");
+}
+
+/**
+ * Narrow-screen time range. A block owns only ~123px of text column on a
+ * phone, where "8:00 AM – 8:45 AM · 45 min" needs 162px and the duration was
+ * the part that got ellipsed. Bare times and a tight en dash fit — "8:00–8:45"
+ * — and the full form returns at `sm`. The aria-label always reads the full one.
+ */
+function compactRange(start: number, end: number, hourCycle: HourCycle): string {
+  return `${bareTime(start, hourCycle)}–${bareTime(end, hourCycle)}`;
+}
+
+/** Narrow-screen duration: "45m", "1h", "1h 30m". */
+function compactDuration(min: number): string {
+  if (min < 60) return `${min}m`;
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return m ? `${h}h ${m}m` : `${h}h`;
+}
 
 interface DragState {
   id: string;
@@ -363,7 +390,8 @@ export function TimelineCanvas({
             a.start <= effectiveNow &&
             effectiveNow < a.start + a.duration;
           const h = a.duration * PX_PER_MIN;
-          const compact = h < 76;
+          const compact = h < COMPACT_PX;
+          const micro = h < MICRO_PX;
           // Checklist lines only when the block is tall enough to hold them.
           const checklistRows = compact
             ? 0
@@ -391,11 +419,11 @@ export function TimelineCanvas({
                 usuallyMin != null ? ` Usually runs about ${usuallyMin} minutes.` : ""
               }${interactive ? " Use arrow keys to move, plus or minus to resize. Enter to edit." : ""}`}
               aria-keyshortcuts={interactive ? "ArrowUp ArrowDown + - Enter" : undefined}
-              className={`group absolute flex gap-3 overflow-hidden rounded-2xl px-3.5 outline-none ${cat.fill} ${
+              className={`group absolute flex gap-2.5 overflow-hidden rounded-2xl px-3 outline-none sm:gap-3 sm:px-3.5 ${cat.fill} ${
                 past && !a.done ? "timeline-past" : ""
               } ${a.done ? "timeline-done" : ""} ${heavy ? "timeline-heavy" : ""} ${current ? "shadow-float ring-2 ring-now/70" : ""} ${
-                compact ? "items-center py-1.5" : "py-3"
-              } ${hasConflict ? "ring-2 ring-danger animate-pulse" : ""} rise-in ${
+                compact ? "items-center" : ""
+              } ${micro ? "py-0.5" : compact ? "py-1" : "py-3"} ${hasConflict ? "ring-2 ring-danger animate-pulse" : ""} rise-in ${
                 interactive
                   ? "cursor-grab transition-transform hover:-translate-y-px hover:shadow-card active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-iris"
                   : ""
@@ -427,41 +455,83 @@ export function TimelineCanvas({
             >
               <span
                 className={`grid shrink-0 place-items-center rounded-full bg-surface-raised/80 ${
-                  compact ? "size-8 text-base" : "size-10 text-lg"
+                  micro ? "size-6 text-[13px]" : compact ? "size-8 text-base" : "size-10 text-lg"
                 }`}
                 aria-hidden
               >
                 {a.emoji}
               </span>
 
-              <div className="min-w-0 flex-1">
+              <div className={`min-w-0 flex-1 ${micro ? "flex items-baseline gap-2" : ""}`}>
                 <p
                   className={`truncate font-semibold leading-tight ${cat.ink} ${
-                    compact ? "text-[14px]" : "text-[15px]"
+                    micro
+                      ? "min-w-0 flex-1 text-[13px]"
+                      : compact
+                        ? "text-[14px]"
+                        : "text-[15px]"
                   } ${a.done ? "line-through decoration-2" : ""}`}
                 >
                   {a.title}
                 </p>
-                <p className={`tnum mt-0.5 truncate text-[12px] font-medium ${cat.ink}`}>
-                  {a.recurring && (
-                    <span title="Repeats" aria-label="Repeats">
-                      ↻{" "}
+                {micro ? (
+                  // One row of type is all a 15-minute block can hold: start
+                  // time + duration, the two facts the block height cannot show.
+                  <p
+                    className={`tnum shrink-0 whitespace-nowrap text-[11px] font-medium ${cat.ink}`}
+                  >
+                    <span className="sm:hidden" aria-hidden>
+                      {bareTime(a.start, hourCycle)} · {compactDuration(a.duration)}
                     </span>
-                  )}
-                  {formatTime(a.start, hourCycle)} – {formatTime(a.start + a.duration, hourCycle)} · {fmtDuration(a.duration)}
-                  {usuallyMin != null && (
-                    <span
-                      className="font-semibold"
-                      title="Based on your recent focus sessions"
-                    >
-                      {" "}· usually ~{usuallyMin}m
+                    <span className="hidden sm:inline">
+                      {formatTime(a.start, hourCycle)} · {fmtDuration(a.duration)}
                     </span>
-                  )}
-                  {a.checklist && a.checklist.length > 0
-                    ? ` · ${a.checklist.filter((c) => c.done).length}/${a.checklist.length} steps`
-                    : ""}
-                  {heavy ? " · heavy for today" : ""}
-                </p>
+                  </p>
+                ) : (
+                  // Segments are their own nowrap units: the time range always
+                  // survives intact, and the softer facts fall to a second line
+                  // (or out of the block) instead of ellipsing the duration away.
+                  <p
+                    className={`tnum mt-0.5 flex flex-wrap items-baseline gap-x-1 text-[12px] font-medium leading-tight ${cat.ink}`}
+                  >
+                    <span className="whitespace-nowrap">
+                      {a.recurring && (
+                        <span title="Repeats" aria-label="Repeats">
+                          ↻{" "}
+                        </span>
+                      )}
+                      <span className="sm:hidden" aria-hidden>
+                        {compactRange(a.start, a.start + a.duration, hourCycle)}
+                      </span>
+                      <span className="hidden sm:inline">
+                        {formatTime(a.start, hourCycle)} –{" "}
+                        {formatTime(a.start + a.duration, hourCycle)}
+                      </span>
+                    </span>
+                    <span className="whitespace-nowrap">
+                      <span className="sm:hidden" aria-hidden>
+                        · {compactDuration(a.duration)}
+                      </span>
+                      <span className="hidden sm:inline">· {fmtDuration(a.duration)}</span>
+                    </span>
+                    {usuallyMin != null && (
+                      <span
+                        className="whitespace-nowrap font-semibold"
+                        title="Based on your recent focus sessions"
+                      >
+                        · usually ~{usuallyMin}m
+                      </span>
+                    )}
+                    {/* Only when the steps themselves are not listed below. */}
+                    {checklistRows === 0 && a.checklist && a.checklist.length > 0 && (
+                      <span className="whitespace-nowrap">
+                        · {a.checklist.filter((c) => c.done).length}/{a.checklist.length}{" "}
+                        steps
+                      </span>
+                    )}
+                    {heavy && <span className="whitespace-nowrap">· heavy for today</span>}
+                  </p>
+                )}
                 {checklistRows > 0 && a.checklist && a.checklist.length > 0 && (
                   <ul className="mt-1 space-y-0.5">
                     {a.checklist.slice(0, checklistRows).map((c, i) => {
@@ -524,7 +594,7 @@ export function TimelineCanvas({
                     type="button"
                     aria-label={`Focus on ${a.title}`}
                     className={`grid place-items-center rounded-full border-2 border-current ${cat.ink} hover:bg-surface-raised/50 ${
-                      compact ? "size-7" : "size-8"
+                      micro ? "size-6" : compact ? "size-7" : "size-8"
                     }`}
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => {
@@ -532,7 +602,7 @@ export function TimelineCanvas({
                       onFocus(a.id);
                     }}
                   >
-                    <Timer size={14} />
+                    <Timer size={micro ? 12 : 14} />
                   </button>
                 )}
                 {onComplete && (
@@ -540,7 +610,7 @@ export function TimelineCanvas({
                     type="button"
                     aria-label={a.done ? `Mark ${a.title} not done` : `Complete ${a.title}`}
                     className={`grid place-items-center rounded-full border-2 transition-colors ${
-                      compact ? "size-7" : "size-8"
+                      micro ? "size-6" : compact ? "size-7" : "size-8"
                     } ${
                       a.done
                         ? "border-transparent bg-success text-ink-inverse"
@@ -566,7 +636,7 @@ export function TimelineCanvas({
                       }
                     }}
                   >
-                    {a.done && <Check size={14} strokeWidth={3} />}
+                    {a.done && <Check size={micro ? 12 : 14} strokeWidth={3} />}
                   </button>
                 )}
               </div>

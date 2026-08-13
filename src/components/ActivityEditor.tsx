@@ -40,12 +40,30 @@ const EMOJI_PRESETS = ["📋", "💊", "🎨", "🚶", "🍜", "🏋️", "📞"
 
 type CategoryRow = { id: string; key: string; label: string };
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+/**
+ * A labelled section. Pass `htmlFor` when the section wraps exactly one form
+ * control so the visible caption becomes that control's accessible name.
+ */
+function Field({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor?: string;
+  children: React.ReactNode;
+}) {
+  const cls =
+    "mb-1.5 block text-[12px] font-bold uppercase tracking-[0.1em] text-ink-soft";
   return (
     <div>
-      <p className="mb-1.5 text-[12px] font-bold uppercase tracking-[0.1em] text-ink-soft">
-        {label}
-      </p>
+      {htmlFor ? (
+        <label htmlFor={htmlFor} className={cls}>
+          {label}
+        </label>
+      ) : (
+        <p className={cls}>{label}</p>
+      )}
       {children}
     </div>
   );
@@ -512,6 +530,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
               )}
             </div>
             <input
+              aria-label="Activity title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="What are you doing?"
@@ -547,12 +566,14 @@ export function ActivityEditor(props: ActivityEditorProps) {
             <div className="flex flex-wrap items-center gap-2">
               <input
                 type="date"
+                aria-label="Date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 className="rounded-xl border border-border bg-surface px-3 py-2 text-[14px] font-semibold text-ink"
               />
               <input
                 type="time"
+                aria-label="Start time"
                 value={minutesToTimeInput(startMin)}
                 onChange={(e) => setStartMin(timeInputToMinutes(e.target.value))}
                 className="tnum rounded-xl border border-border bg-surface px-3 py-2 text-[14px] font-semibold text-ink"
@@ -737,7 +758,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
             </Field>
           </div>
 
-          <Field label="Steps">
+          <Field label="Steps" htmlFor="activity-step-draft">
             <div className="space-y-1.5">
               {steps.map((step, i) => (
                 <div
@@ -784,6 +805,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
               ))}
               <div className="flex gap-2">
                 <input
+                  id="activity-step-draft"
                   value={stepDraft}
                   onChange={(e) => setStepDraft(e.target.value)}
                   onKeyDown={(e) => {
@@ -859,8 +881,9 @@ export function ActivityEditor(props: ActivityEditorProps) {
             </div>
           </Field>
 
-          <Field label="Notes">
+          <Field label="Notes" htmlFor="activity-notes">
             <textarea
+              id="activity-notes"
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}

@@ -73,7 +73,12 @@ function FocusRing({
   const stroke = tone === "mint" ? "var(--cat-mint-ink)" : "var(--cat-sky-ink)";
   return (
     <div className="relative">
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+      {/* Geometry stays at 300; CSS scales it so the idle screen — ring, chips
+          and the Start button — fits above the mobile tab bar without scrolling. */}
+      <svg
+        viewBox={`0 0 ${size} ${size}`}
+        className="size-[232px] -rotate-90 sm:size-[300px]"
+      >
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -471,13 +476,13 @@ export function FocusClient({
   if (loading) {
     return (
       <div
-        className="mx-auto flex min-h-[calc(100dvh-6rem)] max-w-2xl flex-col items-center px-4 py-10 md:min-h-dvh md:justify-center"
+        className="mx-auto flex min-h-[calc(100dvh-6rem)] max-w-2xl flex-col items-center px-4 py-6 sm:py-10 md:min-h-dvh md:justify-center"
         aria-busy="true"
         aria-label="Loading focus"
       >
         <div className="h-4 w-16 animate-pulse rounded-lg bg-surface-sunken" />
         <div className="mt-3 h-8 w-48 animate-pulse rounded-xl bg-surface-sunken" />
-        <div className="mt-10 size-[300px] animate-pulse rounded-full border-[18px] border-surface-sunken" />
+        <div className="mt-6 size-[232px] animate-pulse rounded-full border-[18px] border-surface-sunken sm:mt-10 sm:size-[300px]" />
         <div className="mt-10 h-12 w-40 animate-pulse rounded-2xl bg-surface-sunken" />
       </div>
     );
@@ -487,7 +492,7 @@ export function FocusClient({
   if (breakSec != null) {
     if (breakSec > 0) {
       return (
-        <div className="mx-auto flex min-h-[calc(100dvh-6rem)] max-w-2xl flex-col items-center px-4 py-10 md:min-h-dvh md:justify-center">
+        <div className="mx-auto flex min-h-[calc(100dvh-6rem)] max-w-2xl flex-col items-center px-4 py-6 sm:py-10 md:min-h-dvh md:justify-center">
           <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
             Break
           </p>
@@ -523,7 +528,7 @@ export function FocusClient({
       );
     }
     return (
-      <div className="mx-auto flex min-h-[calc(100dvh-6rem)] max-w-2xl flex-col items-center px-4 py-10 md:min-h-dvh md:justify-center">
+      <div className="mx-auto flex min-h-[calc(100dvh-6rem)] max-w-2xl flex-col items-center px-4 py-6 sm:py-10 md:min-h-dvh md:justify-center">
         <span className="grid size-16 place-items-center rounded-3xl bg-cat-mint text-3xl" aria-hidden>
           🌿
         </span>
@@ -572,7 +577,7 @@ export function FocusClient({
   // ---- Post-session flow ----
   if (finished) {
     return (
-      <div className="mx-auto flex min-h-[calc(100dvh-6rem)] max-w-2xl flex-col items-center px-4 py-10 md:min-h-dvh md:justify-center">
+      <div className="mx-auto flex min-h-[calc(100dvh-6rem)] max-w-2xl flex-col items-center px-4 py-6 sm:py-10 md:min-h-dvh md:justify-center">
         <span className="grid size-16 place-items-center rounded-3xl bg-success-soft text-3xl" aria-hidden>
           ✓
         </span>
@@ -629,7 +634,7 @@ export function FocusClient({
 
   if (!session) {
     return (
-      <div className="mx-auto flex min-h-[calc(100dvh-6rem)] max-w-2xl flex-col items-center px-4 py-10 md:min-h-dvh md:justify-center">
+      <div className="mx-auto flex min-h-[calc(100dvh-6rem)] max-w-2xl flex-col items-center px-4 py-6 sm:py-10 md:min-h-dvh md:justify-center">
         <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
           Focus
         </p>
@@ -693,7 +698,7 @@ export function FocusClient({
           aria-pressed={companion}
           onClick={toggleCompanion}
           title="A quiet presence that stays with you through the session"
-          className={`mt-6 inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none ${
+          className={`mt-4 inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition-colors sm:mt-6 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none ${
             companion
               ? "border-iris bg-iris-soft text-iris"
               : "border-border bg-surface text-ink-soft hover:text-ink"
@@ -704,7 +709,7 @@ export function FocusClient({
         </button>
 
         <div
-          className="mt-4 flex items-center gap-1.5 rounded-full border border-border bg-surface p-1 shadow-card"
+          className="mt-3 flex items-center gap-1.5 rounded-full border border-border bg-surface p-1 shadow-card sm:mt-4"
           role="group"
           aria-label="Session length"
         >
@@ -734,7 +739,7 @@ export function FocusClient({
           type="button"
           onClick={() => void start()}
           disabled={mutationPending}
-          className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-iris px-8 py-3.5 text-[15px] font-semibold text-ink-inverse shadow-float transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:cursor-wait disabled:opacity-60"
+          className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-iris px-8 py-3.5 text-[15px] font-semibold text-ink-inverse shadow-float sm:mt-8 transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:cursor-wait disabled:opacity-60"
         >
           <Play size={17} fill="currentColor" />
           Start focus
@@ -769,7 +774,7 @@ export function FocusClient({
   const overtimeMin = Math.max(1, Math.ceil(overtimeSec / 60));
 
   return (
-    <div className="mx-auto flex min-h-[calc(100dvh-6rem)] max-w-2xl flex-col items-center px-4 py-10 md:min-h-dvh md:justify-center">
+    <div className="mx-auto flex min-h-[calc(100dvh-6rem)] max-w-2xl flex-col items-center px-4 py-6 sm:py-10 md:min-h-dvh md:justify-center">
       <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-ink-soft">
         {isPaused ? "Paused" : inOvertime ? "Still going" : "Now focusing"}
       </p>

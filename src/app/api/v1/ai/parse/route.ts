@@ -4,7 +4,7 @@
 import { requireSession } from "@/server/auth-session";
 import { handleErrors, parseBody, errorResponse } from "@/server/api-errors";
 import { rateLimitedResponse } from "@/server/ratelimit";
-import { parseNaturalLanguage, AiQuotaExceededError } from "@/server/services/ai";
+import { parseNaturalLanguage, AiQuotaExceededError, AiUnavailableError } from "@/server/services/ai";
 import { z } from "zod";
 
 const bodySchema = z.object({
@@ -27,6 +27,14 @@ export async function POST(request: Request) {
       const result = await parseNaturalLanguage(body.input, userId);
       return Response.json(result);
     } catch (e) {
+      if (e instanceof AiUnavailableError) {
+        return errorResponse(
+          "service_unavailable",
+          "The AI co-planner is unavailable right now. Your plan is untouched — try again shortly.",
+          503,
+          { retryable: true },
+        );
+      }
       if (e instanceof AiQuotaExceededError) {
         return rateLimitedResponse(e.result, "Daily AI quota exceeded");
       }

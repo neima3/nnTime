@@ -114,10 +114,17 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 30,
     updateAge: 60 * 60 * 24,
-    cookieCache: {
-      enabled: true,
-      maxAge: 5 * 60,
-    },
+    // Deliberately OFF. The cookie cache answers `getSession` straight from the
+    // signed cookie without reading the session row, which silently defeats
+    // every server-side revocation for up to its maxAge:
+    //  - `revokeSessionsOnPasswordReset` above — a stolen cookie outlived the
+    //    reset that was supposed to kill it;
+    //  - account deletion — the deleted user stayed authenticated, and the
+    //    planner answered 500 (writes against a user id that no longer exists)
+    //    instead of 401.
+    // Revocation has to be immediate to mean anything, and every authenticated
+    // request in this app already hits Postgres, so the saved lookup buys little.
+    cookieCache: { enabled: false },
   },
   account: accountSecurityOptions,
   advanced: {

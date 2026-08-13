@@ -84,6 +84,26 @@ export async function checkRateLimit(
 }
 
 /**
+ * Hand a consumed token back.
+ *
+ * Callers that reserve a slot BEFORE doing paid work (the AI quota) need a way
+ * to undo the reservation when the work never happened — otherwise an upstream
+ * outage silently eats the user's whole allowance. Never drops below zero, and
+ * only ever touches an existing bucket row.
+ */
+export async function releaseRateLimit(
+  bucket: string,
+  opts: { db?: Db } = {},
+): Promise<void> {
+  const db = opts.db ?? dbDefault;
+  await db.execute(sql`
+    UPDATE rate_limit_buckets
+       SET count = GREATEST(count - 1, 0), updated_at = now()
+     WHERE bucket = ${bucket}
+  `);
+}
+
+/**
  * Convenience: standard 429 response body (ADR-002 envelope) for a blocked
  * request. `message` overrides the generic copy for endpoint-specific limits.
  */

@@ -67,21 +67,65 @@ export function LiveNowLine({
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
+  const ready = mounted && nowMin != null;
+
   // Bring the current time into view on first load. scrollIntoView walks every
   // scrollable ancestor (the page scrolls at the window level, not a wrapper
-  // div), so this works wherever the timeline is embedded.
+  // div), so this works wherever the timeline is embedded. One shot is not
+  // enough: the line's offset comes from the timeline's laid-out height, so an
+  // early pass can measure it mid-layout, and a late re-render can reset the
+  // scroll out from under a smooth one. Watch for a beat instead, and stand
+  // down the moment the user takes over.
   useEffect(() => {
-    if (!mounted || nowMin == null || scrolled.current) return;
-    const el = lineRef.current;
-    if (!el) return;
-    scrolled.current = true;
-    const rect = el.getBoundingClientRect();
-    const vh = window.innerHeight || 0;
-    // Already comfortably in view — don't yank the page.
-    if (rect.top >= vh * 0.1 && rect.top <= vh * 0.7) return;
-    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    el.scrollIntoView({ block: "center", behavior: reduceMotion ? "auto" : "smooth" });
-  }, [mounted, nowMin]);
+    if (!ready || scrolled.current) return;
+
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    const deadline = Date.now() + 2500;
+    let raf = 0;
+    let lastY = Number.NaN;
+    let retryAfter = 0;
+    let moved = false;
+
+    const finish = () => {
+      scrolled.current = true;
+      cancelAnimationFrame(raf);
+      for (const evt of ["wheel", "touchmove", "keydown", "pointerdown"]) {
+        window.removeEventListener(evt, finish);
+      }
+    };
+
+    const tick = () => {
+      const el = lineRef.current;
+      const vh = window.innerHeight || 0;
+      const y = window.scrollY;
+      const idle = y === lastY;
+      lastY = y;
+      if (Date.now() > deadline) return finish();
+      // Never measure mid-scroll: a smooth scroll in flight reads as out of view.
+      if (el && vh > 0 && idle && Date.now() >= retryAfter) {
+        const rect = el.getBoundingClientRect();
+        // Comfortably in view — don't yank the page.
+        if (rect.top < vh * 0.1 || rect.top > vh * 0.7) {
+          const smooth = !reduceMotion && !moved;
+          el.scrollIntoView({ block: "center", behavior: smooth ? "smooth" : "auto" });
+          moved = true;
+          retryAfter = Date.now() + (smooth ? 700 : 250);
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+
+    raf = requestAnimationFrame(tick);
+    for (const evt of ["wheel", "touchmove", "keydown", "pointerdown"]) {
+      window.addEventListener(evt, finish, { passive: true });
+    }
+    return () => {
+      cancelAnimationFrame(raf);
+      for (const evt of ["wheel", "touchmove", "keydown", "pointerdown"]) {
+        window.removeEventListener(evt, finish);
+      }
+    };
+  }, [ready]);
 
   if (!mounted || nowMin == null) return null;
 
@@ -94,7 +138,7 @@ export function LiveNowLine({
         className="pointer-events-none absolute inset-x-0 z-20 flex items-center gap-2"
         style={{ top: top(clampedMin) }}
       >
-        <span className="tnum w-10 -translate-y-1/2 rounded-md bg-now text-center text-[11px] font-bold text-now-ink">
+        <span className="tnum min-w-10 shrink-0 -translate-y-1/2 whitespace-nowrap rounded-md bg-now px-1 text-center text-[11px] font-bold text-now-ink">
           {formatTime(Math.floor(clampedMin), hourCycle)}
         </span>
         <div className="relative h-0.5 flex-1 rounded bg-now">

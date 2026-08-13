@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import {
   BarChart3,
   CalendarDays,
@@ -54,6 +54,36 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const { signedIn } = useAppSession();
+  const skipRef = useRef<HTMLAnchorElement>(null);
+
+  // The timeline's now-line calls scrollIntoView on load, and Chrome moves the
+  // sequential-focus starting point to whatever was scrolled to — so the very
+  // first Tab would land mid-page and jump straight over "Skip to content".
+  // Claim that first Tab for the skip link; once the user has pointed at
+  // something, their click owns the starting point and we stay out of the way.
+  useEffect(() => {
+    let interacted = false;
+    const onPointerDown = () => {
+      interacted = true;
+    };
+    function handler(e: KeyboardEvent) {
+      if (e.key !== "Tab" || e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (interacted) return;
+      interacted = true;
+      const focused = document.activeElement;
+      if (focused && focused !== document.body && focused !== document.documentElement)
+        return;
+      if (!skipRef.current) return;
+      e.preventDefault();
+      skipRef.current.focus();
+    }
+    window.addEventListener("pointerdown", onPointerDown, true);
+    window.addEventListener("keydown", handler);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown, true);
+      window.removeEventListener("keydown", handler);
+    };
+  }, []);
 
   // Keyboard shortcuts: n=new, t=today, i=inbox, w=week, f=focus, s=settings
   useEffect(() => {
@@ -74,6 +104,7 @@ export function AppShell({
     <div className="flex min-h-dvh w-full bg-canvas">
       {/* Skip to content — keyboard accessibility */}
       <a
+        ref={skipRef}
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-xl focus:bg-iris focus:px-4 focus:py-2 focus:text-ink-inverse focus:shadow-float"
       >
@@ -136,7 +167,18 @@ export function AppShell({
       </aside>
 
       {/* main */}
-      <main id="main-content" className="min-w-0 flex-1 pb-24 md:pb-0">{children}</main>
+      {/* tabIndex -1 so "Skip to content" actually lands focus here. */}
+      {/* Mobile bottom chrome is two layers, not one: the tab bar (~60px) and the
+          floating now-bar above it (NowBar sits at bottom-[3.75rem]). pb-24 only
+          cleared the tab bar, so the last row of More and the Apply control on
+          Templates rendered underneath the now-bar. */}
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="min-w-0 flex-1 pb-32 outline-none md:pb-0"
+      >
+        {children}
+      </main>
       {signedIn && <OfflineShell />}
       {signedIn && <NowStrip active={active} />}
       <CelebrationHost />

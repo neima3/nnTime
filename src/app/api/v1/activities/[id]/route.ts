@@ -164,12 +164,16 @@ async function applyPatch(
       eventType: "skip",
       payload: { occurrenceKey: occurrenceKey.toISOString() },
     }, { db }).catch(() => {});
-  } else if (status === "pending" && completedAt === null) {
+  } else if (status === "pending") {
+    // Previously this also required an explicit `completedAt: null`, so a plain
+    // {status:"pending"} undo recorded nothing at all and stats kept counting
+    // the completion. The occurrenceKey mirrors the `complete` payload so the
+    // two can be paired per occurrence.
     await appendPlannerEvent(userId, {
       entityType: "activity_series",
       entityId: result.seriesId,
       eventType: "uncomplete",
-      payload: {},
+      payload: { occurrenceKey: occurrenceKey.toISOString() },
     }, { db }).catch(() => {});
   }
 

@@ -209,6 +209,7 @@ export function CommandPalette() {
           <Search size={17} className="shrink-0 text-ink-faint" />
           <input
             ref={inputRef}
+            aria-label="Search commands and your planner"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);

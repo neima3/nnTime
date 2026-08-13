@@ -229,6 +229,7 @@ export function RoutinesClient({
             />
             <input
               ref={titleInputRef}
+              aria-label="Routine name"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Morning reset"
@@ -236,6 +237,7 @@ export function RoutinesClient({
             />
           </div>
           <textarea
+            aria-label="Steps, one per line"
             value={stepsText}
             onChange={(e) => setStepsText(e.target.value)}
             placeholder={"One step per line\nWater + meds\nStretch\nMake bed"}

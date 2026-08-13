@@ -4,7 +4,7 @@
 import { requireSession } from "@/server/auth-session";
 import { handleErrors, errorResponse } from "@/server/api-errors";
 import { rateLimitedResponse } from "@/server/ratelimit";
-import { groupByPriority, AiQuotaExceededError, AI_MAX_TASKS } from "@/server/services/ai";
+import { groupByPriority, AiQuotaExceededError, AiUnavailableError, AI_MAX_TASKS } from "@/server/services/ai";
 import { listTasks } from "@/server/dal";
 
 export async function POST() {
@@ -36,6 +36,14 @@ export async function POST() {
         truncated: tasks.length > considered.length,
       });
     } catch (e) {
+      if (e instanceof AiUnavailableError) {
+        return errorResponse(
+          "service_unavailable",
+          "The AI co-planner is unavailable right now. Your plan is untouched — try again shortly.",
+          503,
+          { retryable: true },
+        );
+      }
       if (e instanceof AiQuotaExceededError) {
         return rateLimitedResponse(e.result, "Daily AI quota exceeded");
       }

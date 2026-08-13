@@ -121,6 +121,12 @@ function Section({
   );
 }
 
+const THEME_HINTS: Record<Settings["theme"], string> = {
+  system: "System follows your device",
+  light: "Always light, day or night",
+  dark: "Always dark, day or night",
+};
+
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 const REMINDER_SELECT_CLASS =
   "min-h-11 rounded-xl border border-border bg-surface px-3 py-2 text-[13px] font-semibold";
@@ -707,7 +713,7 @@ export function SettingsClient({
       <Section icon={Palette} title="Appearance">
         <Row
           label="Theme"
-          hint="System follows your device"
+          hint={THEME_HINTS[settings.theme]}
           right={
             <select
               value={settings.theme}

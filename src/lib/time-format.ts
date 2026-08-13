@@ -51,3 +51,32 @@ export function formatHourLabel(hour: number, hourCycle: HourCycle = "h24"): str
 export function toHourCycle(value: unknown): HourCycle {
   return value === "h12" ? "h12" : "h24";
 }
+
+/**
+ * Name a calendar date for a heading — "Thursday", "August 13".
+ *
+ * `dateStr` is already the user's local day (resolved in their planning zone),
+ * so this only has to spell it out. Projecting it through a timezone can only
+ * move it: building noon UTC and formatting it in the planning zone — the
+ * previous approach — holds only for offsets strictly inside ±12, so at
+ * UTC+12/+13 (Auckland, Chatham, Kiritimati) the heading read one day ahead of
+ * the timeline beneath it. Reading the parts back in UTC is stable everywhere.
+ */
+export function formatDayLabel(dateStr: string): {
+  dayLabel: string;
+  dayDate: string;
+} {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const named = new Date(Date.UTC(year!, month! - 1, day!));
+  return {
+    dayLabel: named.toLocaleDateString("en-US", {
+      weekday: "long",
+      timeZone: "UTC",
+    }),
+    dayDate: named.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      timeZone: "UTC",
+    }),
+  };
+}

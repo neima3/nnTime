@@ -376,7 +376,10 @@ export function QuickCapture() {
             className="rise-in w-full max-w-lg rounded-3xl border border-border bg-surface p-4 shadow-float"
           >
             <div className="flex items-center justify-between">
-              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-ink-faint">
+              <p
+                id="quick-capture-label"
+                className="text-[11px] font-bold uppercase tracking-[0.12em] text-ink-faint"
+              >
                 Get it out of your head
               </p>
               <button
@@ -391,6 +394,7 @@ export function QuickCapture() {
             <div className="mt-2.5 flex items-center gap-2">
               <input
                 ref={inputRef}
+                aria-labelledby="quick-capture-label"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={(e) => {

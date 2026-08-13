@@ -99,9 +99,10 @@ export function OneThing() {
           <span className="mt-8 text-7xl" aria-hidden>
             {subject.emoji}
           </span>
-          <h1 className="mt-6 font-display text-4xl font-bold leading-tight tracking-tight md:text-5xl">
+          {/* h2, not h1: the page heading behind the overlay is still the h1. */}
+          <h2 className="mt-6 font-display text-4xl font-bold leading-tight tracking-tight md:text-5xl">
             {subject.title}
-          </h1>
+          </h2>
           {current && info && (
             <p className="tnum mt-4 text-lg font-semibold text-ink-soft">
               {Math.max(1, current.endMin - info.nowMin)} min left — no rush
@@ -147,9 +148,9 @@ export function OneThing() {
           <span className="text-6xl" aria-hidden>
             🌤
           </span>
-          <h1 className="mt-6 font-display text-3xl font-bold tracking-tight">
+          <h2 className="mt-6 font-display text-3xl font-bold tracking-tight">
             Nothing scheduled right now.
-          </h1>
+          </h2>
           <p className="mt-2 text-[15px] text-ink-soft">
             The space is yours. Rest counts too.
           </p>

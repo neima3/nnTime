@@ -34,7 +34,7 @@ import { SoftStreaks } from "@/components/SoftStreaks";
 import { AmbientSounds } from "@/components/AmbientSounds";
 import { AnytimeRail } from "@/components/AnytimeRail";
 import { instantToDateStr } from "@/server/temporal/zone";
-import { formatTime, toHourCycle, type HourCycle } from "@/lib/time-format";
+import { formatDayLabel, formatTime, toHourCycle, type HourCycle } from "@/lib/time-format";
 import { SignedOutCard } from "@/components/EmptyState";
 import { appReturnTo } from "@/lib/auth-return";
 import { getMagicLinkRedirectError } from "@/lib/auth-redirect-error";
@@ -45,20 +45,6 @@ function shiftDate(dateStr: string, deltaDays: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
-function formatDayLabel(dateStr: string, zone: string) {
-  // Use noon UTC so the calendar date is stable across zones for labels.
-  const instant = new Date(`${dateStr}T12:00:00Z`);
-  const dayLabel = instant.toLocaleDateString("en-US", {
-    weekday: "long",
-    timeZone: zone,
-  });
-  const dayDate = instant.toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    timeZone: zone,
-  });
-  return { dayLabel, dayDate };
-}
 
 /**
  * Load real data for the Today screen. Falls back to mock data when the user is
@@ -101,7 +87,7 @@ async function loadTodayData(dateParam?: string) {
     resolved.anytimeTasks as Parameters<typeof taskToInboxItem>[0][]
   ).map((t) => taskToInboxItem(t, categoryMap));
 
-  const { dayLabel, dayDate } = formatDayLabel(resolved.date, resolved.zone);
+  const { dayLabel, dayDate } = formatDayLabel(resolved.date);
   const todayInZone = instantToDateStr(new Date(), resolved.zone);
   const isToday = resolved.date === todayInZone;
 

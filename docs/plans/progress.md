@@ -1,5 +1,70 @@
 # Progress log
 
+## 2026-08-13 — Round 87: QA remediation (Grok CLI hands-on QA → fixes)
+
+Six Grok 4.6 passes drove the running app through Playwright (core loop, visuals,
+arcade, settings, regressions, a11y). Every defect was re-reproduced before being
+fixed, and three reported "defects" were disproved rather than patched.
+
+**High**
+- **Tapping "Start focus" on mobile navigated you away.** The CTA rendered under
+  the fixed tab bar — `elementFromPoint` at the button's own centre returned a
+  bottom-nav link. The idle Focus screen now fits a 375×812 viewport (responsive
+  ring, tightened rhythm); hit-test confirms the tap lands on the button
+  (`startTapWorks: false → true`, top 759 → 671). `main` also reserves for the
+  now-bar as well as the tab bar (`pb-24 → pb-32`), which fixed the buried last
+  row on More and the Apply control on Templates.
+- **Un-completing never decremented the numbers.** `planner_events` is
+  append-only, so stats counted raw `complete` rows and one activity toggled
+  twice read as 4. Two stacked bugs: the `uncomplete` event was only written when
+  the client explicitly sent `completedAt: null`, and stats never subtracted it.
+  Now the event always records (with an occurrenceKey) and `netCompletions`
+  walks chronologically so an occurrence counts at most once, on its most recent
+  complete. Live: 0→1→0→1→0→1 (was 1→2→2→3→3→4).
+- **A deleted account stayed signed in.** `session.cookieCache` answered
+  `getSession` from the signed cookie without reading the session row, so the
+  deleted user kept authenticating: `/api/v1/tasks` 200, settings/day 500. The
+  cache also silently defeated `revokeSessionsOnPasswordReset` (round 86) for its
+  full maxAge. Cache disabled + session cookies expired on delete. Live: all
+  endpoints 401 after deletion (was 500/200/500).
+- **Today's heading was a day ahead at UTC+12 and beyond.** `formatDayLabel`
+  built noon UTC and projected it into the planning zone, which only holds inside
+  ±12 — Auckland read "Saturday, August 15" above a timeline showing Friday the
+  14th. Moved to `src/lib/time-format.ts`, reads the date parts in UTC, and is
+  now unit-pinned. Verified UTC+14 → UTC−11.
+
+**Medium**
+- Today never scrolled to now: the effect latched a ref on its single attempt and
+  never retried, so anything that moved scroll or layout afterwards won. Now a
+  short rAF watcher that stands down on the first real user scroll. Live: now-line
+  in view on first load and reload at 375×812 and 1440×900 (was scrollY 0, line
+  549px below the fold).
+- A failed AI call no longer burns quota — the slot is refunded when the provider
+  never billed (network/5xx/auth/billing), and a provider outage now returns 503
+  with honest copy instead of a generic 500.
+- Every activity lost its duration on mobile (123px column, 140–192px of text).
+  Meta line now wraps into nowrap segments with a compact narrow form; 0/8 blocks
+  clipped at 375/390/320px, proportional block heights unchanged. Week chips at
+  tablet went from 35px of title (`Mor…`) to 61px.
+- Overlay fields had no accessible names (quick capture, command palette, editor,
+  new routine) — now named from the visible captions where they exist.
+- Skip-to-content was unreachable and landed nowhere. Root cause found: the
+  now-line's `scrollIntoView` moves Chrome's sequential-focus starting point.
+  Verified: Tab → skip link, Enter → focus inside `<main>`, click-then-Tab
+  unchanged.
+
+**Low** — Theme hint now reflects the selected mode; now-line chip no longer wraps
+at 320px/200% zoom; the One thing overlay no longer adds a second `h1`.
+
+**Disproved, not patched** — a "routine Pause 404" was a corrupted Turbopack dev
+cache (clean restart → 200, and the route is in the production build); "AI
+breakdown 500s on every call" was the Anthropic key having no credit balance; the
+React "script tag" console error is the deliberate no-flash bootstrap with an
+`A11yApply` fallback.
+
+**Gates:** lint, typecheck, `pnpm test` (138 files / 1313 tests), `pnpm build`,
+`pnpm test:e2e` (48 passed / 4 skipped / 0 failed), iOS OpenAPI contract in sync.
+
 ## 2026-08-13 — Round 86: cross-verified audit remediation (Grok CLI + Claude)
 
 Eight parallel Grok 4.6 review passes over the full web + iOS codebase, every
