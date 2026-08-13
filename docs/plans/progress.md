@@ -1,5 +1,90 @@
 # Progress log
 
+## 2026-08-13 — Round 86: cross-verified audit remediation (Grok CLI + Claude)
+
+Eight parallel Grok 4.6 review passes over the full web + iOS codebase, every
+finding re-verified against source before acting, then fixed across five
+subagents plus the main session. Read-only audit report: the artifact linked in
+the session, raw pass output under the session scratchpad.
+
+**Security / data integrity (all verified fixes, each pinned by a test that
+fails without it):**
+- **Account deletion was reversible for 15 minutes.** `verification` has no
+  user_id and no FK cascade, so pending magic-link tokens outlived the user row;
+  better-auth's verify path is `if (!user) if (!disableSignUp) createUser(...)`,
+  so opening a pre-deletion link recreated the account with a session.
+  `deleteAccount` now clears reset-password (value = user id) and magic-link
+  (value = JSON with the email) rows, and runs all statements in one
+  transaction. `src/server/services/privacy-deletion.test.ts` (5 tests, 4 fail
+  without the fix).
+- **Password reset left every session valid** — `revokeSessionsOnPasswordReset`
+  was unset, making better-auth's revocation a no-op against 30-day sessions.
+- **A DB blip was indistinguishable from a sign-out**: `getSession` swallowed
+  every throw, so a transient outage silently replaced a signed-in user's day
+  with the demo "Sample planner" and answered 401 instead of 5xx. Now throws
+  `SessionUnavailableError` → 503 retryable; still lenient when DATABASE_URL is
+  unset. Next's `DYNAMIC_SERVER_USAGE` bail-out passes through untouched (it
+  broke the `/app/editor` prerender first time round).
+- **Sync could permanently skip rows.** `change_log.id` is assigned at INSERT,
+  not COMMIT, so a lower id committing after a higher one let the client cursor
+  advance past it — silent data loss. `appendChangeLog` now takes a per-user
+  `pg_advisory_xact_lock`; `startFocusSession` wraps in a transaction so the
+  lock actually holds.
+- **Any invalid timezone string 500'd the planner permanently.** `ianaTimezone`
+  was `z.string().min(1)` and `assertValidZone` was never called at a write
+  boundary; now validated in the schema (covers every write path) and on the
+  `x-timezone` seed. Task/activity titles bounded to match routines (schema +
+  `api/openapi.yaml` + iOS copy).
+- **Deleting/pausing a routine left its materialized days on Today**, and
+  deleting an activity left a focus session running against it (ADR-004).
+  Both now cascade; history is preserved. `src/server/dal/cascade.test.ts`.
+- SEC-01 isolation tests added for the surfaces `dal.test.ts` never covered —
+  activity series, occurrences, routines, steps, categories, tags, settings.
+  `src/server/dal/isolation.test.ts` (5 of 11 fail on a dropped owner predicate).
+
+**Correctness:**
+- "Move to tomorrow" left the occurrence on the old day and never showed it on
+  the new one — day expansion bucketed purely by the original occurrence key.
+  Now excludes moved-away instances and pulls in moved-in ones.
+- Standard ICS timed events (`DTSTART;TZID=…:20260717T100000`, no trailing Z)
+  were silently dropped on import; all-day events landed on the previous
+  evening west of UTC. Both fixed via the existing `wallClockToInstant`.
+- The "Week starts" setting was never read by the week or month grids.
+- Stats "this week" keyed UTC days against zone-bucketed data.
+- AI quota was split across two buckets and `breakdown` returned 500 (not 429)
+  when exhausted; `group-priority` sent the entire unbounded inbox to Anthropic.
+  One quota path now, capped payloads, `ratelimit/middleware.ts` deleted (dead
+  duplicate); push/test and privacy/export gained the limits they never had.
+- Client resilience: Settings/Stats no longer show an infinite skeleton or a
+  false signed-out card on a failed load; Inbox actions no longer hang or
+  duplicate a task on 409; Focus and NowBar no longer apply stale in-flight
+  responses.
+- The "New routine" dialog was `aria-modal` with no focus trap and no Escape.
+
+**Games / iOS parity:** AGENTS.md's "mirrored verbatim by ArcadeLogic" claim was
+false for Time Feel and Quick Tap — both were reimplemented in the SwiftUI view
+with truncating arithmetic (92 vs 93, 280 vs 281). Moved into `ArcadeLogic` with
+a `jsRound` that matches ECMAScript `Math.round`, pinned on both sides. Quick Tap
+was unfinishable if the last attempt was an early tap (both platforms). Green
+Light scored taps after the light hid, on iOS only.
+
+**Test honesty:** 13 DB test files used `if (!dbAvailable) return`, which vitest
+records as a PASS with zero assertions — with Postgres down the suite reported
+`1210 passed, 0 skipped`. Converted to the honest `skip()` form already used by
+6 other files: now `1130 passed, 130 skipped`. An OpenAPI staleness loop had no
+assertions at all and could not fail. `flushQueue` had no unit coverage.
+
+**Gates:** lint, typecheck, `pnpm test` (134 files / 1277 tests), and
+`pnpm build` green. `pnpm test:e2e` green — the three password-reset specs now
+skip via `/api/v1/auth/capabilities` instead of failing on a machine without
+`RESEND_API_KEY` (the app degrades that flow by design). iOS unit tests
+"Executed 59 tests, with 0 failures".
+
+**Deploy note:** `NEXT_PUBLIC_VAPID_PUBLIC_KEY` is inlined at BUILD time and the
+Dockerfile had no ARG for it, so the image shipped `undefined` and push
+reminders silently disabled themselves. Added as a build arg — **Coolify must
+pass it as a build argument, not just a runtime env var.**
+
 ## 2026-08-10 — Round 85: truthful signed-out Review preview (Codex)
 
 - **Production dogfood found personal-looking sample data presented as real.**

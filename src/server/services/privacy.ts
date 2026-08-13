@@ -8,7 +8,8 @@ import "server-only";
 import dbDefault from "../db";
 import type { Db } from "../dal";
 import * as schema from "../db/schema";
-import { eq } from "drizzle-orm";
+import { verification } from "../auth-schema";
+import { eq, or, sql } from "drizzle-orm";
 
 /**
  * Export ALL of the user's data as a JSON-serializable object. SEC-10.
@@ -59,24 +60,65 @@ export async function exportUserData(
   return result;
 }
 
+/** Escape LIKE wildcards so an address containing % or _ still matches exactly. */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
 /**
  * Account deletion cascade — SEC-10.
+ *
+ * `verification` (Better Auth) has no user_id and therefore no FK cascade, so
+ * pending tokens outlive the user row. That is not cosmetic: magic-link verify
+ * is `if (!user) if (!disableSignUp) createUser({emailVerified: true})`, so a
+ * link issued before deletion and opened inside its TTL would recreate the
+ * account and mint a session. Reset-password rows store the user id; magic-link
+ * rows store JSON.stringify({email, name}). Both are cleared here.
+ *
+ * All statements run in one transaction — a partial delete would otherwise
+ * leave a live account with its focus sessions cancelled and push tombstoned.
  */
 export async function deleteAccount(
   userId: string,
   opts: { db?: Db } = {},
 ): Promise<void> {
   const db = opts.db ?? dbDefault;
-  // Cancel any active focus session.
-  await db
-    .update(schema.focusSessions)
-    .set({ state: "cancelled", completionReason: "account_deleted" })
-    .where(eq(schema.focusSessions.userId, userId));
-  // Tombstone push subscriptions.
-  await db
-    .update(schema.pushSubscriptions)
-    .set({ deletedAt: new Date() })
-    .where(eq(schema.pushSubscriptions.userId, userId));
-  // Delete the Better Auth user row (cascade removes all FK-owned rows).
-  await db.delete(schema.users).where(eq(schema.users.id, userId));
+  await db.transaction(async (tx) => {
+    const tdb = tx as unknown as Db;
+
+    const [owner] = await tdb
+      .select({ email: schema.users.email })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    // Cancel any active focus session.
+    await tdb
+      .update(schema.focusSessions)
+      .set({ state: "cancelled", completionReason: "account_deleted" })
+      .where(eq(schema.focusSessions.userId, userId));
+    // Tombstone push subscriptions.
+    await tdb
+      .update(schema.pushSubscriptions)
+      .set({ deletedAt: new Date() })
+      .where(eq(schema.pushSubscriptions.userId, userId));
+
+    // Revoke pending auth tokens that would otherwise resurrect this identity.
+    const emailPattern = owner?.email
+      ? `%"email":"${escapeLike(owner.email)}"%`
+      : null;
+    await tdb
+      .delete(verification)
+      .where(
+        emailPattern
+          ? or(
+              eq(verification.value, userId),
+              sql`${verification.value} LIKE ${emailPattern} ESCAPE '\\'`,
+            )
+          : eq(verification.value, userId),
+      );
+
+    // Delete the Better Auth user row (cascade removes all FK-owned rows).
+    await tdb.delete(schema.users).where(eq(schema.users.id, userId));
+  });
 }

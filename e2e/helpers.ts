@@ -62,3 +62,25 @@ export async function createActivity(
     timeout: 15_000,
   });
 }
+
+/**
+ * Auth capabilities as reported by the RUNNING server (`/api/v1/auth/capabilities`).
+ *
+ * Email-dependent flows (password reset, magic link) render a degraded
+ * "temporarily unavailable" state when RESEND_API_KEY is unset, and sign-in
+ * hides its "Forgot password?" link entirely. Specs that assert the configured
+ * branch must skip rather than fail on a dev machine without mail credentials —
+ * reading the server avoids guessing from the test process's own env.
+ */
+let capabilitiesCache: Promise<{ magicLink: boolean }> | null = null;
+
+export function authCapabilities(
+  request: { get: (url: string) => Promise<{ json: () => Promise<unknown> }> },
+): Promise<{ magicLink: boolean }> {
+  capabilitiesCache ??= request
+    .get("/api/v1/auth/capabilities")
+    .then((r) => r.json())
+    .then((body) => ({ magicLink: Boolean((body as { magicLink?: boolean }).magicLink) }))
+    .catch(() => ({ magicLink: false }));
+  return capabilitiesCache;
+}

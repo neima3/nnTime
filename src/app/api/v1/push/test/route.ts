@@ -5,10 +5,17 @@
 import { requireSession } from "@/server/auth-session";
 import { sendToUser, pushConfigured } from "@/server/services/push";
 import { handleErrors, errorResponse } from "@/server/api-errors";
+import { checkRateLimit, rateLimitedResponse } from "@/server/ratelimit";
 
 export async function POST() {
   return handleErrors(async () => {
     const { userId } = await requireSession();
+    // A test nudge sends a real push; cap the loop at 5/hour per user.
+    const rl = await checkRateLimit(`push:test:${userId}`, {
+      limit: 5,
+      windowSec: 3600,
+    });
+    if (!rl.allowed) return rateLimitedResponse(rl);
     if (!pushConfigured()) {
       return errorResponse(
         "service_unavailable",

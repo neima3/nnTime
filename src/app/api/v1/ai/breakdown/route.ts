@@ -1,11 +1,11 @@
 /**
  * POST /api/v1/ai/breakdown — SEC-05: no mutation; suggestion only.
- * Rate limited: 50 requests / 24h per user (atomic quota).
+ * Rate limited by the shared per-user AI quota (50 / 24h, see services/ai).
  */
 import { requireSession } from "@/server/auth-session";
 import { handleErrors, parseBody, errorResponse } from "@/server/api-errors";
-import { breakDownTask } from "@/server/services/ai";
-import { limitAI } from "@/server/ratelimit/middleware";
+import { breakDownTask, AiQuotaExceededError } from "@/server/services/ai";
+import { rateLimitedResponse } from "@/server/ratelimit";
 import { z } from "zod";
 
 const bodySchema = z.object({
@@ -15,13 +15,6 @@ const bodySchema = z.object({
 export async function POST(request: Request) {
   return handleErrors(async () => {
     const { userId } = await requireSession();
-    
-    // Rate limit: 50 AI requests per user per day
-    const rl = await limitAI(userId);
-    if (!rl.allowed) {
-      return errorResponse("rate_limited", "Daily AI quota exceeded", 429);
-    }
-
     const body = await parseBody(request, bodySchema);
     if (body instanceof Response) return body;
     if (!process.env.ANTHROPIC_API_KEY) {
@@ -31,7 +24,15 @@ export async function POST(request: Request) {
         503,
       );
     }
-    const result = await breakDownTask(body.title, userId);
-    return Response.json(result);
+    try {
+      const result = await breakDownTask(body.title, userId);
+      return Response.json(result);
+    } catch (e) {
+      if (e instanceof AiQuotaExceededError) {
+        return rateLimitedResponse(e.result, "Daily AI quota exceeded");
+      }
+      console.error("[ai/breakdown]", e);
+      return errorResponse("internal", "An unexpected error occurred", 500);
+    }
   });
 }

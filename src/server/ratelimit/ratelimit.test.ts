@@ -29,8 +29,12 @@ afterAll(async () => {
 }, 60000);
 
 const itDb = (name: string, fn: () => Promise<void> | void) =>
-  it(name, async () => {
-    if (!dbAvailable || !env) return;
+  it(name, async ({ skip }) => {
+    if (!dbAvailable || !env) {
+      console.warn(`[SKIP] ${name}: Postgres unavailable`);
+      skip(true, "Postgres unavailable");
+      return;
+    }
     await fn();
   });
 
@@ -91,5 +95,19 @@ describe("rateLimitedResponse", () => {
     const res = rateLimitedResponse({ allowed: false, remaining: 0, retryAfterSec: 30 });
     expect(res.status).toBe(429);
     expect(res.headers.get("retry-after")).toBe("30");
+  });
+
+  it("carries an endpoint-specific message in the ADR-002 envelope", async () => {
+    const res = rateLimitedResponse(
+      { allowed: false, remaining: 0, retryAfterSec: 86400 },
+      "Daily AI quota exceeded",
+    );
+    const body = await res.json();
+    expect(body.error).toMatchObject({
+      code: "rate_limited",
+      message: "Daily AI quota exceeded",
+      retryable: true,
+      retryAfterSec: 86400,
+    });
   });
 });

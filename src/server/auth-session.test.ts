@@ -67,3 +67,53 @@ describe("auth session boundary", () => {
     });
   });
 });
+
+/**
+ * A DB outage used to be indistinguishable from "signed out": getSession
+ * swallowed every throw and returned null, so API routes answered 401 and
+ * Server Components silently rendered the demo "Sample planner" in place of the
+ * user's real day.
+ */
+describe("database failure is not a sign-out", () => {
+  const dbDown = () => {
+    mocks.ensureMigrated.mockRejectedValue(new Error("ECONNREFUSED"));
+  };
+
+  it("throws SessionUnavailableError when the database is configured but failing", async () => {
+    vi.stubEnv("DATABASE_URL", "postgresql://user@localhost:5432/kairo");
+    dbDown();
+    await expect(getSession()).rejects.toThrow("Session store unavailable");
+    vi.unstubAllEnvs();
+  });
+
+  it("answers 503 retryable — not 401 — from requireSession", async () => {
+    vi.stubEnv("DATABASE_URL", "postgresql://user@localhost:5432/kairo");
+    dbDown();
+    const response = await requireSession().catch((e) => e);
+    expect(response).toBeInstanceOf(Response);
+    expect((response as Response).status).toBe(503);
+    const body = await (response as Response).json();
+    expect(body.error.code).toBe("service_unavailable");
+    expect(body.error.retryable).toBe(true);
+    vi.unstubAllEnvs();
+  });
+
+  it("stays lenient when no database is provisioned at all", async () => {
+    vi.stubEnv("DATABASE_URL", "");
+    dbDown();
+    await expect(getSession()).resolves.toBeNull();
+    vi.unstubAllEnvs();
+  });
+
+  it("lets Next's dynamic-rendering bail-out pass through untouched", async () => {
+    // headers() throws this to opt a page out of static prerender. Wrapping it
+    // broke `pnpm build` at the /app/editor prerender.
+    vi.stubEnv("DATABASE_URL", "postgresql://user@localhost:5432/kairo");
+    const bailout = Object.assign(new Error("Dynamic server usage"), {
+      digest: "DYNAMIC_SERVER_USAGE",
+    });
+    mocks.ensureMigrated.mockRejectedValue(bailout);
+    await expect(getSession()).rejects.toBe(bailout);
+    vi.unstubAllEnvs();
+  });
+});

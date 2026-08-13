@@ -9,6 +9,7 @@
 
 import { z } from "zod";
 import {
+  boundedTitle,
   dateStr,
   energyLevelEnum,
   managedRowFields,
@@ -40,7 +41,7 @@ export const taskResponse = z.object({
 /** POST /api/v1/tasks body. */
 export const taskCreate = z.object({
   bucket: taskBucketEnum,
-  title: z.string(),
+  title: boundedTitle,
   emoji: z.string().optional(),
   categoryId: uuid.optional(),
   /** Required for `anytime` bucket; must be null/absent for `inbox`. */
@@ -53,7 +54,7 @@ export const taskCreate = z.object({
 /** PATCH /api/v1/tasks/{id} body. */
 export const taskUpdate = z.object({
   bucket: taskBucketEnum.optional(),
-  title: z.string().optional(),
+  title: boundedTitle.optional(),
   emoji: z.string().nullable().optional(),
   categoryId: uuid.nullable().optional(),
   date: dateStr.nullable().optional(),

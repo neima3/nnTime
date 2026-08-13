@@ -61,8 +61,12 @@ export function QuickTap({ onExit }: { onExit: () => void }) {
   const tap = useCallback(() => {
     if (stage === "waiting") {
       if (timerRef.current) window.clearTimeout(timerRef.current);
-      setTimes((t) => [...t, null]);
-      setStage("early");
+      // An early tap still fills a round slot — if it was the last one, the
+      // run is over (otherwise the player is stranded on "Go again").
+      const all = [...times, null];
+      setTimes(all);
+      if (all.length >= QUICK_TAP_ROUNDS) finishRun(all);
+      else setStage("early");
       return;
     }
     if (stage === "go") {

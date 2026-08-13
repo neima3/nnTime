@@ -3,7 +3,8 @@
  */
 import { requireSession } from "@/server/auth-session";
 import { handleErrors, errorResponse } from "@/server/api-errors";
-import { groupByPriority } from "@/server/services/ai";
+import { rateLimitedResponse } from "@/server/ratelimit";
+import { groupByPriority, AiQuotaExceededError, AI_MAX_TASKS } from "@/server/services/ai";
 import { listTasks } from "@/server/dal";
 
 export async function POST() {
@@ -20,18 +21,23 @@ export async function POST() {
     if (tasks.length === 0) {
       return Response.json({ groups: [], message: "Inbox is empty." });
     }
+    // Quota caps request count, not payload size: only the oldest AI_MAX_TASKS
+    // inbox items go to the model (same cap plan-day uses).
+    const considered = tasks.slice(0, AI_MAX_TASKS);
     try {
       const result = await groupByPriority(
         userId,
-        tasks.map((t) => ({ id: t.id, title: t.title })),
+        considered.map((t) => ({ id: t.id, title: t.title })),
       );
-      return Response.json(result);
+      return Response.json({
+        ...result,
+        consideredCount: considered.length,
+        totalCount: tasks.length,
+        truncated: tasks.length > considered.length,
+      });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "AI error";
-      if (msg.includes("quota")) {
-        return errorResponse("rate_limited", "Daily AI quota exceeded", 429, {
-          retryable: true,
-        });
+      if (e instanceof AiQuotaExceededError) {
+        return rateLimitedResponse(e.result, "Daily AI quota exceeded");
       }
       console.error("[ai/group-priority]", e);
       return errorResponse("internal", "An unexpected error occurred", 500);

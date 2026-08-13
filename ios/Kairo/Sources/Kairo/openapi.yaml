@@ -1593,7 +1593,7 @@ components:
       required: [bucket, title]
       properties:
         bucket: { $ref: '#/components/schemas/TaskBucket' }
-        title: { type: string }
+        title: { type: string, minLength: 1, maxLength: 200 }
         emoji: { type: string }
         categoryId: { type: string, format: uuid }
         date: { type: [string, 'null'], format: date }
@@ -1605,7 +1605,7 @@ components:
       type: object
       properties:
         bucket: { $ref: '#/components/schemas/TaskBucket' }
-        title: { type: string }
+        title: { type: string, minLength: 1, maxLength: 200 }
         emoji: { type: [string, 'null'] }
         categoryId: { type: [string, 'null'], format: uuid }
         date: { type: [string, 'null'], format: date }
@@ -1705,7 +1705,7 @@ components:
         rdate:
           type: array
           items: { type: string, format: date-time }
-        title: { type: string }
+        title: { type: string, minLength: 1, maxLength: 200 }
         emoji: { type: string }
         categoryId: { type: string, format: uuid }
         durationMin: { type: integer, format: int32 }
@@ -1736,7 +1736,7 @@ components:
         rdate:
           type: [array, 'null']
           items: { type: string, format: date-time }
-        title: { type: string }
+        title: { type: string, minLength: 1, maxLength: 200 }
         emoji: { type: [string, 'null'] }
         categoryId: { type: [string, 'null'], format: uuid }
         durationMin: { type: integer, format: int32 }

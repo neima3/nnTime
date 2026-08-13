@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { gotoHydrated, signUp, uniqueEmail } from "./helpers";
+import { authCapabilities, gotoHydrated, signUp, uniqueEmail } from "./helpers";
 
 const previewRoutes = [
   "/app/today?preview=1",
@@ -488,7 +488,12 @@ test("an invalid password-reset token becomes an actionable recovery state", asy
 
 test("password recovery preserves safe destination intent end to end", async ({
   browser,
+  request,
 }) => {
+  test.skip(
+    !(await authCapabilities(request)).magicLink,
+    "email delivery not configured (RESEND_API_KEY) — the app degrades this flow by design",
+  );
   const context = await browser.newContext({ serviceWorkers: "block" });
   const page = await context.newPage();
   let resetRedirectTo: string | undefined;
@@ -594,7 +599,12 @@ test("password reset can reveal and re-mask the new credential", async ({ page }
 
 test("password-reset requests keep production confirmation account-neutral", async ({
   page,
+  request,
 }) => {
+  test.skip(
+    !(await authCapabilities(request)).magicLink,
+    "email delivery not configured (RESEND_API_KEY) — the app degrades this flow by design",
+  );
   await page.route("**/api/auth/request-password-reset", async (route) => {
     await route.fulfill({
       status: 200,
@@ -613,7 +623,14 @@ test("password-reset requests keep production confirmation account-neutral", asy
   await expect(page.getByText(/local dev|server logs/i)).toHaveCount(0);
 });
 
-test("successful magic-link requests clear an entered password", async ({ page }) => {
+test("successful magic-link requests clear an entered password", async ({
+  page,
+  request,
+}) => {
+  test.skip(
+    !(await authCapabilities(request)).magicLink,
+    "email delivery not configured (RESEND_API_KEY) — the app degrades this flow by design",
+  );
   await page.route("**/api/auth/sign-in/magic-link", async (route) => {
     await route.fulfill({
       status: 200,

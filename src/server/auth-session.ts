@@ -20,9 +20,42 @@ export interface AuthSession {
 }
 
 /**
- * Get the authenticated session. Returns null if not authenticated OR if the
- * database isn't available (e.g. DATABASE_URL not yet provisioned). This lets
- * Server Components fall back to mock data gracefully during infra setup.
+ * Raised when the database is provisioned but unreachable. Distinct from "not
+ * authenticated" on purpose: collapsing the two made a transient DB blip look
+ * like a sign-out, so a signed-in user's real day was silently replaced by the
+ * demo "Sample planner" and every API call answered 401 instead of 5xx.
+ */
+export class SessionUnavailableError extends Error {
+  constructor(cause?: unknown) {
+    super("Session store unavailable");
+    this.name = "SessionUnavailableError";
+    this.cause = cause;
+  }
+}
+
+/**
+ * Next signals control flow with thrown errors: `headers()` throws
+ * DYNAMIC_SERVER_USAGE to bail a page out of static prerendering, and
+ * redirect()/notFound() throw NEXT_REDIRECT/NEXT_HTTP_ERROR_FALLBACK. They all
+ * carry a `digest`, and React's PPR postpone is a tagged object. Swallowing any
+ * of them turns a normal bail-out into a build failure, so they pass straight
+ * through.
+ */
+function isFrameworkSignal(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  if (typeof (error as { digest?: unknown }).digest === "string") return true;
+  return (
+    (error as { $$typeof?: symbol }).$$typeof === Symbol.for("react.postpone")
+  );
+}
+
+/**
+ * Get the authenticated session. Returns null when the request is genuinely
+ * unauthenticated, and also when DATABASE_URL is unset — that is the infra-setup
+ * case where Server Components intentionally fall back to the sample planner.
+ *
+ * Throws `SessionUnavailableError` when the database IS configured but failing,
+ * so callers surface an error instead of presenting mock data as the user's own.
  */
 export async function getSession(): Promise<AuthSession | null> {
   try {
@@ -39,8 +72,10 @@ export async function getSession(): Promise<AuthSession | null> {
     return { userId: session.user.id, sessionId: session.session.id };
   } catch (error) {
     if (error instanceof Response) throw error;
-    // DB not connected (no DATABASE_URL in prod yet) or auth not configured.
-    return null;
+    if (isFrameworkSignal(error)) throw error;
+    // No database provisioned yet — stay lenient so the design reference renders.
+    if (!process.env.DATABASE_URL) return null;
+    throw new SessionUnavailableError(error);
   }
 }
 
@@ -49,7 +84,32 @@ export async function getSession(): Promise<AuthSession | null> {
  * — route handlers can `await requireSession()` and let the Response propagate.
  */
 export async function requireSession(): Promise<AuthSession> {
-  const session = await getSession();
+  let session: AuthSession | null;
+  try {
+    session = await getSession();
+  } catch (error) {
+    if (error instanceof Response) throw error;
+    if (error instanceof SessionUnavailableError) {
+      throw new Response(
+        JSON.stringify({
+          error: {
+            code: "service_unavailable",
+            message: "Service temporarily unavailable",
+            retryable: true,
+          },
+        }),
+        {
+          status: 503,
+          headers: {
+            "content-type": "application/json",
+            "cache-control": "no-store",
+            "retry-after": "5",
+          },
+        },
+      );
+    }
+    throw error;
+  }
   if (!session) {
     throw new Response(
       JSON.stringify({

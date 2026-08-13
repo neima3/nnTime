@@ -96,13 +96,18 @@ function shiftDate(dateStr: string, days: number): string {
   return new Date(Date.UTC(y!, m! - 1, d! + days)).toISOString().slice(0, 10);
 }
 
-/** Monday of the week containing dateStr (ISO Monday-start). */
-function mondayOf(dateStr: string): string {
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** 0=Sun … 6=Sat for a YYYY-MM-DD calendar date. */
+function weekdayOf(dateStr: string): number {
   const [y, m, d] = dateStr.split("-").map(Number);
-  const dt = new Date(Date.UTC(y!, m! - 1, d!));
-  const dow = dt.getUTCDay(); // 0=Sun
-  const offset = dow === 0 ? -6 : 1 - dow;
-  return shiftDate(dateStr, offset);
+  return new Date(Date.UTC(y!, m! - 1, d!)).getUTCDay();
+}
+
+/** First day of the week containing dateStr, honouring the user's weekStart. */
+function weekStartOf(dateStr: string, weekStart: number): string {
+  const offset = (weekdayOf(dateStr) - weekStart + 7) % 7;
+  return shiftDate(dateStr, -offset);
 }
 
 async function loadWeek(weekParam?: string) {
@@ -119,7 +124,11 @@ async function loadWeek(weekParam?: string) {
   const settings = await getOrCreateSettings(session.userId);
   const zone = settings.timezone;
   const todayStr = instantToDateStr(new Date(), zone);
-  const weekStart = mondayOf(weekParam && /^\d{4}-\d{2}-\d{2}$/.test(weekParam) ? weekParam : todayStr);
+  const firstWeekday = ((settings.weekStart ?? 0) % 7 + 7) % 7;
+  const weekStart = weekStartOf(
+    weekParam && /^\d{4}-\d{2}-\d{2}$/.test(weekParam) ? weekParam : todayStr,
+    firstWeekday,
+  );
 
   const series = await listActivitySeries(session.userId);
   const occurrences = await listUserOccurrences(session.userId);
@@ -128,7 +137,6 @@ async function loadWeek(weekParam?: string) {
     categories as unknown as Parameters<typeof buildCategoryMap>[0],
   );
 
-  const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const days: DayCol[] = [];
   for (let i = 0; i < 7; i++) {
     const dateStr = shiftDate(weekStart, i);
@@ -154,7 +162,7 @@ async function loadWeek(weekParam?: string) {
       };
     });
     days.push({
-      day: dayNames[i]!,
+      day: DAY_NAMES[weekdayOf(dateStr)]!,
       date: Number(dateStr.slice(8, 10)),
       dateStr,
       isToday: dateStr === todayStr,

@@ -17,7 +17,8 @@ import "server-only";
 import dbDefault from "../db";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import * as schema from "../db/schema";
-import { and, eq, inArray, isNull, asc, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, asc, sql } from "drizzle-orm";
+import { isValidZone } from "../temporal/zone";
 
 // Schema-agnostic drizzle client type so both the app instance and ephemeral
 // test DBs are accepted.
@@ -561,6 +562,46 @@ export async function deleteActivitySeries(
         throw e;
       }
     }
+    // ADR-004: deleting the activity auto-cancels a session running against it.
+    // focus_sessions.activity_occurrence_id is a bare uuid with no FK, so
+    // nothing did this and the timer kept counting down on a deleted activity.
+    const orphaned = await tdb
+      .update(schema.focusSessions)
+      .set({
+        state: "cancelled",
+        completionReason: "activity_deleted",
+        revision: sql`${schema.focusSessions.revision} + 1`,
+      })
+      .where(
+        and(
+          eq(schema.focusSessions.userId, userId),
+          inArray(schema.focusSessions.state, ["running", "paused"]),
+          inArray(
+            schema.focusSessions.activityOccurrenceId,
+            tdb
+              .select({ id: schema.activityOccurrences.id })
+              .from(schema.activityOccurrences)
+              .where(
+                and(
+                  eq(schema.activityOccurrences.seriesId, id),
+                  eq(schema.activityOccurrences.userId, userId),
+                ),
+              ),
+          ),
+        ),
+      )
+      .returning();
+    for (const session of orphaned) {
+      await appendChangeLog(
+        tdb,
+        userId,
+        "focus_sessions",
+        session.id,
+        "upsert",
+        session.revision,
+      );
+    }
+
     await appendChangeLog(tdb, userId, "activity_series", id, "delete", updated.revision);
   });
 }
@@ -839,7 +880,13 @@ export async function getOrCreateSettings(
     .limit(1);
   if (row) return row;
 
-  const timezone = opts.timezoneHint || "UTC";
+  // The hint comes straight off an `x-timezone` request header, which never
+  // passes through zod — an unvalidated value here would be persisted and then
+  // throw RangeError on every later day/search read.
+  const timezone =
+    opts.timezoneHint && isValidZone(opts.timezoneHint)
+      ? opts.timezoneHint
+      : "UTC";
   // Concurrent first-loads race here (e.g. two parallel Server Component
   // renders after signup) — on conflict, another request already created the
   // row; re-read it instead of failing.
@@ -1100,8 +1147,104 @@ export async function deleteRoutine(
         throw e;
       }
     }
+    // Soft-deleting only the parent left steps, schedules and already-
+    // materialized days live, so a deleted routine kept appearing on Today.
+    const now = new Date();
+    const schedules = await tdb
+      .update(schema.routineSchedules)
+      .set({ deletedAt: now, revision: sql`${schema.routineSchedules.revision} + 1` })
+      .where(
+        and(
+          eq(schema.routineSchedules.routineId, id),
+          eq(schema.routineSchedules.userId, userId),
+          isNull(schema.routineSchedules.deletedAt),
+        ),
+      )
+      .returning();
+    for (const sched of schedules) {
+      await appendChangeLog(
+        tdb,
+        userId,
+        "routine_schedules",
+        sched.id,
+        "delete",
+        sched.revision,
+      );
+    }
+    const steps = await tdb
+      .update(schema.routineSteps)
+      .set({ deletedAt: now, revision: sql`${schema.routineSteps.revision} + 1` })
+      .where(
+        and(
+          eq(schema.routineSteps.routineId, id),
+          eq(schema.routineSteps.userId, userId),
+          isNull(schema.routineSteps.deletedAt),
+        ),
+      )
+      .returning();
+    for (const step of steps) {
+      await appendChangeLog(
+        tdb,
+        userId,
+        "routine_steps",
+        step.id,
+        "delete",
+        step.revision,
+      );
+    }
+    await cancelPendingRoutineSeries(
+      tdb,
+      userId,
+      schedules.map((s) => s.id),
+      now,
+    );
+
     await appendChangeLog(tdb, userId, "routines", id, "delete", updated.revision);
   });
+}
+
+/**
+ * Tombstone still-pending activity_series materialized from the given routine
+ * schedules (ADR-004: "schedule edits cancel/regenerate pending rows").
+ *
+ * The materializer writes one-off series with `source='routine'` and
+ * `sourceRef = "<scheduleId>|<occurrenceKey>"`, so a deleted or paused routine
+ * previously kept showing up on Today from rows written before the change.
+ * Only future occurrences are cancelled — past ones are history and stay.
+ */
+async function cancelPendingRoutineSeries(
+  tdb: Db,
+  userId: string,
+  scheduleIds: string[],
+  from: Date,
+) {
+  if (scheduleIds.length === 0) return;
+  const pending = await tdb
+    .update(schema.activitySeries)
+    .set({ deletedAt: from, revision: sql`${schema.activitySeries.revision} + 1` })
+    .where(
+      and(
+        eq(schema.activitySeries.userId, userId),
+        eq(schema.activitySeries.source, "routine"),
+        inArray(
+          sql`split_part(${schema.activitySeries.sourceRef}, '|', 1)`,
+          scheduleIds,
+        ),
+        gte(schema.activitySeries.dtstartLocal, from),
+        isNull(schema.activitySeries.deletedAt),
+      ),
+    )
+    .returning();
+  for (const row of pending) {
+    await appendChangeLog(
+      tdb,
+      userId,
+      "activity_series",
+      row.id,
+      "delete",
+      row.revision,
+    );
+  }
 }
 
 export async function listRoutineSteps(
@@ -1210,6 +1353,11 @@ export async function updateRoutineSchedule(
       if (!existing || existing.deletedAt) throw new NotFoundError("routine_schedule");
       throw new ConflictError("revision mismatch", existing);
     }
+    // Pausing (or re-timing) a schedule must also retire the days already
+    // materialized from it, otherwise the paused routine still shows on Today.
+    if (input.paused === true || input.rrule !== undefined || input.tz !== undefined) {
+      await cancelPendingRoutineSeries(tdb, userId, [id], new Date());
+    }
     await appendChangeLog(tdb, userId, "routine_schedules", id, "upsert", updated.revision);
     return updated;
   });
@@ -1273,6 +1421,18 @@ export async function appendChangeLog(
   op: "upsert" | "delete",
   revision: number,
 ) {
+  // ADR-002 sync reads `id > cursor`, and `id` comes from a global sequence
+  // assigned at INSERT — not at COMMIT. Two concurrent writes for one account
+  // (web + iOS, or two tabs) could therefore commit out of sequence order: if
+  // id=12 commits while id=11 is still open, a poll returns 12, the client
+  // advances its cursor past 11, and row 11 is never delivered — silent,
+  // permanent data loss on sync.
+  //
+  // A transaction-scoped advisory lock keyed on the user makes id assignment
+  // and commit order agree. It serializes only a single account's concurrent
+  // mutations, which is negligible, and is released automatically on commit or
+  // rollback.
+  await db.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${userId}))`);
   // Fail the mutation if change_log insert fails (callers wrap in transactions
   // so entity write + change_log stay atomic).
   await db.insert(schema.changeLog).values({

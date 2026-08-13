@@ -47,3 +47,34 @@ export function clientToday(zone?: string): string {
   const d = String(now.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
+
+/**
+ * The last `count` calendar days ending today, oldest first.
+ *
+ * Both the `key` (YYYY-MM-DD, matching what the API buckets data under) and the
+ * `label` (narrow weekday) are derived from the same zone-resolved day, so a
+ * bar can never be drawn under another day's letter. Stepping happens on a
+ * UTC-anchored calendar so a DST transition can't drop or double a day.
+ *
+ * @param zone Optional IANA zone (the account's planning zone). When omitted,
+ * uses the browser's local calendar date.
+ */
+export function clientRecentDays(
+  count: number,
+  zone?: string,
+): { key: string; label: string }[] {
+  const today = clientToday(zone);
+  const [y, m, d] = today.split("-").map(Number) as [number, number, number];
+  const anchor = Date.UTC(y, m - 1, d);
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    weekday: "narrow",
+  });
+  return Array.from({ length: count }, (_, i) => {
+    const day = new Date(anchor - (count - 1 - i) * 86_400_000);
+    return {
+      key: day.toISOString().slice(0, 10),
+      label: weekday.format(day),
+    };
+  });
+}

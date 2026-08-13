@@ -3,7 +3,8 @@
  */
 import { requireSession } from "@/server/auth-session";
 import { handleErrors, parseBody, errorResponse } from "@/server/api-errors";
-import { parseNaturalLanguage } from "@/server/services/ai";
+import { rateLimitedResponse } from "@/server/ratelimit";
+import { parseNaturalLanguage, AiQuotaExceededError } from "@/server/services/ai";
 import { z } from "zod";
 
 const bodySchema = z.object({
@@ -26,11 +27,8 @@ export async function POST(request: Request) {
       const result = await parseNaturalLanguage(body.input, userId);
       return Response.json(result);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "AI error";
-      if (msg.includes("quota")) {
-        return errorResponse("rate_limited", "Daily AI quota exceeded", 429, {
-          retryable: true,
-        });
+      if (e instanceof AiQuotaExceededError) {
+        return rateLimitedResponse(e.result, "Daily AI quota exceeded");
       }
       console.error("[ai/parse]", e);
       return errorResponse("internal", "An unexpected error occurred", 500);

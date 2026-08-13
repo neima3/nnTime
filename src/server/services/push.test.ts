@@ -58,8 +58,12 @@ afterEach(() => {
 });
 
 const itDb = (name: string, fn: () => Promise<void>) =>
-  it(name, async () => {
-    if (!dbAvailable || !env) return;
+  it(name, async ({ skip }) => {
+    if (!dbAvailable || !env) {
+      console.warn(`[SKIP] ${name}: Postgres unavailable`);
+      skip(true, "Postgres unavailable");
+      return;
+    }
     await fn();
   });
 

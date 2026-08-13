@@ -313,9 +313,7 @@ struct TimeFeelGame: View {
         return err < 0 ? "\(r.target)s felt shorter to you — a fast-running brain." : "\(r.target)s felt longer — time was dragging."
     }
     private func score() -> Int {
-        guard !results.isEmpty else { return 0 }
-        let mean = results.map { abs($0.actual - Double($0.target)) / Double($0.target) }.reduce(0, +) / Double(results.count)
-        return max(0, Int((1 - mean) * 100))
+        ArcadeLogic.timeFeelScore(results.map { (targetSec: Double($0.target), actualSec: $0.actual) })
     }
 }
 
@@ -389,10 +387,10 @@ struct QuickTapGame: View {
                     Text("Round \(times.count) of \(rounds)").font(.kBody(13)).foregroundStyle(Color.kInkSoft)
                     Button("Next round") { arm() }.buttonStyle(PrimaryPill())
                 default:
-                    let avg = times.isEmpty ? 0 : times.reduce(0, +) / times.count
-                    let best = times.isEmpty ? PlayScores.best(for: "quicktap") : PlayScores.recordLower(avg, for: "quicktap")
-                    Text(times.isEmpty ? "All jumps 😄" : "Average: \(avg) ms").font(.kDisplay(28)).foregroundStyle(Color.kInk)
-                    if let best, !times.isEmpty {
+                    let avg = ArcadeLogic.quickTapAverage(times.map { Optional($0) })
+                    let best = avg.map { PlayScores.recordLower($0, for: "quicktap") } ?? PlayScores.best(for: "quicktap")
+                    Text(avg.map { "Average: \($0) ms" } ?? "All jumps 😄").font(.kDisplay(28)).foregroundStyle(Color.kInk)
+                    if let best, let avg {
                         Text(avg <= best ? "New personal best 🎉" : "Your best: \(best) ms")
                             .font(.kBody(13, weight: .semibold)).foregroundStyle(Color.kIris)
                     }
@@ -404,22 +402,28 @@ struct QuickTapGame: View {
         .onDisappear { task?.cancel() }
     }
     private func arm() {
-        if times.count >= rounds || (stage == 4 && round + 1 > rounds) { return }
+        if times.count >= rounds { return }
         round = min(round + (stage == 0 ? 0 : 1), rounds)
         stage = 1
+        let delay = ArcadeLogic.quickTapDelayMs(roll: Double.random(in: 0..<1))
         task = Task {
-            try? await Task.sleep(nanoseconds: UInt64((1.2 + Double.random(in: 0...2.3)) * 1_000_000_000))
+            try? await Task.sleep(nanoseconds: UInt64(delay) * 1_000_000)
             if !Task.isCancelled { goAt = Date(); stage = 2 }
         }
     }
     private func tap() {
-        if stage == 1 { task?.cancel(); times.append(-1); stage = 3; return }
+        if stage == 1 {
+            // An early tap still fills a round slot — if it was the last one,
+            // the run ends instead of stranding the player on "Go again".
+            task?.cancel()
+            times.append(-1)
+            stage = times.count >= rounds ? 5 : 3
+            return
+        }
         if stage == 2 {
-            last = Int(Date().timeIntervalSince(goAt) * 1000)
+            last = ArcadeLogic.jsRound(Date().timeIntervalSince(goAt) * 1000)
             times.append(last)
-            let valid = times.filter { $0 > 0 }
-            stage = valid.count >= rounds || times.count >= rounds ? 5 : 4
-            if stage == 5 { times = valid }
+            stage = times.count >= rounds ? 5 : 4
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
     }

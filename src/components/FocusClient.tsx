@@ -220,32 +220,47 @@ export function FocusClient({
     [activityId, checklist, checklistRev, occurrenceKey],
   );
 
-  const hydrate = useCallback(async (): Promise<boolean> => {
-    try {
-      const res = await fetch("/api/v1/focus-sessions");
-      if (res.status === 401) {
+  /**
+   * Bumped by every hydrate and every mutation. A poll that started before the
+   * user paused/extended carries a stale snapshot; applying it would un-pause
+   * the UI and rewind the clock, so only the newest token may write state.
+   */
+  const hydrateGenRef = useRef(0);
+
+  const hydrate = useCallback(
+    async (opts?: { force?: boolean }): Promise<boolean> => {
+      // `force` is for the 409 path, which hydrates *because* its own mutation
+      // lost the race and needs the server's truth. Any other poll that starts
+      // mid-mutation would read a snapshot the mutation is about to invalidate.
+      if (!opts?.force && mutationInFlightRef.current) return false;
+      const gen = ++hydrateGenRef.current;
+      const stale = () => hydrateGenRef.current !== gen;
+      try {
+        const res = await fetch("/api/v1/focus-sessions");
+        if (stale()) return false;
+        if (!res.ok) {
+          // 401 included: nothing to show, but stop blocking on the skeleton.
+          setLoading(false);
+          return false;
+        }
+        const data = await res.json();
+        if (stale()) return false;
+        if (data.session) {
+          setSession(data.session);
+          setRemainingSec(data.remainingSec ?? 0);
+        } else {
+          setSession(null);
+        }
         setLoading(false);
+        return true;
+      } catch {
+        /* offline */
+        if (!stale()) setLoading(false);
         return false;
       }
-      if (!res.ok) {
-        setLoading(false);
-        return false;
-      }
-      const data = await res.json();
-      if (data.session) {
-        setSession(data.session);
-        setRemainingSec(data.remainingSec ?? 0);
-      } else {
-        setSession(null);
-      }
-      setLoading(false);
-      return true;
-    } catch {
-      /* offline */
-      setLoading(false);
-      return false;
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     // Load active session after mount (auth-bound fetch; no SSR session object).
@@ -326,6 +341,7 @@ export function FocusClient({
   const start = useCallback(async (minutes?: number) => {
     if (mutationInFlightRef.current) return;
     mutationInFlightRef.current = true;
+    hydrateGenRef.current++;
     setMutationPending(true);
     setError(null);
     setFinished(null);
@@ -376,6 +392,7 @@ export function FocusClient({
     async (body: Record<string, unknown>) => {
       if (!session || mutationInFlightRef.current) return;
       mutationInFlightRef.current = true;
+      hydrateGenRef.current++;
       setMutationPending(true);
       setError(null);
       const fingerprint = JSON.stringify({
@@ -401,7 +418,7 @@ export function FocusClient({
         });
         if (res.status === 409) {
           patchAttemptRef.current = null;
-          const refreshed = await hydrate();
+          const refreshed = await hydrate({ force: true });
           setError(
             refreshed
               ? "Focus changed elsewhere — refreshed to the latest session."

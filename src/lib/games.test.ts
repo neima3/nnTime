@@ -131,6 +131,11 @@ describe("timeFeelScore", () => {
   it("returns 0 for an empty round list", () => {
     expect(timeFeelScore([])).toBe(0);
   });
+
+  it("rounds halves up", () => {
+    // 7.5% mean error -> 92.5 -> 93 (truncation would give 92).
+    expect(timeFeelScore([{ targetSec: 100, actualSec: 107.5 }])).toBe(93);
+  });
 });
 
 describe("timeFeelFeeling", () => {
@@ -161,6 +166,12 @@ describe("quickTapAverage", () => {
   it("rounds the average", () => {
     // (100 + 101) / 2 = 100.5 -> rounds to 101
     expect(quickTapAverage([100, 101])).toBe(101);
+    // Pinned against the iOS mirror: truncation would give 280.
+    expect(quickTapAverage([280, 281])).toBe(281);
+  });
+
+  it("ignores the iOS early-tap sentinel", () => {
+    expect(quickTapAverage([-1, 200, -1])).toBe(200);
   });
 });
 
@@ -171,6 +182,11 @@ describe("quickTapDelayMs", () => {
 
   it("maps a roll near 1 to at most 3500ms", () => {
     expect(quickTapDelayMs(0.999999)).toBeLessThanOrEqual(3500);
+  });
+
+  it("rounds halves up", () => {
+    // 1200 + 0.125 * 2300 = 1487.5 -> 1488 (truncation would give 1487).
+    expect(quickTapDelayMs(0.125)).toBe(1488);
   });
 
   it("is monotonically increasing in roll", () => {

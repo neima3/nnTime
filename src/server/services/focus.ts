@@ -46,36 +46,43 @@ export async function startFocusSession(
   const db = opts.db ?? dbDefault;
   const now = new Date();
 
-  // Yield any existing active session (two-device contention: the new one wins).
-  await db
-    .update(schema.focusSessions)
-    .set({
-      state: "cancelled",
-      completionReason: "superseded",
-      updatedAt: now,
-    })
-    .where(
-      and(
-        eq(schema.focusSessions.userId, userId),
-        inArray(schema.focusSessions.state, ["running", "paused"]),
-      ),
-    );
+  // One transaction so the yield + insert are atomic, and so appendChangeLog's
+  // per-user advisory lock actually holds until commit — outside a transaction
+  // it would be released immediately and the sync cursor could skip this row.
+  return db.transaction(async (tx) => {
+    const tdb = tx as unknown as Db;
 
-  const id = crypto.randomUUID();
-  const [session] = await db
-    .insert(schema.focusSessions)
-    .values({
-      id,
-      userId,
-      activityOccurrenceId: input.activityOccurrenceId ?? null,
-      state: "running",
-      startedAt: now,
-      targetDurationMin: input.targetDurationMin,
-      currentIntervalStartedAt: now,
-    })
-    .returning();
-  await appendChangeLog(db, userId, "focus_sessions", id, "upsert", session!.revision);
-  return session!;
+    // Yield any existing active session (two-device contention: the new one wins).
+    await tdb
+      .update(schema.focusSessions)
+      .set({
+        state: "cancelled",
+        completionReason: "superseded",
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(schema.focusSessions.userId, userId),
+          inArray(schema.focusSessions.state, ["running", "paused"]),
+        ),
+      );
+
+    const id = crypto.randomUUID();
+    const [session] = await tdb
+      .insert(schema.focusSessions)
+      .values({
+        id,
+        userId,
+        activityOccurrenceId: input.activityOccurrenceId ?? null,
+        state: "running",
+        startedAt: now,
+        targetDurationMin: input.targetDurationMin,
+        currentIntervalStartedAt: now,
+      })
+      .returning();
+    await appendChangeLog(tdb, userId, "focus_sessions", id, "upsert", session!.revision);
+    return session!;
+  });
 }
 
 /**

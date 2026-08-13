@@ -13,7 +13,11 @@ import { buildCategoryMap } from "@/lib/adapters";
 import { expandActivitiesForDay } from "@/server/services/day";
 import { instantToDateStr, resolveDayBounds } from "@/server/temporal/zone";
 
-const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+/** Column labels rotated to start on the user's first day of the week. */
+function weekdayLabels(weekStart: number): string[] {
+  return Array.from({ length: 7 }, (_, i) => DAY_NAMES[(weekStart + i) % 7]!);
+}
 
 type DayCell = {
   date: number;
@@ -35,6 +39,7 @@ async function loadMonth(year: number, month: number): Promise<{
   year: number;
   month: number;
   authed: boolean;
+  weekdays: string[];
 }> {
   const session = await getSession();
   const monthLabel = new Date(year, month, 1).toLocaleDateString("en-US", {
@@ -48,6 +53,8 @@ async function loadMonth(year: number, month: number): Promise<{
       year,
       month,
       authed: false,
+      // The sample grid is pre-built Monday-first.
+      weekdays: weekdayLabels(1),
     };
   }
 
@@ -61,8 +68,9 @@ async function loadMonth(year: number, month: number): Promise<{
     categories as unknown as Parameters<typeof buildCategoryMap>[0],
   );
 
+  const firstWeekday = ((settings.weekStart ?? 0) % 7 + 7) % 7;
   const firstDay = new Date(year, month, 1);
-  const startWeekday = (firstDay.getDay() + 6) % 7; // 0=Mon
+  const startWeekday = (firstDay.getDay() - firstWeekday + 7) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const prevMonthDays = new Date(year, month, 0).getDate();
 
@@ -109,7 +117,14 @@ async function loadMonth(year: number, month: number): Promise<{
     });
   }
 
-  return { days: result, label: monthLabel, year, month, authed: true };
+  return {
+    days: result,
+    label: monthLabel,
+    year,
+    month,
+    authed: true,
+    weekdays: weekdayLabels(firstWeekday),
+  };
 }
 
 export default async function MonthPage({
@@ -127,7 +142,7 @@ export default async function MonthPage({
     month = m! - 1;
   }
 
-  const { days, label, authed } = await loadMonth(year, month);
+  const { days, label, authed, weekdays } = await loadMonth(year, month);
   // A blank grid with no explanation reads as "broken", not as "free".
   const emptyMonth = days.every((d) => d.otherMonth || d.dots.length === 0);
   const prev = shiftMonth(year, month, -1);

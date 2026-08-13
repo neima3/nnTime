@@ -11,6 +11,7 @@ import {
   Calendar,
   Moon,
   Palette,
+  RefreshCw,
   User,
 } from "lucide-react";
 import { invalidateSettingsCache } from "@/lib/settings-cache";
@@ -366,6 +367,8 @@ export function SettingsClient({
   const [settings, setSettings] = useState<Settings | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [authed, setAuthed] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [connectedProviders, setConnectedProviders] = useState<Set<string>>(
     () => new Set(),
   );
@@ -386,11 +389,15 @@ export function SettingsClient({
       headers: tz ? { "x-timezone": tz } : {},
     })
       .then(async (r) => {
+        if (cancelled) return null;
         if (r.status === 401) {
-          if (!cancelled) setAuthed(false);
+          setAuthed(false);
           return null;
         }
-        if (!r.ok) return null;
+        if (!r.ok) {
+          setLoadError("Your settings didn’t come back from the server.");
+          return null;
+        }
         return r.json();
       })
       .then((data) => {
@@ -406,16 +413,19 @@ export function SettingsClient({
           revision: data.revision,
         };
         setSettings(s);
+        setLoadError(null);
         applyTheme(s.theme);
         syncA11y(parseA11yPrefs(s));
       })
       .catch(() => {
-        if (!cancelled) setAuthed(false);
+        // A thrown fetch means the network, not the session — this page is
+        // already inside SignedInOnly, so never render a signed-out card here.
+        if (!cancelled) setLoadError("Couldn’t reach the server.");
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadKey]);
 
   const settingsReady = settings !== null;
 
@@ -623,6 +633,11 @@ export function SettingsClient({
     setMethodsReloadKey((key) => key + 1);
   }, []);
 
+  const retryLoad = useCallback(() => {
+    setLoadError(null);
+    setReloadKey((key) => key + 1);
+  }, []);
+
   if (!authed) {
     return (
       <SignedOutCard
@@ -635,6 +650,33 @@ export function SettingsClient({
   }
 
   if (!settings) {
+    if (loadError) {
+      return (
+        <section
+          role="alert"
+          className="mx-auto max-w-md rounded-3xl border border-border bg-surface px-6 py-10 text-center shadow-card"
+        >
+          <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-danger-soft text-danger">
+            <Palette size={26} strokeWidth={2.2} />
+          </span>
+          <h2 className="mt-4 font-display text-xl font-bold tracking-tight">
+            Settings didn’t load
+          </h2>
+          <p className="mx-auto mt-1.5 max-w-xs text-[14px] leading-relaxed text-ink-soft">
+            {loadError} Your preferences are safe on the server — this is just
+            the screen.
+          </p>
+          <button
+            type="button"
+            onClick={retryLoad}
+            className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-iris px-5 py-2.5 text-[14px] font-semibold text-ink-inverse shadow-card transition-transform hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+          >
+            <RefreshCw size={16} />
+            Try again
+          </button>
+        </section>
+      );
+    }
     return <SkeletonRows count={6} />;
   }
 

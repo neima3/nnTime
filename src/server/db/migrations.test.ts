@@ -41,11 +41,15 @@ afterAll(async () => {
   if (env) await env.teardown();
 }, 60000);
 
-// Wrapper that skips when the DB is unavailable (evaluated at runtime, not
-// module load, so beforeAll has a chance to set dbAvailable).
+// Wrapper that reports an honest SKIP (never a silent pass) when the DB is
+// unavailable (evaluated at runtime, so beforeAll can set dbAvailable first).
 const itDb = (name: string, fn: () => Promise<void> | void) =>
-  it(name, async () => {
-    if (!dbAvailable) return; // no DB → treated as a no-op (CI without pg)
+  it(name, async ({ skip }) => {
+    if (!dbAvailable || !env) {
+      console.warn(`[SKIP] ${name}: Postgres unavailable`);
+      skip(true, "Postgres unavailable");
+      return;
+    }
     await fn();
   });
 

@@ -27,7 +27,14 @@ beforeAll(async () => {
 afterAll(async () => { if (env) await env.teardown(); });
 
 const itDb = (name: string, fn: () => Promise<void> | void) =>
-  it(name, async () => { if (!dbAvailable || !env) return; await fn(); });
+  it(name, async ({ skip }) => {
+    if (!dbAvailable || !env) {
+      console.warn(`[SKIP] ${name}: Postgres unavailable`);
+      skip(true, "Postgres unavailable");
+      return;
+    }
+    await fn();
+  });
 
 describe("Focus extend + multi-extend", () => {
   itDb("extend rejects a stale client revision and accepts the current one", async () => {

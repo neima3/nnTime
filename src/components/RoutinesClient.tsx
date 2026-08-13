@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pause, Play, PlayCircle, Plus, Trash2 } from "lucide-react";
 import { clientToday } from "@/lib/client-date";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 import { sendReplaySafeCreate } from "@/lib/offline-mutation";
 import { toast } from "./Toast";
 import { RoutinePlayer } from "./RoutinePlayer";
@@ -53,6 +54,35 @@ export function RoutinesClient({
   const [busy, setBusy] = useState(false);
   const [playing, setPlaying] = useState<RoutineView | null>(null);
 
+  // The panel announces aria-modal, so it owes the keyboard the modal contract:
+  // focus starts inside, Tab stays inside, Escape leaves — same as QuickCapture
+  // and PickForMe.
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  useFocusTrap(dialogRef, open);
+
+  const closeDialog = useCallback(() => {
+    setOpen(false);
+    openerRef.current?.focus();
+    openerRef.current = null;
+  }, []);
+
+  const openDialog = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    openerRef.current = e.currentTarget;
+    setOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    titleInputRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeDialog();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, closeDialog]);
+
   const create = useCallback(async () => {
     if (!authed) {
       toast("Sign in to save routines");
@@ -79,7 +109,7 @@ export function RoutinesClient({
     setBusy(false);
     if (delivery.state === "queued") {
       toast("Saved on this device — your routine will appear when you’re back");
-      setOpen(false);
+      closeDialog();
       setTitle("");
       setStepsText("");
       return;
@@ -93,11 +123,11 @@ export function RoutinesClient({
       return;
     }
     toast("Routine created");
-    setOpen(false);
+    closeDialog();
     setTitle("");
     setStepsText("");
     router.refresh();
-  }, [authed, title, emoji, stepsText, router]);
+  }, [authed, title, emoji, stepsText, router, closeDialog]);
 
   const togglePause = useCallback(
     async (r: RoutineView) => {
@@ -169,7 +199,7 @@ export function RoutinesClient({
         <div className="mb-6 flex flex-wrap items-center gap-3">
           <button
             type="button"
-            onClick={() => setOpen(true)}
+            onClick={openDialog}
             className="flex items-center gap-2 rounded-2xl bg-iris px-4 py-2.5 text-sm font-semibold text-ink-inverse shadow-card hover:bg-iris-deep focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
           >
             <Plus size={17} strokeWidth={2.5} />
@@ -180,9 +210,11 @@ export function RoutinesClient({
 
       {open && (
         <div
+          ref={dialogRef}
           role="dialog"
           aria-modal="true"
           aria-labelledby="new-routine-title"
+          tabIndex={-1}
           className="mb-6 rounded-3xl border border-border bg-surface p-5 shadow-float"
         >
           <h2 id="new-routine-title" className="font-display text-lg font-bold">
@@ -196,6 +228,7 @@ export function RoutinesClient({
               aria-label="Emoji"
             />
             <input
+              ref={titleInputRef}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Morning reset"
@@ -212,7 +245,7 @@ export function RoutinesClient({
           <div className="mt-3 flex justify-end gap-2">
             <button
               type="button"
-              onClick={() => setOpen(false)}
+              onClick={closeDialog}
               className="rounded-xl px-4 py-2 text-[13px] font-semibold text-ink-soft"
             >
               Cancel
@@ -299,7 +332,7 @@ export function RoutinesClient({
             </p>
             <button
               type="button"
-              onClick={() => setOpen(true)}
+              onClick={openDialog}
               className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-iris px-4 py-2 text-[13px] font-semibold text-ink-inverse shadow-card transition-colors hover:bg-iris-deep focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
             >
               + Build your first routine

@@ -119,6 +119,23 @@ function exdatesToOccurrenceKeys(
   });
 }
 
+/** `[start, end)` — end is exclusive per ADR-001. */
+function withinBounds(instant: Date, bounds: { start: Date; end: Date }): boolean {
+  const t = instant.getTime();
+  return t >= bounds.start.getTime() && t < bounds.end.getTime();
+}
+
+function resolveChecklist(
+  override: ExpandableOccurrence | undefined,
+  series: ExpandableSeries,
+) {
+  const overridden =
+    override?.checklistOverride != null && Array.isArray(override.checklistOverride)
+      ? override.checklistOverride
+      : undefined;
+  return overridden ?? series.checklistTemplate;
+}
+
 /**
  * Pure: expand all non-deleted series into activity rows for a day window.
  * Unit-testable without DB/auth.
@@ -139,7 +156,12 @@ export function expandActivitiesForDay(
     overrideByKey.set(key, occ);
   }
 
+  const seriesById = new Map<string, ExpandableSeries>();
+  for (const s of seriesList) seriesById.set(s.id, s);
+
   const activities: ResolvedDayActivity[] = [];
+  /** `seriesId|occurrenceKey` already placed on this day — guards the reverse pass. */
+  const emitted = new Set<string>();
 
   for (const series of seriesList) {
     if (series.deletedAt) continue;
@@ -188,23 +210,49 @@ export function expandActivitiesForDay(
       // Cancelled / skipped instances are not shown on the day timeline.
       if (status === "cancelled" || status === "skipped") continue;
 
-      const checklistTemplate =
-        override?.checklistOverride != null &&
-        Array.isArray(override.checklistOverride)
-          ? override.checklistOverride
-          : series.checklistTemplate;
+      // A "this occurrence" reschedule (e.g. Review → Move to tomorrow) writes
+      // override.startAt while the occurrence_key stays put. Bucketing purely
+      // by the expanded key kept the instance on its original day at the new
+      // clock time, and it never appeared on the day it was moved to.
+      if (override?.startAt && !withinBounds(override.startAt, bounds)) continue;
 
+      emitted.add(mapKey);
       activities.push({
         ...(series as DbActivitySeries),
         dtstartLocal: override?.startAt ?? occ.startAt,
         durationMin: override?.durationMin ?? series.durationMin,
         title: override?.title ?? series.title,
         energy: override?.energy ?? series.energy,
-        checklistTemplate: checklistTemplate ?? series.checklistTemplate,
+        checklistTemplate: resolveChecklist(override, series),
         occurrenceKey: occ.occurrenceKey,
         status,
       });
     }
+  }
+
+  // Reverse pass: instances rescheduled INTO this day from another one. Their
+  // occurrence_key sits outside the window, so the expansion above never sees
+  // them.
+  for (const override of overrideByKey.values()) {
+    if (!override.startAt || !withinBounds(override.startAt, bounds)) continue;
+    const mapKey = `${override.seriesId}|${override.occurrenceKey.getTime()}`;
+    if (emitted.has(mapKey)) continue;
+    const status = (override.status ?? "pending") as ResolvedDayActivity["status"];
+    if (status === "cancelled" || status === "skipped") continue;
+    const series = seriesById.get(override.seriesId);
+    if (!series || series.deletedAt) continue;
+
+    emitted.add(mapKey);
+    activities.push({
+      ...(series as DbActivitySeries),
+      dtstartLocal: override.startAt,
+      durationMin: override.durationMin ?? series.durationMin,
+      title: override.title ?? series.title,
+      energy: override.energy ?? series.energy,
+      checklistTemplate: resolveChecklist(override, series),
+      occurrenceKey: override.occurrenceKey,
+      status,
+    });
   }
 
   activities.sort(

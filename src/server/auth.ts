@@ -68,6 +68,10 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: false,
+    // ADR-003: a reset is a privilege-sensitive event. Without this Better Auth
+    // keeps every standing session valid, so a stolen cookie survives the reset
+    // for the full 30-day session lifetime.
+    revokeSessionsOnPasswordReset: true,
     sendVerificationEmail: async ({
       user,
       url,

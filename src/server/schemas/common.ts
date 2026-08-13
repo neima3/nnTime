@@ -14,6 +14,7 @@
  */
 
 import { z } from "zod";
+import { isValidZone } from "../temporal/zone";
 
 /* -------------------------------------------------------------------------- */
 /* Primitives                                                                 */
@@ -38,11 +39,27 @@ export const instant = z.iso.datetime();
 export const dateStr = z.iso.date();
 
 /**
- * IANA timezone key (e.g. `America/Los_Angeles`). Validated as a non-empty
- * string at the API edge; full IANA membership check happens in the service
- * layer to avoid bundling the timezone database into the schema.
+ * IANA timezone key (e.g. `America/Los_Angeles`), validated for real.
+ *
+ * This used to be `z.string().min(1)` on the theory that the service layer
+ * checked membership — nothing did. `assertValidZone` was only ever called from
+ * inside zone.ts, so any non-empty string was persisted and then threw a
+ * RangeError on the next day/search read, i.e. a self-inflicted permanent 500.
+ * The check costs nothing to bundle: `isValidZone` probes Intl, which is built
+ * into the runtime, not a shipped timezone database.
  */
-export const ianaTimezone = z.string().min(1);
+export const ianaTimezone = z
+  .string()
+  .min(1)
+  .refine(isValidZone, { message: "Invalid IANA timezone" });
+
+/**
+ * User-supplied title on a create/update body. Bounded because these strings
+ * are persisted and some are forwarded into AI prompts — `routineCreate` already
+ * used min(1)/max(200), while task and activity titles accepted unbounded (and
+ * empty) input. Response schemas stay unbounded so existing rows still validate.
+ */
+export const boundedTitle = z.string().min(1).max(200);
 
 /** PostgreSQL `integer` / Swift `Int32` wire range. */
 export const pgInteger = z.int32();

@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { BarChart3, Flame } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { BarChart3, Flame, RefreshCw } from "lucide-react";
 import { toast } from "./Toast";
 import { SignedOutCard, SkeletonCards } from "./EmptyState";
+import { clientRecentDays } from "@/lib/client-date";
+import { getSettingsCached } from "@/lib/settings-cache";
 import { formatHourLabel } from "@/lib/time-format";
 import { useHourCycle } from "@/lib/use-hour-cycle";
 import { RewardGarden } from "./RewardGarden";
@@ -70,9 +72,46 @@ function Card({
   );
 }
 
+/** Load failed (not a session problem) — say so and offer the way back. */
+function LoadErrorCard({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <section
+      role="alert"
+      className="mx-auto max-w-md rounded-3xl border border-border bg-surface px-6 py-10 text-center shadow-card"
+    >
+      <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-danger-soft text-danger">
+        <BarChart3 size={26} strokeWidth={2.2} />
+      </span>
+      <h2 className="mt-4 font-display text-xl font-bold tracking-tight">
+        Your numbers didn’t load
+      </h2>
+      <p className="mx-auto mt-1.5 max-w-xs text-[14px] leading-relaxed text-ink-soft">
+        {message} Nothing is lost — it’s just this screen.
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-iris px-5 py-2.5 text-[14px] font-semibold text-ink-inverse shadow-card transition-transform hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+      >
+        <RefreshCw size={16} />
+        Try again
+      </button>
+    </section>
+  );
+}
+
 export function StatsClient() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [authed, setAuthed] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [zone, setZone] = useState<string | undefined>(undefined);
   const [moodBusy, setMoodBusy] = useState(false);
   const hourCycle = useHourCycle();
 
@@ -80,22 +119,44 @@ export function StatsClient() {
     let cancelled = false;
     fetch("/api/v1/stats?days=14")
       .then(async (r) => {
+        if (cancelled) return;
         if (r.status === 401) {
-          if (!cancelled) setAuthed(false);
-          return null;
+          setAuthed(false);
+          return;
         }
-        if (!r.ok) return null;
-        return r.json();
-      })
-      .then((data) => {
-        if (!cancelled && data) setStats(data);
+        if (!r.ok) {
+          setLoadError("Couldn’t load your numbers just now.");
+          return;
+        }
+        const data = await r.json();
+        if (cancelled) return;
+        setStats(data);
+        setLoadError(null);
       })
       .catch(() => {
-        if (!cancelled) setAuthed(false);
+        // A thrown fetch is the network, not the session — never sign the page
+        // out from under someone who is already authorized.
+        if (!cancelled) setLoadError("Couldn’t reach the server.");
       });
     return () => {
       cancelled = true;
     };
+  }, [reloadKey]);
+
+  // Chart days must be keyed in the planning zone the server buckets by.
+  useEffect(() => {
+    let cancelled = false;
+    void getSettingsCached().then((s) => {
+      if (!cancelled && s?.timezone) setZone(s.timezone);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const retry = useCallback(() => {
+    setLoadError(null);
+    setReloadKey((k) => k + 1);
   }, []);
 
   async function sendMood(mood: string) {
@@ -132,19 +193,16 @@ export function StatsClient() {
   }
 
   if (!stats) {
+    if (loadError) {
+      return <LoadErrorCard message={loadError} onRetry={retry} />;
+    }
     return <SkeletonCards count={4} />;
   }
 
-  const last7 = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    const key = d.toISOString().slice(0, 10);
-    return {
-      key,
-      label: d.toLocaleDateString("en-US", { weekday: "narrow" }),
-      completed: stats.byDate[key]?.completed ?? 0,
-    };
-  });
+  const last7 = clientRecentDays(7, zone).map((d) => ({
+    ...d,
+    completed: stats.byDate[d.key]?.completed ?? 0,
+  }));
   const maxC = Math.max(1, ...last7.map((d) => d.completed));
 
   return (

@@ -29,7 +29,14 @@ beforeAll(async () => {
 afterAll(async () => { if (env) await env.teardown(); });
 
 const itDb = (name: string, fn: () => Promise<void> | void) =>
-  it(name, async () => { if (!dbAvailable || !env) return; await fn(); });
+  it(name, async ({ skip }) => {
+    if (!dbAvailable || !env) {
+      console.warn(`[SKIP] ${name}: Postgres unavailable`);
+      skip(true, "Postgres unavailable");
+      return;
+    }
+    await fn();
+  });
 
 describe("Task CRUD lifecycle", () => {
   itDb("full create → update → delete flow", async () => {

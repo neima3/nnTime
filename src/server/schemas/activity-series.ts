@@ -10,6 +10,7 @@
 
 import { z } from "zod";
 import {
+  boundedTitle,
   activitySourceEnum,
   dateStr,
   editScopeEnum,
@@ -69,7 +70,7 @@ export const activitySeriesCreate = z.object({
   rrule: z.string().nullable().optional(),
   exdate: z.array(dateStr).optional(),
   rdate: z.array(instant).optional(),
-  title: z.string(),
+  title: boundedTitle,
   emoji: z.string().optional(),
   categoryId: uuid.optional(),
   durationMin: pgInteger,
@@ -101,7 +102,7 @@ export const activitySeriesUpdate = z.object({
   rrule: z.string().nullable().optional(),
   exdate: z.array(dateStr).nullable().optional(),
   rdate: z.array(instant).nullable().optional(),
-  title: z.string().optional(),
+  title: boundedTitle.optional(),
   emoji: z.string().nullable().optional(),
   categoryId: uuid.nullable().optional(),
   durationMin: pgInteger.optional(),

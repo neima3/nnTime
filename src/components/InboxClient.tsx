@@ -183,49 +183,62 @@ export function InboxClient({
     async (item: InboxItem) => {
       if (!authed) return;
       setBusy(item.id);
-      const res = await fetch(`/api/v1/tasks/${item.id}`, {
-        method: "DELETE",
-        headers: { "If-Match": String(item.revision) },
-      });
-      if (res.ok || res.status === 204) {
-        setItems((prev) => prev.filter((i) => i.id !== item.id));
-        router.refresh();
-        toast(`Deleted “${item.title}”`, {
-          durationMs: 8000,
-          actionLabel: "Undo",
-          onAction: () => {
-            void (async () => {
-              const recreate = await fetch("/api/v1/tasks", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  bucket: "inbox",
-                  title: item.title,
-                  emoji: item.emoji,
-                  priority: item.priority,
-                }),
-              });
-              if (!recreate.ok) {
-                toast("Couldn't bring it back — it may be gone for good");
-                return;
-              }
-              const task = await recreate.json();
-              setItems((prev) => [
-                {
-                  ...item,
-                  id: task.id,
-                  revision: task.revision ?? 1,
-                },
-                ...prev,
-              ]);
-              router.refresh();
-            })();
-          },
+      setError(null);
+      try {
+        const res = await fetch(`/api/v1/tasks/${item.id}`, {
+          method: "DELETE",
+          headers: { "If-Match": String(item.revision) },
         });
-      } else {
-        setError("Couldn't delete it — try again");
+        if (res.ok || res.status === 204) {
+          setItems((prev) => prev.filter((i) => i.id !== item.id));
+          router.refresh();
+          toast(`Deleted “${item.title}”`, {
+            durationMs: 8000,
+            actionLabel: "Undo",
+            onAction: () => {
+              void (async () => {
+                try {
+                  const recreate = await fetch("/api/v1/tasks", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      bucket: "inbox",
+                      title: item.title,
+                      emoji: item.emoji,
+                      priority: item.priority,
+                    }),
+                  });
+                  if (!recreate.ok) {
+                    toast("Couldn't bring it back — it may be gone for good");
+                    return;
+                  }
+                  const task = await recreate.json();
+                  setItems((prev) => [
+                    {
+                      ...item,
+                      id: task.id,
+                      revision: task.revision ?? 1,
+                    },
+                    ...prev,
+                  ]);
+                  router.refresh();
+                } catch {
+                  toast("Couldn't reach the server — it's still deleted");
+                }
+              })();
+            },
+          });
+        } else if (res.status === 409 || res.status === 412) {
+          setError("That one changed somewhere else — reload and try again");
+          router.refresh();
+        } else {
+          setError("Couldn't delete it — try again");
+        }
+      } catch {
+        setError("Couldn't reach the server — try again?");
+      } finally {
+        setBusy(null);
       }
-      setBusy(null);
     },
     [authed, router],
   );
@@ -234,23 +247,38 @@ export function InboxClient({
     async (item: InboxItem) => {
       if (!authed) return;
       setBusy(item.id);
+      setError(null);
       const today = clientToday();
-      const res = await fetch(`/api/v1/tasks/${item.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "If-Match": String(item.revision),
-        },
-        body: JSON.stringify({
-          bucket: "anytime",
-          date: today,
-        }),
-      });
-      if (res.ok) {
-        setItems((prev) => prev.filter((i) => i.id !== item.id));
-        router.refresh();
-      } else {
-        // bucket may not be in PATCH schema — fall back: create anytime + delete inbox
+      try {
+        const res = await fetch(`/api/v1/tasks/${item.id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "If-Match": String(item.revision),
+          },
+          body: JSON.stringify({
+            bucket: "anytime",
+            date: today,
+          }),
+        });
+        if (res.ok) {
+          setItems((prev) => prev.filter((i) => i.id !== item.id));
+          router.refresh();
+          return;
+        }
+        if (res.status === 409 || res.status === 412) {
+          // Revision conflict: the task moved elsewhere. Creating a copy here
+          // would leave the user with two of it.
+          setError("That one changed somewhere else — reload and try again");
+          router.refresh();
+          return;
+        }
+        if (res.status !== 400 && res.status !== 422) {
+          setError("Couldn't move it — try again");
+          return;
+        }
+        // Only a schema rejection (nothing changed server-side) is safe to
+        // retry as create-then-delete: an API without `bucket` in PATCH.
         const createRes = await fetch("/api/v1/tasks", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -262,18 +290,28 @@ export function InboxClient({
             priority: item.priority,
           }),
         });
-        if (createRes.ok) {
-          await fetch(`/api/v1/tasks/${item.id}`, {
-            method: "DELETE",
-            headers: { "If-Match": String(item.revision) },
-          });
-          setItems((prev) => prev.filter((i) => i.id !== item.id));
-          router.refresh();
-        } else {
+        if (!createRes.ok) {
           setError("Couldn't move it — try again");
+          return;
         }
+        const delRes = await fetch(`/api/v1/tasks/${item.id}`, {
+          method: "DELETE",
+          headers: { "If-Match": String(item.revision) },
+        });
+        if (!delRes.ok && delRes.status !== 204) {
+          setError(
+            "Moved it to today, but the inbox copy is still here — delete it when you can",
+          );
+          router.refresh();
+          return;
+        }
+        setItems((prev) => prev.filter((i) => i.id !== item.id));
+        router.refresh();
+      } catch {
+        setError("Couldn't reach the server — try again?");
+      } finally {
+        setBusy(null);
       }
-      setBusy(null);
     },
     [authed, router],
   );

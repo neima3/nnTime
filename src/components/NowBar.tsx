@@ -69,16 +69,32 @@ export function NowProvider({
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
+    // Four callers can start a load (mount, interval, visibilitychange, day
+    // change); only the newest may write, or an older response wins by landing
+    // late and shows a stale "now".
+    let generation = 0;
+    let knownZone: string | undefined;
     async function load() {
+      const mine = ++generation;
+      const stale = () => cancelled || mine !== generation;
       try {
-        const res = await fetch(`/api/v1/day/${clientToday()}`);
+        // The API expands the day in the account's planning zone, so ask for
+        // the date in *that* zone — a traveller's browser day can differ.
+        const settings = await getSettingsCached();
+        if (stale()) return;
+        const zoneForToday = settings?.timezone ?? knownZone;
+        const res = await fetch(`/api/v1/day/${clientToday(zoneForToday)}`);
+        if (stale()) return;
         if (!res.ok) {
-          if (!cancelled) setActivities(null);
+          // Keep whatever is already on screen — a transient 5xx shouldn't
+          // blank the bar. Only a lost session clears it.
+          if (res.status === 401) setActivities(null);
           return;
         }
         const data = await res.json();
-        if (cancelled) return;
+        if (stale()) return;
         const z: string = data.zone;
+        knownZone = z;
         interface WireActivity {
           title: string;
           emoji: string | null;

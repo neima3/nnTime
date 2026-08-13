@@ -15,6 +15,8 @@
 import "server-only";
 import dns from "node:dns/promises";
 import net from "node:net";
+import { z } from "zod";
+import { isValidZone, wallClockToInstant } from "../temporal/zone";
 
 const MAX_ICS_BYTES = 5 * 1024 * 1024;
 const MAX_REDIRECTS = 3;
@@ -247,48 +249,133 @@ export async function fetchIcs(url: string): Promise<string> {
   }
 }
 
-/** Parse ICS text into events. Minimal parser for VEVENT extraction. */
-export function parseIcs(icsText: string): Array<{
+/** Parsed ICS VEVENT. `start`/`end` are absolute instants; all-day events also
+ * carry the calendar day the feed literally names (ADR-001: date-only values
+ * are days, never midnight-UTC instants). */
+export type IcsEvent = {
   uid: string;
   title: string;
   start?: Date;
   end?: Date;
-  allDay?: boolean;
-}> {
-  const events: Array<{ uid: string; title: string; start?: Date; end?: Date; allDay?: boolean }> = [];
-  const vevents = icsText.match(/BEGIN:VEVENT[\s\S]*?END:VEVENT/g) ?? [];
+  allDay: boolean;
+  /** All-day only: DTSTART as `YYYY-MM-DD`. */
+  startDate?: string;
+  /** All-day only: DTEND as `YYYY-MM-DD` (exclusive, per RFC 5545). */
+  endDate?: string;
+};
+
+/**
+ * DATE (`20260718`), floating/zoned DATE-TIME (`20260717T100000`) or UTC
+ * DATE-TIME (`20260717T140000Z`) — RFC 5545 §3.3.4/§3.3.5.
+ */
+const icsDateValue = z
+  .string()
+  .regex(/^\d{8}(T\d{6}Z?)?$/)
+  .transform((v) => ({
+    year: Number(v.slice(0, 4)),
+    month: Number(v.slice(4, 6)) - 1,
+    day: Number(v.slice(6, 8)),
+    hour: v.length > 8 ? Number(v.slice(9, 11)) : 0,
+    minute: v.length > 8 ? Number(v.slice(11, 13)) : 0,
+    second: v.length > 8 ? Number(v.slice(13, 15)) : 0,
+    dateOnly: v.length === 8,
+    utc: v.endsWith("Z"),
+  }));
+
+type IcsProperty = { params: Record<string, string>; value: string };
+
+/** Unfold RFC 5545 continuation lines (CRLF + single space/tab). */
+function unfold(icsText: string): string {
+  return icsText.replace(/\r?\n[ \t]/g, "");
+}
+
+function unescapeText(v: string): string {
+  return v
+    .replace(/\\n/gi, " ")
+    .replace(/\\([,;\\])/g, "$1")
+    .trim();
+}
+
+function property(block: string, key: string): IcsProperty | undefined {
+  const m = new RegExp(`^${key}((?:;[^:\\r\\n]*)?):(.*)$`, "m").exec(block);
+  if (!m) return undefined;
+  const params: Record<string, string> = {};
+  for (const part of m[1]!.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq <= 0) continue;
+    params[part.slice(0, eq).trim().toUpperCase()] = part
+      .slice(eq + 1)
+      .trim()
+      .replace(/^"|"$/g, "");
+  }
+  return { params, value: m[2]!.trim() };
+}
+
+/** TZID may be quoted or Outlook-prefixed (`/America/New_York`). */
+function resolveZone(tzid: string | undefined, fallback: string): string {
+  const candidate = tzid?.replace(/^\//, "");
+  return candidate && isValidZone(candidate) ? candidate : fallback;
+}
+
+/**
+ * Resolve an ICS date value to a UTC instant.
+ *  - `…Z` → already absolute.
+ *  - TZID-qualified local wall time → resolved in that zone (DST gap/fold per
+ *    ADR-001 via `wallClockToInstant`).
+ *  - floating local time / DATE → resolved in `zone` (the importer's planning
+ *    zone).
+ */
+function icsInstant(prop: IcsProperty, zone: string): Date | undefined {
+  const parsed = icsDateValue.safeParse(prop.value);
+  if (!parsed.success) return undefined;
+  const p = parsed.data;
+  if (p.utc) {
+    return new Date(Date.UTC(p.year, p.month, p.day, p.hour, p.minute, p.second));
+  }
+  return wallClockToInstant(
+    p.year,
+    p.month,
+    p.day,
+    p.hour,
+    p.minute,
+    p.second,
+    resolveZone(prop.params.TZID, zone),
+  );
+}
+
+function icsDateOnly(prop: IcsProperty): string | undefined {
+  const parsed = icsDateValue.safeParse(prop.value);
+  if (!parsed.success || !parsed.data.dateOnly) return undefined;
+  return `${prop.value.slice(0, 4)}-${prop.value.slice(4, 6)}-${prop.value.slice(6, 8)}`;
+}
+
+/**
+ * Parse ICS text into events. Minimal VEVENT extraction.
+ *
+ * `zone` is the importing user's planning zone: it resolves floating local
+ * times and all-day days (never UTC midnight — ADR-001).
+ */
+export function parseIcs(icsText: string, zone = "UTC"): IcsEvent[] {
+  const events: IcsEvent[] = [];
+  const vevents = unfold(icsText).match(/BEGIN:VEVENT[\s\S]*?END:VEVENT/g) ?? [];
   for (const block of vevents) {
-    const get = (key: string) => {
-      const m = new RegExp(`^${key}[^:]*:(.+)$`, "m").exec(block);
-      return m?.[1]?.trim();
-    };
-    const uid = get("UID") ?? crypto.randomUUID();
-    const title = get("SUMMARY") ?? "Untitled";
-    const dtstart = get("DTSTART");
-    const dtend = get("DTEND");
-    const allDay = !!(dtstart && /^\d{8}$/.test(dtstart));
+    const uid = property(block, "UID")?.value ?? crypto.randomUUID();
+    const summary = property(block, "SUMMARY")?.value;
+    const dtstart = property(block, "DTSTART");
+    const dtend = property(block, "DTEND");
+    const startDate = dtstart ? icsDateOnly(dtstart) : undefined;
+    const endDate = dtend ? icsDateOnly(dtend) : undefined;
     events.push({
       uid,
-      title,
-      start: dtstart ? parseIcsDate(dtstart) : undefined,
-      end: dtend ? parseIcsDate(dtend) : undefined,
-      allDay,
+      title: summary ? unescapeText(summary) : "Untitled",
+      start: dtstart ? icsInstant(dtstart, zone) : undefined,
+      end: dtend ? icsInstant(dtend, zone) : undefined,
+      allDay: !!startDate || dtstart?.params.VALUE === "DATE",
+      ...(startDate ? { startDate } : {}),
+      ...(endDate ? { endDate } : {}),
     });
   }
   return events;
-}
-
-function parseIcsDate(s: string): Date | undefined {
-  // YYYYMMDD or YYYYMMDDTHHMMSSZ
-  if (/^\d{8}$/.test(s)) {
-    return new Date(`${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`);
-  }
-  if (/^\d{8}T\d{6}Z$/.test(s)) {
-    return new Date(
-      `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}T${s.slice(9, 11)}:${s.slice(11, 13)}:${s.slice(13, 15)}Z`,
-    );
-  }
-  return undefined;
 }
 
 /**

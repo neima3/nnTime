@@ -3,6 +3,50 @@ import Foundation
 // Pure logic for the brain-breaks arcade — mirrors src/lib/games.ts so web and
 // iOS behave identically. Every function takes a seedable RNG for tests.
 enum ArcadeLogic {
+    // MARK: Rounding
+
+    /// JavaScript `Math.round`: floor(x + 0.5), so ties go toward +∞ and
+    /// -2.5 lands on -2. Swift's `rounded()` breaks ties away from zero, and
+    /// `Int(_:)` truncates — both drift from the web on half values.
+    static func jsRound(_ value: Double) -> Int {
+        Int((value + 0.5).rounded(.down))
+    }
+
+    // MARK: Time Feel (time reproduction)
+
+    static let timeFeelRounds = [5, 8, 12, 20]
+
+    /// Absolute error fraction for one round (0 = perfect).
+    static func timeFeelRoundError(targetSec: Double, actualSec: Double) -> Double {
+        guard targetSec > 0 else { return 0 }
+        return abs(actualSec - targetSec) / targetSec
+    }
+
+    /// 100 − mean absolute error%, floored at 0 and rounded like the web.
+    static func timeFeelScore(_ rounds: [(targetSec: Double, actualSec: Double)]) -> Int {
+        guard !rounds.isEmpty else { return 0 }
+        let meanErr = rounds.reduce(0.0) {
+            $0 + timeFeelRoundError(targetSec: $1.targetSec, actualSec: $1.actualSec)
+        } / Double(rounds.count)
+        return max(0, jsRound(100 * (1 - meanErr)))
+    }
+
+    // MARK: Quick Tap (reaction)
+
+    static let quickTapRounds = 5
+
+    /// Average of valid reaction times; nil when no round produced one.
+    static func quickTapAverage(_ ms: [Int?]) -> Int? {
+        let valid = ms.compactMap { $0 }.filter { $0 > 0 }
+        guard !valid.isEmpty else { return nil }
+        return jsRound(Double(valid.reduce(0, +)) / Double(valid.count))
+    }
+
+    /// Random wait before the go-signal (1.2–3.5 s), from a [0,1) roll.
+    static func quickTapDelayMs(roll: Double) -> Int {
+        jsRound(1200 + roll * 2300)
+    }
+
     // MARK: Focus Finder (Schulte grid)
 
     static let schulteSize = 25

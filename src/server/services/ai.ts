@@ -18,10 +18,16 @@
 import "server-only";
 import { z } from "zod";
 import Anthropic from "@anthropic-ai/sdk";
-import { checkRateLimit } from "../ratelimit";
+import { checkRateLimit, type RateLimitResult } from "../ratelimit";
 
-/** Per-user daily AI quota (SEC-05). */
+/** Per-user daily AI quota (SEC-05) — one bucket shared by every AI route. */
 const AI_DAILY_QUOTA = 50;
+
+/** Max tasks handed to the model in one call — bounds input-token cost. */
+export const AI_MAX_TASKS = 20;
+
+/** Max characters of a user-authored title forwarded to the model. */
+const AI_MAX_TITLE_CHARS = 200;
 
 /** The Anthropic client is created lazily so the key isn't required at import. */
 let client: Anthropic | null = null;
@@ -81,12 +87,34 @@ export const priorityGroupingSchema = z.strictObject({
 /* Quota check (SEC-05: atomic per-user daily quota)                           */
 /* -------------------------------------------------------------------------- */
 
-export async function checkAiQuota(userId: string): Promise<{ allowed: boolean; remaining: number }> {
-  const result = await checkRateLimit(`ai:quota:${userId}:${new Date().toISOString().slice(0, 10)}`, {
+/** Thrown when the shared daily AI quota is spent; routes map it to 429. */
+export class AiQuotaExceededError extends Error {
+  readonly result: RateLimitResult;
+  constructor(result: RateLimitResult) {
+    super("AI daily quota exceeded");
+    this.name = "AiQuotaExceededError";
+    this.result = result;
+  }
+}
+
+export async function checkAiQuota(userId: string): Promise<RateLimitResult> {
+  return checkRateLimit(`ai:quota:${userId}:${new Date().toISOString().slice(0, 10)}`, {
     limit: AI_DAILY_QUOTA,
     windowSec: 86400, // 24h
   });
-  return { allowed: result.allowed, remaining: result.remaining };
+}
+
+/** The single quota gate: every AI feature consumes this one counter. */
+async function consumeAiQuota(userId: string): Promise<void> {
+  const result = await checkAiQuota(userId);
+  if (!result.allowed) throw new AiQuotaExceededError(result);
+}
+
+/** Bound an untrusted task list before it becomes prompt input. */
+function capTasks<T extends { title: string }>(tasks: T[]): T[] {
+  return tasks
+    .slice(0, AI_MAX_TASKS)
+    .map((t) => ({ ...t, title: t.title.slice(0, AI_MAX_TITLE_CHARS) }));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -94,15 +122,19 @@ export async function checkAiQuota(userId: string): Promise<{ allowed: boolean; 
 /* -------------------------------------------------------------------------- */
 
 export async function breakDownTask(taskTitle: string, userId: string): Promise<{ steps: string[] }> {
-  const quota = await checkAiQuota(userId);
-  if (!quota.allowed) throw new Error("AI daily quota exceeded");
+  await consumeAiQuota(userId);
 
   const response = await getClient().messages.create({
     model: "claude-haiku-4-5",
     max_tokens: 500,
     system: `You break tasks into small, actionable steps for someone with ADHD. Return 3-7 steps, each under 200 characters. Respond ONLY with JSON: {"steps": ["step1", "step2", ...]}.`,
     // SEC-05: untrusted field delimited.
-    messages: [{ role: "user", content: `Break down this task into steps:\n<task>${taskTitle}</task>` }],
+    messages: [
+      {
+        role: "user",
+        content: `Break down this task into steps:\n<task>${taskTitle.slice(0, AI_MAX_TITLE_CHARS)}</task>`,
+      },
+    ],
   });
 
   const text = response.content
@@ -118,8 +150,7 @@ export async function breakDownTask(taskTitle: string, userId: string): Promise<
 /* -------------------------------------------------------------------------- */
 
 export async function parseNaturalLanguage(input: string, userId: string) {
-  const quota = await checkAiQuota(userId);
-  if (!quota.allowed) throw new Error("AI daily quota exceeded");
+  await consumeAiQuota(userId);
 
   // Ground relative dates ("tomorrow", "tuesday") in the user's planning zone.
   const { getOrCreateSettings } = await import("../dal");
@@ -158,8 +189,8 @@ export async function planMyDay(
   freeSlots: { start: string; end: string }[],
   learned?: { chargedStart: number; chargedEnd: number } | null,
 ) {
-  const quota = await checkAiQuota(userId);
-  if (!quota.allowed) throw new Error("AI daily quota exceeded");
+  await consumeAiQuota(userId);
+  const capped = capTasks(tasks);
 
   // Round 9 (E07): the learned pattern travels as data, described in the
   // system prompt — same delimiting discipline as every other untrusted field.
@@ -174,7 +205,7 @@ export async function planMyDay(
     messages: [
       {
         role: "user",
-        content: `<tasks>${JSON.stringify(tasks)}</tasks>\n<energy>${currentEnergy}</energy>\n<slots>${JSON.stringify(freeSlots)}</slots>${learnedBlock}`,
+        content: `<tasks>${JSON.stringify(capped)}</tasks>\n<energy>${currentEnergy}</energy>\n<slots>${JSON.stringify(freeSlots)}</slots>${learnedBlock}`,
       },
     ],
   });
@@ -195,14 +226,14 @@ export async function groupByPriority(
   userId: string,
   tasks: { id: string; title: string }[],
 ) {
-  const quota = await checkAiQuota(userId);
-  if (!quota.allowed) throw new Error("AI daily quota exceeded");
+  await consumeAiQuota(userId);
+  const capped = capTasks(tasks);
 
   const response = await getClient().messages.create({
     model: "claude-haiku-4-5",
     max_tokens: 500,
     system: `Group tasks by priority (high/low/none) for someone with ADHD. Respond ONLY with JSON: {"groups":[{"priority":"high|low|none","taskIds":["uuid"],"durationEstimateMin":N}]}.`,
-    messages: [{ role: "user", content: `<tasks>${JSON.stringify(tasks)}</tasks>` }],
+    messages: [{ role: "user", content: `<tasks>${JSON.stringify(capped)}</tasks>` }],
   });
 
   const text = response.content

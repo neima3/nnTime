@@ -320,6 +320,9 @@ struct GreenLightGame: View {
         runTask?.cancel()
         sequence = ArcadeLogic.buildGoSequence()
         score = 0
+        idx = 0
+        showing = false
+        flash = nil
         isNewBest = false
         best = PlayScores.best(for: "greenlight")
         stage = 1
@@ -351,7 +354,7 @@ struct GreenLightGame: View {
     }
 
     private func tap() {
-        guard stage == 1, !tapped else { return }
+        guard stage == 1, showing, !tapped else { return }
         tapped = true
         flash = goNow
         if goNow { UIImpactFeedbackGenerator(style: .light).impactOccurred() }

@@ -36,9 +36,20 @@ afterAll(async () => {
   if (env) await env.teardown();
 });
 
+/** Skip (not pass) when Postgres is unavailable — honest CI signal. */
+const itDb = (name: string, fn: (env: EphemeralDb) => Promise<void> | void) =>
+  it(name, async ({ skip }) => {
+    const ready = env;
+    if (!dbAvailable || !ready) {
+      console.warn(`[SKIP] ${name}: Postgres unavailable`);
+      skip(true, "Postgres unavailable");
+      return;
+    }
+    await fn(ready);
+  });
+
 describe("withIdempotency concurrency", () => {
-  it("does not cache a transient conflict that a fresh revision can resolve", async () => {
-    if (!dbAvailable || !env) return;
+  itDb("does not cache a transient conflict that a fresh revision can resolve", async (env) => {
     const key = crypto.randomUUID();
     let executions = 0;
     const execute = async () => {
@@ -71,8 +82,7 @@ describe("withIdempotency concurrency", () => {
     expect(executions).toBe(2);
   });
 
-  it("replays an empty 204 response without repeating the delete", async () => {
-    if (!dbAvailable || !env) return;
+  itDb("replays an empty 204 response without repeating the delete", async (env) => {
     const key = crypto.randomUUID();
     let executions = 0;
     const execute = async () => {
@@ -104,8 +114,7 @@ describe("withIdempotency concurrency", () => {
     expect(executions).toBe(1);
   });
 
-  it("rejects same-user key reuse for a different operation", async () => {
-    if (!dbAvailable || !env) return;
+  itDb("rejects same-user key reuse for a different operation", async (env) => {
     const key = crypto.randomUUID();
     let executions = 0;
     const execute = async () => {
@@ -145,8 +154,7 @@ describe("withIdempotency concurrency", () => {
     expect(executions).toBe(1);
   });
 
-  it("scopes identical keys independently by user", async () => {
-    if (!dbAvailable || !env) return;
+  itDb("scopes identical keys independently by user", async (env) => {
     const otherUserId = crypto.randomUUID();
     await insertUser(env.db, otherUserId, "idempotency-other@test.com");
     const key = crypto.randomUUID();
@@ -178,8 +186,7 @@ describe("withIdempotency concurrency", () => {
     expect(executions).toBe(2);
   });
 
-  it("allows only one same-key mood side effect", async () => {
-    if (!dbAvailable || !env) return;
+  itDb("allows only one same-key mood side effect", async (env) => {
     const key = crypto.randomUUID();
     let executions = 0;
     let releaseFirst!: () => void;
@@ -249,8 +256,7 @@ describe("withIdempotency concurrency", () => {
     ).toHaveLength(1);
   });
 
-  it("keeps task and activity mutations on the locked connection under pool saturation", async () => {
-    if (!dbAvailable || !env) return;
+  itDb("keeps task and activity mutations on the locked connection under pool saturation", async (env) => {
     const client = postgres(env.url, { max: 2 });
     const boundedDb = drizzle(client, { schema });
     const timeout = new Promise<never>((_, reject) => {

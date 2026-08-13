@@ -3,7 +3,8 @@
  */
 import { requireSession } from "@/server/auth-session";
 import { handleErrors, parseBody, errorResponse } from "@/server/api-errors";
-import { planMyDay } from "@/server/services/ai";
+import { rateLimitedResponse } from "@/server/ratelimit";
+import { planMyDay, AiQuotaExceededError, AI_MAX_TASKS } from "@/server/services/ai";
 import { getEnergyPattern } from "@/server/services/stats";
 import { listTasks } from "@/server/dal";
 import { z } from "zod";
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
     }
     const tasks = await listTasks(userId, { bucket: "inbox" });
     const anytime = await listTasks(userId, { bucket: "anytime" });
-    const combined = [...tasks, ...anytime].slice(0, 20).map((t) => ({
+    const combined = [...tasks, ...anytime].slice(0, AI_MAX_TASKS).map((t) => ({
       id: t.id,
       title: t.title,
       energy: t.energy ?? undefined,
@@ -60,11 +61,8 @@ export async function POST(request: Request) {
       }));
       return Response.json({ ...result, items });
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "AI error";
-      if (msg.includes("quota")) {
-        return errorResponse("rate_limited", "Daily AI quota exceeded", 429, {
-          retryable: true,
-        });
+      if (e instanceof AiQuotaExceededError) {
+        return rateLimitedResponse(e.result, "Daily AI quota exceeded");
       }
       console.error("[ai/plan-day]", e);
       return errorResponse("internal", "An unexpected error occurred", 500);

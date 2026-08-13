@@ -6,6 +6,65 @@ import XCTest
 /// miss-memory semantics. If the web logic changes, these fail on purpose.
 final class PlayArcadeLogicTests: XCTestCase {
 
+    // MARK: Rounding
+
+    func testJSRoundBreaksTiesTowardPositiveInfinity() {
+        XCTAssertEqual(ArcadeLogic.jsRound(0.5), 1)
+        XCTAssertEqual(ArcadeLogic.jsRound(1.5), 2)
+        XCTAssertEqual(ArcadeLogic.jsRound(2.4), 2)
+        XCTAssertEqual(ArcadeLogic.jsRound(-2.5), -2)
+        XCTAssertEqual(ArcadeLogic.jsRound(-2.6), -3)
+    }
+
+    // MARK: Time Feel — pins mirror games.test.ts
+
+    func testTimeFeelRoundErrorMatchesTheWebPins() {
+        XCTAssertEqual(ArcadeLogic.timeFeelRoundError(targetSec: 10, actualSec: 15), 0.5, accuracy: 1e-9)
+        XCTAssertEqual(ArcadeLogic.timeFeelRoundError(targetSec: 10, actualSec: 5), 0.5, accuracy: 1e-9)
+        XCTAssertEqual(ArcadeLogic.timeFeelRoundError(targetSec: 20, actualSec: 20), 0)
+        XCTAssertEqual(ArcadeLogic.timeFeelRoundError(targetSec: 0, actualSec: 5), 0)
+        XCTAssertEqual(ArcadeLogic.timeFeelRoundError(targetSec: -1, actualSec: 5), 0)
+    }
+
+    func testTimeFeelScoreMatchesTheWebPins() {
+        XCTAssertEqual(ArcadeLogic.timeFeelScore([
+            (targetSec: 5, actualSec: 5), (targetSec: 12, actualSec: 12),
+        ]), 100)
+        XCTAssertEqual(ArcadeLogic.timeFeelScore([
+            (targetSec: 10, actualSec: 15), (targetSec: 10, actualSec: 10),
+        ]), 75)
+        XCTAssertEqual(ArcadeLogic.timeFeelScore([(targetSec: 5, actualSec: 100)]), 0)
+        XCTAssertEqual(ArcadeLogic.timeFeelScore([]), 0)
+    }
+
+    func testTimeFeelScoreRoundsHalvesUp() {
+        // 7.5% mean error -> 92.5 -> 93 (truncation would give 92).
+        XCTAssertEqual(ArcadeLogic.timeFeelScore([(targetSec: 100, actualSec: 107.5)]), 93)
+    }
+
+    // MARK: Quick Tap — pins mirror games.test.ts
+
+    func testQuickTapAverageMatchesTheWebPins() {
+        XCTAssertEqual(ArcadeLogic.quickTapAverage([100, nil, 200, nil, 300]), 200)
+        XCTAssertNil(ArcadeLogic.quickTapAverage([nil, nil, nil]))
+        XCTAssertEqual(ArcadeLogic.quickTapAverage([100, 101]), 101)
+        XCTAssertEqual(ArcadeLogic.quickTapAverage([280, 281]), 281)
+    }
+
+    func testQuickTapAverageIgnoresTheEarlyTapSentinel() {
+        XCTAssertEqual(ArcadeLogic.quickTapAverage([-1, 200, -1]), 200)
+        XCTAssertNil(ArcadeLogic.quickTapAverage([-1, -1, -1, -1, -1]))
+    }
+
+    func testQuickTapDelayMatchesTheWebPins() {
+        XCTAssertEqual(ArcadeLogic.quickTapDelayMs(roll: 0), 1200)
+        XCTAssertLessThanOrEqual(ArcadeLogic.quickTapDelayMs(roll: 0.999999), 3500)
+        XCTAssertLessThan(ArcadeLogic.quickTapDelayMs(roll: 0.1), ArcadeLogic.quickTapDelayMs(roll: 0.5))
+        XCTAssertLessThan(ArcadeLogic.quickTapDelayMs(roll: 0.5), ArcadeLogic.quickTapDelayMs(roll: 0.9))
+        // 1200 + 0.125 * 2300 = 1487.5 -> 1488 (truncation would give 1487).
+        XCTAssertEqual(ArcadeLogic.quickTapDelayMs(roll: 0.125), 1488)
+    }
+
     // MARK: Focus Finder
 
     func testSchulteGridContainsEveryNumberOnce() {

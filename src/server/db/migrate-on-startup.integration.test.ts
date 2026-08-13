@@ -28,9 +28,20 @@ afterAll(async () => {
   await env?.teardown();
 }, 60_000);
 
+/** Skip (not pass) when Postgres is unavailable — honest CI signal. */
+const itDb = (name: string, fn: (env: EphemeralDb) => Promise<void> | void) =>
+  it(name, async ({ skip }) => {
+    const ready = env;
+    if (!dbAvailable || !ready) {
+      console.warn(`[SKIP] ${name}: Postgres unavailable`);
+      skip(true, "Postgres unavailable");
+      return;
+    }
+    await fn(ready);
+  });
+
 describe("startup migration concurrency", () => {
-  it("serializes independent workers against one database", async () => {
-    if (!dbAvailable || !env) return;
+  itDb("serializes independent workers against one database", async (env) => {
 
     await env.sql.unsafe(`
       CREATE TABLE __migrations (

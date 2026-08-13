@@ -42,6 +42,12 @@ const HANDLERS_WITHOUT_OPENAPI = [
 ] as const;
 
 /**
+ * Allowlist entries permitted to exist before their handler does (genuinely
+ * future routes). Every other entry must match a real handler.
+ */
+const FUTURE_ROUTE_ALLOWLIST_ENTRIES = new Set<string>(["/api/v1/jobs/tick"]);
+
+/**
  * OpenAPI paths without a handler yet — deferred to a later phase.
  * Keep documented so the contract stays aspirational; remove when shipped.
  */
@@ -236,25 +242,35 @@ describe("OpenAPI ↔ handler inventory", () => {
       ).toBe(false);
     }
 
-    // Handler-only allowlist entries that are exact should either exist as
-    // handlers or be prefix globs for future routes (e.g. jobs/tick).
+    // Handler-only allowlist entries must name a handler that actually exists
+    // and is genuinely undocumented — otherwise the entry is stale.
     for (const entry of HANDLERS_WITHOUT_OPENAPI) {
-      if (entry.endsWith("/*")) {
-        const prefix = entry.slice(0, -1);
-        const any = [...handlerPaths].some(
-          (p) => p === entry.slice(0, -2) || p.startsWith(prefix),
-        );
-        // Prefix allowlists may be empty (jobs/tick not yet); that's fine.
-        void any;
-        continue;
+      const isGlob = entry.endsWith("/*");
+      const prefix = entry.slice(0, -1);
+      const base = entry.slice(0, -2);
+      const matches = isGlob
+        ? [...handlerPaths].filter((p) => p === base || p.startsWith(prefix))
+        : handlerPaths.has(entry)
+          ? [entry]
+          : [];
+
+      if (!FUTURE_ROUTE_ALLOWLIST_ENTRIES.has(entry)) {
+        expect(
+          matches.length,
+          `HANDLERS_WITHOUT_OPENAPI entry matches no route handler — remove from allowlist (or add to FUTURE_ROUTE_ALLOWLIST_ENTRIES): ${entry}`,
+        ).toBeGreaterThan(0);
       }
-      // Exact entries: if the handler was removed, drop the allowlist entry.
-      // jobs/tick may not exist yet — skip enforce when absent.
-      if (!handlerPaths.has(entry) && entry !== "/api/v1/jobs/tick") {
-        // Only fail if OpenAPI also has it (then it should move lists); otherwise
-        // warn via expect that optional extras still match.
-        // Soft: allow pre-declared future handlers.
-      }
+
+      // Documented paths belong in the spec-side lists, not this one.
+      const documented = isGlob
+        ? [...openapiPaths].filter((p) => p === base || p.startsWith(prefix))
+        : openapiPaths.has(entry)
+          ? [entry]
+          : [];
+      expect(
+        documented,
+        `HANDLERS_WITHOUT_OPENAPI entry is documented in OpenAPI — remove from allowlist: ${entry}`,
+      ).toEqual([]);
     }
   });
 });

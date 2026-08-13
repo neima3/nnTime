@@ -84,14 +84,18 @@ export async function checkRateLimit(
 }
 
 /**
- * Convenience: standard 429 response body for a blocked request.
+ * Convenience: standard 429 response body (ADR-002 envelope) for a blocked
+ * request. `message` overrides the generic copy for endpoint-specific limits.
  */
-export function rateLimitedResponse(result: RateLimitResult) {
+export function rateLimitedResponse(
+  result: RateLimitResult,
+  message = "Too many requests. Please retry shortly.",
+) {
   return Response.json(
     {
       error: {
         code: "rate_limited",
-        message: "Too many requests. Please retry shortly.",
+        message,
         retryable: true,
         retryAfterSec: result.retryAfterSec,
       },

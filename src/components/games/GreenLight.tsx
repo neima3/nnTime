@@ -58,6 +58,9 @@ export function GreenLight({ onExit }: { onExit: () => void }) {
     timersRef.current = [];
     seqRef.current = buildGoSequence();
     setScore(0);
+    setIdx(0);
+    setShowing(false);
+    setFlash(null);
     setIsNewBest(false);
     setBest(readBest("green-light"));
     setStage("playing");
