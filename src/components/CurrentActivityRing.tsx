@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { nowMinutesInZone } from "@/lib/client-now";
 
 interface CurrentActivityRingProps {
   activityStart: number; // minutes from midnight
@@ -16,6 +17,8 @@ interface CurrentActivityRingProps {
   emoji: string;
   /** The now-line position (minutes from midnight). Updated externally. */
   nowMin?: number;
+  /** Account planning zone (ADR-001). Empty → browser-local fallback. */
+  zone?: string;
 }
 
 export function CurrentActivityRing({
@@ -23,6 +26,7 @@ export function CurrentActivityRing({
   activityDuration,
   emoji,
   nowMin: externalNow,
+  zone,
 }: CurrentActivityRingProps) {
   const [mounted, setMounted] = useState(false);
   const [nowMin, setNowMin] = useState(externalNow ?? 13 * 60);
@@ -32,16 +36,15 @@ export function CurrentActivityRing({
     /* eslint-disable react-hooks/set-state-in-effect */
     setMounted(true);
     if (externalNow === undefined) {
-      const now = new Date();
-      setNowMin(now.getHours() * 60 + now.getMinutes());
+      // "Now" follows the planning zone, not the device clock.
+      setNowMin(nowMinutesInZone(zone));
       const interval = setInterval(() => {
-        const n = new Date();
-        setNowMin(n.getHours() * 60 + n.getMinutes());
+        setNowMin(nowMinutesInZone(zone));
       }, 30000); // 30s is enough for the ring
       return () => clearInterval(interval);
     }
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [externalNow]);
+  }, [externalNow, zone]);
 
   if (!mounted) return <span aria-hidden>{emoji}</span>;
 

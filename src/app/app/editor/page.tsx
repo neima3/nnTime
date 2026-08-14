@@ -23,12 +23,19 @@ export default async function EditorPage({
   const start = typeof sp.start === "string" ? Number(sp.start) : undefined;
   const date = typeof sp.date === "string" ? sp.date : undefined;
   const title = typeof sp.title === "string" ? sp.title : undefined;
+  // ADR-001 occurrence identity: which day of a repeating series is open. The
+  // editor needs it to offer "just this time" instead of rewriting the series.
+  const occurrenceKey =
+    typeof sp.occurrenceKey === "string" ? sp.occurrenceKey : undefined;
+  const repeats = sp.repeats === "1";
   const returnTo = appReturnTo("/app/editor", {
     id,
     taskId,
     start: Number.isFinite(start) ? start : undefined,
     date,
     title,
+    occurrenceKey,
+    repeats: repeats ? "1" : undefined,
   });
   const session = await getSession();
   const task =
@@ -71,6 +78,8 @@ export default async function EditorPage({
             Number.isFinite(start) ? (start as number) : undefined
           }
           initialDate={date}
+          initialOccurrenceKey={occurrenceKey}
+          initialRepeats={repeats}
           initialTitle={task?.title ?? title}
           initialEmoji={task?.emoji ?? undefined}
           initialCategoryKey={categoryKey}

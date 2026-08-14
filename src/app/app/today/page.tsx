@@ -409,6 +409,7 @@ export default async function TodayPage({
 
           {authed && isToday && (
             <DailyBrief
+              zone={zone || undefined}
               blocks={activities.map((a) => ({
                 title: a.title,
                 emoji: a.emoji,
@@ -418,7 +419,7 @@ export default async function TodayPage({
             />
           )}
           {authed && isToday && <LowBatteryNote date={date} />}
-          {authed && isToday && <PeakFocusNudge />}
+          {authed && isToday && <PeakFocusNudge zone={zone || undefined} />}
 
           {authed && !activities.every((a) => a.done) && (
             <DayLoadMeter activities={activities} />

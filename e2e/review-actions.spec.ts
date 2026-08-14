@@ -11,6 +11,17 @@ test.use({
   serviceWorkers: "block",
 });
 
+/**
+ * Scope title assertions to <main>. The now-bar (rendered as a sibling of
+ * <main> in AppShell) also shows the current activity's title, so an unscoped
+ * getByText matched twice and failed strict mode whenever the seeded block
+ * happened to be happening right now — this spec seeds blocks at 00:05-00:15
+ * local, so it only fired in the few minutes after local midnight.
+ */
+function reviewCard(page: import("@playwright/test").Page, title: string) {
+  return page.locator("main").getByText(title);
+}
+
 test("authenticated Review decisions persist before celebrating", async ({
   page,
 }) => {
@@ -53,7 +64,7 @@ test("authenticated Review decisions persist before celebrating", async ({
   expect(createStatuses).toEqual([201, 201, 201]);
 
   await gotoHydrated(page, "/app/review");
-  await expect(page.getByText(titles[0]!)).toBeVisible();
+  await expect(reviewCard(page, titles[0]!)).toBeVisible();
   await page.evaluate(() => {
     document.documentElement.dataset.reviewCelebrations = "0";
     window.addEventListener("kairo:celebrate", () => {
@@ -92,10 +103,10 @@ test("authenticated Review decisions persist before celebrating", async ({
       () => document.documentElement.dataset.reviewCelebrations,
     ),
   ).toBe("0");
-  await expect(page.getByText(titles[0]!)).toBeVisible();
+  await expect(reviewCard(page, titles[0]!)).toBeVisible();
 
   await complete.click();
-  await expect(page.getByText(titles[1]!)).toBeVisible({ timeout: 15_000 });
+  await expect(reviewCard(page, titles[1]!)).toBeVisible({ timeout: 15_000 });
   expect(
     await page.evaluate(
       () => document.documentElement.dataset.reviewCelebrations,
@@ -103,8 +114,8 @@ test("authenticated Review decisions persist before celebrating", async ({
   ).toBe("1");
 
   await page.getByRole("button", { name: "Move to tomorrow" }).click();
-  await expect(page.getByText(titles[2]!)).toBeVisible({ timeout: 15_000 });
+  await expect(reviewCard(page, titles[2]!)).toBeVisible({ timeout: 15_000 });
 
   await page.getByRole("button", { name: "Let it go" }).click();
-  await expect(page.getByText(titles[2]!)).toHaveCount(0, { timeout: 15_000 });
+  await expect(reviewCard(page, titles[2]!)).toHaveCount(0, { timeout: 15_000 });
 });

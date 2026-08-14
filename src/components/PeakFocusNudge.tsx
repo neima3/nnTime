@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CalendarPlus, Check, Sparkles, X } from "lucide-react";
 import { clientToday } from "@/lib/client-date";
+import { nowHourInZone } from "@/lib/client-now";
 import { detectTimezone } from "@/lib/timezone";
 import { localMinutesToInstant } from "@/lib/adapters";
 import { sendReplaySafeCreate } from "@/lib/offline-mutation";
@@ -26,14 +27,14 @@ import {
   PEAK_MIN_SESSIONS,
 } from "@/lib/insights";
 
-export function PeakFocusNudge() {
+export function PeakFocusNudge({ zone }: { zone?: string } = {}) {
   const [peakHour, setPeakHour] = useState<number | null>(null);
   const [dismissed, setDismissed] = useState(true);
   const [protecting, setProtecting] = useState(false);
   const [protectedDaily, setProtectedDaily] = useState(false);
 
   useEffect(() => {
-    const today = clientToday();
+    const today = clientToday(zone);
     if (typeof window !== "undefined" &&
         localStorage.getItem("kairo:peak-nudge-dismissed") === today) {
       return;
@@ -51,17 +52,19 @@ export function PeakFocusNudge() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [zone]);
 
   if (dismissed || peakHour == null) return null;
 
-  const nowHour = new Date().getHours();
+  // peakHour comes from computeFocusHours, which buckets by the ACCOUNT zone's
+  // wall clock — so "is it my peak hour now" must be asked in that same zone.
+  const nowHour = nowHourInZone(zone);
   if (!isInPeakWindow(nowHour, peakHour)) return null;
 
   function dismiss() {
     setDismissed(true);
     try {
-      localStorage.setItem("kairo:peak-nudge-dismissed", clientToday());
+      localStorage.setItem("kairo:peak-nudge-dismissed", clientToday(zone));
     } catch {}
   }
 
@@ -70,12 +73,13 @@ export function PeakFocusNudge() {
     if (peakHour == null) return;
     setProtecting(true);
     try {
-      const zone = detectTimezone();
+      // Planning zone first; the browser guess is only the signed-out fallback.
+      const tz = zone || detectTimezone();
       const delivery = await sendReplaySafeCreate({
         path: "/api/v1/activities",
         body: {
-          tz: zone,
-          dtstartLocal: localMinutesToInstant(clientToday(), peakHour * 60, zone),
+          tz,
+          dtstartLocal: localMinutesToInstant(clientToday(tz), peakHour * 60, tz),
           title: "Focus time",
           emoji: "🎯",
           durationMin: 45,

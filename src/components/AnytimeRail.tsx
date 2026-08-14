@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { CalendarPlus, Check, Wand2 } from "lucide-react";
 import { catClasses, type CategoryId } from "@/lib/mock";
 import { localMinutesToInstant } from "@/lib/adapters";
+import { nowMinutesInZone } from "@/lib/client-now";
 import { toast } from "./Toast";
 import { firstFreeSlot } from "@/lib/slots";
 import { notifyDayChanged } from "./NowBar";
@@ -49,8 +50,9 @@ export function AnytimeRail({
       if (!authed || !zone) return;
       setSlotting(item.id);
       try {
-        const now = new Date();
-        const nowMin = now.getHours() * 60 + now.getMinutes();
+        // "Now" in the account's planning zone — the busy ranges and the
+        // instant we POST are both zone-local, so this must be too.
+        const nowMin = nowMinutesInZone(zone);
         const start = firstFreeSlot(busy, nowMin, 30);
         if (start == null) {
           toast("Today's pretty full — tomorrow-you can have this one");

@@ -18,6 +18,12 @@ import { SignedInOnly } from "@/components/AppSessionBoundary";
 
 type Block = {
   id: string;
+  /** Absent on the signed-out sample week, which links nowhere real. */
+  seriesId?: string;
+  /** ADR-001 occurrence identity — which day of a repeating series this is. */
+  occurrenceKey?: string;
+  repeats?: boolean;
+  startMin?: number;
   emoji: string;
   title: string;
   time: string;
@@ -155,6 +161,10 @@ async function loadWeek(weekParam?: string) {
         // Occurrence-aware id for React key uniqueness when a series
         // expands to multiple instances (or same series appears once per day).
         id: `${s.id}:${occKey}`,
+        seriesId: s.id,
+        occurrenceKey: occKey,
+        repeats: Boolean(s.rrule),
+        startMin,
         emoji: s.emoji ?? "📋",
         title: s.title,
         time: formatTime(startMin, toHourCycle(settings.hourCycle)),
@@ -279,13 +289,20 @@ export default async function WeekPage({
               </header>
               {d.blocks.map((b) => {
                 const cat = catClasses[b.category];
-                // id is `${seriesId}:${occurrenceKey}`; editor needs series UUID only.
-                const seriesId = b.id.split(":")[0]!;
                 const [clock, meridiem] = b.time.split(" ");
+                // Carry the occurrence identity so the editor can scope the
+                // save to this day alone (ADR-001) rather than the series.
+                const editorParams = new URLSearchParams({
+                  id: b.seriesId ?? b.id.split(":")[0]!,
+                  date: d.dateStr,
+                });
+                if (b.startMin != null) editorParams.set("start", String(b.startMin));
+                if (b.occurrenceKey) editorParams.set("occurrenceKey", b.occurrenceKey);
+                if (b.repeats) editorParams.set("repeats", "1");
                 return (
                   <Link
                     key={b.id}
-                    href={`/app/editor?id=${seriesId}&date=${d.dateStr}`}
+                    href={`/app/editor?${editorParams}`}
                     className={`block rounded-xl px-2.5 py-2 ${cat.fill} focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none`}
                   >
                     {/* Emoji and start time share the top line so the title

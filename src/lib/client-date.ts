@@ -78,3 +78,31 @@ export function clientRecentDays(
     };
   });
 }
+
+/**
+ * A UTC instant as the YYYY-MM-DD calendar day it falls on in `zone`.
+ *
+ * The editor needs this to show the day an occurrence actually lands on:
+ * `toISOString().slice(0, 10)` names the UTC day, which is the wrong date for
+ * most planning zones for part of every day.
+ */
+export function instantToLocalDateStr(instant: Date, zone?: string): string {
+  if (zone) {
+    try {
+      return ymd(
+        new Intl.DateTimeFormat("en-CA", {
+          timeZone: zone,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).formatToParts(instant),
+      );
+    } catch {
+      // Invalid zone — fall through to the browser's local calendar.
+    }
+  }
+  const y = instant.getFullYear();
+  const m = String(instant.getMonth() + 1).padStart(2, "0");
+  const d = String(instant.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}

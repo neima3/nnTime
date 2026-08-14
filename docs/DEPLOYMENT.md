@@ -298,8 +298,14 @@ periodically (Phase 8C ongoing hardening).
 
 Applied by `src/proxy.ts` (Next.js 16 — `middleware.ts` is renamed `proxy.ts`)
 on every non-static response:
-- `Content-Security-Policy-Report-Only` (tighten to enforcing in 6C once the
-  app is exercised; report endpoint `/api/csp-report` for violations).
+- `Content-Security-Policy` — **enforcing** (not report-only; the 6C tightening
+  already shipped). Verify with
+  `curl -sSI https://time.neima.me | grep -i content-security-policy`.
+  Known remaining relaxation: `script-src` still allows `'unsafe-inline'` because
+  the no-flash theme/a11y bootstrap is an inline `<script>` (`src/app/theme-script.tsx`,
+  `src/app/app/layout.tsx`). Dropping it needs per-request nonces or hashed
+  external files — tracked as A9 in `docs/plans/2026-08-13-trust-glanceability.md`.
+  Do not "fix" it by landing a CSP that breaks first paint.
 - `X-Content-Type-Options: nosniff`
 - `X-Frame-Options: DENY` + CSP `frame-ancestors 'none'`
 - `Referrer-Policy: strict-origin-when-cross-origin`

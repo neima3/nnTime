@@ -259,9 +259,17 @@ export function TodayTimeline({
 
   const handleOpen = useCallback(
     (id: string) => {
-      router.push(`/app/editor?id=${id}&date=${date}`);
+      const act = activities.find((a) => a.id === id);
+      // Carry the day's identity (ADR-001 occurrence_key) and its real start
+      // so the editor can offer "just this time" instead of rewriting the
+      // whole series — and so it opens at the time this block actually sits at.
+      const params = new URLSearchParams({ id, date });
+      if (act?.occurrenceKey) params.set("occurrenceKey", act.occurrenceKey);
+      if (act?.recurring) params.set("repeats", "1");
+      if (act) params.set("start", String(act.start));
+      router.push(`/app/editor?${params}`);
     },
-    [router, date],
+    [router, date, activities],
   );
 
   const handleFocus = useCallback(

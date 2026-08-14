@@ -1,5 +1,59 @@
 # Progress log
 
+## 2026-08-14 — Round 88 / Slice 1: honest edit, honest clock, no reload
+
+New program planned this round: `docs/plans/2026-08-13-trust-glanceability.md` (+ executor prompt at
+`docs/plans/trust-glanceability-agent-prompt.md`). The original 8-phase roadmap is finished and both
+parity gates pass, so the plan takes a position on what comes next: **trust and glanceability, not more
+features.** It was drafted by Grok, reviewed against the repo (every factual claim verified), revised
+once on that review, then executed. Track A = agent-executable; Track B = human-gated (Google policy,
+a physical iPhone, staging DNS, prod SSH) and deliberately NOT attempted.
+
+**The headline bug: the editor rewrote whole series.** `ActivityEditor` always sent
+`editScope: "all"` on save and `?editScope=all` on delete, with no scope prompt anywhere in the file —
+so editing or deleting one occurrence of a repeating activity silently changed every occurrence. Drag,
+complete and Review had been fixed to `this` long ago; the flagship editor was missed, and
+`design-spec.md` had required the prompt all along. Now: one-offs save as before; a repeating
+occurrence asks "Just this time / This and every one after / The whole series", defaulting to **this**,
+never silently `all`. Pinned red-then-green in `recurrence-patch.test.ts` and by a new
+`e2e/editor-edit-scope.spec.ts`.
+
+**Two more data-corruption bugs surfaced while fixing it** — both newly destructive under scoped
+writes, both fixed: the editor never loaded the occurrence's real date/start (every edit reset it to
+09:00, which `editScope=this` would have written as `startAt`), and never loaded the saved category
+(every edit reassigned it to the default, which `this_and_future` would have baked into the split).
+A load-race guard was added after a Playwright run caught the post-mount fetch overwriting a
+just-typed title.
+
+**The clock lied off-zone.** Seven `getHours()` sites read the *browser* clock instead of the account's
+planning zone — the same class as the Auckland heading fixed in Round 87. New `src/lib/client-now.ts`
+(`nowMinutesInZone` / `nowHourInZone` / `isMorningInZone`) with a documented browser fallback; DailyBrief,
+PeakFocusNudge, AnytimeRail, CurrentActivityRing and the editor's Now/+30 chips all read the account
+zone now. Proved in a browser with the page clock frozen at one instant and only the zones varying:
+account Auckland + browser New York shows the morning brief; the reverse hides it. `getHours()` now
+appears only in LiveNowLine's documented fallback.
+
+**Smaller Slice 1 items:** keyboard shortcuts (t/i/w/f/s/g/n) use `router.push` instead of
+`window.location.href`, which was throwing away the React tree on every keystroke; the stale
+`Content-Security-Policy-Report-Only` sentence in `docs/DEPLOYMENT.md` now says enforcing and records
+the one remaining `'unsafe-inline'` relaxation and why.
+
+**One e2e failure investigated, not waved away:** `review-actions` failed on a strict-mode locator
+matching twice. Cause was wall-clock, not the change — the spec seeds blocks at 00:05–00:15 local and
+the suite ran at 00:11 local, so the now-bar legitimately showed the title too. Scoped the assertions
+to `<main>` (the now-bar renders outside it), which also removes a landmine that only fired in the few
+minutes after local midnight.
+
+**Gates:** lint, typecheck, `pnpm test` (139 files / 1329 tests), `pnpm build`, `pnpm test:e2e`
+(50 passed / 4 skipped / 0 failed). `node scripts/parity.mjs` unchanged at the floor —
+web 89.74%, iOS 86.93%.
+
+**Known follow-ups (not done this round):** `CurrentActivityRing` is dead code — nothing renders it,
+yet parity row D01 credits it; either mount it or drop the claim. iOS `EditorSheet` still has no
+`editScope` (Track A item A2) — the native editor has the same whole-series bug the web one just lost.
+Track B remains unblocked-by-Neima: Google/Apple/Resend credentials, the physical-device pass, staging
+DNS, and a predeploy `pg_dump` before any future migration.
+
 ## 2026-08-13 — Round 87: QA remediation (Grok CLI hands-on QA → fixes)
 
 Six Grok 4.6 passes drove the running app through Playwright (core loop, visuals,

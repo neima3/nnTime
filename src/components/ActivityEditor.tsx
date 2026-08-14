@@ -17,8 +17,10 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { localMinutesToInstant } from "@/lib/adapters";
-import { clientToday } from "@/lib/client-date";
+import { dateToMinutesFromMidnight, localMinutesToInstant } from "@/lib/adapters";
+import { clientToday, instantToLocalDateStr } from "@/lib/client-date";
+import { nowMinutesInZone } from "@/lib/client-now";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 import { sendReplaySafeCreate } from "@/lib/offline-mutation";
 import {
   buildChecklistTemplate,
@@ -133,6 +135,221 @@ function timeInputToMinutes(t: string) {
   return (h ?? 0) * 60 + (m ?? 0);
 }
 
+/* ---- Edit scope (ADR-001) ------------------------------------------------
+ *
+ * A repeating activity is one series with many days on it. Saving or deleting
+ * one of those days has to say which days it means, or a rename on Tuesday
+ * quietly rewrites every Tuesday-and-everything-else. The three choices map
+ * 1:1 onto the ADR-001 scopes; "Just this time" is always the default so the
+ * safe answer is the one you get by pressing Enter.
+ */
+type EditScope = "this" | "this_and_future" | "all";
+
+const SCOPE_COPY: Record<
+  EditScope,
+  { label: string; saveHint: string; deleteHint: string }
+> = {
+  this: {
+    label: "Just this time",
+    saveHint: "Every other day stays exactly as it is.",
+    deleteHint: "It still shows up on all the other days.",
+  },
+  this_and_future: {
+    label: "This and every one after",
+    saveHint: "Days before this one stay as they are.",
+    deleteHint: "Days before this one stay as they are.",
+  },
+  all: {
+    label: "The whole series",
+    saveHint: "Every day this happens, past and future.",
+    deleteHint: "Removes it from every day, past and future.",
+  },
+};
+
+const SCOPE_ORDER: EditScope[] = ["this", "this_and_future", "all"];
+
+/**
+ * The scope question, asked once, right before the write.
+ *
+ * Mobile: bottom sheet over the editor sheet. Desktop: centered card.
+ * Radios (not three buttons) so arrow keys move between the choices and the
+ * default choice is announced — and so a stray tap can't commit a delete.
+ */
+function EditScopeChooser({
+  intent,
+  value,
+  onChange,
+  onCancel,
+  onConfirm,
+  busy,
+  scopedDisabled,
+  sharedFields,
+}: {
+  intent: "save" | "delete";
+  value: EditScope | null;
+  onChange: (scope: EditScope) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+  busy: boolean;
+  /** True when we couldn't tell which day is open, so per-day choices can't be honored. */
+  scopedDisabled: boolean;
+  /** Changed fields that only exist on the whole series (shown under "Just this time"). */
+  sharedFields: string[];
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const firstRef = useRef<HTMLInputElement>(null);
+  useFocusTrap(panelRef, true);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onCancel();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onCancel]);
+
+  useEffect(() => {
+    firstRef.current?.focus();
+  }, []);
+
+  const isDelete = intent === "delete";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-surface-sunken/70 p-0 backdrop-blur-[2px] md:items-center md:p-4">
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-scope-title"
+        aria-describedby="edit-scope-body"
+        className="sheet-up max-h-[92dvh] w-full max-w-[440px] overflow-y-auto rounded-t-3xl border border-border bg-surface p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-float md:rounded-3xl md:pb-5"
+      >
+        <h2
+          id="edit-scope-title"
+          className="font-display text-[19px] font-bold tracking-tight"
+        >
+          This one repeats
+        </h2>
+        <p id="edit-scope-body" className="mt-1 text-[13.5px] leading-relaxed text-ink-soft">
+          {isDelete
+            ? "Which days should it come off?"
+            : "Which days should the change land on?"}
+        </p>
+
+        <fieldset className="mt-4 space-y-2">
+          <legend className="sr-only">
+            {isDelete ? "Days to remove" : "Days to change"}
+          </legend>
+          {SCOPE_ORDER.map((scope, i) => {
+            const copy = SCOPE_COPY[scope];
+            const disabled = scopedDisabled && scope !== "all";
+            const selected = value === scope;
+            return (
+              <label
+                key={scope}
+                className={`relative flex min-h-[52px] cursor-pointer items-start gap-3 rounded-2xl border px-3.5 py-3 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-iris has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-surface ${
+                  disabled
+                    ? "cursor-not-allowed border-border bg-surface-sunken opacity-55"
+                    : selected
+                      ? "border-iris bg-iris-soft"
+                      : "border-border bg-surface hover:border-border-strong"
+                }`}
+              >
+                <input
+                  ref={i === 0 ? firstRef : undefined}
+                  type="radio"
+                  name="edit-scope"
+                  // Transparent, not sr-only: the whole row is the hit target
+                  // (≥52px tall), so a thumb never has to find the dot.
+                  className="absolute inset-0 size-full cursor-pointer appearance-none opacity-0 disabled:cursor-not-allowed"
+                  value={scope}
+                  checked={selected}
+                  disabled={disabled}
+                  onChange={() => onChange(scope)}
+                />
+                <span
+                  aria-hidden
+                  className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border-2 ${
+                    selected ? "border-iris" : "border-border-strong"
+                  }`}
+                >
+                  {selected && <span className="size-2.5 rounded-full bg-iris" />}
+                </span>
+                <span className="min-w-0">
+                  <span
+                    className={`block text-[15px] font-semibold ${
+                      selected ? "text-iris" : "text-ink"
+                    }`}
+                  >
+                    {copy.label}
+                  </span>
+                  <span className="mt-0.5 block text-[13px] leading-relaxed text-ink-soft">
+                    {isDelete ? copy.deleteHint : copy.saveHint}
+                  </span>
+                  {scope === "this" && !isDelete && sharedFields.length > 0 && (
+                    <span className="mt-1.5 block text-[12.5px] leading-relaxed text-ink-faint">
+                      {sentenceCase(joinWithAnd(sharedFields))}{" "}
+                      {sharedFields.length > 1 ? "are" : "is"} shared by every
+                      day, so {sharedFields.length > 1 ? "they" : "it"} won’t
+                      change here.
+                    </span>
+                  )}
+                  {disabled && (
+                    <span className="mt-1.5 block text-[12.5px] leading-relaxed text-ink-faint">
+                      Open it from a day to pick this.
+                    </span>
+                  )}
+                </span>
+              </label>
+            );
+          })}
+        </fieldset>
+
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="min-h-11 rounded-xl border border-border bg-surface px-4 py-2.5 text-[14px] font-semibold text-ink-soft hover:text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+          >
+            Never mind
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy || value === null}
+            className={`min-h-11 rounded-xl px-5 py-2.5 text-[14px] font-semibold shadow-card transition-colors disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none ${
+              isDelete
+                ? "bg-danger-soft text-danger hover:bg-danger-soft"
+                : "bg-iris text-ink-inverse hover:bg-iris-deep"
+            }`}
+          >
+            {busy
+              ? isDelete
+                ? "Deleting…"
+                : "Saving…"
+              : isDelete
+                ? "Delete"
+                : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** "the icon, the category and the notes" */
+function joinWithAnd(parts: string[]): string {
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+function sentenceCase(text: string): string {
+  return text ? text[0]!.toUpperCase() + text.slice(1) : text;
+}
+
 export type ActivityEditorProps = {
   mode: "create" | "edit";
   activityId?: string;
@@ -150,7 +367,10 @@ export type ActivityEditorProps = {
   initialNotes?: string;
   initialSteps?: EditorStepInput[];
   initialRevision?: number;
+  /** Stable identity of the day being edited (ADR-001 occurrence_key). */
   initialOccurrenceKey?: string;
+  /** Caller already knows the series repeats — lets the scope prompt render before the fetch lands. */
+  initialRepeats?: boolean;
   timezone?: string;
   /** When embedded without full page chrome */
   onClose?: () => void;
@@ -162,7 +382,10 @@ export function ActivityEditor(props: ActivityEditorProps) {
 
   const [title, setTitle] = useState(props.initialTitle ?? "");
   const [emoji, setEmoji] = useState(props.initialEmoji ?? "📋");
-  const [categoryKey, setCategoryKey] = useState(props.initialCategoryKey ?? "sky");
+  /** null until the user picks a chip — lets the saved category win on load. */
+  const [categoryKey, setCategoryKey] = useState<string | null>(
+    props.initialCategoryKey ?? null,
+  );
   const [date, setDate] = useState(props.initialDate ?? todayStr);
   const [startMin, setStartMin] = useState(props.initialStartMin ?? 9 * 60);
   const [durationMin, setDurationMin] = useState(props.initialDurationMin ?? 45);
@@ -193,6 +416,32 @@ export function ActivityEditor(props: ActivityEditorProps) {
   const [repeatN, setRepeatN] = useState(2);
   /** Preserved verbatim when the existing rule doesn't fit the chip row. */
   const [customRrule, setCustomRrule] = useState<string | null>(null);
+
+  /* ---- Edit scope (ADR-001) ---------------------------------------------
+   * `saved` is the series as the server has it. It answers two questions the
+   * prompt needs: does this activity repeat (so ask at all), and which of the
+   * fields the user just changed live on the whole series rather than on the
+   * single day.
+   */
+  const [saved, setSaved] = useState<{
+    rrule: string | null;
+    emoji: string;
+    categoryId: string | null;
+    priority: string;
+    notes: string;
+  } | null>(null);
+  const [occurrenceKey, setOccurrenceKey] = useState<string | null>(
+    props.initialOccurrenceKey ?? null,
+  );
+  const [seriesRepeats, setSeriesRepeats] = useState(
+    props.initialRepeats ?? false,
+  );
+  const [scopeAsk, setScopeAsk] = useState<"save" | "delete" | null>(null);
+  const [scope, setScope] = useState<EditScope | null>("this");
+  /** Server truth must not overwrite anything the user already touched. */
+  const timeTouched = useRef(false);
+  const textTouched = useRef(false);
+  const [serverCategoryId, setServerCategoryId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -247,14 +496,19 @@ export function ActivityEditor(props: ActivityEditorProps) {
       if (!res.ok || cancelled) return;
       const a = await res.json();
       if (cancelled) return;
-      setTitle(a.title ?? "");
+      // The load lands after first paint, so anything already typed wins —
+      // otherwise a fast typist watches their title get wiped.
+      if (!textTouched.current) {
+        setTitle(a.title ?? "");
+        setNotes(a.notes ?? "");
+      }
       setEmoji(a.emoji ?? "📋");
       setDurationMin(a.durationMin ?? 45);
       setEnergy(a.energy ?? null);
       setPriority(a.priority ?? "none");
-      setNotes(a.notes ?? "");
       setRevision(a.revision);
-      setTz(a.tz ?? tz);
+      const zone: string = a.tz ?? tz;
+      setTz(zone);
       const parsed = parseRrule(a.rrule);
       setRepeat(parsed.kind);
       setRepeatN(parsed.n);
@@ -262,19 +516,90 @@ export function ActivityEditor(props: ActivityEditorProps) {
       if (Array.isArray(a.checklistTemplate)) {
         setSteps(normalizeEditorSteps(a.checklistTemplate));
       }
+      setSaved({
+        rrule: a.rrule ?? null,
+        emoji: a.emoji ?? "📋",
+        categoryId: a.categoryId ?? null,
+        priority: a.priority ?? "none",
+        notes: a.notes ?? "",
+      });
+      setSeriesRepeats(Boolean(a.rrule));
+      if (a.categoryId) setServerCategoryId(a.categoryId as string);
+
+      /* Which day is open?
+       *
+       * The URL carries it when the caller knows (Today, Week). When it
+       * doesn't — a bare /app/editor?id= — resolve it from the day the user
+       * came from rather than guessing: the series' own dtstartLocal is the
+       * FIRST day, so a "just this time" edit would land on the wrong one.
+       */
+      let key = props.initialOccurrenceKey ?? null;
+      let startsAt: Date | null = null;
+      if (a.rrule && !key && props.initialDate) {
+        const day = await fetch(
+          `/api/v1/day/${props.initialDate}`,
+        ).catch(() => null);
+        if (day?.ok) {
+          const body = await day.json().catch(() => null);
+          const match = (body?.activities as { id: string; occurrenceKey: string; dtstartLocal: string }[] | undefined)
+            ?.find((row) => row.id === props.activityId);
+          if (match) {
+            key = match.occurrenceKey;
+            startsAt = new Date(match.dtstartLocal);
+          }
+        }
+      }
+      if (cancelled) return;
+      if (key) setOccurrenceKey(key);
+
+      // Show the day and time this occurrence actually sits at. Without this
+      // the editor opened every activity at its default 09:00 and saving
+      // moved it there.
+      if (!timeTouched.current && props.initialStartMin == null) {
+        const anchor =
+          startsAt ??
+          (key ? new Date(key) : null) ??
+          (a.dtstartLocal ? new Date(a.dtstartLocal) : null);
+        if (anchor && !Number.isNaN(anchor.getTime())) {
+          setDate(instantToLocalDateStr(anchor, zone));
+          setStartMin(dateToMinutesFromMidnight(anchor, zone));
+        }
+      }
     })();
     return () => {
       cancelled = true;
     };
-  }, [props.mode, props.activityId, props.initialTitle, tz]);
+  }, [
+    props.mode,
+    props.activityId,
+    props.initialTitle,
+    props.initialDate,
+    props.initialStartMin,
+    props.initialOccurrenceKey,
+    tz,
+  ]);
+
+  /* The chips are keyed by name while the series stores an id, and the owned
+   * category list arrives from its own request. Derived rather than mirrored,
+   * so the saved category shows up the moment both halves land — before this,
+   * every edit save quietly reassigned the activity to the default chip. */
+  const selectedCategoryKey =
+    categoryKey ??
+    categories.find((c) => c.id === serverCategoryId)?.key ??
+    "sky";
 
   const categoryId = useMemo(() => {
-    const row = categories.find((c) => c.key === categoryKey);
+    const row = categories.find((c) => c.key === selectedCategoryKey);
     if (row) return row.id;
-    return categoryKey === props.initialCategoryKey
+    return selectedCategoryKey === props.initialCategoryKey
       ? props.initialCategoryId
       : undefined;
-  }, [categories, categoryKey, props.initialCategoryId, props.initialCategoryKey]);
+  }, [
+    categories,
+    selectedCategoryKey,
+    props.initialCategoryId,
+    props.initialCategoryKey,
+  ]);
 
   const close = useCallback(() => {
     if (props.onClose) props.onClose();
@@ -289,7 +614,12 @@ export function ActivityEditor(props: ActivityEditorProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [close]);
 
-  const save = useCallback(async () => {
+  /**
+   * Write the form. `editScope` is ignored when creating (a new activity has
+   * exactly one day and nothing to choose between) and is the ADR-001 scope
+   * the user picked when editing.
+   */
+  const commit = useCallback(async (editScope: EditScope) => {
     const trimmed = title.trim();
     if (!trimmed) {
       setError("Give this activity a title.");
@@ -395,26 +725,48 @@ export function ActivityEditor(props: ActivityEditorProps) {
           setSaving(false);
           return;
         }
+        if (editScope !== "all" && !occurrenceKey) {
+          setError("We lost track of which day this is — reopen it from the day view.");
+          setSaving(false);
+          return;
+        }
+        /* "Just this time" writes an occurrence override, and an override can
+         * only carry the fields that belong to a single day (ADR-001). The
+         * rest — icon, category, priority, notes, the repeat rule — live on
+         * the series; the chooser says so before the user commits. */
+        const body =
+          editScope === "this"
+            ? {
+                editScope,
+                occurrenceKey,
+                title: trimmed,
+                startAt: dtstartLocal,
+                durationMin,
+                energy,
+                checklistOverride: checklistTemplate,
+              }
+            : {
+                editScope,
+                ...(editScope === "this_and_future" ? { occurrenceKey } : {}),
+                tz,
+                dtstartLocal,
+                rrule,
+                title: trimmed,
+                emoji,
+                categoryId: categoryId ?? null,
+                durationMin,
+                energy,
+                priority,
+                notes: notes || null,
+                checklistTemplate,
+              };
         const res = await fetch(`/api/v1/activities/${props.activityId}`, {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
             "If-Match": String(revision),
           },
-          body: JSON.stringify({
-            editScope: "all",
-            tz,
-            dtstartLocal,
-            rrule,
-            title: trimmed,
-            emoji,
-            categoryId: categoryId ?? null,
-            durationMin,
-            energy,
-            priority,
-            notes: notes || null,
-            checklistTemplate,
-          }),
+          body: JSON.stringify(body),
         });
         if (res.status === 409) {
           setError("Someone else changed this — refresh and try again.");
@@ -429,6 +781,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
         }
       }
 
+      setScopeAsk(null);
       router.push(`/app/today?date=${date}`);
       router.refresh();
     } catch {
@@ -455,24 +808,100 @@ export function ActivityEditor(props: ActivityEditorProps) {
     repeat,
     repeatN,
     customRrule,
+    occurrenceKey,
   ]);
 
-  const remove = useCallback(async () => {
-    if (props.mode !== "edit" || !props.activityId || revision == null) return;
-    if (!confirm("Delete this activity?")) return;
-    setSaving(true);
-    const res = await fetch(`/api/v1/activities/${props.activityId}?editScope=all`, {
-      method: "DELETE",
-      headers: { "If-Match": String(revision) },
-    });
-    if (!res.ok && res.status !== 204) {
-      setError("Couldn't delete it — try again");
-      setSaving(false);
+  const commitDelete = useCallback(
+    async (editScope: EditScope) => {
+      if (props.mode !== "edit" || !props.activityId || revision == null) return;
+      if (editScope !== "all" && !occurrenceKey) {
+        setError("We lost track of which day this is — reopen it from the day view.");
+        return;
+      }
+      setSaving(true);
+      setError(null);
+      const query =
+        editScope === "all"
+          ? "editScope=all"
+          : `editScope=${editScope}&occurrenceKey=${encodeURIComponent(occurrenceKey!)}`;
+      const res = await fetch(
+        `/api/v1/activities/${props.activityId}?${query}`,
+        { method: "DELETE", headers: { "If-Match": String(revision) } },
+      );
+      if (!res.ok && res.status !== 204) {
+        setError("Couldn't delete it — try again");
+        setSaving(false);
+        return;
+      }
+      setScopeAsk(null);
+      router.push(`/app/today?date=${date}`);
+      router.refresh();
+    },
+    [props.mode, props.activityId, revision, router, date, occurrenceKey],
+  );
+
+  /* The prompt only exists for activities that actually repeat — a one-off has
+   * a single day, so asking would be noise (ADR-001: one-offs are a series with
+   * no RRULE and one occurrence). */
+  const asksScope = props.mode === "edit" && seriesRepeats;
+  /** Without a day identity, only the whole-series answer can be honored. */
+  const scopedDisabled = !occurrenceKey;
+
+  const openScopePrompt = useCallback(
+    (intent: "save" | "delete") => {
+      // Never preselect "the whole series": the widest blast radius must be a
+      // deliberate answer, not the one Enter picks for you.
+      setScope(occurrenceKey ? "this" : null);
+      setScopeAsk(intent);
+    },
+    [occurrenceKey],
+  );
+
+  const save = useCallback(() => {
+    if (!title.trim()) {
+      setError("Give this activity a title.");
       return;
     }
-    router.push(`/app/today?date=${date}`);
-    router.refresh();
-  }, [props.mode, props.activityId, revision, router, date]);
+    if (asksScope) {
+      openScopePrompt("save");
+      return;
+    }
+    void commit("all");
+  }, [asksScope, commit, openScopePrompt, title]);
+
+  const remove = useCallback(() => {
+    if (props.mode !== "edit" || !props.activityId || revision == null) return;
+    if (asksScope) {
+      openScopePrompt("delete");
+      return;
+    }
+    if (!confirm("Delete this activity?")) return;
+    void commitDelete("all");
+  }, [
+    asksScope,
+    commitDelete,
+    openScopePrompt,
+    props.mode,
+    props.activityId,
+    revision,
+  ]);
+
+  /**
+   * Fields the user changed that belong to the whole series, so "Just this
+   * time" can say plainly what it won't carry across.
+   */
+  const sharedFields = useMemo(() => {
+    if (!saved) return [];
+    const changed: string[] = [];
+    if (emoji !== saved.emoji) changed.push("the icon");
+    if ((categoryId ?? null) !== saved.categoryId) changed.push("the category");
+    if (priority !== saved.priority) changed.push("the priority");
+    if ((notes || "") !== saved.notes) changed.push("the notes");
+    const nextRrule =
+      repeat === "custom" ? customRrule : buildRrule(repeat, date, repeatN);
+    if ((nextRrule ?? null) !== saved.rrule) changed.push("how often it repeats");
+    return changed;
+  }, [saved, emoji, categoryId, priority, notes, repeat, customRrule, date, repeatN]);
 
   return (
     <div className="relative flex min-h-dvh items-end bg-surface-sunken/60 md:block md:px-4 md:py-8">
@@ -532,7 +961,10 @@ export function ActivityEditor(props: ActivityEditorProps) {
             <input
               aria-label="Activity title"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                textTouched.current = true;
+                setTitle(e.target.value);
+              }}
               placeholder="What are you doing?"
               className="w-full rounded-2xl border border-border bg-surface-raised px-4 py-3.5 text-[17px] font-semibold outline-none focus:ring-2 focus:ring-iris"
               autoFocus
@@ -542,7 +974,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
           <Field label="Category">
             <div className="flex flex-wrap gap-2">
               {CATEGORY_UI.map((c) => {
-                const selected = c.key === categoryKey;
+                const selected = c.key === selectedCategoryKey;
                 return (
                   <button
                     key={c.key}
@@ -568,14 +1000,20 @@ export function ActivityEditor(props: ActivityEditorProps) {
                 type="date"
                 aria-label="Date"
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={(e) => {
+                  timeTouched.current = true;
+                  setDate(e.target.value);
+                }}
                 className="rounded-xl border border-border bg-surface px-3 py-2 text-[14px] font-semibold text-ink"
               />
               <input
                 type="time"
                 aria-label="Start time"
                 value={minutesToTimeInput(startMin)}
-                onChange={(e) => setStartMin(timeInputToMinutes(e.target.value))}
+                onChange={(e) => {
+                  timeTouched.current = true;
+                  setStartMin(timeInputToMinutes(e.target.value));
+                }}
                 className="tnum rounded-xl border border-border bg-surface px-3 py-2 text-[14px] font-semibold text-ink"
               />
               <span className="inline-flex items-center gap-1 rounded-xl border border-border bg-surface px-2 py-1">
@@ -602,16 +1040,16 @@ export function ActivityEditor(props: ActivityEditorProps) {
                   {
                     label: "Now",
                     apply: () => {
-                      setDate(clientToday());
-                      const nowM = new Date().getHours() * 60 + new Date().getMinutes();
+                      setDate(clientToday(tz));
+                      const nowM = nowMinutesInZone(tz);
                       setStartMin(Math.min(1425, Math.ceil(nowM / 15) * 15));
                     },
                   },
                   {
                     label: "+30 min",
                     apply: () => {
-                      setDate(clientToday());
-                      const nowM = new Date().getHours() * 60 + new Date().getMinutes() + 30;
+                      setDate(clientToday(tz));
+                      const nowM = nowMinutesInZone(tz) + 30;
                       setStartMin(Math.min(1425, Math.ceil(nowM / 15) * 15));
                     },
                   },
@@ -621,7 +1059,10 @@ export function ActivityEditor(props: ActivityEditorProps) {
                 <button
                   key={c.label}
                   type="button"
-                  onClick={c.apply}
+                  onClick={() => {
+                    timeTouched.current = true;
+                    c.apply();
+                  }}
                   className="rounded-lg bg-surface-sunken px-2.5 py-1 text-[12px] font-semibold text-ink-soft transition-colors hover:bg-iris-ghost hover:text-iris"
                 >
                   {c.label}
@@ -708,9 +1149,9 @@ export function ActivityEditor(props: ActivityEditorProps) {
                 </span>
               )}
             </div>
-            {props.mode === "edit" && repeat !== "none" && (
+            {asksScope && (
               <p className="mt-1.5 text-[12px] text-ink-faint">
-                Saving updates every occurrence of this activity.
+                When you save, we’ll ask which days to change.
               </p>
             )}
           </Field>
@@ -886,7 +1327,10 @@ export function ActivityEditor(props: ActivityEditorProps) {
               id="activity-notes"
               rows={2}
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              onChange={(e) => {
+                textTouched.current = true;
+                setNotes(e.target.value);
+              }}
               placeholder="Anything future-you should know…"
               className="w-full resize-none rounded-xl border border-border bg-surface px-3 py-2.5 text-[14px] outline-none placeholder:text-ink-faint focus:ring-2 focus:ring-iris"
             />
@@ -930,6 +1374,23 @@ export function ActivityEditor(props: ActivityEditorProps) {
           </div>
         </div>
       </div>
+
+      {scopeAsk && (
+        <EditScopeChooser
+          intent={scopeAsk}
+          value={scope}
+          onChange={setScope}
+          onCancel={() => setScopeAsk(null)}
+          onConfirm={() => {
+            if (!scope) return;
+            if (scopeAsk === "delete") void commitDelete(scope);
+            else void commit(scope);
+          }}
+          busy={saving}
+          scopedDisabled={scopedDisabled}
+          sharedFields={sharedFields}
+        />
+      )}
     </div>
   );
 }

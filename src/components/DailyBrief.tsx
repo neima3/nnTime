@@ -14,6 +14,7 @@ import { getStatsCached } from "@/lib/stats-cache";
 import { useEffect, useState } from "react";
 import { Sun, X } from "lucide-react";
 import { clientToday } from "@/lib/client-date";
+import { isMorningInZone, nowHourInZone } from "@/lib/client-now";
 import { hourLabel, focusSessionCount, PEAK_MIN_SESSIONS } from "@/lib/insights";
 import { formatTime } from "@/lib/time-format";
 import { useHourCycle } from "@/lib/use-hour-cycle";
@@ -25,16 +26,23 @@ export type BriefBlock = {
   done: boolean;
 };
 
-export function DailyBrief({ blocks }: { blocks: BriefBlock[] }) {
+export function DailyBrief({
+  blocks,
+  zone,
+}: {
+  blocks: BriefBlock[];
+  /** Account planning zone (ADR-001). Empty → browser-local fallback. */
+  zone?: string;
+}) {
   const hourCycle = useHourCycle();
   const [dismissed, setDismissed] = useState(true);
   const [peakHour, setPeakHour] = useState<number | null>(null);
 
   useEffect(() => {
-    const today = clientToday();
-    // Morning-only, and only once per day.
-    const hour = new Date().getHours();
-    if (hour >= 12) return;
+    const today = clientToday(zone);
+    // Morning-only, and only once per day — morning in the PLANNING zone, not
+    // whatever the laptop clock happens to say.
+    if (!isMorningInZone(zone)) return;
     if (localStorage.getItem("kairo:brief-dismissed") === today) return;
     /* eslint-disable react-hooks/set-state-in-effect */
     setDismissed(false);
@@ -47,7 +55,7 @@ export function DailyBrief({ blocks }: { blocks: BriefBlock[] }) {
         setPeakHour(data.focusHours.peakHour);
       })
       .catch(() => {});
-  }, []);
+  }, [zone]);
 
   if (dismissed) return null;
 
@@ -58,13 +66,13 @@ export function DailyBrief({ blocks }: { blocks: BriefBlock[] }) {
     .sort((a, b) => a.start - b.start);
   const first = remaining[0];
 
-  const hour = new Date().getHours();
+  const hour = nowHourInZone(zone);
   const greeting = hour < 5 ? "Still up" : hour < 12 ? "Good morning" : "Hello";
 
   function dismiss() {
     setDismissed(true);
     try {
-      localStorage.setItem("kairo:brief-dismissed", clientToday());
+      localStorage.setItem("kairo:brief-dismissed", clientToday(zone));
     } catch {}
   }
 

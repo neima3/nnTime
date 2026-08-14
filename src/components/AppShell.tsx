@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   BarChart3,
   CalendarDays,
@@ -54,6 +55,7 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const { signedIn } = useAppSession();
+  const router = useRouter();
   const skipRef = useRef<HTMLAnchorElement>(null);
 
   // The timeline's now-line calls scrollIntoView on load, and Chrome moves the
@@ -93,11 +95,15 @@ export function AppShell({
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const routes: Record<string, string> = { n: "/app/editor", t: "/app/today", i: "/app/inbox", w: "/app/week", f: "/app/focus", s: "/app/settings", g: "/app/play" };
       const route = routes[e.key.toLowerCase()];
-      if (route) { e.preventDefault(); window.location.href = route; }
+      // router.push, not window.location.href: the shortcuts are the fast path
+      // through the app, and a full document load threw away the React tree,
+      // the now-bar's polling state and any in-flight optimistic update on
+      // every keystroke.
+      if (route) { e.preventDefault(); router.push(route); }
     }
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, []);
+  }, [router]);
 
   return (
     <NowProvider enabled={signedIn}>
