@@ -85,7 +85,7 @@ their written criteria and zero-credit treatment in the table below.
 | C03 | Routine builder / library redesign | C | both | 5D | planned | 1 | — |
 | C04 | Community/shared routine templates | C | both | — | deferred | 0 | Named deferred in the roadmap (community template sharing). |
 | C05 | Pause a recurring routine | C | both | 2B, 5D | planned | 1 | SHIPPED: routineSchedules.paused column + materializer skips paused schedules. |
-| D01 | Visual countdown / progress ring | D | both | 3A, 3C, 7E | planned | 1 | SHIPPED: DayProgress component on Today + CurrentActivityRing (src/components/CurrentActivityRing.tsx). |
+| D01 | Visual countdown / progress ring | D | both | 3A, 3C, 7E | planned | 1 | SHIPPED: DayProgress ring on Today (src/app/app/today/page.tsx) + the focus countdown ring (FocusRing in src/components/FocusClient.tsx). Evidence corrected 2026-08-14: this row previously cited CurrentActivityRing.tsx, which nothing rendered — it was dead code and has been removed. The credit stands on the two surfaces that do ship. |
 | D02 | Auto-start on scheduled tasks | D | both | 3A | planned | 1 | — |
 | D03 | Pause / resume | D | both | 3A | planned | 1 | SHIPPED: focus state machine (src/server/services/focus.ts) — transitionFocusSession running↔paused; 6 tests passing. |
 | D04 | Extend ("+1 minute") | D | both | 3A, 7E | planned | 1 | SHIPPED: extendFocusSession (+1/+5/+10 min); 6 tests passing. Roadmap 3A itemizes quick-extend controls (+1/+5/+10 min) on the live timer; 7E ports to iOS. |

@@ -645,7 +645,10 @@ actor KairoAPI: NativeSyncTransport {
         let key = idempotencyKey ?? idempotencyKeyProvider()
         var update = update
         if update.editScope == nil {
-            update.editScope = .all
+            // ADR-001 / the OpenAPI parameter both default to `this`. A caller
+            // that identified a single day means that day; only a caller with
+            // no day identity can mean the whole series.
+            update.editScope = update.occurrenceKey == nil ? .all : .this
         }
         return try await plannerCall {
             let output = try await planner.updateActivitySeries(
@@ -705,16 +708,35 @@ actor KairoAPI: NativeSyncTransport {
         )
     }
 
+    /// Tombstone a series (ADR-001 delete scopes mirror the edit scopes).
+    ///
+    /// `editScope` defaults to `.all` so a one-off delete stays a one-liner;
+    /// a repeating occurrence must pass `.this` / `.thisAndFuture` together
+    /// with its `occurrenceKey`, which the route requires ("A valid
+    /// occurrenceKey is required for scoped deletes").
     func deleteActivity(
         activityId: String,
-        revision: Int
+        revision: Int,
+        editScope: ActivityEditScope = .all,
+        occurrenceKey: String? = nil
     ) async throws {
         let key = idempotencyKeyProvider()
         try await plannerCall {
             try GeneratedAPIAdapters.empty(
                 await planner.deleteActivitySeries(
                     path: .init(id: activityId),
-                    query: .init(editScope: .all),
+                    query: .init(
+                        editScope: {
+                            switch editScope {
+                            case .this: .this
+                            case .thisAndFuture: .this_and_future
+                            case .all: .all
+                            }
+                        }(),
+                        occurrenceKey: editScope == .all
+                            ? nil
+                            : try occurrenceKey.map(Self.date)
+                    ),
                     headers: .init(
                         Idempotency_hyphen_Key: key,
                         If_hyphen_Match: String(revision)

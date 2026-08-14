@@ -1,6 +1,7 @@
 # Kairo — Trust + Glanceability Plan v2
 
-Status: Slice 1 shipped — see progress.md 2026-08-14 (Round 88)
+Status: Slice 1 shipped — see progress.md 2026-08-14 (Round 88).
+A2 (iOS editor scopes) shipped — see progress.md 2026-08-14 (Round 89).
 
 
 > **For agentic workers:** execute **Slice 1** only unless a later prompt names a later Track A item. Track B is human-gated. If a step needs Neima, a phone, DNS, Coolify UI, or SSH: **STOP and report**. Do not simulate evidence.
@@ -115,7 +116,7 @@ An executing agent works **Track A** only. The moment a step is Track B, the age
 | ID | Item | Notes |
 |---|---|---|
 | **Slice 1** | Editor scopes + zone clock + AppShell push + CSP doc | Defined below. This session. |
-| A2 | iOS `EditorSheet` / `KairoAPI.updateActivity` scope prompt | Same bug, native. After Slice 1. |
+| ~~A2~~ | iOS `EditorSheet` / `KairoAPI.updateActivity` scope prompt | **DONE** — Round 89, see progress.md 2026-08-14. |
 | A3 | Phase 2 **behind the flag, default ON** | No visual change for Neima until he flips it. |
 | A4 | Phase 2 screenshot pack + one-tap e2e | Gate, not a ship-default. |
 | A5 | Phase 2 default-flip commit (one line) | Only after Neima has seen A4. |

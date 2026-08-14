@@ -740,6 +740,92 @@ final class KairoAPITransportTests: XCTestCase {
         )
     }
 
+    /// A caller that identified a single day means that day. The facade used
+    /// to widen every unscoped PATCH to `all`, which is how a per-occurrence
+    /// intent turned into a whole-series rewrite.
+    func testUnscopedPatchWidensToAllOnlyWithoutADayIdentity() async throws {
+        let recorder = PlannerRequestRecorder()
+        let keys = DeterministicKeySource()
+        let api = KairoAPI(
+            baseURL: URL(string: "http://127.0.0.1:3456")!,
+            plannerTransport: PlannerMockTransport(
+                recorder: recorder,
+                responder: { operation in Self.successResponse(operation) }
+            ),
+            timezoneIdentifierProvider: { "America/Chicago" },
+            idempotencyKeyProvider: { keys.next() }
+        )
+
+        _ = try await api.updateActivity(
+            activityId: "activity-1",
+            revision: 2,
+            update: .init(title: "No day named")
+        )
+        _ = try await api.updateActivity(
+            activityId: "activity-1",
+            revision: 2,
+            update: .init(
+                occurrenceKey: Date(timeIntervalSince1970: 1_786_000_000),
+                title: "One day named"
+            )
+        )
+
+        let paths = await recorder.captures.map(\.path)
+        XCTAssertEqual(paths, [
+            "/activities/activity-1?editScope=all",
+            "/activities/activity-1?editScope=this",
+        ])
+    }
+
+    /// ADR-001 delete scopes. `deleteActivity` used to hardcode `editScope=all`
+    /// with no way to say otherwise, so the native editor's Delete button
+    /// tombstoned the whole repeating series.
+    func testScopedDeleteCarriesTheOccurrenceKeyOnTheWire() async throws {
+        let recorder = PlannerRequestRecorder()
+        let keys = DeterministicKeySource()
+        let api = KairoAPI(
+            baseURL: URL(string: "http://127.0.0.1:3456")!,
+            plannerTransport: PlannerMockTransport(
+                recorder: recorder,
+                responder: { operation in Self.successResponse(operation) }
+            ),
+            timezoneIdentifierProvider: { "America/Chicago" },
+            idempotencyKeyProvider: { keys.next() }
+        )
+
+        try await api.deleteActivity(
+            activityId: "activity-1",
+            revision: 4,
+            editScope: .this,
+            occurrenceKey: "2026-08-14T13:00:00.000Z"
+        )
+        try await api.deleteActivity(
+            activityId: "activity-1",
+            revision: 4,
+            editScope: .thisAndFuture,
+            occurrenceKey: "2026-08-14T13:00:00.000Z"
+        )
+        // Default stays whole-series for one-offs, which is all a one-off is.
+        try await api.deleteActivity(activityId: "activity-1", revision: 4)
+
+        let captures = await recorder.captures
+        let paths = captures.map {
+            "\($0.method) \($0.path.removingPercentEncoding ?? $0.path)"
+        }
+        XCTAssertEqual(captures.map(\.operationID), Array(
+            repeating: "deleteActivitySeries",
+            count: 3
+        ))
+        XCTAssertEqual(paths, [
+            "DELETE /activities/activity-1?editScope=this"
+                + "&occurrenceKey=2026-08-14T13:00:00Z",
+            "DELETE /activities/activity-1?editScope=this_and_future"
+                + "&occurrenceKey=2026-08-14T13:00:00Z",
+            "DELETE /activities/activity-1?editScope=all",
+        ])
+        XCTAssertTrue(captures.allSatisfy { $0.headers["if-match"] == "4" })
+    }
+
     func testShippingAppContainsNoPlannerPathLiteral() throws {
         let appDirectory = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

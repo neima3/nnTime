@@ -19,6 +19,8 @@ struct EditorSheet: View {
     @State private var error: String?
     @State private var steps: [(label: String, done: Bool)] = []
     @State private var stepDraft = ""
+    /// ADR-001: which days a save/delete lands on. `nil` = not asking.
+    @State private var scopeAsk: EditScopeIntent?
 
     /// Fired after a successful create (used by Inbox promotion).
     var onCreated: (() -> Void)? = nil
@@ -52,6 +54,21 @@ struct EditorSheet: View {
     }
 
     private let emojis = ["📋", "💊", "🎨", "🚶", "🍜", "🏋️", "📞", "☕", "📚", "🧠", "🧹", "✨"]
+
+    /// Does this edit need the scope question, and which answer opens selected?
+    private var scopePlan: EditScopePlan { EditScopePlan(block: editing) }
+
+    /// Series-level fields the user has changed, named for the "Just this
+    /// time" row so it can say what it won't carry across.
+    private var sharedFields: [String] {
+        guard let editing else { return [] }
+        return EditScopeWrite.sharedFields(
+            emoji: emoji,
+            savedEmoji: editing.emoji,
+            category: category,
+            savedCategory: editing.category
+        )
+    }
 
     var body: some View {
         NavigationStack {
@@ -136,6 +153,13 @@ struct EditorSheet: View {
                                 }
                             }
                         }
+                        } else if scopePlan.asksScope {
+                            section("Repeats") {
+                                Text("When you save, we’ll ask which days to change.")
+                                    .font(.kBody(13))
+                                    .foregroundStyle(Color.kInkSoft)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
 
                         section("Steps") {
@@ -193,7 +217,7 @@ struct EditorSheet: View {
                                         .background(RoundedRectangle(cornerRadius: 14).fill(Color.kIrisGhost))
                                 }
                                 Button(role: .destructive) {
-                                    Task { await deleteEditing() }
+                                    requestDelete()
                                 } label: {
                                     Label("Delete activity", systemImage: "trash")
                                         .font(.kBody(15, weight: .semibold))
@@ -223,7 +247,7 @@ struct EditorSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
-                        Task { await save() }
+                        requestSave()
                     } label: {
                         if busy { ProgressView() } else {
                             Text("Save").font(.kBody(15, weight: .bold)).foregroundStyle(Color.kIris)
@@ -235,6 +259,23 @@ struct EditorSheet: View {
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+        .sheet(item: $scopeAsk) { intent in
+            EditScopeSheet(
+                intent: intent,
+                plan: scopePlan,
+                sharedFields: sharedFields,
+                busy: busy
+            ) { scope in
+                scopeAsk = nil
+                Task {
+                    if intent == .delete {
+                        await deleteEditing(scope: scope)
+                    } else {
+                        await save(scope: scope)
+                    }
+                }
+            }
+        }
     }
 
     private func section(_ label: String, @ViewBuilder content: () -> some View) -> some View {
@@ -310,11 +351,49 @@ struct EditorSheet: View {
         }
     }
 
-    private func deleteEditing() async {
+    /* ---- Scoped writes (ADR-001) -------------------------------------------
+     *
+     * Creating never asks: a new activity has exactly one day and nothing to
+     * choose between. Editing or deleting a one-off is still `.all` — that is
+     * the whole of a non-recurring series. Only a repeating occurrence gets
+     * the question, and it opens on "Just this time".
+     */
+    private func requestSave() {
+        guard editing != nil else {
+            Task { await save(scope: .all) }   // create — nothing to choose
+            return
+        }
+        if let scope = scopePlan.silentScope {
+            Task { await save(scope: scope) }
+            return
+        }
+        scopeAsk = .save
+    }
+
+    private func requestDelete() {
+        guard editing != nil else { return }
+        if let scope = scopePlan.silentScope {
+            Task { await deleteEditing(scope: scope) }
+            return
+        }
+        scopeAsk = .delete
+    }
+
+    private func deleteEditing(scope: ActivityEditScope) async {
         guard let editing else { return }
+        if scope != .all, editing.occurrenceKey == nil {
+            error = "We lost track of which day this is — reopen it from the day view."
+            return
+        }
         busy = true
+        error = nil
         do {
-            try await KairoAPI.shared.deleteActivity(activityId: editing.id, revision: editing.revision)
+            try await KairoAPI.shared.deleteActivity(
+                activityId: editing.id,
+                revision: stepsRevision ?? editing.revision,
+                editScope: scope,
+                occurrenceKey: editing.occurrenceKey
+            )
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             dismiss()
         } catch let apiError as APIError {
@@ -326,29 +405,35 @@ struct EditorSheet: View {
         }
     }
 
-    private func save() async {
+    private func save(scope: ActivityEditScope) async {
         busy = true
         error = nil
         let categoryId = app.categoryMap.first(where: { $0.value == category })?.key
         do {
             if let editing {
+                guard let update = EditScopeWrite.update(
+                    scope: scope,
+                    occurrenceKey: EditScopeWrite.occurrenceDate(editing.occurrenceKey),
+                    tz: app.timezone.identifier,
+                    instant: KTime.instantDate(
+                        date: date,
+                        minutes: startMin,
+                        zone: app.timezone
+                    ),
+                    title: title.trimmingCharacters(in: .whitespaces),
+                    emoji: emoji,
+                    categoryId: categoryId,
+                    checklist: steps.map { .init(label: $0.label, done: $0.done) },
+                    durationMin: durationMin
+                ) else {
+                    error = "We lost track of which day this is — reopen it from the day view."
+                    busy = false
+                    return
+                }
                 _ = try await KairoAPI.shared.updateActivity(
                     activityId: editing.id,
-                    revision: editing.revision,
-                    update: .init(
-                        tz: app.timezone.identifier,
-                        dtstartLocal: KTime.instantDate(
-                            date: date,
-                            minutes: startMin,
-                            zone: app.timezone
-                        ),
-                        title: title.trimmingCharacters(in: .whitespaces),
-                        emoji: .value(emoji),
-                        categoryId: categoryId.map {
-                            .value($0)
-                        } ?? .null,
-                        durationMin: durationMin
-                    )
+                    revision: stepsRevision ?? editing.revision,
+                    update: update
                 )
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
                 dismiss()

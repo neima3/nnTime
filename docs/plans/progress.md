@@ -1,5 +1,109 @@
 # Progress log
 
+## 2026-08-14 — Round 89 / Track A item A2: the native editor asks too
+
+Round 88 fixed the web editor and left the same bug live on iPhone.
+`ios/App/Features/Today/EditorSheet.swift` contained **zero** occurrences of
+`editScope`: `save()` sent an unscoped PATCH (which `KairoAPI.updateActivity`
+widened to `.all`) and `deleteEditing()` called a `deleteActivity` that
+hardcoded `?editScope=all` with no parameter to say otherwise. Editing or
+deleting one day of a repeating activity silently rewrote every day.
+
+**Now:** creating still never asks. Editing or deleting a one-off is still
+`.all` — that is the whole of a non-recurring series. A repeating occurrence
+raises a sheet with the same three choices and the **same copy as the web**
+(`SCOPE_COPY` in `ActivityEditor.tsx`): "Just this time" / "This and every one
+after" / "The whole series", preselected on **this**. `.all` is never silent:
+with no `occurrenceKey` the two scoped rows are disabled, nothing is
+preselected, and the whole-series answer needs an explicit tap.
+
+- New `ios/App/Features/Today/EditScopePrompt.swift` — `EditScopePlan`
+  (testable defaults), `EditScopeWrite` (request builder), `EditScopeSheet`
+  (the prompt; tokens only, 52pt rows, Dynamic Type, reduce-motion aware).
+- `KairoAPI.deleteActivity` grew `editScope` / `occurrenceKey` (the REST
+  contract already had `OccurrenceKeyQuery` — no OpenAPI change, no
+  `api:sync-ios`). `updateActivity`'s unscoped fallback now widens to `.all`
+  only when no day was identified; with an `occurrenceKey` it means `.this`.
+- `editScope=this` sends only occurrence-legal fields (occurrenceKey, title,
+  startAt, durationMin, checklistOverride) — the route rejects master-only
+  fields on a scoped edit. Mirrors the web exactly.
+- Save/delete now use `stepsRevision ?? editing.revision`, so a step toggled
+  before saving no longer 409s on a stale revision.
+- The `-kairoTodayFixture` tour gained one repeating 15:00 block ("Stretch")
+  so the prompt is reachable without a server.
+
+**Tests:** `ios/UnitTests/EditScopePlanTests.swift` (13, incl. the default,
+the no-key fallback, the occurrence-legal field set, and the copy pinned word
+for word against the web), plus two `KairoAPITransportTests` cases for the
+scoped DELETE wire format and the unscoped-PATCH default. Proven red first:
+forcing `defaultChoice` to `.all` fails 2 of them. `KairoRound89EditScopeTour`
+is the evidence tour (3/3 passed; shots in `browser-qa/r89-ios-edit-scope/`,
+git-ignored). iOS gate: **Executed 417 tests, with 1 test skipped and 0
+failures**.
+
+**Found while verifying:** the tour caught a real a11y defect in the new sheet
+— an `.accessibilityLabel` on the choice stack replaced every row's own label,
+so VoiceOver read three identical "Days to change" buttons. Fixed with
+`.accessibilityElement(children: .contain)`.
+
+**Not fixed (out of scope, still live):** `TodayView.remove(_:)`
+(`ios/App/Features/Today/TodayView.swift:861`) is the swipe/context delete on a
+Today block and still calls `deleteActivity` with the default `.all` — the same
+whole-series bug on a different surface.
+
+**Gates:** `pnpm lint`, `pnpm typecheck`, `pnpm test` (139 files / 1329 tests),
+`./scripts/ios-main-thread-gate.sh`, `pnpm ios:release:preflight`,
+`pnpm api:check-ios`, `pnpm api:check-ios-adoption`. Parity unchanged at the
+floor — web 89.74% / iOS 86.93%. Not deployed, not live-verified (native
+change; no web surface moved). Track B still blocked: B1–B6 unchanged.
+
+### Also this round (A7 + two honesty fixes)
+
+**A7 — the DAL is no longer one 1,445-line file.** `src/server/dal/index.ts` held
+every SEC-01 ownership predicate in the product, which made it the likeliest home
+for the next dropped-`userId` bug. It is now a 69-line barrel over eight modules
+(`types`, `errors`, `change-log`, `tasks`, `activities`, `tags-categories-settings`,
+`routines`, `events-changes`). This was a move, not a rewrite, and was proved as
+one twice: a TypeScript compiler-API script resolved the barrel's exports before
+and after and diffed them (**38 exports, byte-identical signatures, no output from
+`diff`**), and the moved code was compared as a line multiset (1363 vs 1363,
+identical). No test file was edited. Import graph is acyclic, one-way from the
+leaves. `appendChangeLog` kept its per-user advisory lock verbatim.
+
+**Today's swipe-delete had the same whole-series bug.** The A2 agent flagged that
+`TodayView.remove(_:)` still called `deleteActivity` with the default `.all` —
+so swiping one day off Today deleted every future occurrence, while `move` right
+above it already scoped per occurrence. Fixed: a recurring block with an
+occurrence key deletes `.this`; one-offs stay `.all`, where the two mean the same
+thing. iOS gate re-run after the change: `Executed 417 tests, with 1 test skipped
+and 0 failures`.
+
+**A parity row was claiming a component nothing rendered.** `CurrentActivityRing`
+was imported by exactly one thing — a test that reads its source as text — yet
+parity row D01 took full credit citing it, and it had already cost an agent real
+time (Round 88 threaded a zone prop through it and had to build a throwaway probe
+page to exercise something no screen mounts). The component is deleted and D01's
+evidence now cites the two ring surfaces that actually ship: `DayProgress` on
+Today and `FocusRing` on Focus. The credit is unchanged because those two
+genuinely satisfy the row — only the evidence was wrong. Parity still
+89.74% web / 86.93% iOS.
+
+**On the gates:** the full e2e suite failed twice mid-round with *different* tests
+each time, including `browserContext.close: Target page, context or browser has
+been closed`. That was machine load, not a regression — load average peaked at
+**106** with several concurrent sessions building. The same specs passed 26/26 in
+isolation, and a clean full run once load dropped gave **50 passed / 4 skipped /
+0 failed**. Worth knowing for the next agent: this suite is not trustworthy above
+~40 load average, and a failure there should be re-run in isolation before it is
+believed.
+
+**Still open (unchanged):** Track B is entirely Neima-gated — Google/Apple/Resend
+credentials, the physical-device pass, staging DNS (`time-staging.neima.me` still
+fails TLS while docs advertise it), and a predeploy `pg_dump` before any migration.
+Track A next: Phase 2 (the Today strip, behind a flag, screenshot-gated), 6.2 the
+client-error sink, and A9 the CSP `unsafe-inline` removal.
+
+
 ## 2026-08-14 — Round 88 / Slice 1: honest edit, honest clock, no reload
 
 New program planned this round: `docs/plans/2026-08-13-trust-glanceability.md` (+ executor prompt at

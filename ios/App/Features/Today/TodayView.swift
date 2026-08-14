@@ -681,6 +681,16 @@ struct TodayView: View {
                     startMin: 13 * 60, durationMin: 45, category: .sky,
                     done: false, recurring: false, revision: 1,
                     occurrenceKey: nil, checklist: [], energy: nil),
+                // Repeating, with a day identity — the only block that makes
+                // the ADR-001 edit-scope prompt reachable without a server.
+                DayBlock(
+                    id: "fixture-stretch", title: "Stretch", emoji: "🧘",
+                    startMin: 15 * 60, durationMin: 20, category: .peach,
+                    done: false, recurring: true, revision: 1,
+                    occurrenceKey: KTime.instant(
+                        date: dateStr, minutes: 15 * 60, zone: zone
+                    ),
+                    checklist: [], energy: nil),
             ]
             loading = false
             return
@@ -860,7 +870,17 @@ struct TodayView: View {
 
     private func remove(_ block: DayBlock) async {
         do {
-            try await KairoAPI.shared.deleteActivity(activityId: block.id, revision: block.revision)
+            // A swipe on one day must not take the whole series with it. `move`
+            // directly above already scopes per occurrence; this path did not,
+            // so deleting today's block silently removed every future one too.
+            // One-offs keep `.all` — for them the two are the same thing.
+            let scopedToThisDay = block.recurring && block.occurrenceKey != nil
+            try await KairoAPI.shared.deleteActivity(
+                activityId: block.id,
+                revision: block.revision,
+                editScope: scopedToThisDay ? .this : .all,
+                occurrenceKey: scopedToThisDay ? block.occurrenceKey : nil
+            )
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             await load()
         } catch {

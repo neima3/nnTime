@@ -18,7 +18,6 @@ const landing = readFileSync(resolve(__dirname, "page.tsx"), "utf8");
 const timeline = readFileSync(resolve(__dirname, "../components/TimelineCanvas.tsx"), "utf8");
 const nowBar = readFileSync(resolve(__dirname, "../components/NowBar.tsx"), "utf8");
 const oneThing = readFileSync(resolve(__dirname, "../components/OneThing.tsx"), "utf8");
-const currentRing = readFileSync(resolve(__dirname, "../components/CurrentActivityRing.tsx"), "utf8");
 const offlineIndicator = readFileSync(resolve(__dirname, "../components/OfflineIndicator.tsx"), "utf8");
 
 function sourceFiles(directory: string): string[] {
@@ -188,7 +187,6 @@ describe("normal-theme contrast contract", () => {
     }
     expect(nowBar).toContain('isNow ? "text-now-text"');
     expect(oneThing).toContain('current ? "text-now-text"');
-    expect(currentRing).toContain("text-now-text");
     expect(offlineIndicator).toContain("text-danger");
   });
 });
