@@ -29,6 +29,8 @@ struct TodayView: View {
         OfflineTodayStatusMutation.Failure.Stage?
     /// 0 = today, ±n days.
     @State private var dayOffset = 0
+    /// Repeating block awaiting a day-vs-series answer before it is deleted.
+    @State private var pendingDelete: DayBlock?
     /// Device-local "today I don't have it" switch (mirrors web LowBattery).
     @State private var lowBattery = false
 
@@ -202,6 +204,16 @@ struct TodayView: View {
             }
             .sheet(item: $editingBlock, onDismiss: { Task { await load() } }) { block in
                 EditorSheet(date: date, startMin: block.startMin, editing: block)
+            }
+            .sheet(item: $pendingDelete) { block in
+                EditScopeSheet(
+                    intent: .delete,
+                    plan: EditScopePlan(block: block),
+                    busy: false
+                ) { scope in
+                    pendingDelete = nil
+                    Task { await remove(block, scope: scope) }
+                }
             }
             .sheet(isPresented: $showPick) {
                 PickForMeSheet(blocks: blocks, nowMin: nowMin, lowBattery: lowBattery && dayOffset == 0)
@@ -868,18 +880,32 @@ struct TodayView: View {
         await load()
     }
 
+    /// Swipe-to-delete on a day block.
+    ///
+    /// A swipe on one day must not take the whole series with it (ADR-001).
+    /// A one-off deletes straight away — asking would be noise, since its single
+    /// occurrence *is* the series. A repeating block raises the same prompt the
+    /// editor uses, so the day-vs-series answer is the user's, not ours.
     private func remove(_ block: DayBlock) async {
+        let plan = EditScopePlan(block: block)
+        guard let scope = plan.silentScope else {
+            pendingDelete = block
+            return
+        }
+        await remove(block, scope: scope)
+    }
+
+    private func remove(_ block: DayBlock, scope: ActivityEditScope) async {
+        // Never widen to `.all` to get a write through: without a day identity
+        // the scoped answers are not offered at all.
+        guard EditScopePlan(block: block).allows(scope) else { return }
+        let occurrenceKey = scope == .all ? nil : block.occurrenceKey
         do {
-            // A swipe on one day must not take the whole series with it. `move`
-            // directly above already scopes per occurrence; this path did not,
-            // so deleting today's block silently removed every future one too.
-            // One-offs keep `.all` — for them the two are the same thing.
-            let scopedToThisDay = block.recurring && block.occurrenceKey != nil
             try await KairoAPI.shared.deleteActivity(
                 activityId: block.id,
                 revision: block.revision,
-                editScope: scopedToThisDay ? .this : .all,
-                occurrenceKey: scopedToThisDay ? block.occurrenceKey : nil
+                editScope: scope,
+                occurrenceKey: occurrenceKey
             )
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             await load()
@@ -887,6 +913,7 @@ struct TodayView: View {
             await load()
         }
     }
+
 
     private func toggle(_ block: DayBlock) async {
         let newDone = !block.done

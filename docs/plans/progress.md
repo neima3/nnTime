@@ -70,13 +70,29 @@ and after and diffed them (**38 exports, byte-identical signatures, no output fr
 identical). No test file was edited. Import graph is acyclic, one-way from the
 leaves. `appendChangeLog` kept its per-user advisory lock verbatim.
 
-**Today's swipe-delete had the same whole-series bug.** The A2 agent flagged that
-`TodayView.remove(_:)` still called `deleteActivity` with the default `.all` —
-so swiping one day off Today deleted every future occurrence, while `move` right
-above it already scoped per occurrence. Fixed: a recurring block with an
-occurrence key deletes `.this`; one-offs stay `.all`, where the two mean the same
-thing. iOS gate re-run after the change: `Executed 417 tests, with 1 test skipped
-and 0 failures`.
+**Today's swipe-delete had the same whole-series bug — and the first fix was
+still wrong.** `TodayView.remove(_:)` called `deleteActivity` with the default
+`.all`, so swiping one day off Today deleted every future occurrence, while
+`move` right above it already scoped per occurrence. The first pass silently
+scoped recurring blocks to `.this`. That removed the data loss but still decided
+a destructive, ambiguous question on the user's behalf — the whole point of the
+Round 89 prompt is that day-vs-series is *their* answer.
+
+Now the swipe reuses the components already built for the editor rather than
+inventing a second prompt: `EditScopePlan(block:)` decides, and `silentScope`
+is the branch — `nil` means raise `EditScopeSheet(intent: .delete, …)`, non-nil
+means write immediately. So a one-off still deletes in one gesture (its single
+occurrence *is* the series, and asking would be noise) while a repeating block
+asks, preselected on "just this time", with copy already pinned word-for-word
+against the web's `SCOPE_COPY`. `remove(_:scope:)` re-checks `plan.allows(scope)`
+before writing, so a missing `occurrenceKey` cannot degrade into `.all`.
+
+Pinned by three new `EditScopePlanTests` cases and proved red first: asserting
+the pre-fix expectation (`silentScope == .all` for a recurring block) fails —
+`Executed 420 tests, with 1 test skipped and 1 failure`. Restored, the gate is
+`Executed 420 tests, with 1 test skipped and 0 failures`. Note the unit tests pin
+the *decision* the view branches on, not the SwiftUI presentation itself; the
+sheet wiring follows the same `.sheet(item:)` pattern `EditorSheet` already uses.
 
 **A parity row was claiming a component nothing rendered.** `CurrentActivityRing`
 was imported by exactly one thing — a test that reads its source as text — yet

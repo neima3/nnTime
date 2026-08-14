@@ -63,6 +63,44 @@ final class EditScopePlanTests: XCTestCase {
         XCTAssertEqual(EditScopePlan(block: nil).silentScope, .all)
     }
 
+    // MARK: Today swipe-to-delete
+
+    /// Today's swipe-delete used to call `deleteActivity` with the default
+    /// `.all`, so removing one day of a repeating block tombstoned every future
+    /// occurrence — the same ADR-001 bug the editor lost, on a third surface.
+    /// `remove(_:)` now branches on `silentScope`: nil means it MUST raise the
+    /// prompt instead of writing. Pin that a recurring block never yields a
+    /// scope to delete with on its own.
+    func testRecurringTodayBlockCannotBeDeletedWithoutAChoice() {
+        let plan = EditScopePlan(block: Self.block(recurring: true, key: key))
+        XCTAssertNil(
+            plan.silentScope,
+            "a repeating Today block must raise the prompt, not delete silently"
+        )
+        XCTAssertTrue(plan.asksScope)
+        // And when the user does answer, "just this time" is what is offered first.
+        XCTAssertEqual(plan.defaultChoice, .this)
+    }
+
+    /// The swipe on a one-off stays instant — its single occurrence is the
+    /// whole series, so a prompt would be noise.
+    func testOneOffTodayBlockDeletesImmediately() {
+        let plan = EditScopePlan(block: Self.block(recurring: false, key: key))
+        XCTAssertEqual(plan.silentScope, .all)
+        XCTAssertFalse(plan.asksScope)
+    }
+
+    /// A repeating block with no day identity must not degrade into `.all`:
+    /// the scoped answers are refused, so the caller cannot write one.
+    func testRecurringTodayBlockWithoutADayIdentityRefusesScopedDeletes() {
+        let plan = EditScopePlan(block: Self.block(recurring: true, key: nil))
+        XCTAssertNil(plan.silentScope)
+        XCTAssertFalse(plan.allows(.this))
+        XCTAssertFalse(plan.allows(.thisAndFuture))
+        XCTAssertTrue(plan.allows(.all), "only an explicit whole-series tap remains")
+        XCTAssertNil(plan.defaultChoice, "nothing preselected — `.all` is never silent")
+    }
+
     // MARK: Request bodies
 
     func testScopedWriteCarriesANonNilOccurrenceKey() throws {
