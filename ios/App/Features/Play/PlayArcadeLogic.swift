@@ -341,7 +341,8 @@ enum ArcadeLogic {
             }
             return QuizItem(
                 topic: item.topic, prompt: item.prompt, options: options,
-                answer: item.answer, note: item.note)
+                answer: item.answer, note: item.note,
+                examples: item.examples, stress: item.stress)
         }
     }
 
@@ -582,5 +583,17 @@ enum QuizMisses {
     /// Bank items matching stored missed prompts (oldest miss first).
     static func items(in bank: [QuizItem], misses: [String]) -> [QuizItem] {
         misses.compactMap { prompt in bank.first { $0.prompt == prompt } }
+    }
+
+    /// Drop misses whose prompt left the bank (item reworded or retired) —
+    /// an orphan can never be redeemed, so it would inflate the count forever.
+    /// Returns the kept list. Same semantics as the web's pruneMisses.
+    static func prune(_ id: String, bank: [QuizItem]) -> [String] {
+        let misses = read(id)
+        let kept = misses.filter { prompt in bank.contains { $0.prompt == prompt } }
+        if kept.count != misses.count {
+            store.set(kept, forKey: key(id))
+        }
+        return kept
     }
 }

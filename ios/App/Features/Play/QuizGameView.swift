@@ -1,9 +1,13 @@
 import SwiftUI
 
 // MARK: Shared word-quiz engine (Grammar Snap + Spell Check). Eight rounds,
-// tap a choice, instant kind feedback with a one-line memory hook, no timers
-// and no red. Misses are remembered; three or more unlock "your tricky ones",
-// and answering one right redeems it off the list. Mirrors the web QuizGame.
+// tap a choice, instant kind feedback, no timers and no red. After every
+// answer the sentence completes itself, the memory hook lands, and each
+// real-word option shows up used correctly (the distinction, not just the
+// answer); spelling answers underline their trap letters. Misses are
+// remembered; three or more unlock "your tricky ones", answering one right
+// redeems it, and the ending recaps this run's missed rules. Mirrors the
+// web QuizGame.
 
 struct QuizGameView: View {
     let id: String            // bests + misses key, e.g. "grammarsnap"
@@ -23,9 +27,12 @@ struct QuizGameView: View {
     @State private var chosen: String?
     @State private var score = 0
     @State private var missCount = 0
+    @State private var missedThisRun: [QuizItem] = []
     @State private var done = false
     @State private var isNewBest = false
     @State private var best: Int?
+
+    private static let recapCap = 3
 
     private let topicLabels = QuizBank.topicLabels
 
@@ -83,8 +90,8 @@ struct QuizGameView: View {
                         .background(RoundedRectangle(cornerRadius: 6).fill(Color.kSurfaceSunken))
                 }
             }
-            Text(item.prompt)
-                .font(.kDisplay(21)).foregroundStyle(Color.kInk)
+            promptText(item)
+                .font(.kDisplay(21))
                 .multilineTextAlignment(.center)
                 .padding(.top, 18)
             VStack(spacing: 10) {
@@ -101,6 +108,10 @@ struct QuizGameView: View {
                         .font(.kBody(14, weight: .semibold)).foregroundStyle(Color.kInk)
                     Text(item.note)
                         .font(.kBody(13)).foregroundStyle(Color.kInkSoft).multilineTextAlignment(.center)
+                    if !item.examples.isEmpty {
+                        examplesCard(item)
+                            .padding(.top, 8)
+                    }
                     Button(idx + 1 >= rounds.count ? "See how it went" : "Next one") { next() }
                         .buttonStyle(PrimaryPill())
                         .padding(.top, 10)
@@ -108,6 +119,56 @@ struct QuizGameView: View {
                 .padding(.top, 18)
             }
         }
+    }
+
+    /// Before answering: the prompt with its blank. After: the sentence
+    /// completes itself, the answer in success ink (trap letters underlined).
+    private func promptText(_ item: QuizItem) -> Text {
+        guard chosen != nil else {
+            return Text(item.prompt).foregroundStyle(Color.kInk)
+        }
+        let parts = item.prompt.components(separatedBy: "___")
+        guard parts.count > 1 else {
+            return Text(item.prompt).foregroundStyle(Color.kInk)
+        }
+        var result = Text(verbatim: "")
+        for (i, part) in parts.enumerated() {
+            result = result + Text(part).foregroundStyle(Color.kInk)
+            if i < parts.count - 1 { result = result + answerText(item) }
+        }
+        return result
+    }
+
+    private func answerText(_ item: QuizItem) -> Text {
+        guard let stress = item.stress, let range = item.answer.range(of: stress) else {
+            return Text(item.answer).foregroundStyle(Color.kSuccess)
+        }
+        let before = String(item.answer[item.answer.startIndex..<range.lowerBound])
+        let trap = String(item.answer[range])
+        let after = String(item.answer[range.upperBound...])
+        return Text(before).foregroundStyle(Color.kSuccess)
+            + Text(trap).underline().foregroundStyle(Color.kSuccess)
+            + Text(after).foregroundStyle(Color.kSuccess)
+    }
+
+    /// Each real-word option, used correctly in the wild.
+    private func examplesCard(_ item: QuizItem) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(item.examples.count > 1 ? "Each one, used right" : "Used right")
+                .font(.kBody(10.5, weight: .bold)).kerning(1.2)
+                .textCase(.uppercase)
+                .foregroundStyle(Color.kInkFaint)
+            ForEach(item.examples, id: \.word) { ex in
+                (Text(ex.word).fontWeight(.semibold).foregroundStyle(Color.kInk)
+                 + Text(" — \(ex.sample)").foregroundStyle(Color.kInkSoft))
+                    .font(.kBody(13))
+                    .multilineTextAlignment(.leading)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color.kSurfaceSunken))
     }
 
     private func optionButton(_ opt: String, item: QuizItem) -> some View {
@@ -147,14 +208,43 @@ struct QuizGameView: View {
                 Button("Back to my day") { onExit() }.buttonStyle(PrimaryPill())
             }
             .padding(.top, 8)
+            if !missedThisRun.isEmpty {
+                recapCard
+                    .padding(.top, 16)
+            }
         }
         .padding(.top, 40)
+    }
+
+    /// "Pocket these" — the rules from this run's misses leave with you.
+    private var recapCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Pocket these")
+                .font(.kBody(10.5, weight: .bold)).kerning(1.2)
+                .textCase(.uppercase)
+                .foregroundStyle(Color.kInkFaint)
+            ForEach(missedThisRun.prefix(Self.recapCap), id: \.prompt) { m in
+                (Text(m.answer).fontWeight(.semibold).foregroundStyle(Color.kInk)
+                 + Text(" — \(m.note)").foregroundStyle(Color.kInkSoft))
+                    .font(.kBody(12.5))
+                    .multilineTextAlignment(.leading)
+            }
+            if missedThisRun.count > Self.recapCap {
+                Text("…and \(missedThisRun.count - Self.recapCap) more, saved with your tricky ones.")
+                    .font(.kBody(11.5)).foregroundStyle(Color.kInkFaint)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color.kSurface))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.kBorder, lineWidth: 1))
     }
 
     private func bootstrap() {
         guard !started else { return }
         best = PlayScores.best(for: id)
-        missCount = QuizMisses.read(id).count
+        // Prune first: a reworded/retired bank item must not haunt the count.
+        missCount = QuizMisses.prune(id, bank: bank).count
         if missCount >= Self.practiceOfferAt {
             mode = .choose
         } else {
@@ -169,6 +259,7 @@ struct QuizGameView: View {
         idx = 0
         chosen = nil
         score = 0
+        missedThisRun = []
         isNewBest = false
         done = false
         best = PlayScores.best(for: id)
@@ -181,6 +272,7 @@ struct QuizGameView: View {
         idx = 0
         chosen = nil
         score = 0
+        missedThisRun = []
         isNewBest = false
         done = false
         mode = .practice
@@ -195,10 +287,12 @@ struct QuizGameView: View {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
         } else {
             QuizMisses.record(id, prompt: item.prompt)
+            missedThisRun.append(item)
         }
     }
 
     private func next() {
+        guard !done else { return }
         if idx + 1 >= rounds.count {
             // Only fresh runs compete with your best — practice is for redemption.
             if mode == .fresh {

@@ -175,6 +175,8 @@ final class PlayArcadeLogicTests: XCTestCase {
             let original = QuizBank.grammar.first { $0.prompt == item.prompt }
             XCTAssertNotNil(original)
             XCTAssertEqual(item.options.sorted(), original!.options.sorted())
+            XCTAssertEqual(item.examples, original!.examples, "teaching examples must survive the pick")
+            XCTAssertEqual(item.stress, original!.stress, "stress highlight must survive the pick")
         }
     }
 
@@ -193,8 +195,8 @@ final class PlayArcadeLogicTests: XCTestCase {
     // MARK: Quiz banks
 
     func testQuizBanksMatchTheWebCounts() {
-        XCTAssertEqual(QuizBank.grammar.count, 66)
-        XCTAssertEqual(QuizBank.spelling.count, 16)
+        XCTAssertEqual(QuizBank.grammar.count, 80)
+        XCTAssertEqual(QuizBank.spelling.count, 22)
     }
 
     func testEveryBankItemIsAnswerableAndLabeled() {
@@ -202,6 +204,53 @@ final class PlayArcadeLogicTests: XCTestCase {
             XCTAssertTrue(item.options.contains(item.answer), item.prompt)
             XCTAssertNotNil(QuizBank.topicLabels[item.topic], item.topic)
         }
+    }
+
+    func testEveryGrammarItemTeachesWithAtLeastOneExample() {
+        for item in QuizBank.grammar {
+            XCTAssertFalse(item.examples.isEmpty, item.prompt)
+        }
+    }
+
+    func testExamplesUseRealOptionsAndActuallyContainTheirWord() {
+        for item in QuizBank.grammar + QuizBank.spelling {
+            let words = item.examples.map(\.word)
+            XCTAssertEqual(Set(words).count, words.count, item.prompt)
+            for ex in item.examples {
+                XCTAssertTrue(item.options.contains(ex.word), item.prompt)
+                XCTAssertNotNil(
+                    ex.sample.range(of: ex.word, options: .caseInsensitive),
+                    "\(item.prompt) → sample for \"\(ex.word)\" must contain the word")
+            }
+        }
+    }
+
+    func testStressIsASubstringOfItsAnswerAndEverySpellingItemHasOne() {
+        for item in QuizBank.grammar + QuizBank.spelling {
+            if let stress = item.stress {
+                XCTAssertNotNil(item.answer.range(of: stress), item.prompt)
+            }
+        }
+        for item in QuizBank.spelling {
+            XCTAssertNotNil(item.stress, item.prompt)
+        }
+    }
+
+    func testEveryPromptCarriesABlankForTheFilledReveal() {
+        for item in QuizBank.grammar + QuizBank.spelling {
+            XCTAssertTrue(item.prompt.contains("___"), item.prompt)
+        }
+    }
+
+    func testPruneDropsOrphanedMissesAndPersists() {
+        let id = "unit-test-prune"
+        for prompt in QuizMisses.read(id) { QuizMisses.clear(id, prompt: prompt) }
+        let real = QuizBank.grammar[0].prompt
+        QuizMisses.record(id, prompt: real)
+        QuizMisses.record(id, prompt: "a prompt that left the bank")
+        XCTAssertEqual(QuizMisses.prune(id, bank: QuizBank.grammar), [real])
+        XCTAssertEqual(QuizMisses.read(id), [real], "orphan must be removed from storage, not just filtered")
+        QuizMisses.clear(id, prompt: real)
     }
 
     // MARK: Miss memory

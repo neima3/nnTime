@@ -48,7 +48,7 @@ struct PlayView: View {
                          best: bests["inorder"].map { "best \($0)/5 clean" }) { active = .inOrder }
 
                     sectionHeader("Wordplay", "Snags and spellings, zero red pens.")
-                    card("📝", "Grammar Snap", "60+ classic snags across ten topics — it remembers the ones that get you.", .kCatSky,
+                    card("📝", "Grammar Snap", "80 classic snags, each with the trick and real examples — it remembers the ones that get you.", .kCatSky,
                          best: bests["grammarsnap"].map { "best \($0)/8" }) { active = .grammar }
                     card("🔤", "Spell Check", "Definitely? Definately? One of these is real.", .kCatRose,
                          best: bests["spellcheck"].map { "best \($0)/8" }) { active = .spelling }
