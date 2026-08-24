@@ -1,5 +1,73 @@
 # Progress log
 
+## 2026-08-24 — Round 91: Phase 2 Quiet Today + 6.2 error sink, staged behind the B6 gate (Fable)
+
+Both remaining agent-executable Track A features are BUILT, GREEN, and parked
+on branches — deliberately not merged, because the plan gates any 4.3/6.2
+prod migration on B6 (Neima's pg_dump) and forbids them sharing a SHA.
+
+**`feat/quiet-today` (A3+A4, migration `0010_today_helpers.sql`):**
+- Expand commit: typed `user_settings.today_helpers` (default true), zod +
+  OpenAPI (+ iOS yaml sync), DAL, and the "Show helpers on Today" Settings
+  toggle. Zero Today changes; default preserves today's UI.
+- Wiring commit: `today_helpers=false` unmounts SoftStreaks / PickForMe /
+  DailyBrief / DayRituals / PeakFocusNudge from `/app/today`; a Rhythm chip
+  (Flame, Review-chip idiom) appears in their place → `/app/stats`.
+  TimezoneNudge, LowBattery, DayLoadMeter, DayDoneRain, AnytimeRail, Review
+  and day chrome stay. **Deviation, on purpose:** the plan said "Stats mounts
+  <SoftStreaks>"; Stats already renders the same numbers in its richer
+  Soft-streak card, so Rhythm lands there (testid `soft-streak-card`) instead
+  of double-mounting the chip.
+- Hard acceptance `e2e/today-helpers.spec.ts` is GREEN and fully
+  deterministic: the spec's own account steers its wall clock by setting the
+  account timezone to a fixed-offset zone where it is currently morning, and
+  seeds streak/candidates/5 focus stops through the real APIs — all five
+  helpers render ON, all five unmount OFF (flipped via the real toggle),
+  Rhythm→Stats / Inbox→PickForMe / Review / Focus each one tap, skip link
+  intact. The suite-wide America/New_York pin is untouched.
+- Screenshot gate DONE: `node scripts/phase2-screenshots.mjs` → 8 shots in
+  `browser-qa/phase-2/` ({light,dark} × {on,off} × {390,1440}), reviewed —
+  OFF keeps the header at ring + Rhythm + Low battery + Review + switcher.
+- A5 (default flip) intentionally absent. Neima flips the toggle himself.
+
+**`feat/client-error-sink` (A8, migration `0011_client_error_reports.sql`),
+built by a sonnet subagent in a worktree, then reviewed + restacked:**
+table + composite index, SEC-01-scoped DAL, redaction (`src/server/redact.ts`:
+auth headers, bearer/cookies, token params, magic links, ICS URLs), zod caps
+(truncate-not-reject), rate-limited authed `POST /api/v1/client-errors`
+(10/min), `ClientErrorReporter` mounted behind SignedInOnly (dedupe, ≤5
+posts/page, keepalive), privacy cascade + isolation + red-green tests,
+OpenAPI + regenerated iOS yaml. `release` stays null until a build SHA env
+exists (`KAIRO_RELEASE` hook; NEXT_PUBLIC_ trap avoided).
+
+**Migration collision, resolved by stacking:** both efforts wanted `0010`
+(`migration-chain.test.ts` forbids gaps, so parallel branches MUST collide).
+`feat/client-error-sink` is now REBASED ONTO `feat/quiet-today` carrying
+`0011`; plan doc + this file updated. Merge order is thereby fixed:
+quiet-today first, then client-error-sink. Stacked-branch gates: lint,
+typecheck, **1377 tests**, build (route in table). quiet-today alone: lint,
+typecheck, **1339 tests**, build, acceptance e2e, 8 screenshots.
+
+**Neima's runbook (B6, ~15 min):**
+1. SSH to the Coolify/Postgres host, `pg_dump` per docs/DEPLOYMENT.md SEC-07;
+   stash the dump off-host.
+2. Merge `feat/quiet-today` → main, let it deploy, verify Today unchanged and
+   the Settings toggle exists; flip it on your account when ready (that IS
+   the A4 human look; A5 default-flip stays a later one-line commit).
+3. AFTER that deploy settles: merge `feat/client-error-sink` → main, deploy,
+   verify `/api/v1/client-errors` 401s signed-out. Never both in one deploy.
+
+**Also this round:** `.claude/worktrees/**` and `browser-qa/**` added to
+eslint ignores (an agent worktree's `.next` was failing the host checkout's
+lint). The machine's disk hit literal 0 bytes free mid-round (macOS purged
+Playwright's browser cache, which had to be reinstalled); freed to ~11 GiB —
+**the data volume is still 98% full and deserves attention**. Auth rate
+limit (10/10min/IP) bit twice during e2e iteration; spec runs cost 2 sign-ups
+each — space them.
+
+**Not done / still open:** A5 default flip (after Neima's look), A9 CSP
+research (still unstarted — next round), Track B unchanged.
+
 ## 2026-08-23 — Round 90: the word quizzes learn to teach (Fable)
 
 "Make the grammar game better with explanations/examples." The quiz engine

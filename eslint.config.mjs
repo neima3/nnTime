@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Agent worktrees (each carries its own .next/ and node_modules/) —
+    // without this, any in-repo worktree fails the host checkout's lint.
+    ".claude/worktrees/**",
+    // Git-ignored QA evidence and scripts (browser-qa is not product code).
+    "browser-qa/**",
   ]),
 ]);
 
