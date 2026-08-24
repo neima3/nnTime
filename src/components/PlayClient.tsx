@@ -204,7 +204,7 @@ const SECTIONS: { label: string; blurb: string; games: GameCard[] }[] = [
         id: "grammar-snap",
         emoji: "📝",
         title: "Grammar Snap",
-        hook: "60+ classic snags across ten topics — it remembers the ones that get you.",
+        hook: "80 classic snags, each with the trick and real examples — it remembers the ones that get you.",
         tint: "bg-cat-sky",
         bestLabel: (v) => `best ${v}/8`,
       },

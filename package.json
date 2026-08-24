@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "api:sync-ios": "node scripts/sync-ios-openapi.mjs",
+    "quiz:sync-ios": "vitest run tests/ios-quiz-bank-sync.test.ts --update",
     "api:check-ios": "node scripts/sync-ios-openapi.mjs --check",
     "api:check-ios-adoption": "node scripts/ios-manual-api-contract.mjs",
     "api:check-ios-client": "pnpm api:check-ios-adoption",

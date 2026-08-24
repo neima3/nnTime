@@ -42,6 +42,7 @@ import {
   patternShowMs,
   pickPatternTiles,
   pickQuizRounds,
+  pruneMisses,
   QUIZ_ROUNDS,
   quickTapAverage,
   quickTapDelayMs,
@@ -361,8 +362,8 @@ describe("SPELLING_BANK spot check", () => {
 });
 
 describe("GRAMMAR_BANK expanded shape", () => {
-  it("has at least 60 items", () => {
-    expect(GRAMMAR_BANK.length).toBeGreaterThanOrEqual(60);
+  it("has at least 80 items", () => {
+    expect(GRAMMAR_BANK.length).toBeGreaterThanOrEqual(80);
   });
 
   it("gives every item a topic", () => {
@@ -379,6 +380,67 @@ describe("GRAMMAR_BANK expanded shape", () => {
   it("has unique prompts (miss tracking keys off prompt identity)", () => {
     const prompts = GRAMMAR_BANK.map((item) => item.prompt);
     expect(new Set(prompts).size).toBe(prompts.length);
+  });
+
+  it("teaches every item: at least one correct-usage example", () => {
+    for (const item of GRAMMAR_BANK) {
+      expect(item.examples, item.prompt).toBeDefined();
+      expect(item.examples!.length).toBeGreaterThanOrEqual(1);
+    }
+  });
+});
+
+describe("teaching content (examples + stress)", () => {
+  const all = [...GRAMMAR_BANK, ...SPELLING_BANK];
+
+  it("every example's word is one of that item's options, no word twice", () => {
+    for (const item of all) {
+      if (!item.examples) continue;
+      const words = item.examples.map((ex) => ex.word);
+      expect(new Set(words).size, item.prompt).toBe(words.length);
+      for (const word of words) {
+        expect(item.options, item.prompt).toContain(word);
+      }
+    }
+  });
+
+  it("every example sample actually uses its word", () => {
+    for (const item of all) {
+      for (const ex of item.examples ?? []) {
+        expect(ex.sample.trim().length, item.prompt).toBeGreaterThan(0);
+        expect(
+          ex.sample.toLowerCase().includes(ex.word.toLowerCase()),
+          `${item.prompt} → sample for "${ex.word}" must contain the word`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("examples never just parrot the item's own prompt", () => {
+    for (const item of all) {
+      for (const ex of item.examples ?? []) {
+        expect(ex.sample, item.prompt).not.toBe(item.prompt.replace("___", ex.word));
+      }
+    }
+  });
+
+  it("every stress is a real substring of its answer", () => {
+    for (const item of all) {
+      if (item.stress == null) continue;
+      expect(item.answer.includes(item.stress), item.prompt).toBe(true);
+    }
+  });
+
+  it("every spelling item spotlights its trap letters", () => {
+    for (const item of SPELLING_BANK) {
+      expect(item.stress, item.prompt).toBeTruthy();
+    }
+  });
+
+  it("every prompt carries a blank so the reveal can complete the sentence", () => {
+    for (const item of all) {
+      expect(item.prompt.includes("___"), item.prompt).toBe(true);
+    }
   });
 });
 
@@ -428,6 +490,18 @@ describe("pickQuizRounds", () => {
       expect(multiset(round.options)).toEqual(multiset(source!.options));
       expect(round.options).toContain(round.answer);
       expect(round.answer).toBe(source!.answer);
+    }
+  });
+
+  it("carries teaching fields (examples, stress) through untouched", () => {
+    const grammar = pickQuizRounds(GRAMMAR_BANK, GRAMMAR_BANK.length, fakeRandom(rollsA));
+    const spelling = pickQuizRounds(SPELLING_BANK, SPELLING_BANK.length, fakeRandom(rollsA));
+    const bank = GRAMMAR_BANK.concat(SPELLING_BANK);
+    for (const round of [...grammar, ...spelling]) {
+      const source = bank.find((item) => item.prompt === round.prompt);
+      expect(source).toBeDefined();
+      expect(round.examples).toEqual(source!.examples);
+      expect(round.stress).toBe(source!.stress);
     }
   });
 
@@ -584,6 +658,16 @@ describe("miss tracking (recordMiss / clearMiss / readMisses / missedItems)", ()
     const p5 = GRAMMAR_BANK[5]!.prompt;
     const items = missedItems(GRAMMAR_BANK, [p5, "not-a-real-prompt", p0]);
     expect(items.map((i) => i.prompt)).toEqual([p5, p0]);
+  });
+
+  it("pruneMisses drops orphaned prompts (reworded/retired items) and persists the kept list", () => {
+    vi.stubGlobal("localStorage", new FakeStorage());
+    const p0 = GRAMMAR_BANK[0]!.prompt;
+    recordMiss(id, p0);
+    recordMiss(id, "a prompt that left the bank");
+    expect(pruneMisses(id, GRAMMAR_BANK)).toEqual([p0]);
+    // Persisted, not just returned — the orphan can never be redeemed.
+    expect(readMisses(id)).toEqual([p0]);
   });
 });
 

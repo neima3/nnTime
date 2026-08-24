@@ -2,7 +2,7 @@
 
 /**
  * Grammar Snap, self-contained: carries its bank and end-copy so the
- * arcade can lazy-load the whole quiz (engine + 60-item bank) on tap.
+ * arcade can lazy-load the whole quiz (engine + 80-item bank) on tap.
  */
 import { GRAMMAR_BANK } from "@/lib/games";
 import { QuizGame } from "./QuizGame";

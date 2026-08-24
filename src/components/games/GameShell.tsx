@@ -98,8 +98,12 @@ export function GameShell({
           <X size={17} />
         </button>
       </header>
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-5 pb-10">
-        {children}
+      {/* my-auto (not justify-center) so tall content scrolls from its top
+          instead of clipping both ends off-screen. */}
+      <div className="flex min-h-0 flex-1 flex-col items-center overflow-y-auto px-5 pb-10">
+        <div className="my-auto flex w-full flex-col items-center pt-4">
+          {children}
+        </div>
       </div>
     </dialog>
   );

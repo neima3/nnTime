@@ -65,6 +65,14 @@ export function buildMatchDeck(random: () => number = Math.random): string[] {
 
 /* ---- Word quizzes (Grammar Snap + Spell Check) --------------------------- */
 
+/** One confusable word shown correctly in the wild — the contrast that teaches. */
+export interface QuizExample {
+  /** Exactly one of the item's options. */
+  word: string;
+  /** A short sentence using that word correctly. */
+  sample: string;
+}
+
 export interface QuizItem {
   /** Sentence with ___ for grammar; plain "Which is spelled right?" for spelling. */
   prompt: string;
@@ -74,6 +82,14 @@ export interface QuizItem {
   note: string;
   /** Topic slug — the picker spreads a run across topics. */
   topic?: string;
+  /**
+   * Correct-usage sample per real-word option (fake words like "alot" get
+   * none). Shown after answering so the learner sees when the OTHER word
+   * would be right — the distinction, not just the answer.
+   */
+  examples?: QuizExample[];
+  /** Substring of the answer to spotlight in the filled-in reveal (spelling). */
+  stress?: string;
 }
 
 /** Human labels for quiz topics (shown as a small chip on questions). */
@@ -93,115 +109,379 @@ export const QUIZ_TOPIC_LABELS: Record<string, string> = {
 export const QUIZ_ROUNDS = 8;
 
 /**
- * Grammar Snap bank — 64 snags across ten topics: sound-alikes,
+ * Grammar Snap bank — 80 snags across nine topics: sound-alikes,
  * apostrophes, agreement, pronouns, comparisons, tricky verb pairs, tense,
  * word choice, and double negatives. Tone: playful, zero red-pen energy.
  * The picker guarantees topic spread, so no run is eight rounds of its/it's.
+ * Every real-word option carries a correct-usage example — the game teaches
+ * the distinction, not just the answer. Prompts are identity keys for miss
+ * tracking: never reword an existing prompt, add a new item instead.
  */
 export const GRAMMAR_BANK: QuizItem[] = [
   /* -- sound-alikes (homophones) -- */
-  { topic: "homophones", prompt: "___ going to love this timeline.", options: ["Your", "You're"], answer: "You're", note: "You're = you are. Your = it belongs to you." },
-  { topic: "homophones", prompt: "___ meeting starts in five minutes.", options: ["They're", "Their", "There"], answer: "Their", note: "Their = belongs to them. There = a place. They're = they are." },
-  { topic: "homophones", prompt: "We planned more breaks ___ we actually took.", options: ["then", "than"], answer: "than", note: "Than compares. Then is about time." },
-  { topic: "homophones", prompt: "Coffee has a strong ___ on my morning plans.", options: ["affect", "effect"], answer: "effect", note: "Effect is (usually) the noun; affect is the verb." },
-  { topic: "homophones", prompt: "Don't ___ your keys again — put them in the bowl.", options: ["loose", "lose"], answer: "lose", note: "Lose = misplace. Loose = not tight. One o of difference." },
-  { topic: "homophones", prompt: "I'm ___ tired to argue about semicolons.", options: ["to", "too", "two"], answer: "too", note: "Too = also / excessively. To = direction. Two = 2." },
-  { topic: "homophones", prompt: "I walked ___ the old library on my way home.", options: ["passed", "past"], answer: "past", note: "Past = beyond (place/time). Passed = the verb pass, done." },
-  { topic: "homophones", prompt: "Time ___ faster during hyperfocus.", options: ["passed", "past"], answer: "passed", note: "Here it's the verb: time passes, time passed." },
-  { topic: "homophones", prompt: "I can't decide ___ to nap or to snack.", options: ["weather", "whether"], answer: "whether", note: "Whether = choice. Weather = rain and sunshine." },
-  { topic: "homophones", prompt: "Ice cream after a hard day is a just ___.", options: ["desert", "dessert"], answer: "dessert", note: "Dessert has two s's — you always want seconds." },
-  { topic: "homophones", prompt: "Please ___ before the stop sign.", options: ["brake", "break"], answer: "brake", note: "Brake stops the car. Break is what you take at 3pm." },
-  { topic: "homophones", prompt: "Reading ___ is allowed in the quiet car. Wait—", options: ["aloud", "allowed"], answer: "aloud", note: "Aloud = out loud. Allowed = permitted." },
-  { topic: "homophones", prompt: "That scarf really ___ your eyes.", options: ["complements", "compliments"], answer: "complements", note: "Complement completes. Compliment flatters." },
-  { topic: "homophones", prompt: "The ___ of the school knew everyone's name.", options: ["principal", "principle"], answer: "principal", note: "The principal is your pal (allegedly). A principle is a rule." },
-  { topic: "homophones", prompt: "The car stayed ___ while the light was red.", options: ["stationary", "stationery"], answer: "stationary", note: "StationAry = not moving. StationEry = envelopes (e for envelope)." },
-  { topic: "homophones", prompt: "A quiet morning brings a rare peace of ___.", options: ["mind", "mine"], answer: "mind", note: "Peace of mind — your mind, at peace. (Piece of cake is the other one.)" },
+  { topic: "homophones", prompt: "___ going to love this timeline.", options: ["Your", "You're"], answer: "You're", note: "You're = you are. Your = it belongs to you.", examples: [
+    { word: "You're", sample: "You're going to crush today." },
+    { word: "Your", sample: "Your playlist is elite." },
+  ] },
+  { topic: "homophones", prompt: "___ meeting starts in five minutes.", options: ["They're", "Their", "There"], answer: "Their", note: "Their = belongs to them. There = a place. They're = they are.", examples: [
+    { word: "Their", sample: "Their dog runs the house." },
+    { word: "There", sample: "The keys are over there." },
+    { word: "They're", sample: "They're already on the bus." },
+  ] },
+  { topic: "homophones", prompt: "We planned more breaks ___ we actually took.", options: ["then", "than"], answer: "than", note: "Than compares. Then is about time.", examples: [
+    { word: "than", sample: "Taller than a giraffe." },
+    { word: "then", sample: "First coffee, then everything else." },
+  ] },
+  { topic: "homophones", prompt: "Coffee has a strong ___ on my morning plans.", options: ["affect", "effect"], answer: "effect", note: "Effect is (usually) the noun; affect is the verb.", examples: [
+    { word: "effect", sample: "The nap had a magical effect." },
+    { word: "affect", sample: "Rain doesn't affect my plans." },
+  ] },
+  { topic: "homophones", prompt: "Don't ___ your keys again — put them in the bowl.", options: ["loose", "lose"], answer: "lose", note: "Lose = misplace. Loose = not tight. One o of difference.", examples: [
+    { word: "lose", sample: "Don't lose the remote again." },
+    { word: "loose", sample: "This screw is a little loose." },
+  ] },
+  { topic: "homophones", prompt: "I'm ___ tired to argue about semicolons.", options: ["to", "too", "two"], answer: "too", note: "Too = also / excessively. To = direction. Two = 2.", examples: [
+    { word: "too", sample: "It's too cozy to move." },
+    { word: "to", sample: "Walk to the window and back." },
+    { word: "two", sample: "Two snoozes minimum." },
+  ] },
+  { topic: "homophones", prompt: "I walked ___ the old library on my way home.", options: ["passed", "past"], answer: "past", note: "Past = beyond (place/time). Passed = the verb pass, done.", examples: [
+    { word: "past", sample: "We drove past the bakery. Twice." },
+    { word: "passed", sample: "She passed the test easily." },
+  ] },
+  { topic: "homophones", prompt: "Time ___ faster during hyperfocus.", options: ["passed", "past"], answer: "passed", note: "Here it's the verb: time passes, time passed.", examples: [
+    { word: "passed", sample: "The deadline passed quietly." },
+    { word: "past", sample: "That's all in the past." },
+  ] },
+  { topic: "homophones", prompt: "I can't decide ___ to nap or to snack.", options: ["weather", "whether"], answer: "whether", note: "Whether = choice. Weather = rain and sunshine.", examples: [
+    { word: "whether", sample: "Whether tea or coffee, hydrate." },
+    { word: "weather", sample: "The weather canceled our picnic." },
+  ] },
+  { topic: "homophones", prompt: "Ice cream after a hard day is a well-earned ___.", options: ["desert", "dessert"], answer: "dessert", note: "Dessert has two s's — you always want seconds. (The idiom, weirdly, is 'just deserts' — one s.)", examples: [
+    { word: "dessert", sample: "Dessert first is a valid strategy." },
+    { word: "desert", sample: "Cacti thrive in the desert." },
+  ] },
+  { topic: "homophones", prompt: "Please ___ before the stop sign.", options: ["brake", "break"], answer: "brake", note: "Brake stops the car. Break is what you take at 3pm.", examples: [
+    { word: "brake", sample: "Tap the brake gently on ice." },
+    { word: "break", sample: "Take a break — you earned it." },
+  ] },
+  { topic: "homophones", prompt: "Reading ___ is allowed in the quiet car. Wait—", options: ["aloud", "allowed"], answer: "aloud", note: "Aloud = out loud. Allowed = permitted.", examples: [
+    { word: "aloud", sample: "She read the poem aloud." },
+    { word: "allowed", sample: "Snacks are allowed in this house." },
+  ] },
+  { topic: "homophones", prompt: "That scarf really ___ your eyes.", options: ["complements", "compliments"], answer: "complements", note: "Complement completes. Compliment flatters.", examples: [
+    { word: "complements", sample: "The sauce complements the fries." },
+    { word: "compliments", sample: "He compliments everyone's handwriting." },
+  ] },
+  { topic: "homophones", prompt: "The ___ of the school knew everyone's name.", options: ["principal", "principle"], answer: "principal", note: "The principal is your pal (allegedly). A principle is a rule.", examples: [
+    { word: "principal", sample: "The principal canceled homework. Legend." },
+    { word: "principle", sample: "Kindness is her guiding principle." },
+  ] },
+  { topic: "homophones", prompt: "The car stayed ___ while the light was red.", options: ["stationary", "stationery"], answer: "stationary", note: "StationAry = not moving. StationEry = envelopes (e for envelope).", examples: [
+    { word: "stationary", sample: "The bike is stationary — pedal anyway." },
+    { word: "stationery", sample: "Fancy stationery makes letters feel royal." },
+  ] },
+  { topic: "homophones", prompt: "A quiet morning brings a rare peace of ___.", options: ["mind", "mine"], answer: "mind", note: "Peace of mind — your mind, at peace. (Piece of cake is the other one.)", examples: [
+    { word: "mind", sample: "A slow walk clears my mind." },
+    { word: "mine", sample: "That cozy blanket is mine." },
+  ] },
+  { topic: "homophones", prompt: "I ___ your apology — let's get pancakes.", options: ["accept", "except"], answer: "accept", note: "Accept = take in. Except = leave out. (Ex- exits.)", examples: [
+    { word: "accept", sample: "I accept your cookie offering." },
+    { word: "except", sample: "Everyone left except the cat." },
+  ] },
+  { topic: "homophones", prompt: "Take a deep ___ before the next thing.", options: ["breath", "breathe"], answer: "breath", note: "Breath is the noun; breathe (rhymes with seethe) is the verb — the extra e does the exhaling.", examples: [
+    { word: "breath", sample: "Take one slow breath." },
+    { word: "breathe", sample: "Breathe out longer than in." },
+  ] },
+  { topic: "homophones", prompt: "Sacramento is the ___ of California.", options: ["capital", "capitol"], answer: "capital", note: "Capitol with an o is only the building. Every other sense is capital.", examples: [
+    { word: "capital", sample: "Start sentences with a capital letter." },
+    { word: "capitol", sample: "The capitol dome was gleaming." },
+  ] },
+  { topic: "homophones", prompt: "___ split the sky right before the thunder.", options: ["Lightning", "Lightening"], answer: "Lightning", note: "Lightning strikes; lightening means making lighter. The storm has no time for an extra e.", examples: [
+    { word: "Lightning", sample: "Lightning never bothered the ducks." },
+    { word: "Lightening", sample: "She's lightening her backpack daily." },
+  ] },
+  { topic: "homophones", prompt: "My ___ is clear. Mostly.", options: ["conscience", "conscious"], answer: "conscience", note: "Conscience = your inner judge. Conscious = awake and aware.", examples: [
+    { word: "conscience", sample: "Her conscience approved the second nap." },
+    { word: "conscious", sample: "I'm conscious of the time. Barely." },
+  ] },
 
   /* -- apostrophes & ownership -- */
-  { topic: "apostrophes", prompt: "The cat licked ___ paw and judged us all.", options: ["its", "it's"], answer: "its", note: "It's = it is. The cat owns the paw, so: its." },
-  { topic: "apostrophes", prompt: "___ turn is it to water the plant?", options: ["Whose", "Who's"], answer: "Whose", note: "Who's = who is. Whose owns things." },
-  { topic: "apostrophes", prompt: "The ___ toys are everywhere.", options: ["dogs'", "dog's", "dogs"], answer: "dogs'", note: "Several dogs own the toys → apostrophe after the s: dogs'." },
-  { topic: "apostrophes", prompt: "Music from the ___ still slaps.", options: ["1990s", "1990's"], answer: "1990s", note: "Decades are plain plurals: the 1990s. No apostrophe needed." },
-  { topic: "apostrophes", prompt: "That backpack is ___.", options: ["hers", "her's"], answer: "hers", note: "Hers, ours, yours, theirs — possessive pronouns never take apostrophes." },
-  { topic: "apostrophes", prompt: "___ been a long week already.", options: ["Its", "It's"], answer: "It's", note: "It's = it is / it has. This one is 'it has been' — apostrophe earned." },
+  { topic: "apostrophes", prompt: "The cat licked ___ paw and judged us all.", options: ["its", "it's"], answer: "its", note: "It's = it is. The cat owns the paw, so: its.", examples: [
+    { word: "its", sample: "The plant dropped its last leaf." },
+    { word: "it's", sample: "It's nap o'clock somewhere." },
+  ] },
+  { topic: "apostrophes", prompt: "___ turn is it to water the plant?", options: ["Whose", "Who's"], answer: "Whose", note: "Who's = who is. Whose owns things.", examples: [
+    { word: "Whose", sample: "Whose mug is in the sink?" },
+    { word: "Who's", sample: "Who's bringing the snacks?" },
+  ] },
+  { topic: "apostrophes", prompt: "The two ___ toys are everywhere.", options: ["dogs'", "dog's", "dogs"], answer: "dogs'", note: "Two dogs own the toys → apostrophe after the s: dogs'.", examples: [
+    { word: "dogs'", sample: "The dogs' beds are all occupied." },
+    { word: "dog's", sample: "One dog's tail knocked the lamp." },
+    { word: "dogs", sample: "Three dogs, zero regrets." },
+  ] },
+  { topic: "apostrophes", prompt: "Music from the ___ still slaps.", options: ["1990s", "1990's"], answer: "1990s", note: "Decades are plain plurals: the 1990s. No apostrophe needed.", examples: [
+    { word: "1990s", sample: "The 1990s gave us great cartoons." },
+  ] },
+  { topic: "apostrophes", prompt: "That backpack is ___.", options: ["hers", "her's"], answer: "hers", note: "Hers, ours, yours, theirs — possessive pronouns never take apostrophes.", examples: [
+    { word: "hers", sample: "The window seat is hers." },
+  ] },
+  { topic: "apostrophes", prompt: "___ been a long week already.", options: ["Its", "It's"], answer: "It's", note: "It's = it is / it has. This one is 'it has been' — apostrophe earned.", examples: [
+    { word: "It's", sample: "It's been a cozy morning." },
+    { word: "Its", sample: "The app saved its own settings." },
+  ] },
+  { topic: "apostrophes", prompt: "Two ___ from now, this is done.", options: ["weeks", "week's", "weeks'"], answer: "weeks", note: "Just a plural — nothing owns anything, so no apostrophe.", examples: [
+    { word: "weeks", sample: "Three weeks flew by." },
+    { word: "week's", sample: "This week's goal: rest more." },
+    { word: "weeks'", sample: "Two weeks' notice, politely given." },
+  ] },
 
   /* -- matching up (agreement) -- */
-  { topic: "agreement", prompt: "The plan ___ fine until lunch happened.", options: ["was", "were"], answer: "was", note: "One plan → was. Plural things → were." },
-  { topic: "agreement", prompt: "Neither of the timers ___ set.", options: ["was", "were"], answer: "was", note: "Neither is singular at heart — neither one was set." },
-  { topic: "agreement", prompt: "Each of the steps ___ five minutes.", options: ["takes", "take"], answer: "takes", note: "Each = one at a time → singular verb. Each one takes." },
-  { topic: "agreement", prompt: "There ___ three snacks left in the drawer.", options: ["is", "are"], answer: "are", note: "Three snacks are. Flip it: 'three snacks are there.'" },
-  { topic: "agreement", prompt: "A list of tasks ___ waiting in the inbox.", options: ["is", "are"], answer: "is", note: "The LIST is waiting (one list) — 'of tasks' is just decoration." },
-  { topic: "agreement", prompt: "Everyone on both teams ___ trying their best.", options: ["is", "are"], answer: "is", note: "Everyone is singular, always — even in a crowd." },
-  { topic: "agreement", prompt: "The pair of scissors ___ missing again.", options: ["is", "are"], answer: "is", note: "The pair is one thing (even with two blades)." },
+  { topic: "agreement", prompt: "The plan ___ fine until lunch happened.", options: ["was", "were"], answer: "was", note: "One plan → was. Plural things → were.", examples: [
+    { word: "was", sample: "The soup was perfect." },
+    { word: "were", sample: "The dumplings were even better." },
+  ] },
+  { topic: "agreement", prompt: "Neither of the timers ___ set.", options: ["was", "were"], answer: "was", note: "Neither is singular at heart — neither one was set.", examples: [
+    { word: "was", sample: "Neither alarm was loud enough." },
+    { word: "were", sample: "Both alarms were asleep too." },
+  ] },
+  { topic: "agreement", prompt: "Each of the steps ___ five minutes.", options: ["takes", "take"], answer: "takes", note: "Each = one at a time → singular verb. Each one takes.", examples: [
+    { word: "takes", sample: "Each step takes patience." },
+    { word: "take", sample: "Small steps take you far." },
+  ] },
+  { topic: "agreement", prompt: "There ___ three snacks left in the drawer.", options: ["is", "are"], answer: "are", note: "Three snacks are. Flip it: 'three snacks are there.'", examples: [
+    { word: "are", sample: "There are two cookies left." },
+    { word: "is", sample: "There is one brave carrot." },
+  ] },
+  { topic: "agreement", prompt: "A list of tasks ___ waiting in the inbox.", options: ["is", "are"], answer: "is", note: "The LIST is waiting (one list) — 'of tasks' is just decoration.", examples: [
+    { word: "is", sample: "A stack of books is a mood." },
+    { word: "are", sample: "The books are due Friday." },
+  ] },
+  { topic: "agreement", prompt: "Everyone on both teams ___ trying their best.", options: ["is", "are"], answer: "is", note: "Everyone is singular, always — even in a crowd.", examples: [
+    { word: "is", sample: "Everybody is welcome here." },
+    { word: "are", sample: "All of us are welcome too." },
+  ] },
+  { topic: "agreement", prompt: "The pair of scissors ___ missing again.", options: ["is", "are"], answer: "is", note: "The pair is one thing (even with two blades).", examples: [
+    { word: "is", sample: "A pair of mittens is enough." },
+    { word: "are", sample: "The mittens are inseparable." },
+  ] },
 
   /* -- pronouns -- */
-  { topic: "pronouns", prompt: "Between you and ___, this app gets me.", options: ["me", "I"], answer: "me", note: "After a preposition (between), it's me. Fancy ≠ correct." },
-  { topic: "pronouns", prompt: "The snacks are for ___ finishes their review.", options: ["whoever", "whomever"], answer: "whoever", note: "Whoever does the finishing — subjects get whoever." },
-  { topic: "pronouns", prompt: "My friend and ___ built a pillow fort.", options: ["I", "me", "myself"], answer: "I", note: "Drop the friend: 'I built a fort.' Subjects get I." },
-  { topic: "pronouns", prompt: "They saved seats for Sam and ___.", options: ["I", "me", "myself"], answer: "me", note: "Drop Sam: 'they saved a seat for me.' Objects get me." },
-  { topic: "pronouns", prompt: "___ should I say is calling?", options: ["Who", "Whom"], answer: "Who", note: "Who is doing the calling → who. (Whom = him test: 'him is calling'? No.)" },
-  { topic: "pronouns", prompt: "To ___ should I address this very formal letter?", options: ["who", "whom"], answer: "whom", note: "To him → to whom. The him-test works every time." },
-  { topic: "pronouns", prompt: "I fixed it ___ — no tutorial needed.", options: ["myself", "meself", "my own self"], answer: "myself", note: "Myself is for emphasis or reflexives — and this one's earned." },
+  { topic: "pronouns", prompt: "Between you and ___, this app gets me.", options: ["me", "I"], answer: "me", note: "After a preposition (between), it's me. Fancy ≠ correct.", examples: [
+    { word: "me", sample: "Save a seat for me." },
+    { word: "I", sample: "Sam and I found the fort." },
+  ] },
+  { topic: "pronouns", prompt: "The snacks are for ___ finishes their review.", options: ["whoever", "whomever"], answer: "whoever", note: "Whoever does the finishing — subjects get whoever.", examples: [
+    { word: "whoever", sample: "Whoever naps first wins." },
+    { word: "whomever", sample: "Give the prize to whomever you like." },
+  ] },
+  { topic: "pronouns", prompt: "My friend and ___ built a pillow fort.", options: ["I", "me", "myself"], answer: "I", note: "Drop the friend: 'I built a fort.' Subjects get I.", examples: [
+    { word: "I", sample: "Ana and I made pancakes." },
+    { word: "me", sample: "The pancakes were for me." },
+    { word: "myself", sample: "I flipped one myself." },
+  ] },
+  { topic: "pronouns", prompt: "They saved seats for Sam and ___.", options: ["I", "me", "myself"], answer: "me", note: "Drop Sam: 'they saved a seat for me.' Objects get me.", examples: [
+    { word: "me", sample: "They cheered for Sam and me." },
+    { word: "I", sample: "Sam and I took a bow." },
+    { word: "myself", sample: "I surprised even myself." },
+  ] },
+  { topic: "pronouns", prompt: "___ should I say is calling?", options: ["Who", "Whom"], answer: "Who", note: "Who is doing the calling → who. (Whom = him test: 'him is calling'? No.)", examples: [
+    { word: "Who", sample: "Who ate the last dumpling?" },
+    { word: "Whom", sample: "To whom do I owe thanks?" },
+  ] },
+  { topic: "pronouns", prompt: "To ___ should I address this very formal letter?", options: ["who", "whom"], answer: "whom", note: "To him → to whom. (Run the him-test inside the clause that owns the verb.)", examples: [
+    { word: "whom", sample: "To whom it may concern: hi." },
+    { word: "who", sample: "Who wrote this lovely note?" },
+  ] },
+  { topic: "pronouns", prompt: "I fixed it ___ — no tutorial needed.", options: ["myself", "meself", "my own self"], answer: "myself", note: "Myself is for emphasis or reflexives — and this one's earned.", examples: [
+    { word: "myself", sample: "I assembled the shelf myself." },
+  ] },
 
   /* -- comparisons -- */
-  { topic: "comparisons", prompt: "She did ___ on the exam than she expected.", options: ["better", "more better"], answer: "better", note: "Better is already the comparison — it flies solo." },
-  { topic: "comparisons", prompt: "The express lane: ten items or ___.", options: ["fewer", "less"], answer: "fewer", note: "Fewer for things you can count. Less for stuff you can't (less time, fewer minutes)." },
-  { topic: "comparisons", prompt: "I have ___ energy after lunch than before.", options: ["fewer", "less"], answer: "less", note: "Energy isn't countable → less energy. (Fewer naps, less sleep.)" },
-  { topic: "comparisons", prompt: "How much ___ is the trailhead?", options: ["farther", "further"], answer: "farther", note: "Farther = physical distance. Further = more of anything else." },
-  { topic: "comparisons", prompt: "Let's discuss this ___ after snacks.", options: ["farther", "further"], answer: "further", note: "Ideas go further; roads go farther." },
-  { topic: "comparisons", prompt: "The focus timer works really ___.", options: ["good", "well"], answer: "well", note: "Things work well (adverb). The result can be good (adjective)." },
-  { topic: "comparisons", prompt: "Of the two routes, this one is ___.", options: ["shorter", "shortest"], answer: "shorter", note: "Two things → -er. Three or more → -est." },
+  { topic: "comparisons", prompt: "She did ___ on the exam than she expected.", options: ["better", "more better"], answer: "better", note: "Better is already the comparison — it flies solo.", examples: [
+    { word: "better", sample: "Rested-me plans better than tired-me." },
+  ] },
+  { topic: "comparisons", prompt: "The express lane: ten items or ___.", options: ["fewer", "less"], answer: "fewer", note: "Fewer counts things; less handles stuff. (Real signs say less — old idiom — but fewer is the tidy pick.)", examples: [
+    { word: "fewer", sample: "Fewer tabs, calmer brain." },
+    { word: "less", sample: "Less noise, more focus." },
+  ] },
+  { topic: "comparisons", prompt: "I have ___ energy after lunch than before.", options: ["fewer", "less"], answer: "less", note: "Energy isn't countable → less energy. (Fewer naps, less sleep.)", examples: [
+    { word: "less", sample: "There's less traffic before eight." },
+    { word: "fewer", sample: "Fewer alarms, gentler mornings." },
+  ] },
+  { topic: "comparisons", prompt: "This was the ___ day of the whole summer.", options: ["hottest", "most hottest"], answer: "hottest", note: "-est already does the most-work — no double stacking.", examples: [
+    { word: "hottest", sample: "July's hottest day melted the crayons." },
+  ] },
+  { topic: "comparisons", prompt: "Let's discuss this ___ after snacks.", options: ["farther", "further"], answer: "further", note: "Ideas go further; roads go farther.", examples: [
+    { word: "further", sample: "The rumor went further than intended." },
+    { word: "farther", sample: "The lake is farther than it looks." },
+  ] },
+  { topic: "comparisons", prompt: "The focus timer works really ___.", options: ["good", "well"], answer: "well", note: "Things work well (adverb). The result can be good (adjective).", examples: [
+    { word: "well", sample: "The plan worked out well." },
+    { word: "good", sample: "The result was good." },
+  ] },
+  { topic: "comparisons", prompt: "Of the two routes, this one is ___.", options: ["shorter", "shortest"], answer: "shorter", note: "Two things → -er. Three or more → -est.", examples: [
+    { word: "shorter", sample: "This queue is shorter than that one." },
+    { word: "shortest", sample: "Of all three lines, this is shortest." },
+  ] },
 
   /* -- tricky verb pairs -- */
-  { topic: "verb-pairs", prompt: "I'm going to ___ down for ten minutes.", options: ["lie", "lay"], answer: "lie", note: "You lie down yourself; you lay something else down. (Lay needs an object.)" },
-  { topic: "verb-pairs", prompt: "___ the blanket on the couch, please.", options: ["Lie", "Lay"], answer: "Lay", note: "Laying the blanket — lay takes an object." },
-  { topic: "verb-pairs", prompt: "Can I ___ your charger until lunch?", options: ["borrow", "lend"], answer: "borrow", note: "You borrow FROM someone; they lend TO you." },
-  { topic: "verb-pairs", prompt: "Could you ___ me five minutes of quiet?", options: ["borrow", "lend"], answer: "lend", note: "They give it → lend. You take it → borrow." },
-  { topic: "verb-pairs", prompt: "___ the timer for twenty minutes.", options: ["Sit", "Set"], answer: "Set", note: "You set things down/up; you sit yourself." },
-  { topic: "verb-pairs", prompt: "Bread ___ when the yeast wakes up.", options: ["rises", "raises"], answer: "rises", note: "Things rise on their own; you raise something else." },
-  { topic: "verb-pairs", prompt: "___ your snacks when you come over.", options: ["Bring", "Take"], answer: "Bring", note: "Bring = toward the speaker. Take = away. Come here and bring snacks." },
+  { topic: "verb-pairs", prompt: "I'm going to ___ down for ten minutes.", options: ["lie", "lay"], answer: "lie", note: "You lie down yourself; you lay something else down. (Lay needs an object.)", examples: [
+    { word: "lie", sample: "I lie down when the timer ends." },
+    { word: "lay", sample: "Lay the mat by the window." },
+  ] },
+  { topic: "verb-pairs", prompt: "___ the blanket on the couch, please.", options: ["Lie", "Lay"], answer: "Lay", note: "Laying the blanket — lay takes an object.", examples: [
+    { word: "Lay", sample: "Lay your worries down gently." },
+    { word: "Lie", sample: "Lie back and watch the clouds." },
+  ] },
+  { topic: "verb-pairs", prompt: "Can I ___ your charger until lunch?", options: ["borrow", "lend"], answer: "borrow", note: "You borrow FROM someone; they lend TO you.", examples: [
+    { word: "borrow", sample: "May I borrow a pencil?" },
+    { word: "lend", sample: "I'll lend you my lucky one." },
+  ] },
+  { topic: "verb-pairs", prompt: "Could you ___ me five minutes of quiet?", options: ["borrow", "lend"], answer: "lend", note: "They give it → lend. You take it → borrow.", examples: [
+    { word: "lend", sample: "Friends lend hoodies forever." },
+    { word: "borrow", sample: "You can borrow the good pen." },
+  ] },
+  { topic: "verb-pairs", prompt: "___ the timer for twenty minutes.", options: ["Sit", "Set"], answer: "Set", note: "You set things down/up; you sit yourself.", examples: [
+    { word: "Set", sample: "Set the mug down slowly." },
+    { word: "Sit", sample: "Sit wherever the sun lands." },
+  ] },
+  { topic: "verb-pairs", prompt: "Bread ___ when the yeast wakes up.", options: ["rises", "raises"], answer: "rises", note: "Things rise on their own; you raise something else.", examples: [
+    { word: "rises", sample: "The moon rises over the lot." },
+    { word: "raises", sample: "She raises the blinds at noon." },
+  ] },
+  { topic: "verb-pairs", prompt: "___ your snacks when you come over.", options: ["Bring", "Take"], answer: "Bring", note: "Bring = toward the speaker. Take = away. Come here and bring snacks.", examples: [
+    { word: "Bring", sample: "Bring your appetite over here." },
+    { word: "Take", sample: "Take this umbrella when you go." },
+  ] },
+  { topic: "verb-pairs", prompt: "Could you ___ me that dice trick?", options: ["teach", "learn"], answer: "teach", note: "You teach someone else; you learn for yourself.", examples: [
+    { word: "teach", sample: "Teach me that card trick." },
+    { word: "learn", sample: "I learn best by doing." },
+  ] },
 
   /* -- past tense & participles -- */
-  { topic: "tense", prompt: "I ___ have gone to bed earlier.", options: ["should of", "should have"], answer: "should have", note: "\"Should of\" is \"should've\" playing dress-up. It's should have." },
-  { topic: "tense", prompt: "I've ___ that movie three times this week.", options: ["saw", "seen"], answer: "seen", note: "With have/has: seen. Alone: saw. (I saw it; I have seen it.)" },
-  { topic: "tense", prompt: "She has ___ to that cafe every day this week.", options: ["went", "gone"], answer: "gone", note: "With have/has: gone. Went stands alone. (She went; she has gone.)" },
-  { topic: "tense", prompt: "The timer had already ___ when I looked up.", options: ["rang", "rung"], answer: "rung", note: "Ring, rang, (has/had) rung — the u shows up with had." },
-  { topic: "tense", prompt: "I ___ my water bottle somewhere in this house.", options: ["should have left", "should have leaved"], answer: "should have left", note: "Leave, left, left. 'Leaved' only happens to trees, and not even then." },
-  { topic: "tense", prompt: "We had ___ our best plans by 9 a.m.", options: ["abandoned", "abandonded"], answer: "abandoned", note: "Just one -ed. (Also: relatable.)" },
+  { topic: "tense", prompt: "I ___ gone to bed earlier.", options: ["should of", "should have"], answer: "should have", note: "\"Should of\" is \"should've\" playing dress-up. It's should have.", examples: [
+    { word: "should have", sample: "I should have stretched first." },
+  ] },
+  { topic: "tense", prompt: "I've ___ that movie three times this week.", options: ["saw", "seen"], answer: "seen", note: "With have/has: seen. Alone: saw. (I saw it; I have seen it.)", examples: [
+    { word: "seen", sample: "I've seen this twist before." },
+    { word: "saw", sample: "I saw it coming anyway." },
+  ] },
+  { topic: "tense", prompt: "She has ___ to that cafe every day this week.", options: ["went", "gone"], answer: "gone", note: "With have/has: gone. Went stands alone. (She went; she has gone.)", examples: [
+    { word: "gone", sample: "She has gone full cozy mode." },
+    { word: "went", sample: "She went to bed at nine." },
+  ] },
+  { topic: "tense", prompt: "The timer had already ___ when I looked up.", options: ["rang", "rung"], answer: "rung", note: "Ring, rang, (has/had) rung — the u shows up with had.", examples: [
+    { word: "rung", sample: "The bell had rung twice." },
+    { word: "rang", sample: "The bell rang at noon." },
+  ] },
+  { topic: "tense", prompt: "I ___ my water bottle somewhere in this house.", options: ["must have left", "must have leaved"], answer: "must have left", note: "Leave, left, left. 'Leaved' only happens to trees, and not even then.", examples: [
+    { word: "must have left", sample: "I must have left it in the car." },
+  ] },
+  { topic: "tense", prompt: "We had ___ our best plans by 9 a.m.", options: ["abandoned", "abandonded"], answer: "abandoned", note: "Just one -ed. (Also: relatable.)", examples: [
+    { word: "abandoned", sample: "We abandoned the spreadsheet, not the dream." },
+  ] },
+  { topic: "tense", prompt: "She had ___ all the cocoa by nine.", options: ["drunk", "drank"], answer: "drunk", note: "Drink, drank, (has/had) drunk — the u arrives with have/had.", examples: [
+    { word: "drunk", sample: "We had drunk the whole pot." },
+    { word: "drank", sample: "I drank mine too fast." },
+  ] },
+  { topic: "tense", prompt: "Yesterday I ___ rest, and it was correct.", options: ["chose", "choose"], answer: "chose", note: "Choose (oo) is now; chose (one o) already happened.", examples: [
+    { word: "chose", sample: "Yesterday I chose the couch." },
+    { word: "choose", sample: "Today I choose the trail." },
+  ] },
 
   /* -- word choice -- */
-  { topic: "word-choice", prompt: "___ a nap change everything? Absolutely.", options: ["Can", "May"], answer: "Can", note: "Can = ability. May = permission. Naps need no permission." },
-  { topic: "word-choice", prompt: "Bring a snack — ___, something chocolatey.", options: ["e.g.", "i.e."], answer: "e.g.", note: "e.g. = for example. i.e. = that is (an exact restatement)." },
-  { topic: "word-choice", prompt: "I water the plants ___ — it's my anchor habit.", options: ["everyday", "every day"], answer: "every day", note: "Every day = each day. Everyday = ordinary ('everyday shoes')." },
-  { topic: "word-choice", prompt: "That took ___ of courage.", options: ["alot", "a lot", "allot"], answer: "a lot", note: "A lot is two words. Allot means to portion out. Alot is a mythical creature." },
-  { topic: "word-choice", prompt: "Split the dessert ___ the three of us.", options: ["between", "among"], answer: "among", note: "Between two; among three or more." },
-  { topic: "word-choice", prompt: "The ___ of steps doesn't matter — starting does.", options: ["amount", "number"], answer: "number", note: "Number for countables (steps); amount for stuff (effort)." },
-  { topic: "word-choice", prompt: "Turn your to-dos ___ time blocks.", options: ["into", "in to"], answer: "into", note: "Into = transformation/entering. 'In to' is two separate jobs ('log in to the app')." },
+  { topic: "word-choice", prompt: "___ a nap change everything? Absolutely.", options: ["Can", "May"], answer: "Can", note: "Can = ability. May = permission. Naps need no permission.", examples: [
+    { word: "Can", sample: "Can she juggle? Absolutely." },
+    { word: "May", sample: "May I open a window?" },
+  ] },
+  { topic: "word-choice", prompt: "Bring a snack — ___, trail mix or something chocolatey.", options: ["e.g.", "i.e."], answer: "e.g.", note: "e.g. = for example. i.e. = that is (an exact restatement).", examples: [
+    { word: "e.g.", sample: "Pack layers, e.g., a hoodie." },
+    { word: "i.e.", sample: "The demo starts at noon — i.e., in twenty minutes." },
+  ] },
+  { topic: "word-choice", prompt: "I water the plants ___ — it's my anchor habit.", options: ["everyday", "every day"], answer: "every day", note: "Every day = each day. Everyday = ordinary ('everyday shoes').", examples: [
+    { word: "every day", sample: "I stretch every day at three." },
+    { word: "everyday", sample: "These are my everyday sneakers." },
+  ] },
+  { topic: "word-choice", prompt: "That took ___ of courage.", options: ["alot", "a lot", "allot"], answer: "a lot", note: "A lot is two words. Allot means to portion out. Alot is a mythical creature.", examples: [
+    { word: "a lot", sample: "That took a lot of nerve." },
+    { word: "allot", sample: "Allot ten minutes for tidying." },
+  ] },
+  { topic: "word-choice", prompt: "The rumor spread ___ the wedding guests.", options: ["between", "among"], answer: "among", note: "Among for a group as a whole; between for pairs and one-on-one deals.", examples: [
+    { word: "among", sample: "Calm settled among the hikers." },
+    { word: "between", sample: "Split the fries between us two." },
+  ] },
+  { topic: "word-choice", prompt: "The ___ of steps doesn't matter — starting does.", options: ["amount", "number"], answer: "number", note: "Number for countables (steps); amount for stuff (effort).", examples: [
+    { word: "number", sample: "The number of ducks doubled." },
+    { word: "amount", sample: "The amount of joy: immense." },
+  ] },
+  { topic: "word-choice", prompt: "Turn your to-dos ___ time blocks.", options: ["into", "in to"], answer: "into", note: "Into = transformation/entering. 'In to' is two separate jobs ('log in to the app').", examples: [
+    { word: "into", sample: "She turned leftovers into lunch." },
+    { word: "in to", sample: "Log in to see your streak." },
+  ] },
+  { topic: "word-choice", prompt: "Thanks for the ___ — I'll take it this time.", options: ["advice", "advise"], answer: "advice", note: "Advice (sounds like ice) is the thing; advise (sounds like eyes) is the doing.", examples: [
+    { word: "advice", sample: "Her advice: nap first, decide later." },
+    { word: "advise", sample: "I advise starting tiny." },
+  ] },
+  { topic: "word-choice", prompt: "The library was ___ except for one loud keyboard.", options: ["quiet", "quite"], answer: "quiet", note: "Quiet = hush (two syllables). Quite = very. The e placement does all the work.", examples: [
+    { word: "quiet", sample: "The park stayed blissfully quiet." },
+    { word: "quite", sample: "That plan is quite ambitious." },
+  ] },
+  { topic: "word-choice", prompt: "Please ___ the oven is actually off.", options: ["ensure", "insure"], answer: "ensure", note: "Ensure = make certain. Insure is best saved for policies and premiums.", examples: [
+    { word: "ensure", sample: "Ensure the door clicks shut." },
+    { word: "insure", sample: "You can insure the tuba." },
+  ] },
+  { topic: "word-choice", prompt: "I didn't mean to ___ you took the last slice.", options: ["imply", "infer"], answer: "imply", note: "Speakers imply (send the hint); listeners infer (catch it).", examples: [
+    { word: "imply", sample: "I didn't mean to imply that." },
+    { word: "infer", sample: "From the crumbs, I infer cookies." },
+  ] },
 
   /* -- double negatives -- */
-  { topic: "negation", prompt: "I can ___ believe the week is over.", options: ["hardly", "not hardly"], answer: "hardly", note: "Hardly is already negative — it works alone." },
-  { topic: "negation", prompt: "I couldn't care ___ about perfect handwriting.", options: ["less", "fewer"], answer: "less", note: "Couldn't care less = zero care left. ('Could care less' means you still do!)" },
-  { topic: "negation", prompt: "We didn't do ___ wrong.", options: ["anything", "nothing"], answer: "anything", note: "Didn't + nothing cancels out. One negative per sentence does the job." },
+  { topic: "negation", prompt: "I can ___ believe the week is over.", options: ["hardly", "not hardly"], answer: "hardly", note: "Hardly is already negative — it works alone.", examples: [
+    { word: "hardly", sample: "I can hardly wait for Friday." },
+  ] },
+  { topic: "negation", prompt: "I couldn't care ___ about perfect handwriting.", options: ["less", "fewer"], answer: "less", note: "Couldn't care less = zero care left. ('Could care less' means you still do!)", examples: [
+    { word: "less", sample: "There's less drama in comfy pants." },
+    { word: "fewer", sample: "Fewer meetings, more meandering." },
+  ] },
+  { topic: "negation", prompt: "We didn't do ___ wrong.", options: ["anything", "nothing"], answer: "anything", note: "Didn't + nothing cancels out. One negative per sentence does the job.", examples: [
+    { word: "anything", sample: "We didn't break anything important." },
+    { word: "nothing", sample: "Nothing beats a quiet morning." },
+  ] },
+  { topic: "negation", prompt: "Nobody said ___ about a pop quiz.", options: ["anything", "nothing"], answer: "anything", note: "Nobody already brings the negative — anything keeps the sentence single-negative.", examples: [
+    { word: "anything", sample: "She didn't say anything about cake." },
+    { word: "nothing", sample: "Nothing says Friday like pancakes." },
+  ] },
 ];
 
-/** Spell Check bank — famously slippery words, one true spelling each. */
+/**
+ * Spell Check bank — famously slippery words, one true spelling each.
+ * `stress` marks the trap letters; the reveal underlines them inside the
+ * filled-in answer so the eye lands exactly where the word bites.
+ */
 export const SPELLING_BANK: QuizItem[] = [
-  { prompt: "It will ___ happen. Probably today.", options: ["definitely", "definately", "definitly"], answer: "definitely", note: "Finite lives inside definitely." },
-  { prompt: "Let's keep work and rest ___.", options: ["seperate", "separate", "seperete"], answer: "separate", note: "There's a rat in separate." },
-  { prompt: "Did you ___ my message?", options: ["recieve", "receive", "receeve"], answer: "receive", note: "I before E… except after C — this is the exception's home." },
-  { prompt: "Rest is ___, not optional.", options: ["necessary", "neccessary", "necesary"], answer: "necessary", note: "One collar (c), two sleeves (s)." },
-  { prompt: "The hotel can ___ late arrivals.", options: ["accomodate", "accommodate", "acommodate"], answer: "accommodate", note: "Accommodate is roomy: two c's AND two m's." },
-  { prompt: "Don't let one typo ___ you.", options: ["embarass", "embarrass", "embaress"], answer: "embarrass", note: "Two r's, two s's — fully flustered." },
-  { prompt: "Deep focus is a rare ___.", options: ["occurence", "occurrence", "occurance"], answer: "occurrence", note: "Double c, double r — it happens a lot in this word." },
-  { prompt: "Drums keep the ___ steady.", options: ["rythm", "rhythm", "rhythem"], answer: "rhythm", note: "Rhythm Helps Your Two Hips Move." },
-  { prompt: "Sleep is a ___, guard it.", options: ["privilege", "priviledge", "privelege"], answer: "privilege", note: "No d — privilege travels light." },
-  { prompt: "Check the ___ before promising anything.", options: ["calender", "calendar", "calandar"], answer: "calendar", note: "It ends like \"radar\": -ar." },
-  { prompt: "That dream was genuinely ___.", options: ["wierd", "weird", "weerd"], answer: "weird", note: "Weird is weird — it breaks the i-before-e rule on purpose." },
-  { prompt: "New week, new ___ to try again.", options: ["oppurtunity", "opportunity", "opportunaty"], answer: "opportunity", note: "Two p's up front, like a running start." },
-  { prompt: "Small steps, big ___.", options: ["achievment", "achievement", "acheivement"], answer: "achievement", note: "Achieve keeps its e before -ment." },
-  { prompt: "Trust the ___ of your routine.", options: ["maintenence", "maintenance", "maintainance"], answer: "maintenance", note: "Main + ten + ance. The ten is the tricky bit." },
-  { prompt: "A quiet morning is my favorite ___.", options: ["enviroment", "environment", "enviornment"], answer: "environment", note: "There's iron in environment." },
-  { prompt: "We started at the ___.", options: ["begining", "beginning", "beggining"], answer: "beginning", note: "Begin doubles its n when it keeps going." },
+  { prompt: "It will ___ happen. Probably today.", options: ["definitely", "definately", "definitly"], answer: "definitely", note: "Finite lives inside definitely.", stress: "finite" },
+  { prompt: "Let's keep work and rest ___.", options: ["seperate", "separate", "seperete"], answer: "separate", note: "There's a rat in separate.", stress: "arat" },
+  { prompt: "Did you ___ my message?", options: ["recieve", "receive", "receeve"], answer: "receive", note: "I before E… except after C — this is the exception's home.", stress: "cei" },
+  { prompt: "Rest is ___, not optional.", options: ["necessary", "neccessary", "necesary"], answer: "necessary", note: "One collar (c), two sleeves (s).", stress: "cess" },
+  { prompt: "The hotel can ___ late arrivals.", options: ["accomodate", "accommodate", "acommodate"], answer: "accommodate", note: "Accommodate is roomy: two c's AND two m's.", stress: "ccomm" },
+  { prompt: "Don't let one typo ___ you.", options: ["embarass", "embarrass", "embaress"], answer: "embarrass", note: "Two r's, two s's — fully flustered.", stress: "rrass" },
+  { prompt: "Deep focus is a rare ___.", options: ["occurence", "occurrence", "occurance"], answer: "occurrence", note: "Double c, double r — it happens a lot in this word.", stress: "ccurr" },
+  { prompt: "Drums keep the ___ steady.", options: ["rythm", "rhythm", "rhythem"], answer: "rhythm", note: "Rhythm Helps Your Two Hips Move.", stress: "hyth" },
+  { prompt: "Sleep is a ___ — guard it.", options: ["privilege", "priviledge", "privelege"], answer: "privilege", note: "No d — privilege travels light.", stress: "lege" },
+  { prompt: "Check the ___ before promising anything.", options: ["calender", "calendar", "calandar"], answer: "calendar", note: "It ends like \"radar\": -ar.", stress: "dar" },
+  { prompt: "That dream was genuinely ___.", options: ["wierd", "weird", "weerd"], answer: "weird", note: "Weird is weird — it breaks the i-before-e rule on purpose.", stress: "ei" },
+  { prompt: "New week, new ___ to try again.", options: ["oppurtunity", "opportunity", "opportunaty"], answer: "opportunity", note: "There's a port in opportunity — opp-OR-tunity, ending in -ity.", stress: "port" },
+  { prompt: "Small steps, big ___.", options: ["achievment", "achievement", "acheivement"], answer: "achievement", note: "Achieve keeps its e before -ment.", stress: "eve" },
+  { prompt: "Trust the ___ of your routine.", options: ["maintenence", "maintenance", "maintainance"], answer: "maintenance", note: "Main + ten + ance. The ten is the tricky bit.", stress: "ten" },
+  { prompt: "A quiet morning is my favorite ___.", options: ["enviroment", "environment", "enviornment"], answer: "environment", note: "There's iron in environment.", stress: "iron" },
+  { prompt: "We started at the ___.", options: ["begining", "beginning", "beggining"], answer: "beginning", note: "Begin doubles its n when it keeps going.", stress: "nn" },
+  { prompt: "Let's try that new ___ on Friday.", options: ["restaraunt", "restaurant", "resturant"], answer: "restaurant", note: "Rest + aura + nt — there's an aura in there.", stress: "aura" },
+  { prompt: "The shortest month is ___.", options: ["February", "Febuary", "Febraury"], answer: "February", note: "Feb-RU-ary — the first r is shy but present.", stress: "bru" },
+  { prompt: "The ___ had forty questions. We answered six.", options: ["questionaire", "questionnaire", "questionnair"], answer: "questionnaire", note: "Question + naire — the n doubles at the seam.", stress: "nn" },
+  { prompt: "The cat looked deeply ___.", options: ["mischievous", "mischievious", "mischevious"], answer: "mischievous", note: "MIS-chie-vous, three syllables — no extra i near the end.", stress: "vous" },
+  { prompt: "Her French ___ is showing off again.", options: ["pronounciation", "pronunciation", "pronunceation"], answer: "pronunciation", note: "You pronounce, but the noun drops that o: pro-nun-ciation.", stress: "nun" },
+  { prompt: "He ___ praised the office plant.", options: ["publicley", "publicly", "publicaly"], answer: "publicly", note: "Public + ly, nothing extra. (The 'publically' you see in the wild is the less-loved variant.)", stress: "cly" },
 ];
 
 /**
@@ -288,6 +568,22 @@ export function missedItems(bank: QuizItem[], misses: string[]): QuizItem[] {
   return misses
     .map((p) => bank.find((item) => item.prompt === p))
     .filter((x): x is QuizItem => x != null);
+}
+
+/**
+ * Drop saved misses whose prompt no longer exists in the bank (an item was
+ * reworded or retired). Without this an orphaned miss can never be redeemed,
+ * so the "tricky ones" count would inflate forever. Returns the kept list.
+ */
+export function pruneMisses(id: GameId, bank: QuizItem[]): string[] {
+  const misses = readMisses(id);
+  const kept = misses.filter((p) => bank.some((item) => item.prompt === p));
+  if (kept.length !== misses.length) {
+    try {
+      localStorage.setItem(MISS_KEY(id), JSON.stringify(kept));
+    } catch {}
+  }
+  return kept;
 }
 
 /* ---- Focus Finder (Schulte grid) ----------------------------------------- */
@@ -679,7 +975,7 @@ export const PROOF_BANK: ProofItem[] = [
   { topic: "apostrophes", text: "The Smiths dog knows everyone on the street.", errorIndex: 1, fix: "Smiths'", note: "The dog belongs to the Smiths: Smiths' (whole-family possessive)." },
   { topic: "apostrophes", text: "Fresh bagel's are half price after four.", errorIndex: 1, fix: "bagels", note: "Plain plural, no apostrophe — the bagels own nothing." },
   { topic: "apostrophes", text: "Whos turn is it to water the plants?", errorIndex: 0, fix: "Whose", note: "Whose owns the turn. Who's = who is." },
-  { topic: "apostrophes", text: "The teams jerseys arrived a size too small.", errorIndex: 1, fix: "team's", note: "The jerseys belong to the team: team's." },
+  { topic: "apostrophes", text: "The teams jerseys arrived a size too small.", errorIndex: 1, fix: "team's", note: "The jerseys belong to the team: team's. (Several teams? Then teams' — apostrophe either way.)" },
 ];
 
 /** The sentence as tappable word chips. */
