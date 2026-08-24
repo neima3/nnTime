@@ -122,7 +122,7 @@ An executing agent works **Track A** only. The moment a step is Track B, the age
 | A5 | Phase 2 default-flip commit (one line) | Only after Neima has seen A4. |
 | A6 | Remaining `getHours()` if Slice 1 missed a site | Should be none. |
 | A7 | 6.3 DAL split with barrel preserved | Later. |
-| A8 | 6.2 `client_error_reports` **code + migration file** | Do not apply to prod yourself. |
+| ~~A8~~ | 6.2 `client_error_reports` **code + migration file** | **DONE** — branch `feat/client-error-sink`. Migration file only; not applied to prod (needs B6 pg_dump first, then a solo Coolify deploy — never in the same SHA as 4.3). |
 | A9 | CSP tightening research + a real plan to drop `unsafe-inline` | Separate session. Do not land a broken CSP. |
 | A10 | Unit/e2e/browser evidence, gates, `progress.md`, commit, push | Always. |
 | A11 | Deploy + live-verify of Track A SHAs on `https://time.neima.me` | Only after gates. No destructive QA on prod data. |
@@ -319,9 +319,9 @@ Dump shots to `browser-qa/slice-1/` (git-ignored).
 | Later item | Create | Modify |
 |---|---|---|
 | A2 iOS scopes | — | `ios/App/Features/Today/EditorSheet.swift`, `ios/App/API/KairoAPI.swift` (~647 default `.all`), matching unit tests |
-| A3–A5 Phase 2 | `drizzle/0010_today_helpers.sql`, e2e `e2e/today-helpers.spec.ts` | `src/server/db/schema.ts`, `src/server/schemas/user-settings.ts`, `api/openapi.yaml` (+ `pnpm api:sync-ios`), `src/app/app/today/page.tsx`, `src/components/SettingsClient.tsx`, `src/app/app/stats/page.tsx` / inbox / review as destinations |
+| A3–A5 Phase 2 | `drizzle/0010_today_helpers.sql` (shipped on `feat/quiet-today`; 6.2 stacks on it as 0011), e2e `e2e/today-helpers.spec.ts` | `src/server/db/schema.ts`, `src/server/schemas/user-settings.ts`, `api/openapi.yaml` (+ `pnpm api:sync-ios`), `src/app/app/today/page.tsx`, `src/components/SettingsClient.tsx`, `src/app/app/stats/page.tsx` / inbox / review as destinations |
 | A7 DAL split | `src/server/dal/{tasks,activities,routines,taxonomy,settings,events}.ts` (names flexible; group by the existing section comments) | `src/server/dal/index.ts` becomes re-exports. **Do not change** import lines in `isolation.test.ts` / `cascade.test.ts`. |
-| A8 error reports | `drizzle/0011_client_error_reports.sql`, `src/app/api/v1/client-errors/route.ts` | schema, OpenAPI, privacy deletion cascade, rate limit |
+| ~~A8 error reports~~ | **DONE** — `drizzle/0011_client_error_reports.sql` (stacked after 4.3's 0010), `src/app/api/v1/client-errors/route.ts`, `src/server/redact.ts`, `src/server/dal/client-error-reports.ts`. Branch `feat/client-error-sink`, not yet merged/deployed (B6 pg_dump gate). | schema, OpenAPI, privacy deletion cascade, rate limit — all shipped. |
 
 ---
 
@@ -381,8 +381,15 @@ ALTER TABLE "user_settings"
 
 ### 6.2 — `client_error_reports`
 
+**Shipped as `drizzle/0011_client_error_reports.sql`** (branch `feat/client-error-sink`, stacked on `feat/quiet-today`,
+not yet merged to main): A3–A5 (4.3 `today_helpers`) had not landed when A8 ran, so
+The branch stacks on feat/quiet-today, whose 0010_today_helpers.sql takes the next free number (per this section's own
+"next free number if 0010 is taken" caveat, read the other way: 0010 was free).
+**Merge order is fixed: feat/quiet-today (0010) first, then feat/client-error-sink (0011)** —
+check `drizzle/` for the actual latest file before assuming either number.
+
 ```sql
--- drizzle/0011_client_error_reports.sql  (next free number if 0010 is taken)
+-- drizzle/0011_client_error_reports.sql
 CREATE TABLE "client_error_reports" (
   "id" uuid PRIMARY KEY,
   "user_id" text NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,

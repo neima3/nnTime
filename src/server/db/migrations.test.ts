@@ -14,7 +14,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { v7 as uuidv7 } from "uuid";
 import { createEphemeralDb, rethrowIfMigrationFailure, insertUser, type EphemeralDb } from "./test-db";
-import { focusSessions, notificationJobs, schedulerRuns, users } from "./schema";
+import {
+  clientErrorReports,
+  focusSessions,
+  notificationJobs,
+  schedulerRuns,
+  users,
+} from "./schema";
 import { eq, sql } from "drizzle-orm";
 
 let env: EphemeralDb | null = null;
@@ -86,6 +92,7 @@ describe("migrations apply and schema is complete", () => {
       "rate_limit_buckets",
       "notification_jobs",
       "scheduler_runs",
+      "client_error_reports",
     ];
     for (const t of expected) {
       expect(tableNames).toContain(t);
@@ -137,6 +144,14 @@ describe("migrations apply and schema is complete", () => {
     expect(indexNames).toContain("notification_jobs_dedup_idx");
     expect(indexNames).toContain("notification_jobs_due_idx");
     expect(indexNames).toContain("notification_jobs_user_entity_idx");
+  });
+
+  itDb("client_error_reports has the user_id/created_at composite index", async () => {
+    const result = await getDb().execute<{ indexname: string }>(
+      sql`SELECT indexname FROM pg_indexes WHERE schemaname='public' AND tablename='client_error_reports'`,
+    );
+    const indexNames = (result as { indexname: string }[]).map((row) => row.indexname);
+    expect(indexNames).toContain("client_error_reports_user_id_created_at_idx");
   });
 
   itDb("notification claims carry a UUID fencing token", async () => {
@@ -305,5 +320,22 @@ describe("FK cascade on user delete", () => {
     expect(
       await getDb().select().from(schedulerRuns).where(eq(schedulerRuns.id, run.id)),
     ).toHaveLength(1);
+  });
+
+  itDb("deleting a user removes their client error reports", async () => {
+    const userId = uuidv7();
+    await insertUser(getDb(), userId);
+    await getDb().insert(clientErrorReports).values({
+      id: uuidv7(),
+      userId,
+      name: "TypeError",
+      message: "boom",
+    });
+    await getDb().delete(users).where(eq(users.id, userId));
+    const remaining = await getDb()
+      .select()
+      .from(clientErrorReports)
+      .where(eq(clientErrorReports.userId, userId));
+    expect(remaining).toHaveLength(0);
   });
 });

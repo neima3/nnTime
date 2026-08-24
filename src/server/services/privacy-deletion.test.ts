@@ -8,13 +8,14 @@
  * account and minted a session — deletion was reversible for 15 minutes.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import {
   createEphemeralDb,
   insertUser,
   rethrowIfMigrationFailure,
   type EphemeralDb,
 } from "../db/test-db";
+import { clientErrorReports } from "../db/schema";
 import { deleteAccount } from "./privacy";
 
 let env: EphemeralDb | null = null;
@@ -153,5 +154,40 @@ describe("SEC-10 account deletion revokes pending auth tokens", () => {
       sql`SELECT count(*)::text AS n FROM "user" WHERE id = ${userId}`,
     );
     expect(Number((rows as unknown as { n: string }[])[0]?.n ?? "1")).toBe(0);
+  });
+
+  itDb("6.2: deletes client_error_reports for the deleted user", async (e) => {
+    const victim = crypto.randomUUID();
+    const bystander = crypto.randomUUID();
+    await insertUser(e.db, victim, "victim-errors@test.com");
+    await insertUser(e.db, bystander, "bystander-errors@test.com");
+    await e.db.insert(clientErrorReports).values([
+      {
+        id: crypto.randomUUID(),
+        userId: victim,
+        name: "TypeError",
+        message: "victim's stack trace",
+      },
+      {
+        id: crypto.randomUUID(),
+        userId: bystander,
+        name: "TypeError",
+        message: "bystander's stack trace",
+      },
+    ]);
+
+    await deleteAccount(victim, { db: e.db });
+
+    const victimsReports = await e.db
+      .select()
+      .from(clientErrorReports)
+      .where(eq(clientErrorReports.userId, victim));
+    expect(victimsReports).toHaveLength(0);
+
+    const bystandersReports = await e.db
+      .select()
+      .from(clientErrorReports)
+      .where(eq(clientErrorReports.userId, bystander));
+    expect(bystandersReports).toHaveLength(1);
   });
 });

@@ -67,3 +67,8 @@ export {
 } from "./routines";
 
 export { getChanges, appendChangeLog, appendPlannerEvent } from "./events-changes";
+
+export {
+  createClientErrorReport,
+  listClientErrorReports,
+} from "./client-error-reports";

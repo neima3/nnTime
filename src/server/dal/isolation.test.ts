@@ -31,6 +31,8 @@ import {
   updateSettings,
   createTag,
   getTag,
+  createClientErrorReport,
+  listClientErrorReports,
   NotFoundError,
 } from "./index";
 
@@ -202,5 +204,48 @@ describe("SEC-01: categories, tags and settings are scoped to their owner", () =
       timezoneHint: "Not/AZone",
     });
     expect(seeded.timezone).toBe("UTC");
+  });
+});
+
+describe("SEC-01/6.2: client error reports are scoped to their owner", () => {
+  itDb("mallory's read of her own reports is empty, not an error, when she has none", async (e) => {
+    // Baseline: an account with zero reports gets an empty array back, not a
+    // thrown error — this is what "cannot read alice's rows" must look like
+    // below (empty result, not a leak, not an exception).
+    const mine = await listClientErrorReports(mallory, { db: e.db });
+    expect(mine).toEqual([]);
+  });
+
+  itDb("mallory cannot read alice's client error reports through the DAL", async (e) => {
+    await createClientErrorReport(
+      alice,
+      { name: "TypeError", message: "Alice's private stack trace" },
+      { db: e.db },
+    );
+
+    const mallorysView = await listClientErrorReports(mallory, { db: e.db });
+    expect(mallorysView).toEqual([]);
+
+    const alicesView = await listClientErrorReports(alice, { db: e.db });
+    expect(alicesView.length).toBeGreaterThan(0);
+    expect(alicesView.every((r) => r.userId === alice)).toBe(true);
+  });
+
+  itDb("createClientErrorReport ignores a client-supplied owner — it always uses the session userId", async (e) => {
+    // The input type has no owner field at all (by design), but simulate a
+    // route handler that naively spread an untrusted body containing one —
+    // the DAL signature takes userId as its own required first argument, so
+    // a stray `userId`/`ownerId` key on the input object cannot reach the row.
+    const spoofedInput = {
+      name: "TypeError",
+      message: "boom",
+      userId: mallory,
+      ownerId: mallory,
+    } as unknown as Parameters<typeof createClientErrorReport>[1];
+
+    const report = await createClientErrorReport(alice, spoofedInput, { db: e.db });
+
+    expect(report.userId).toBe(alice);
+    expect(report.userId).not.toBe(mallory);
   });
 });

@@ -103,6 +103,7 @@ const expectedRequestOperations = {
   updateCategory: "CategoryUpdateRequest",
   runBatch: "BatchRequest",
   createMoodCheckin: "MoodCheckinRequest",
+  reportClientError: "ClientErrorReportRequest",
 } as const;
 
 const serverOwnedFields = [

@@ -1,5 +1,67 @@
 # Progress log
 
+## 2026-08-24 — Track A item A8: `client_error_reports` sink (subagent, branch not merged)
+
+6.2 from `docs/plans/2026-08-13-trust-glanceability.md`, code + migration
+only, on `feat/client-error-sink` — **not merged to main, not deployed.**
+
+- `drizzle/0011_client_error_reports.sql` (numbered 0010, not the plan's
+  example 0011 — 4.3/`today_helpers` hadn't shipped, so 0010 was actually
+  free; plan doc's 6.2 section updated with a pointer so whoever ships 4.3
+  next numbers it 0011 instead of colliding). Table + composite
+  `(user_id, created_at)` index, exactly the plan's SQL otherwise.
+  `drizzle/meta/_journal.json` left untouched — confirmed 0009 didn't touch
+  it either; the runner (`migrate-on-startup.ts`) reads the directory, not
+  the journal.
+- `src/server/db/schema.ts` — `clientErrorReports` table, added to
+  `userOwnedTables` (14 → 15; `schema-invariants.test.ts` updated to match).
+- `src/server/dal/client-error-reports.ts` — `createClientErrorReport`
+  (session userId only, never client-supplied) / `listClientErrorReports`,
+  exported via the barrel.
+- `src/server/redact.ts` — pure redaction (Authorization headers, Bearer
+  tokens, Cookie/Set-Cookie, `token=`/`key=`-style query secrets incl.
+  magic-link, webcal/.ics URLs) → `[redacted]`. 17 unit tests
+  (`redact.test.ts`), red-green (2 failed on first run over header-case
+  casing, fixed the test expectations not the redactor).
+- `src/app/api/v1/client-errors/route.ts` — POST only, session auth,
+  10/min-per-user rate limit, zod body that trims+truncates instead of
+  rejecting at the name/message/stack/path caps (120/2000/8000/500),
+  redacts before insert, 204 with no echoed body. `release` reads
+  `KAIRO_RELEASE` and is always null today — the Dockerfile threads no
+  build-SHA env through to the runtime container, and per the repo's own
+  known trap this must not become a `NEXT_PUBLIC_` var.
+- `src/components/ClientErrorReporter.tsx` — `window` `error` +
+  `unhandledrejection` listeners, dedupe by name+message, capped at 5
+  POSTs/page lifetime, `keepalive`, swallows its own failures. Mounted only
+  in `src/app/app/layout.tsx` inside `<SignedInOnly>` (existing idiom from
+  `AppSessionBoundary.tsx`) so a signed-out visitor never attempts a POST.
+- `src/server/services/privacy.ts` — added to `exportUserData`; deletion
+  cascade needed **no new code** (FK `ON DELETE CASCADE` already covers it,
+  same as every other owned table) — proved with a new
+  `privacy-deletion.test.ts` case.
+- Isolation test in `dal/isolation.test.ts`: Mallory's read of Alice's
+  reports is `[]`, not an error; a spoofed `userId`/`ownerId` on the DAL
+  input is ignored.
+- `api/openapi.yaml` gained `POST /client-errors` + `ClientErrorReportRequest`
+  + a new `Diagnostics` tag (an enforced contract test — `openapi-inventory
+  .test.ts` — requires every route be documented or allowlisted; this one is
+  documented). `pnpm api:sync-ios` run, iOS copy committed. Zod schema uses
+  `.transform(trim+slice).pipe(z.string().max(n))` so it both truncates at
+  runtime AND keeps `z.toJSONSchema`'s `maxLength` matching the OpenAPI
+  component (`request-openapi-contract.test.ts` checks that alignment).
+
+**Gates:** `pnpm lint` / `pnpm typecheck` / `pnpm test` (143 files, 1377
+tests) / `pnpm build` all green. First full-suite run caught 3 pre-existing
+hardcoded-migration-count assertions this change had to update
+(`migration-chain.test.ts`, `migrate-on-startup.integration.test.ts`,
+`request-openapi-contract.test.ts`) — fixed, not weakened.
+
+**Not done / deliberately out of scope:** not deployed, not applied to any
+database outside the local ephemeral test Postgres. B6 (Neima's `pg_dump`
+per `docs/DEPLOYMENT.md` SEC-07) must run before this SHA reaches prod, and
+per the plan this must ship in its own Coolify release, never bundled with
+4.3.
+
 ## 2026-08-23 — Round 90: the word quizzes learn to teach (Fable)
 
 "Make the grammar game better with explanations/examples." The quiz engine

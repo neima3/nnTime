@@ -667,6 +667,47 @@ export const plannerEvents = pgTable(
 );
 
 /* -------------------------------------------------------------------------- */
+/* Client error reports (6.2 — trust/glanceability plan; ADR-005 SEC-01/03)   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Redacted client-side error telemetry (window.onerror / unhandledrejection).
+ * Write-only from the browser's point of view: the DAL insert always scopes
+ * to the SESSION userId, ignoring any client-supplied owner. `message`,
+ * `stack`, and `path` are redacted (Authorization/Bearer/cookie/token/ICS —
+ * see src/server/redact.ts) before this row is ever written. `release` is
+ * stamped server-side from a build-SHA env var if one reaches the runtime
+ * container; Kairo's Dockerfile does not currently pass one through (and this
+ * must NOT become a NEXT_PUBLIC_ var — those silently ship `undefined` on
+ * Coolify, see Dockerfile comment), so it is null until that changes.
+ * No revision/updatedAt/deletedAt: this is write-once telemetry, not a
+ * synced planner resource (not part of ADR-002 change_log).
+ */
+export const clientErrorReports = pgTable(
+  "client_error_reports",
+  {
+    id: uuid("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "date" })
+      .notNull()
+      .defaultNow(),
+    name: text("name").notNull(),
+    message: text("message").notNull(),
+    stack: text("stack"),
+    path: text("path"),
+    release: text("release"),
+  },
+  (t) => [
+    index("client_error_reports_user_id_created_at_idx").on(
+      t.userId,
+      t.createdAt,
+    ),
+  ],
+);
+
+/* -------------------------------------------------------------------------- */
 /* Sync infrastructure (ADR-002 — "from day one")                              */
 /* -------------------------------------------------------------------------- */
 
@@ -768,6 +809,7 @@ export type DbPushSubscription = typeof pushSubscriptions.$inferSelect;
 export type DbNotificationJob = typeof notificationJobs.$inferSelect;
 export type DbSchedulerRun = typeof schedulerRuns.$inferSelect;
 export type DbPlannerEvent = typeof plannerEvents.$inferSelect;
+export type DbClientErrorReport = typeof clientErrorReports.$inferSelect;
 
 /** All user-owned tables, for invariant checks (schema-invariants.test.ts). */
 export const userOwnedTables = {
@@ -785,4 +827,5 @@ export const userOwnedTables = {
   push_subscriptions: pushSubscriptions,
   notification_jobs: notificationJobs,
   planner_events: plannerEvents,
+  client_error_reports: clientErrorReports,
 } as const;

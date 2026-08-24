@@ -37,6 +37,7 @@ export async function exportUserData(
     ["focus_sessions", db.select().from(schema.focusSessions).where(eq(schema.focusSessions.userId, userId))],
     ["push_subscriptions", db.select().from(schema.pushSubscriptions).where(eq(schema.pushSubscriptions.userId, userId))],
     ["planner_events", db.select().from(schema.plannerEvents).where(eq(schema.plannerEvents.userId, userId))],
+    ["client_error_reports", db.select().from(schema.clientErrorReports).where(eq(schema.clientErrorReports.userId, userId))],
   ];
 
   for (const [name, query] of queries) {

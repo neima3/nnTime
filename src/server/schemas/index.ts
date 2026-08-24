@@ -29,6 +29,7 @@ export * from "./day";
 export * from "./search";
 export * from "./stats";
 export * from "./native-auth";
+export * from "./client-error-report";
 
 // Re-import the schema objects (named exports from above) to build the registry.
 import { errorEnvelope } from "./envelope";
@@ -84,6 +85,7 @@ import {
   appleExchangeResponse,
   authCapabilitiesResponse,
 } from "./native-auth";
+import { clientErrorReportRequest } from "./client-error-report";
 
 /**
  * Registry of response/component schemas keyed by the OpenAPI component name.
@@ -152,6 +154,7 @@ export const requestSchemaRegistry = {
   MoodCheckinRequest: moodCheckinRequest,
   AppleChallengeRequest: appleChallengeRequest,
   AppleExchangeRequest: appleExchangeRequest,
+  ClientErrorReportRequest: clientErrorReportRequest,
 } as const;
 
 /** Type alias for request component-name keys. */

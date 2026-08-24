@@ -75,6 +75,8 @@ tags:
     description: Ranked search across the caller's activity series and tasks.
   - name: Insights
     description: Private planner aggregates and mood check-ins.
+  - name: Diagnostics
+    description: Redacted, rate-limited client-side error telemetry (6.2).
 
 # ---------------------------------------------------------------------------
 # Paths (relative to the server URL, which already includes /api/v1)
@@ -1130,6 +1132,33 @@ paths:
               schema: { $ref: '#/components/schemas/MoodCheckinResponse' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /client-errors:
+    post:
+      tags: [Diagnostics]
+      summary: Report a redacted browser-side error
+      description: |
+        Fire-and-forget crash telemetry from the web client (uncaught
+        exceptions and unhandled promise rejections). The server redacts
+        `message`/`stack`/`path` before storing them (Authorization headers,
+        Bearer tokens, cookies, `token=`/`key=` query secrets, ICS/webcal
+        URLs) and stamps `release`/`userId` itself — neither is accepted from
+        the request body. `name`/`message`/`stack`/`path` are trimmed and
+        truncated to their documented caps rather than rejected, since this
+        is best-effort telemetry from a client that is already failing.
+        Rate-limited per user (10/minute); the response never echoes the
+        stored row.
+      operationId: reportClientError
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClientErrorReportRequest' }
+      responses:
+        '204': { description: Report recorded (no body). }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/RateLimited' }
 
 # ---------------------------------------------------------------------------
 # Components
@@ -2533,3 +2562,28 @@ components:
           additionalProperties:
             $ref: '#/components/schemas/OccurrenceStatus'
           description: Compatibility map from series id to occurrence status.
+
+    # ---- Diagnostics (6.2) --------------------------------------------------
+    ClientErrorReportRequest:
+      type: object
+      additionalProperties: false
+      required: [name, message]
+      description: |
+        `userId` and `release` are never client-supplied: the server stamps
+        the session's userId and its own build identifier. Fields are trimmed
+        and truncated to these caps server-side rather than rejected.
+      properties:
+        name:
+          type: string
+          maxLength: 120
+          description: Error/exception name (e.g. `TypeError`).
+        message:
+          type: string
+          maxLength: 2000
+        stack:
+          type: string
+          maxLength: 8000
+        path:
+          type: string
+          maxLength: 500
+          description: The route the client was on when the error occurred.

@@ -19,6 +19,7 @@ import {
   categories,
   changeLog,
   checklistItems,
+  clientErrorReports,
   focusSessions,
   idempotencyKeys,
   notificationJobs,
@@ -175,6 +176,27 @@ describe("ADR-004: durable notification infrastructure", () => {
   });
 });
 
+describe("6.2: client_error_reports is write-once telemetry", () => {
+  it("has id, user_id, created_at, name, message, stack, path, release — no revision/updatedAt/deletedAt", () => {
+    const cols = columnNames(clientErrorReports as unknown);
+    for (const c of [
+      "id",
+      "userId",
+      "createdAt",
+      "name",
+      "message",
+      "stack",
+      "path",
+      "release",
+    ]) {
+      expect(cols).toContain(c);
+    }
+    expect(cols, "not a synced/versioned resource").not.toContain("revision");
+    expect(cols, "not a synced/versioned resource").not.toContain("updatedAt");
+    expect(cols, "not a synced/versioned resource").not.toContain("deletedAt");
+  });
+});
+
 describe("ADR-002: sync infrastructure tables", () => {
   it("idempotency_keys has composite PK fields + TTL", () => {
     const cols = columnNames(idempotencyKeys as unknown);
@@ -199,11 +221,12 @@ describe("ADR-002: sync infrastructure tables", () => {
 describe("every user-owned table is in the registry", () => {
   it("userOwnedTables covers all owned tables", () => {
     const names = Object.keys(userOwnedTables);
-    // 14 owned tables (users is the identity root, not "owned").
-    expect(names).toHaveLength(14);
+    // 15 owned tables (users is the identity root, not "owned").
+    expect(names).toHaveLength(15);
     expect(names).toContain("user_settings");
     expect(names).toContain("planner_events");
     expect(names).toContain("focus_sessions");
     expect(names).toContain("notification_jobs");
+    expect(names).toContain("client_error_reports");
   });
 });

@@ -11,7 +11,8 @@
  * session), while every product route gets the right surfaces from first paint.
  */
 import { A11yApply } from "@/components/A11yApply";
-import { AppSessionProvider } from "@/components/AppSessionBoundary";
+import { AppSessionProvider, SignedInOnly } from "@/components/AppSessionBoundary";
+import { ClientErrorReporter } from "@/components/ClientErrorReporter";
 import { HourCycleProvider } from "@/lib/use-hour-cycle";
 import { getSession } from "@/server/auth-session";
 import { getPersonalization } from "@/server/services/personalization";
@@ -57,6 +58,11 @@ export default async function AppLayout({
   if (!known) {
     return (
       <AppSessionProvider signedIn={Boolean(session?.userId)}>
+        {/* 6.2: only ever attempts a report when a real session is present —
+            SignedInOnly reads the same signedIn flag, not just the route. */}
+        <SignedInOnly>
+          <ClientErrorReporter />
+        </SignedInOnly>
         <HourCycleProvider value="h24">{children}</HourCycleProvider>
       </AppSessionProvider>
     );
@@ -93,6 +99,11 @@ export default async function AppLayout({
           never runs an inline script. */}
       <script dangerouslySetInnerHTML={{ __html: code }} />
       <A11yApply tokens={serializeA11yPrefs(prefs)} theme={theme} hourCycle={hourCycle} />
+      {/* 6.2: only ever attempts a report when a real session is present —
+          SignedInOnly reads the same signedIn flag, not just the route. */}
+      <SignedInOnly>
+        <ClientErrorReporter />
+      </SignedInOnly>
       <HourCycleProvider value={hourCycle}>{children}</HourCycleProvider>
     </AppSessionProvider>
   );
