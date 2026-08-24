@@ -44,6 +44,7 @@ type Settings = {
   timezone: string;
   theme: "system" | "light" | "dark";
   reducedStimulation: boolean;
+  todayHelpers: boolean;
   hourCycle: "h12" | "h24";
   weekStart: number;
   notificationPrefs: Record<string, unknown>;
@@ -414,6 +415,7 @@ export function SettingsClient({
           timezone: data.timezone,
           theme: data.theme ?? "system",
           reducedStimulation: Boolean(data.reducedStimulation),
+          todayHelpers: data.todayHelpers !== false,
           hourCycle: data.hourCycle ?? "h12",
           weekStart: data.weekStart ?? 0,
           notificationPrefs:
@@ -492,6 +494,8 @@ export function SettingsClient({
       if (partial.theme !== undefined) body.theme = partial.theme;
       if (partial.reducedStimulation !== undefined)
         body.reducedStimulation = partial.reducedStimulation;
+      if (partial.todayHelpers !== undefined)
+        body.todayHelpers = partial.todayHelpers;
       if (partial.hourCycle !== undefined) body.hourCycle = partial.hourCycle;
       if (partial.weekStart !== undefined) body.weekStart = partial.weekStart;
       if (partial.timezone !== undefined) body.timezone = partial.timezone;
@@ -516,6 +520,7 @@ export function SettingsClient({
         timezone: next.timezone,
         theme: next.theme,
         reducedStimulation: next.reducedStimulation,
+        todayHelpers: next.todayHelpers !== false,
         hourCycle: next.hourCycle,
         weekStart: next.weekStart,
         notificationPrefs:
@@ -738,6 +743,17 @@ export function SettingsClient({
               label="Reduced stimulation"
               on={a11y.reducedStimulation}
               onChange={(v) => patchA11y({ reducedStimulation: v })}
+            />
+          }
+        />
+        <Row
+          label="Show helpers on Today"
+          hint="Streaks, pick-for-me, the brief, rituals, and focus nudges. Off keeps just your timeline — each helper stays one tap away."
+          right={
+            <Toggle
+              label="Show helpers on Today"
+              on={settings.todayHelpers}
+              onChange={(v) => void patch({ todayHelpers: v })}
             />
           }
         />

@@ -34,6 +34,8 @@ export const userSettingsResponse = z.object({
   hourCycle: hourCycleEnum,
   theme: themeModeEnum,
   reducedStimulation: z.boolean(),
+  /** Phase 2 (Quiet Today): show the five helper surfaces on Today. */
+  todayHelpers: z.boolean(),
   /** Presentation-only extras: reminder offsets, sounds, quiet hours (jsonb). */
   notificationPrefs: jsonObject,
   schemaVersion: pgInteger,
@@ -50,6 +52,7 @@ export const userSettingsUpdate = z.object({
   hourCycle: hourCycleEnum.optional(),
   theme: themeModeEnum.optional(),
   reducedStimulation: z.boolean().optional(),
+  todayHelpers: z.boolean().optional(),
   notificationPrefs: jsonObject.optional(),
 });
 

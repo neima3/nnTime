@@ -282,6 +282,7 @@ export async function updateSettings(
     hourCycle: "h12" | "h24";
     theme: "system" | "light" | "dark";
     reducedStimulation: boolean;
+    todayHelpers: boolean;
     notificationPrefs: unknown;
   }>,
   ifMatchRevision: number,

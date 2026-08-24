@@ -1490,6 +1490,7 @@ components:
         - hourCycle
         - theme
         - reducedStimulation
+        - todayHelpers
         - notificationPrefs
         - schemaVersion
         - revision
@@ -1510,6 +1511,9 @@ components:
         hourCycle: { $ref: '#/components/schemas/HourCycle' }
         theme: { $ref: '#/components/schemas/ThemeMode' }
         reducedStimulation: { type: boolean }
+        todayHelpers:
+          type: boolean
+          description: Phase 2 (Quiet Today) — show the five helper surfaces on Today.
         notificationPrefs:
           type: object
           additionalProperties: true
@@ -1553,6 +1557,7 @@ components:
         hourCycle: { $ref: '#/components/schemas/HourCycle' }
         theme: { $ref: '#/components/schemas/ThemeMode' }
         reducedStimulation: { type: boolean }
+        todayHelpers: { type: boolean }
         notificationPrefs:
           type: object
           additionalProperties: true

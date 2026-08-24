@@ -143,6 +143,9 @@ export const userSettings = pgTable("user_settings", {
   hourCycle: hourCycle("hour_cycle").notNull().default("h12"),
   theme: themeMode("theme").notNull().default("system"),
   reducedStimulation: boolean("reduced_stimulation").notNull().default(false),
+  // Phase 2 (Quiet Today): mounts/hides the five Today helper surfaces.
+  // Default true = today's UI; the default flip (A5) is its own later commit.
+  todayHelpers: boolean("today_helpers").notNull().default(true),
   // Presentation-only extras (ADR-001 allows JSON here): per-type reminder
   // offsets, sound choices, quiet hours. Typed core settings stay above.
   notificationPrefs: jsonb("notification_prefs").notNull().default({}),

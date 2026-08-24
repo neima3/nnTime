@@ -54,7 +54,7 @@ describe("startup migration concurrency", () => {
       .filter((file) => /^\d{4}_.*\.sql$/.test(file))
       .sort();
     const target = files.at(-1);
-    expect(target).toBe("0009_durable_notification_jobs.sql");
+    expect(target).toBe("0010_today_helpers.sql");
     if (!target) throw new Error("migration target missing");
 
     for (const file of files.slice(0, -1)) {
