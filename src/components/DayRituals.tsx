@@ -184,7 +184,7 @@ export function DayRituals({
 
   if (morningWindow && activityCount < 2 && !allDone && dismissed !== "morning") {
     return (
-      <div className="mb-5 rounded-3xl border border-cat-butter-ink/20 bg-cat-butter/40 p-4">
+      <div data-testid="day-rituals" className="mb-5 rounded-3xl border border-cat-butter-ink/20 bg-cat-butter/40 p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <span className="grid size-9 place-items-center rounded-xl bg-cat-butter text-lg" aria-hidden>
@@ -237,7 +237,7 @@ export function DayRituals({
 
   if (eveningWindow && unfinished.length > 0 && dismissed !== "evening") {
     return (
-      <div className="mb-5 rounded-3xl border border-cat-lilac-ink/20 bg-cat-lilac/40 p-4">
+      <div data-testid="day-rituals" className="mb-5 rounded-3xl border border-cat-lilac-ink/20 bg-cat-lilac/40 p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <span className="grid size-9 place-items-center rounded-xl bg-cat-lilac text-lg" aria-hidden>

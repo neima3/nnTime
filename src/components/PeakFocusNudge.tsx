@@ -114,7 +114,10 @@ export function PeakFocusNudge({ zone }: { zone?: string } = {}) {
   const isNow = nowHour === peakHour;
 
   return (
-    <div className="mb-5 rounded-2xl border border-iris/30 bg-iris-ghost px-4 py-3.5">
+    <div
+      data-testid="peak-focus-nudge"
+      className="mb-5 rounded-2xl border border-iris/30 bg-iris-ghost px-4 py-3.5"
+    >
       <div className="flex items-center gap-3">
         <span
           className="grid size-9 shrink-0 place-items-center rounded-xl bg-iris-soft text-iris"

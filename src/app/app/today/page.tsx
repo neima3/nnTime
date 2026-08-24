@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   ChevronLeft,
   ChevronRight,
+  Flame,
   Link2Off,
   ListChecks,
   PenLine,
@@ -66,6 +67,7 @@ async function loadTodayData(dateParam?: string) {
       hourCycle: "h24" as HourCycle,
       isToday: true,
       nowMin: NOW_MIN,
+      todayHelpers: true,
     };
 
   const settings = await getOrCreateSettings(resolved.userId).catch(() => null);
@@ -102,6 +104,8 @@ async function loadTodayData(dateParam?: string) {
     hourCycle,
     isToday,
     nowMin: isToday ? NOW_MIN : 0, // client LiveNowLine handles live time
+    // Phase 2 (Quiet Today): false hides the five helper surfaces below.
+    todayHelpers: settings?.todayHelpers ?? true,
   };
 }
 
@@ -224,6 +228,7 @@ export default async function TodayPage({
     hourCycle,
     isToday,
     nowMin,
+    todayHelpers,
   } = await loadTodayData(dateParam);
 
   const magicLinkError = getMagicLinkRedirectError(sp);
@@ -341,9 +346,21 @@ export default async function TodayPage({
               </h1>
             </div>
             {!emptyDay && <DayProgress activities={activities} />}
-            <SoftStreaks enabled={authed} />
+            {todayHelpers && <SoftStreaks enabled={authed} />}
+            {/* Quiet Today: with helpers off, the streak stays one tap away
+                (Rhythm → Stats' Soft-streak card) per the Phase 2 contract. */}
+            {authed && !todayHelpers && (
+              <Link
+                href="/app/stats"
+                data-testid="rhythm-link"
+                className="inline-flex items-center gap-1.5 rounded-2xl border border-border bg-surface px-3 py-2 text-[13px] font-semibold text-ink-soft shadow-card hover:bg-surface-sunken hover:text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+              >
+                <Flame size={15} />
+                Rhythm
+              </Link>
+            )}
             {authed && isToday && <LowBatteryToggle date={date} />}
-            {authed && isToday && (
+            {authed && isToday && todayHelpers && (
               <PickForMe candidates={pickCandidates} date={date} />
             )}
             {authed && (
@@ -407,7 +424,7 @@ export default async function TodayPage({
 
           {authed && <TimezoneNudge zone={zone} />}
 
-          {authed && isToday && (
+          {authed && isToday && todayHelpers && (
             <DailyBrief
               zone={zone || undefined}
               blocks={activities.map((a) => ({
@@ -419,13 +436,15 @@ export default async function TodayPage({
             />
           )}
           {authed && isToday && <LowBatteryNote date={date} />}
-          {authed && isToday && <PeakFocusNudge zone={zone || undefined} />}
+          {authed && isToday && todayHelpers && (
+            <PeakFocusNudge zone={zone || undefined} />
+          )}
 
           {authed && !activities.every((a) => a.done) && (
             <DayLoadMeter activities={activities} />
           )}
 
-          {authed && isToday && (
+          {authed && isToday && todayHelpers && (
             <DayRituals
               zone={zone}
               date={date}

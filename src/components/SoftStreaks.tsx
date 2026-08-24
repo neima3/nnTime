@@ -55,7 +55,10 @@ export function SoftStreaks({ optOut, enabled = true }: SoftStreaksProps) {
   if (streak.current === 0 && streak.best === 0) return null;
 
   return (
-    <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-3 py-2 shadow-card">
+    <div
+      data-testid="soft-streaks"
+      className="flex items-center gap-2 rounded-2xl border border-border bg-surface px-3 py-2 shadow-card"
+    >
       <Flame
         size={18}
         className={streak.current > 0 ? "text-iris" : "text-ink-faint"}

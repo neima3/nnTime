@@ -102,6 +102,7 @@ export function PickForMe({
     <>
       <button
         type="button"
+        data-testid="pick-for-me"
         onClick={() => {
           setIndex(0);
           setOpen(true);

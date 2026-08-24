@@ -77,7 +77,10 @@ export function DailyBrief({
   }
 
   return (
-    <div className="mb-5 rounded-2xl border border-border bg-gradient-to-br from-cat-butter/40 to-surface px-4 py-3.5 shadow-card">
+    <div
+      data-testid="daily-brief"
+      className="mb-5 rounded-2xl border border-border bg-gradient-to-br from-cat-butter/40 to-surface px-4 py-3.5 shadow-card"
+    >
       <div className="flex items-start gap-3">
         <span
           className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl bg-cat-butter text-cat-butter-ink"

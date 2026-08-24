@@ -242,7 +242,8 @@ export function StatsClient() {
       </Card>
 
       <Card title="Soft streak" hint="1-day grace · never shaming">
-        <div className="flex items-center gap-3">
+        {/* Quiet Today's Rhythm control lands here — keep this testid stable. */}
+        <div data-testid="soft-streak-card" className="flex items-center gap-3">
           <Flame size={28} className="text-iris" />
           <div>
             <p className="tnum font-display text-3xl font-bold">
