@@ -1,5 +1,82 @@
 # Progress log
 
+## 2026-08-23 — Round 90: the word quizzes learn to teach (Fable)
+
+"Make the grammar game better with explanations/examples." The quiz engine
+(Grammar Snap + Spell Check share it) now teaches the distinction, not just
+the answer, on both platforms:
+
+- **Filled-sentence reveal** — after every answer the prompt's blank fills
+  with the right answer in success ink; spelling answers underline their
+  trap letters (new `stress` field, e.g. sep·ARAT·e, rest·AURA·nt).
+- **"Each one, used right"** — every real-word option carries a
+  correct-usage example (new `examples` field); fake words (alot, meself,
+  should of) get none, deliberately. The card renders after answering.
+- **"Pocket these"** — the end screen recaps the rules from this run's
+  misses (cap 3, "+N more" overflow), fresh and practice modes alike.
+- **Banks grew**: 66 → 80 grammar snags (accept/except, breath/breathe,
+  capital/capitol, lightning/lightening, conscience/conscious, weeks
+  plural-vs-possessive, teach/learn, drank/drunk, chose/choose,
+  advice/advise, quiet/quite, ensure/insure, imply/infer, plus a second
+  double-negative), 16 → 22 spellings (restaurant, February,
+  questionnaire, mischievous, pronunciation, publicly). Every grammar item
+  now has examples; every spelling item has a stress highlight.
+
+**Mirror drift is dead.** `QuizBank.swift` is now GENERATED from
+`games.ts` by `src/lib/quiz-bank-swift.ts`;
+`tests/ios-quiz-bank-sync.test.ts` pins the checked-in Swift file
+byte-for-byte (toMatchFileSnapshot), so a bank edit without
+`pnpm quiz:sync-ios` fails CI. The renderer escapes quotes/backslashes/
+control chars and throws on anything unescapable.
+
+**12-agent adversarial content audit** (per-topic linguist skeptics + two
+diff reviewers) before ship; all substantive findings fixed:
+- Ambiguity blockers: "The ___ toys" now cues two dogs; "a just dessert"
+  reworded off the just-deserts idiom (note now teaches it); the
+  farther-for-distance item (further is dictionary-valid there) replaced
+  with hottest/most-hottest; "split between three of us" (defensible)
+  became "the rumor spread among the wedding guests"; e.g./i.e. prompt now
+  lists two examples so i.e. can't fit; "publically" (a dictionary-listed
+  variant!) swapped for a real fake.
+- Note fixes: him-test overclaim scoped to its clause; opportunity
+  mnemonic retargeted (port, not the undisputed pp); separate stress
+  widened to "arat"; fewer/less and ensure/insure notes soften debunked
+  absolutes; "I ___ have gone" no longer reveals "should have have gone";
+  water-bottle item switched to "must have left" (deduction, not regret).
+- Engine findings: the answer live-region now stays mounted (screen
+  readers reliably hear the verdict); generator hardened against control
+  characters.
+
+**Hands-on QA found a real engine bug**: same-batch double-taps on "Next
+one" walked `idx` past the end via functional updates and blanked the
+dialog (reachable by double-tapping on question 7). Fixed with ref-mirrored
+guards (choose can't fire twice, finish is one-shot, advance is absolute);
+iOS `next()` gained the same `done` guard. Also: `GameShell` now scrolls
+tall content (my-auto centering) instead of clipping both ends, and
+`pruneMisses`/`QuizMisses.prune` drop orphaned miss keys when an item is
+reworded — saved-miss prompts are identity keys, so the audit rewording
+would otherwise have inflated "my tricky ones" forever.
+
+**Evidence** (browser-qa/r90-quiz/, git-ignored): seeded deterministic
+play-throughs, desktop + 390×844 mobile, local and live — chooser, reveal
+with examples, spelling stress underline, end recap, practice redemption
+("Redeemed — off the tricky list it goes." verified interactively).
+Reusable script: `browser-qa/r90-quiz-qa.mjs` (BASE_URL switches env).
+
+**Gates:** `pnpm lint` / `typecheck` / `test` (141 files, 1339 tests) /
+`build` green; e2e 49 passed (+1 machine-load flake, green on isolated
+re-run); iOS gate **Executed 425 tests, 1 skipped, 0 failures**;
+`ios:release:preflight`, `api:check-ios`, `api:check-ios-adoption` green;
+parity unchanged (web 89.74% / iOS 86.93%, both ≥85%).
+
+**Deployed:** Coolify webhook build `jhl5pn6dwp4ydjvoml2uj1bi` on the
+exact SHA `5f481be` finished; CI run 32676005062 **success** (incl. e2e).
+Live-verified at https://time.neima.me by running the seeded QA script
+against prod with the live QA account: filled-sentence reveal, examples
+card, spelling stress underline, and end recap all render on desktop and
+mobile (screenshots in `browser-qa/r90-quiz/live/`, git-ignored) — none
+of that UI exists in the previous build, so the marker is unambiguous.
+
 ## 2026-08-14 — Round 89 / Track A item A2: the native editor asks too
 
 Round 88 fixed the web editor and left the same bug live on iPhone.
