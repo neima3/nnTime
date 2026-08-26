@@ -3,6 +3,8 @@ import Link from "next/link";
 import { ResetPasswordForm } from "./ResetPasswordForm";
 import { ResetUnavailableCard } from "./ResetUnavailableCard";
 import { safeAuthReturnTo } from "@/lib/auth-return";
+import { KairoMark } from "@/components/KairoMark";
+import { AmbientBackdrop } from "@/components/AmbientBackdrop";
 
 export const metadata: Metadata = {
   title: "Choose a new password · Kairo",
@@ -30,11 +32,12 @@ export default async function ResetPasswordPage({
   const returnTo = safeAuthReturnTo(params.next);
 
   return (
-    <main className="grid min-h-dvh place-items-center bg-canvas px-5 py-10">
+    <main className="relative grid min-h-dvh place-items-center overflow-clip bg-gradient-to-b from-surface-sunken via-canvas to-canvas px-5 py-10 dark:from-canvas dark:via-canvas">
+      <AmbientBackdrop />
       <div className="w-full max-w-sm">
         <Link href="/" className="mb-8 flex items-center justify-center gap-2.5">
-          <span className="grid size-9 place-items-center rounded-xl bg-iris text-lg text-ink-inverse shadow-card">
-            ◔
+          <span className="grid size-9 place-items-center rounded-xl bg-iris text-ink-inverse shadow-card">
+            <KairoMark size={18} />
           </span>
           <span className="font-display text-xl font-bold tracking-tight">Kairo</span>
         </Link>

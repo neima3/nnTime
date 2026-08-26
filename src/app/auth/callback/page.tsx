@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { parseMagicCallbackToken } from "@/server/native-magic-link";
+import { KairoMark } from "@/components/KairoMark";
+import { AmbientBackdrop } from "@/components/AmbientBackdrop";
 
 export const metadata: Metadata = {
   title: "Open your sign-in link",
@@ -20,14 +22,15 @@ export default async function MagicLinkCallbackPage({
   const token = parseMagicCallbackToken((await searchParams).token);
 
   return (
-    <main className="grid min-h-dvh place-items-center bg-canvas px-5 py-10">
+    <main className="relative grid min-h-dvh place-items-center overflow-clip bg-gradient-to-b from-surface-sunken via-canvas to-canvas px-5 py-10 dark:from-canvas dark:via-canvas">
+      <AmbientBackdrop />
       <section className="w-full max-w-sm rounded-3xl border border-border bg-surface p-7 text-center shadow-float">
         <div className="mx-auto mb-5 flex justify-center">
           <span
             aria-hidden="true"
-            className="grid size-13 place-items-center rounded-2xl bg-iris text-2xl text-ink-inverse shadow-card"
+            className="grid size-13 place-items-center rounded-2xl bg-iris text-ink-inverse shadow-card"
           >
-            ◔
+            <KairoMark size={26} />
           </span>
         </div>
         {token ? (

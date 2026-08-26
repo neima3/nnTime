@@ -15,6 +15,8 @@ import { useRouter } from "next/navigation";
 import { ArrowRight, Check, Loader2 } from "lucide-react";
 import { detectTimezone } from "@/lib/timezone";
 import { clientToday } from "@/lib/client-date";
+import { KairoMark } from "@/components/KairoMark";
+import { AmbientBackdrop } from "@/components/AmbientBackdrop";
 import { localMinutesToInstant } from "@/lib/adapters";
 import { useSession } from "@/lib/auth-client";
 import { authPageHref } from "@/lib/auth-return";
@@ -193,11 +195,12 @@ export default function OnboardingPage() {
   };
 
   return (
-    <main className="grid min-h-dvh place-items-center bg-canvas px-5 py-10">
+    <main className="relative grid min-h-dvh place-items-center overflow-clip bg-gradient-to-b from-surface-sunken via-canvas to-canvas px-5 py-10 dark:from-canvas dark:via-canvas">
+      <AmbientBackdrop />
       <div className="w-full max-w-md">
         <Link href="/" className="mb-8 flex items-center justify-center gap-2.5">
-          <span className="grid size-9 place-items-center rounded-xl bg-iris text-lg text-ink-inverse shadow-card">
-            ◔
+          <span className="grid size-9 place-items-center rounded-xl bg-iris text-ink-inverse shadow-card">
+            <KairoMark size={18} />
           </span>
           <span className="font-display text-xl font-bold tracking-tight">Kairo</span>
         </Link>

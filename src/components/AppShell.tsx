@@ -24,6 +24,7 @@ import { OneThing } from "./OneThing";
 import { CommandPalette } from "./CommandPalette";
 import { ToastHost } from "./Toast";
 import { useAppSession } from "./AppSessionBoundary";
+import { KairoMark } from "./KairoMark";
 
 const sidebarNav = [
   { href: "/app/today", label: "Today", key: "today", icon: CalendarDays },
@@ -119,8 +120,8 @@ export function AppShell({
       {/* desktop sidebar */}
       <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-border bg-surface px-4 py-6 md:flex">
         <Link href="/" className="flex items-center gap-2.5 px-2">
-          <span className="grid size-9 place-items-center rounded-xl bg-iris text-lg text-ink-inverse shadow-card">
-            ◔
+          <span className="grid size-9 place-items-center rounded-xl bg-iris text-ink-inverse shadow-card">
+            <KairoMark size={18} />
           </span>
           <span className="font-display text-xl font-bold tracking-tight">
             Kairo
@@ -150,20 +151,26 @@ export function AppShell({
 
         <NowCard active={active} />
 
-        <div className="mt-auto rounded-2xl border border-border bg-iris-ghost p-4">
-          <div className="flex items-center gap-2 text-sm font-semibold text-iris">
-            <Sparkles size={16} />
-            AI co-planner
+        <div className="relative mt-auto overflow-hidden rounded-2xl border border-iris/15 bg-iris-ghost p-4">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-8 -top-10 size-28 bg-(image:--glow-iris)"
+          />
+          <div className="relative">
+            <div className="flex items-center gap-2 text-sm font-semibold text-iris">
+              <Sparkles size={16} />
+              AI co-planner
+            </div>
+            <p className="mt-1.5 text-[13px] leading-snug text-ink-soft">
+              Break down any task into gentle, doable steps.
+            </p>
+            <Link
+              href="/app/planner"
+              className="mt-3 block w-full rounded-xl bg-iris py-2 text-center text-[13px] font-semibold text-ink-inverse shadow-card transition-all hover:scale-[1.02] hover:bg-iris-deep"
+            >
+              Plan my day
+            </Link>
           </div>
-          <p className="mt-1.5 text-[13px] leading-snug text-ink-soft">
-            Break down any task into gentle, doable steps.
-          </p>
-          <Link
-            href="/app/planner"
-            className="mt-3 block w-full rounded-xl bg-iris py-2 text-center text-[13px] font-semibold text-ink-inverse transition-colors hover:bg-iris-deep"
-          >
-            Plan my day
-          </Link>
         </div>
 
         <div className="mt-3 border-t border-border pt-3">

@@ -2,12 +2,13 @@
  * Custom 404 — Kairo branded. Keeps the Soft Focus design system.
  */
 import Link from "next/link";
+import { KairoMark } from "@/components/KairoMark";
 
 export default function NotFound() {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-canvas px-4">
-      <span className="grid size-20 place-items-center rounded-3xl bg-iris text-4xl text-ink-inverse shadow-float">
-        ◔
+      <span className="grid size-20 place-items-center rounded-3xl bg-iris text-ink-inverse shadow-float">
+        <KairoMark size={40} />
       </span>
       <div className="text-center">
         <h1 className="font-display text-4xl font-bold tracking-tight">

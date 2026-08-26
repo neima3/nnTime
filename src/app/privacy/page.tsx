@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, ArrowUpRight, ShieldCheck } from "lucide-react";
 import { privacyPolicy } from "@/lib/privacy-policy";
+import { KairoMark } from "@/components/KairoMark";
 
 export const metadata: Metadata = {
   title: "Privacy · Kairo",
@@ -18,8 +19,8 @@ export default function PrivacyPage() {
             href="/"
             className="inline-flex min-h-11 items-center gap-2.5 rounded-xl pr-3 font-display text-lg font-bold tracking-tight"
           >
-            <span className="grid size-9 place-items-center rounded-xl bg-iris text-lg text-ink-inverse shadow-card">
-              ◔
+            <span className="grid size-9 place-items-center rounded-xl bg-iris text-ink-inverse shadow-card">
+              <KairoMark size={18} />
             </span>
             Kairo
           </Link>
