@@ -12,9 +12,12 @@ import {
 } from "@/lib/adapters";
 import { instantToDateStr } from "@/server/temporal/zone";
 import { formatTime, toHourCycle } from "@/lib/time-format";
+import { partitionReviewItems } from "@/lib/review-window";
 
 async function loadReview(): Promise<{
   items: ReviewItem[];
+  /** Pending blocks still ahead of now — counted, never judged. */
+  upcoming: number;
   date: string;
   zone: string;
   authed: boolean;
@@ -27,6 +30,7 @@ async function loadReview(): Promise<{
       authed: false,
       date: today,
       zone: zoneGuess,
+      upcoming: 0,
       items: mockReviewItems.map((r, i) => ({
         id: r.id,
         title: r.title,
@@ -77,8 +81,16 @@ async function loadReview(): Promise<{
     })
     .filter((x): x is ReviewItem => x !== null);
 
-  return {
+  // Opening Review at 2 pm must not list tonight's plan as "didn't happen".
+  const isToday = resolved.date === instantToDateStr(new Date(), resolved.zone);
+  const { past, upcoming } = partitionReviewItems(
     items,
+    isToday ? dateToMinutesFromMidnight(new Date(), resolved.zone) : null,
+  );
+
+  return {
+    items: past,
+    upcoming,
     date: resolved.date,
     zone: resolved.zone,
     authed: true,
@@ -86,10 +98,16 @@ async function loadReview(): Promise<{
 }
 
 export default async function ReviewPage() {
-  const { items, date, zone, authed } = await loadReview();
+  const { items, upcoming, date, zone, authed } = await loadReview();
   return (
     <AppShell active="today">
-      <ReviewClient items={items} date={date} zone={zone} authed={authed} />
+      <ReviewClient
+        items={items}
+        upcoming={upcoming}
+        date={date}
+        zone={zone}
+        authed={authed}
+      />
     </AppShell>
   );
 }

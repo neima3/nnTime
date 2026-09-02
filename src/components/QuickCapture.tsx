@@ -9,6 +9,7 @@
  * chain-dumping. Voice uses the Web Speech API where the browser has it.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useFocusTrap } from "@/lib/useFocusTrap";
 import { Loader2, Mic, MicOff, PenLine, Sparkles, X } from "lucide-react";
 import { toast } from "./Toast";
@@ -57,6 +58,11 @@ function getSpeechRecognition(): (new () => SpeechRecognitionLike) | null {
 
 export function QuickCapture() {
   const hourCycle = useHourCycle();
+  const pathname = usePathname();
+  // The editor and Focus are capture/attention surfaces of their own; the
+  // floating pencil sat on top of their controls on a phone.
+  const hideFab =
+    pathname?.startsWith("/app/editor") || pathname?.startsWith("/app/focus");
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
@@ -352,14 +358,16 @@ export function QuickCapture() {
   return (
     <>
       {/* Mobile capture button — mirrors the FAB on the left, above the tab bar. */}
-      <button
-        type="button"
-        aria-label="Quick capture a thought"
-        onClick={() => setOpen(true)}
-        className="fixed bottom-24 left-5 z-40 grid size-12 place-items-center rounded-2xl border border-border bg-surface text-ink-soft shadow-float transition-transform hover:scale-105 active:scale-95 md:hidden"
-      >
-        <PenLine size={20} />
-      </button>
+      {!hideFab && (
+        <button
+          type="button"
+          aria-label="Quick capture a thought"
+          onClick={() => setOpen(true)}
+          className="fixed bottom-24 left-5 z-40 grid size-12 place-items-center rounded-2xl border border-border bg-surface text-ink-soft shadow-float transition-transform hover:scale-105 active:scale-95 md:hidden"
+        >
+          <PenLine size={20} />
+        </button>
+      )}
 
       {open && (
         <div

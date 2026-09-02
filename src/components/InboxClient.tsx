@@ -499,17 +499,20 @@ export function InboxClient({
           return (
             <li
               key={item.id}
-              className="group flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3 shadow-card"
+              className="group flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-border bg-surface px-4 py-3 shadow-card"
             >
               <span
-                className={`grid size-10 place-items-center rounded-xl text-lg ${cat.fill}`}
+                className={`grid size-10 shrink-0 place-items-center rounded-xl text-lg ${cat.fill}`}
                 aria-hidden
               >
                 {item.emoji}
               </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[15px] font-semibold">{item.title}</p>
-                <div className="mt-0.5 flex items-center gap-2">
+              {/* The title owns the row on a phone (actions drop to their own
+                  line below); inline actions only from sm up, where the row is
+                  wide enough for both without truncating the thought itself. */}
+              <div className="min-w-0 flex-1 basis-40">
+                <p className="line-clamp-2 text-[15px] font-semibold leading-snug">{item.title}</p>
+                <div className="mt-0.5 flex items-center gap-2 empty:hidden">
                   <PriorityFlag level={item.priority} />
                   {(item.ageDays ?? 0) >= 7 && (
                     <span className="rounded-lg bg-cat-butter px-1.5 py-0.5 text-[11px] font-bold text-cat-butter-ink">
@@ -519,7 +522,7 @@ export function InboxClient({
                 </div>
               </div>
               {authed && (
-                <div className="flex flex-wrap items-center gap-1 opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+                <div className="flex w-full flex-wrap items-center gap-1 pl-13 opacity-100 sm:w-auto sm:pl-0 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
                   <button
                     type="button"
                     title="Move to Anytime"

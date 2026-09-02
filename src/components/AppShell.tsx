@@ -118,7 +118,10 @@ export function AppShell({
         Skip to content
       </a>
       {/* desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-border bg-surface px-4 py-6 md:flex">
+      {/* The column scrolls rather than clips: on a 760px laptop viewport the
+          nav + now-card + co-planner + identity footer outgrow the height, and
+          `mt-auto` alone just pushed the footer off-screen. */}
+      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-border bg-surface px-4 py-6 short:py-4 md:flex">
         <Link href="/" className="flex items-center gap-2.5 px-2">
           <span className="grid size-9 place-items-center rounded-xl bg-iris text-ink-inverse shadow-card">
             <KairoMark size={18} />
@@ -128,7 +131,7 @@ export function AppShell({
           </span>
         </Link>
 
-        <nav aria-label="Main navigation" className="mt-8 flex flex-col gap-1">
+        <nav aria-label="Main navigation" className="mt-8 flex flex-col gap-1 short:mt-6 short:gap-0.5">
           {sidebarNav.map(({ href, label, key, icon: Icon }) => {
             const isActive = key === active;
             return (
@@ -136,7 +139,7 @@ export function AppShell({
                 key={href}
                 href={href}
                 aria-current={isActive ? "page" : undefined}
-                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none ${
+                className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none short:py-2 ${
                   isActive
                     ? "bg-iris-soft text-iris"
                     : "text-ink-soft hover:bg-surface-sunken hover:text-ink"
@@ -151,7 +154,7 @@ export function AppShell({
 
         <NowCard active={active} />
 
-        <div className="relative mt-auto overflow-hidden rounded-2xl border border-iris/15 bg-iris-ghost p-4">
+        <div className="relative mt-auto shrink-0 overflow-hidden rounded-2xl border border-iris/15 bg-iris-ghost p-4 short:mt-4 short:p-3">
           <div
             aria-hidden
             className="pointer-events-none absolute -right-8 -top-10 size-28 bg-(image:--glow-iris)"
@@ -161,22 +164,25 @@ export function AppShell({
               <Sparkles size={16} />
               AI co-planner
             </div>
-            <p className="mt-1.5 text-[13px] leading-snug text-ink-soft">
+            <p className="mt-1.5 text-[13px] leading-snug text-ink-soft short:hidden">
               Break down any task into gentle, doable steps.
             </p>
             <Link
               href="/app/planner"
-              className="mt-3 block w-full rounded-xl bg-iris py-2 text-center text-[13px] font-semibold text-ink-inverse shadow-card transition-all hover:scale-[1.02] hover:bg-iris-deep"
+              className="mt-3 block w-full rounded-xl bg-iris py-2 text-center text-[13px] font-semibold text-ink-inverse shadow-card transition-all hover:scale-[1.02] hover:bg-iris-deep short:mt-2"
             >
               Plan my day
             </Link>
           </div>
         </div>
 
-        <div className="mt-3 border-t border-border pt-3">
+        <div className="mt-3 shrink-0 border-t border-border pt-3">
           <UserMenu />
         </div>
-        <ShortcutsHint />
+        {/* The legend is decoration on a short screen; `?` opens the full list. */}
+        <div className="hidden shrink-0 tall:block">
+          <ShortcutsHint />
+        </div>
       </aside>
 
       {/* main */}

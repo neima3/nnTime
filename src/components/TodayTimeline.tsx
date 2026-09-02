@@ -153,14 +153,17 @@ export function TodayTimeline({
   );
 
   const handleComplete = useCallback(
-    async (id: string): Promise<{ ok: boolean }> => {
+    async (id: string, done?: boolean): Promise<{ ok: boolean }> => {
       if (!authed) return { ok: false };
       try {
         const act = activities.find((a) => a.id === id);
         const occurrenceKey = act?.occurrenceKey;
         if (!occurrenceKey) return { ok: false };
         const currentDone = offlineDone[id] ?? act?.done ?? false;
-        const nextStatus = currentDone ? "pending" : "completed";
+        // The canvas says what the tap MEANT. Deriving it from server props
+        // made a quick second tap (undo) re-send "completed", because the
+        // first write had not been refreshed into props yet.
+        const nextStatus = (done ?? !currentDone) ? "completed" : "pending";
 
         let revision = act?.revision;
         if (revision == null && navigator.onLine) {
@@ -199,12 +202,16 @@ export function TodayTimeline({
           toast("Someone else just touched this — refresh to see the latest");
           return { ok: false };
         }
-        if (!res.ok) return { ok: false };
+        if (!res.ok) {
+          toast("That didn't save — try again");
+          return { ok: false };
+        }
         toast(nextStatus === "completed" ? "Nice — marked done" : "Restored");
         router.refresh();
         notifyDayChanged();
         return { ok: true };
       } catch {
+        toast("Couldn't reach the server — try again?");
         return { ok: false };
       }
     },

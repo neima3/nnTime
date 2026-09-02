@@ -331,8 +331,8 @@ export default async function TodayPage({
     <AppShell active="today">
       <div className="timeline-scroll-container mx-auto flex max-w-5xl gap-8 px-4 py-6 md:px-8">
         <section className="min-w-0 flex-1">
-          <header className="mb-6 flex flex-wrap items-center gap-3">
-            <div className="mr-auto">
+          <header className="mb-5 flex flex-wrap items-center gap-3 md:mb-6">
+            <div className="mr-auto min-w-0">
               <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-iris">
                 {dayLabel}
               </p>
@@ -341,21 +341,12 @@ export default async function TodayPage({
               </h1>
             </div>
             {!emptyDay && <DayProgress activities={activities} />}
-            <SoftStreaks enabled={authed} />
-            {authed && isToday && <LowBatteryToggle date={date} />}
-            {authed && isToday && (
-              <PickForMe candidates={pickCandidates} date={date} />
-            )}
-            {authed && (
-              <Link
-                href="/app/review"
-                className="inline-flex items-center gap-1.5 rounded-2xl border border-border bg-surface px-3 py-2 text-[13px] font-semibold text-ink-soft shadow-card hover:bg-surface-sunken hover:text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
-              >
-                <ListChecks size={15} />
-                Review
-              </Link>
-            )}
-            <div className="flex items-center gap-1 rounded-2xl border border-border bg-surface p-1 shadow-card">
+            {/* One chip row. On a phone it scrolls sideways — day switcher
+                first, bleeding to the screen edges — instead of wrapping into
+                three rows above the timeline; from md it wraps inline and the
+                switcher takes the far right, beside the title. */}
+            <div className="no-scrollbar -mx-4 -my-2 flex w-[calc(100%+2rem)] items-center gap-2 overflow-x-auto px-4 py-2 *:shrink-0 md:mx-0 md:my-0 md:w-auto md:flex-wrap md:overflow-visible md:px-0 md:py-0">
+            <div className="flex items-center gap-1 rounded-2xl border border-border bg-surface p-1 shadow-card md:order-last">
               {prevDate ? (
                 <Link
                   href={`/app/today?date=${prevDate}`}
@@ -402,6 +393,21 @@ export default async function TodayPage({
                   <ChevronRight size={18} />
                 </button>
               )}
+            </div>
+            {authed && (
+              <Link
+                href="/app/review"
+                className="inline-flex items-center gap-1.5 rounded-2xl border border-border bg-surface px-3 py-2 text-[13px] font-semibold text-ink-soft shadow-card hover:bg-surface-sunken hover:text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+              >
+                <ListChecks size={15} />
+                Review
+              </Link>
+            )}
+            {authed && isToday && (
+              <PickForMe candidates={pickCandidates} date={date} />
+            )}
+            {authed && isToday && <LowBatteryToggle date={date} />}
+            <SoftStreaks enabled={authed} />
             </div>
           </header>
 

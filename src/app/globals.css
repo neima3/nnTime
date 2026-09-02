@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Viewport-height variants: laptops with a browser chrome sit around 760–820px
+   tall, where a fixed sidebar has to give up its decoration before it clips. */
+@custom-variant short (@media (max-height: 820px));
+@custom-variant tall (@media (min-height: 940px));
+
 /* ---------------------------------------------------------------------------
    Kairo design tokens — "Soft Focus" system
    Warm paper canvas, deep plum ink, iris primary, six pastel category hues.
@@ -158,6 +163,14 @@ body {
 /* time digits always tabular */
 .tnum {
   font-variant-numeric: tabular-nums;
+}
+
+/* Horizontal chip rows on narrow screens scroll without a visible bar. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 /* Timeline state is communicated without translucency so category ink keeps

@@ -76,7 +76,8 @@ interface TimelineCanvasProps {
   zone?: string;
   onUpdateActivity: (id: string, start: number, duration: number) => Promise<{ ok: boolean }>;
   onCreateActivity?: (start: number) => void;
-  onComplete?: (id: string) => Promise<{ ok: boolean }>;
+  /** `done` is what the tap meant — the parent must not re-derive it. */
+  onComplete?: (id: string, done: boolean) => Promise<{ ok: boolean }>;
   onOpen?: (id: string) => void;
   onFocus?: (id: string) => void;
   onToggleStep?: (id: string, stepIndex: number) => Promise<{ ok: boolean }>;
@@ -162,6 +163,8 @@ export function TimelineCanvas({
   const [stepOptimistic, setStepOptimistic] = useState<Map<string, boolean>>(new Map());
   const [conflictId, setConflictId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  /** Ids with a done-toggle in flight — a double tap must not send two writes. */
+  const completeInFlight = useRef<Set<string>>(new Set());
   // Live clock in planning zone (falls back to browser local) when viewing today.
   const liveNow = useLiveNowMin(showNowLine, zone);
   const effectiveNow = showNowLine && liveNow != null ? liveNow : nowMin;
@@ -593,7 +596,7 @@ export function TimelineCanvas({
                   <button
                     type="button"
                     aria-label={`Focus on ${a.title}`}
-                    className={`grid place-items-center rounded-full border-2 border-current ${cat.ink} hover:bg-surface-raised/50 ${
+                    className={`relative grid place-items-center rounded-full border-2 border-current after:absolute after:-inset-2 after:content-[''] ${cat.ink} hover:bg-surface-raised/50 ${
                       micro ? "size-6" : compact ? "size-7" : "size-8"
                     }`}
                     onPointerDown={(e) => e.stopPropagation()}
@@ -609,7 +612,7 @@ export function TimelineCanvas({
                   <button
                     type="button"
                     aria-label={a.done ? `Mark ${a.title} not done` : `Complete ${a.title}`}
-                    className={`grid place-items-center rounded-full border-2 transition-colors ${
+                    className={`relative grid place-items-center rounded-full border-2 transition-colors after:absolute after:-inset-2 after:content-[''] ${
                       micro ? "size-6" : compact ? "size-7" : "size-8"
                     } ${
                       a.done
@@ -619,6 +622,8 @@ export function TimelineCanvas({
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={async (e) => {
                       e.stopPropagation();
+                      if (completeInFlight.current.has(a.id)) return;
+                      completeInFlight.current.add(a.id);
                       const next = !a.done;
                       if (next) celebrate(e.clientX, e.clientY);
                       setDoneOptimistic((prev) => {
@@ -626,13 +631,17 @@ export function TimelineCanvas({
                         m.set(a.id, next);
                         return m;
                       });
-                      const result = await onComplete(a.id);
-                      if (!result.ok) {
-                        setDoneOptimistic((prev) => {
-                          const m = new Map(prev);
-                          m.delete(a.id);
-                          return m;
-                        });
+                      try {
+                        const result = await onComplete(a.id, next);
+                        if (!result.ok) {
+                          setDoneOptimistic((prev) => {
+                            const m = new Map(prev);
+                            m.delete(a.id);
+                            return m;
+                          });
+                        }
+                      } finally {
+                        completeInFlight.current.delete(a.id);
                       }
                     }}
                   >

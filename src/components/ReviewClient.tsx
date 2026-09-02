@@ -31,11 +31,14 @@ export type ReviewItem = {
 
 export function ReviewClient({
   items: initial,
+  upcoming = 0,
   date,
   zone,
   authed,
 }: {
   items: ReviewItem[];
+  /** Pending blocks still ahead of now — mentioned, never put on trial. */
+  upcoming?: number;
   date: string;
   zone: string;
   authed: boolean;
@@ -133,9 +136,13 @@ export function ReviewClient({
   if (!current) {
     return (
       <div className="mx-auto flex max-w-lg flex-col items-center px-4 py-20 text-center">
-        <p className="font-display text-2xl font-bold">All done ✨</p>
+        <p className="font-display text-2xl font-bold">
+          {upcoming > 0 ? "Nothing to review yet" : "All done ✨"}
+        </p>
         <p className="mt-2 text-[14px] text-ink-soft">
-          Nothing left to review for this day.
+          {upcoming > 0
+            ? `${upcoming} ${upcoming === 1 ? "thing is" : "things are"} still ahead today — nothing to decide about ${upcoming === 1 ? "it" : "them"} yet.`
+            : "Nothing left to review for this day."}
         </p>
         <a
           href="/app/today"
@@ -164,6 +171,11 @@ export function ReviewClient({
           ? "Totally fine. Let’s decide what they become."
           : "See how unfinished plans can move forward without guilt."}
       </p>
+      {authed && upcoming > 0 && (
+        <p className="tnum mt-1 text-center text-[12.5px] font-medium text-ink-faint">
+          {upcoming} more still ahead today — not up for review.
+        </p>
+      )}
 
       <div aria-hidden="true" className="mt-5 flex items-center gap-2">
         {items.map((_, i) => (
