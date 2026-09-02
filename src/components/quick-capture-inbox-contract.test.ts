@@ -18,7 +18,7 @@ describe("Quick capture inbox refresh", () => {
     );
     expect(save).toContain("router.refresh()");
     expect(save).toContain('window.dispatchEvent(new Event("kairo:inbox-changed"))');
-    expect(capture).toContain('import { useRouter } from "next/navigation"');
+    expect(capture).toMatch(/import \{[^}]*\buseRouter\b[^}]*\} from "next\/navigation"/);
   });
 
   it("InboxClient adopts a refreshed server list without remounting", () => {
