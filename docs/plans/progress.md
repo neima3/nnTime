@@ -1,5 +1,100 @@
 # Progress log
 
+## 2026-09-02 — Round 92: Honest loops — the app looks and works better for a person using it (Fable + grok-4.6 + glm-5.3-flash)
+
+Plan: `docs/plans/2026-09-02-round92-honest-loops.md` (+ `round92-agent-prompt.md`).
+Brief was "make the entire app look and function better, like a 10x lead, use
+grok / opencode glm-5.3-flash workers, ship". Chosen slice: no new surfaces —
+fix what a real person hits in capture → plan → do → review, on a phone and a
+laptop. Evidence first: a hands-on pass on a fresh seeded local account at
+1440×900 / 1440×760 / 390×844, plus two independent audits run headless in
+throwaway worktrees (grok-4.6: 15 ranked defects; glm-5.3-flash: a
+loading/empty/error/refetch/a11y inventory of all 15 routes). Every audit item
+used was re-verified in source before anyone touched it.
+
+**Shipped on `main` (7 commits, four tracks merged by cherry-pick):**
+
+*Track A — layout + flagship interactions (Fable):*
+- Desktop sidebar fits any laptop: the sticky column scrolls instead of
+  clipping, the co-planner card and shortcut legend give way on short
+  viewports (`short:` / `tall:` custom variants in `globals.css`). At 1440×760
+  the identity footer used to be off-screen and the AI card cut in half.
+- Inbox rows on a phone: the title owns the row (`line-clamp-2`); actions
+  drop to their own line. Titles used to truncate to "Cal…", "Or…".
+- Today header: one chip row — scrolls sideways on mobile (day switcher
+  first, bleeding to the edges), wraps inline from md. Timeline starts ~600px
+  sooner on a 390px screen.
+- Quick-capture pencil hidden on `/app/editor` and `/app/focus` (it sat on
+  their controls).
+- Done-toggle: the canvas passes the intended state (`onComplete(id, done)`),
+  guards double taps, toasts every failure; complete/focus buttons gained
+  ~44px hit areas via `after:-inset-2`.
+- Review Today only judges blocks whose end has passed
+  (`src/lib/review-window.ts`, 4 tests); upcoming ones are counted ("N more
+  still ahead today — not up for review"), never listed. Opening Review at
+  2 pm no longer offers to "let go" of tonight.
+- Focus: a session started from a Today block ends with a success-styled
+  "Mark “…” done" (same occurrence-scoped write as the timeline ✓, then back
+  to Today); "Done for now" returns to the day instead of an empty timer.
+
+*Track B — core-loop correctness (grok-4.6 worker, `fix/core-loops`):*
+- AI Plan-my-day accept and Anytime "Schedule"/"Slot it" now consume the
+  source task (`taskId` → `POST /api/v1/tasks/{id}/schedule`), no duplicates.
+- Quick capture refreshes the open Inbox (`kairo:inbox-changed` + render-time
+  reconciliation of `initialItems`); a failed magic-add saves plain text
+  instead of claiming it did.
+- Routine create can't stick on "Saving…" and the new routine appears at
+  once; "Use today" opens the editor via `?routineId=` with emoji, steps and
+  the summed duration (`src/lib/routine-editor-defaults.ts`).
+- Editor: a failed edit-load shows an error with Save disabled; delete has
+  try/catch/finally.
+
+*Track C — hardening (glm-5.3-flash worker, `fix/error-handling`):*
+- Settings patch/export/delete, Routines pause/delete, TimezoneNudge,
+  WeeklyIntentions, Focus step toggle + hydrate, DayRituals partial failures
+  all surface errors (toast/status/inline retry) instead of swallowing them.
+- Named the Settings selects and the ICS input, the editor emoji presets;
+  Stats zero-data card; new `src/app/app/error.tsx` boundary.
+
+*Track D — shell (grok-4.6 worker, `feat/shell-bootstrap`):*
+- CSP Stage 1 done: the per-user prefs bootstrap is a CONSTANT script reading
+  `data-*` attributes (`src/app/app/prefs-bootstrap.ts`), hashes pinned by
+  test (`sha256-Vvq43+…`, `sha256-gkNQpF…`); the script is skipped on
+  RSC/prefetch requests, which also removes React's "Encountered a script
+  tag" warning on every client navigation into `/app`.
+- Sidebar identity is server-seeded (`AuthSession.user`, `AppSessionProvider
+  user`), so name/email render on first paint instead of a skeleton.
+
+**Gates:** `pnpm lint`, `pnpm typecheck`, `pnpm test` — **158 files /
+1389 tests** (was 140 / 1339), `pnpm build` green, `pnpm test:e2e` —
+**50 passed, 4 skipped, 0 failed** (2.0 min against the :3456 dev server);
+parity unchanged web 89.74% / iOS 86.93%. Deploy: see below.
+
+**Evidence** (`browser-qa/r92/`, git-ignored): `shoot.mjs` (Playwright,
+`PW_CHANNEL=chrome` when the bundled browser is missing) → `after/` = 30 shots
+(7 routes × desktop/mobile × light/dark + Today at 1440×760); hands-on
+verification in the Browser pane: sidebar at 760px, inbox rows at 390px,
+capture → inbox (badge 3→4 without reload), Focus → "Mark done" → Today shows
+the block ✓, no script-tag console warning after client navigation.
+
+**Worker recipe** (saved to memory): worktree + symlinked `node_modules` +
+`.env.local`, `grok -p … --always-approve` / `opencode run --pure --auto
+--dir … -m zai-coding-plan/glm-5.3-flash`, each commits on its branch with a
+`SUMMARY.md`, reviewer cherry-picks and re-runs the full gates (one source-pin
+test broke on a merged import line — fixed).
+
+**Deviations / honest notes:**
+- Focus sessions still don't send `activityOccurrenceId` on start: the day
+  payload carries `occurrenceKey`, not the occurrence row id, and adding it is
+  an OpenAPI + iOS contract change. The user-facing gap (finishing never
+  marked the block) is closed client-side; linking is a later contract item.
+- `feat/quiet-today` and `feat/client-error-sink` stay parked (B6 pg_dump).
+- The machine's data volume hit 98% mid-round again and the dev server's
+  `.next/dev` got wiped (raw "Internal Server Error"); `rm -rf .next` +
+  restart fixed it. Worth a cleanup pass on the disk.
+- `pnpm build` prints BetterAuth "default secret" warnings during static
+  generation (no `BETTER_AUTH_SECRET` in the build env) — pre-existing noise.
+
 ## 2026-08-24 — Round 91: Phase 2 Quiet Today + 6.2 error sink, staged behind the B6 gate (Fable)
 
 Both remaining agent-executable Track A features are BUILT, GREEN, and parked

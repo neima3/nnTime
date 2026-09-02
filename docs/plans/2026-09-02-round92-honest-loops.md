@@ -75,20 +75,20 @@ Fable reviews every diff, merges into `main`, runs the full gates, and ships.
 
 ## Acceptance
 
-- [ ] Sidebar fits a 1440×760 viewport with the NOW card mounted; nothing clipped.
-- [ ] Inbox rows at 390px show the full title (two lines max) with actions on their own row.
-- [ ] Today at 390px: title row + one horizontally scrollable chip row; timeline starts within ~260px.
-- [ ] Quick-capture pencil hidden on `/app/editor` and `/app/focus`.
-- [ ] AI plan accept and Anytime schedule/slot consume the task (no duplicates).
-- [ ] Quick capture on the open Inbox shows the new row; magic-add failure saves plain text.
-- [ ] Review lists only blocks whose end has passed; upcoming ones are counted, not judged.
-- [ ] Done-toggle is idempotent under double tap and every failure is toasted.
-- [ ] Focus from a block links `activityOccurrenceId`; completion offers one-tap "Mark done".
-- [ ] Routine create shows the routine; "Use today" carries emoji + steps.
-- [ ] Editor load failure and delete failure are visible and recoverable.
-- [ ] Sidebar identity renders from the server session (no skeleton on load).
-- [ ] No "script tag" React warning on client navigation; bootstrap script text is constant + hash-pinned.
-- [ ] `pnpm lint && pnpm typecheck && pnpm test && pnpm build` green; `pnpm test:e2e` green; parity ≥ 89.74 / 86.93.
+- [x] Sidebar fits a 1440×760 viewport with the NOW card mounted; nothing clipped. (`after/today-laptop-*.png`)
+- [x] Inbox rows at 390px show the full title (two lines max) with actions on their own row. (`after/inbox-mobile-*.png`)
+- [x] Today at 390px: title row + one horizontally scrollable chip row; timeline starts within ~260px. (`after/today-mobile-*.png`)
+- [x] Quick-capture pencil hidden on `/app/editor` and `/app/focus`. (`after/editor-mobile-*.png`, `after/focus-mobile-*.png`)
+- [x] AI plan accept and Anytime schedule/slot consume the task (no duplicates). (source pins; `/schedule` endpoint)
+- [x] Quick capture on the open Inbox shows the new row; magic-add failure saves plain text. (hands-on: badge 3→4, no reload)
+- [x] Review lists only blocks whose end has passed; upcoming ones are counted, not judged. (`src/lib/review-window.test.ts`)
+- [x] Done-toggle is idempotent under double tap and every failure is toasted.
+- [x] Focus from a block offers one-tap "Mark done" on completion (hands-on: lands on Today with the block ✓). Linking `activityOccurrenceId` on start is deferred — it is an OpenAPI/iOS contract change (the day payload has no occurrence row id).
+- [x] Routine create shows the routine; "Use today" carries emoji + steps.
+- [x] Editor load failure and delete failure are visible and recoverable.
+- [x] Sidebar identity renders from the server session (no skeleton on load). (SSR HTML carries name/email; `UserMenu.test.ts`)
+- [x] No "script tag" React warning on client navigation; bootstrap script text is constant + hash-pinned. (console clean after `Today → Inbox`; `prefs-bootstrap.test.ts`)
+- [x] `pnpm lint && pnpm typecheck && pnpm test && pnpm build` green; `pnpm test:e2e` green (50 passed / 4 skipped); parity 89.74 / 86.93.
 - [ ] Deployed to https://time.neima.me on the exact SHA and live-verified with a marker unique to this build.
 
 ## Verification

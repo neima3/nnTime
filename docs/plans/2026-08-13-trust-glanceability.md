@@ -2,6 +2,9 @@
 
 Status: Slice 1 shipped — see progress.md 2026-08-14 (Round 88).
 A2 (iOS editor scopes) shipped — see progress.md 2026-08-14 (Round 89).
+A9 Stage 1 (hash-friendly bootstrap script) shipped in Round 92 — see
+`docs/plans/2026-09-02-round92-honest-loops.md`; Stages 2–3 (split CSP by
+render mode, report-only soak) remain. A3/A4 stay parked on B6.
 
 
 > **For agentic workers:** execute **Slice 1** only unless a later prompt names a later Track A item. Track B is human-gated. If a step needs Neima, a phone, DNS, Coolify UI, or SSH: **STOP and report**. Do not simulate evidence.
