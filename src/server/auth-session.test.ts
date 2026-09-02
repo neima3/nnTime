@@ -30,13 +30,14 @@ describe("auth session boundary", () => {
 
   it("returns the authenticated session", async () => {
     mocks.getSession.mockResolvedValue({
-      user: { id: "user-a" },
+      user: { id: "user-a", name: "Ada", email: "ada@example.com" },
       session: { id: "session-a" },
     });
 
     await expect(getSession()).resolves.toEqual({
       userId: "user-a",
       sessionId: "session-a",
+      user: { id: "user-a", name: "Ada", email: "ada@example.com" },
     });
   });
 
@@ -57,13 +58,14 @@ describe("auth session boundary", () => {
       new Headers({ "X-Kairo-Queue-Owner": "user-a" }),
     );
     mocks.getSession.mockResolvedValue({
-      user: { id: "user-a" },
+      user: { id: "user-a", name: "Ada", email: "ada@example.com" },
       session: { id: "session-a" },
     });
 
     await expect(requireSession()).resolves.toEqual({
       userId: "user-a",
       sessionId: "session-a",
+      user: { id: "user-a", name: "Ada", email: "ada@example.com" },
     });
   });
 });

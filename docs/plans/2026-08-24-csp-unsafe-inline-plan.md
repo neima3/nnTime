@@ -37,11 +37,18 @@ script blocked → blank page. That is the "broken CSP" the plan forbids.
 ## Staged plan (each stage independently shippable + revertible)
 
 **Stage 1 — make first-party scripts hash-friendly (pure refactor, no CSP
-change).** Rework the app-layout bootstrap so the SCRIPT TEXT is constant:
+change).** DONE (2026-09-02). Rework the app-layout bootstrap so the SCRIPT TEXT is constant:
 SSR the per-user values as `data-*` attributes on a `<meta>`/`<html>` node
 (HTML, not script — CSP-irrelevant), and have a static script read them.
 After this, both first-party scripts are fixed strings whose SHA-256 can be
 computed at build (a tiny unit test pins hash ↔ source drift).
+
+Landed 2026-09-02: `src/app/app/prefs-bootstrap.ts` exports a constant
+`PREFS_BOOTSTRAP_SCRIPT` that reads per-user values from `data-*` attributes
+(`prefsBootstrapAttributes`); `src/app/app/layout.tsx` renders that script
+(skipped on RSC/`next-router-prefetch` navigations) and
+`src/app/theme-script-code.ts` exports `THEME_SCRIPT`. Both SHA-256 hashes
+are pinned in `src/app/app/prefs-bootstrap.test.ts`.
 
 **Stage 2 — split the CSP by render mode in `src/proxy.ts`.** The proxy
 already sees every request. Emit:

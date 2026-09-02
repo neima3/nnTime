@@ -6,6 +6,7 @@ import { useSyncExternalStore } from "react";
 import { LogIn, LogOut } from "lucide-react";
 import { signOut, useSession } from "@/lib/auth-client";
 import { forgetUser, purgeUserCache } from "@/lib/offline-queue";
+import { useAppSession } from "./AppSessionBoundary";
 
 function subscribeOnline(onChange: () => void): () => void {
   window.addEventListener("online", onChange);
@@ -24,6 +25,7 @@ function subscribeOnline(onChange: () => void): () => void {
 export function UserMenu() {
   const router = useRouter();
   const { data, isPending, error } = useSession();
+  const { user: contextUser } = useAppSession();
   const online = useSyncExternalStore(
     subscribeOnline,
     () => navigator.onLine,
@@ -32,12 +34,16 @@ export function UserMenu() {
 
   // A session probe that failed — offline, rate-limited (429), or a server
   // hiccup — is not evidence the user signed out. Only a definitive empty
-  // answer means that. Hold the neutral placeholder for every failure shape.
-  if (isPending || (!data?.user && (!online || error != null))) {
+  // answer means that. Hold the server-seeded identity when we have one;
+  // otherwise the neutral placeholder. Never the "Sign in" link.
+  const waiting = isPending || (!data?.user && (!online || error != null));
+  const user = data?.user ?? (waiting ? contextUser : null);
+
+  if (waiting && !user) {
     return <div className="h-11 animate-pulse rounded-xl bg-surface-sunken" aria-hidden />;
   }
 
-  if (!data?.user) {
+  if (!user) {
     return (
       <Link
         href="/sign-in"
@@ -49,13 +55,13 @@ export function UserMenu() {
     );
   }
 
-  const label = data.user.name || data.user.email;
+  const label = user.name || user.email;
   const initial = (label ?? "?").trim().charAt(0).toUpperCase();
-  const userId = data.user.id;
 
   async function handleSignOut() {
     // ADR-002: offline caches are personal data — purge them with the session.
-    await purgeUserCache(userId).catch(() => {});
+    const userId = data?.user.id ?? contextUser?.id;
+    if (userId) await purgeUserCache(userId).catch(() => {});
     forgetUser();
     await signOut();
     router.push("/");
@@ -68,8 +74,8 @@ export function UserMenu() {
         {initial}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13px] font-semibold leading-tight">{data.user.name || "You"}</p>
-        <p className="truncate text-[11.5px] text-ink-faint">{data.user.email}</p>
+        <p className="truncate text-[13px] font-semibold leading-tight">{user.name || "You"}</p>
+        <p className="truncate text-[11.5px] text-ink-faint">{user.email}</p>
       </div>
       <button
         type="button"

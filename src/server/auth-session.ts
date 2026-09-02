@@ -17,6 +17,7 @@ import {
 export interface AuthSession {
   userId: string;
   sessionId: string;
+  user: { id: string; name: string | null; email: string };
 }
 
 /**
@@ -69,7 +70,15 @@ export async function getSession(): Promise<AuthSession | null> {
       session.user.id,
       requestHeaders.get(QUEUE_OWNER_HEADER),
     );
-    return { userId: session.user.id, sessionId: session.session.id };
+    return {
+      userId: session.user.id,
+      sessionId: session.session.id,
+      user: {
+        id: session.user.id,
+        name: session.user.name ?? null,
+        email: session.user.email,
+      },
+    };
   } catch (error) {
     if (error instanceof Response) throw error;
     if (isFrameworkSignal(error)) throw error;

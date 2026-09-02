@@ -12,6 +12,11 @@ function SessionState() {
   return React.createElement("span", null, signedIn ? "signed-in" : "signed-out");
 }
 
+function SessionUser() {
+  const { user } = useAppSession();
+  return React.createElement("span", null, user ? user.email : "no-user");
+}
+
 describe("AppSessionBoundary", () => {
   it("fails closed when no provider is mounted", () => {
     expect(renderToStaticMarkup(React.createElement(SessionState))).toContain(
@@ -51,5 +56,32 @@ describe("AppSessionBoundary", () => {
 
     expect(markup).toContain("Private planner");
     expect(markup).not.toContain("Sign in");
+  });
+
+  it("exposes the provided user and defaults to null", () => {
+    expect(renderToStaticMarkup(React.createElement(SessionUser))).toContain(
+      "no-user",
+    );
+
+    const withUser = renderToStaticMarkup(
+      React.createElement(
+        AppSessionProvider,
+        {
+          signedIn: true,
+          user: { id: "u1", name: "Ada", email: "ada@example.com" },
+        },
+        React.createElement(SessionUser),
+      ),
+    );
+    expect(withUser).toContain("ada@example.com");
+
+    const withoutUser = renderToStaticMarkup(
+      React.createElement(
+        AppSessionProvider,
+        { signedIn: true },
+        React.createElement(SessionUser),
+      ),
+    );
+    expect(withoutUser).toContain("no-user");
   });
 });

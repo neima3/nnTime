@@ -13,7 +13,7 @@ import { resolve } from "node:path";
 import { ALL_A11Y_CLASSES, A11Y_CLASS_PAIRS, A11Y_STORAGE_KEY } from "@/lib/a11y-prefs";
 
 const css = readFileSync(resolve(__dirname, "globals.css"), "utf8");
-const themeScript = readFileSync(resolve(__dirname, "theme-script.tsx"), "utf8");
+const themeScript = readFileSync(resolve(__dirname, "theme-script-code.ts"), "utf8");
 const landing = readFileSync(resolve(__dirname, "page.tsx"), "utf8");
 const timeline = readFileSync(resolve(__dirname, "../components/TimelineCanvas.tsx"), "utf8");
 const nowBar = readFileSync(resolve(__dirname, "../components/NowBar.tsx"), "utf8");
