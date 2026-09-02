@@ -68,7 +68,17 @@ used was re-verified in source before anyone touched it.
 **Gates:** `pnpm lint`, `pnpm typecheck`, `pnpm test` — **158 files /
 1389 tests** (was 140 / 1339), `pnpm build` green, `pnpm test:e2e` —
 **50 passed, 4 skipped, 0 failed** (2.0 min against the :3456 dev server);
-parity unchanged web 89.74% / iOS 86.93%. Deploy: see below.
+parity unchanged web 89.74% / iOS 86.93%.
+
+**Deployed + live-verified:** push of `b855611` triggered Coolify webhook
+build `bhmft2emhgmiqg0bc67qnunl`, status `finished` at 13:02Z.
+https://time.neima.me → 200, `/api/health` ok (migrate/db/ai/scheduler). The
+served stylesheet (`/_next/static/chunks/32avww4_6n4x6.css`) contains
+`no-scrollbar`, `max-height:820px`, `min-height:940px` and `line-clamp` —
+rules that exist only in this build. A follow-up commit (desktop header:
+switcher joins the title row via `md:contents`) was verified locally with the
+Today/Review/editor e2e specs and deployed the same way — see the line below
+this note once it landed.
 
 **Evidence** (`browser-qa/r92/`, git-ignored): `shoot.mjs` (Playwright,
 `PW_CHANNEL=chrome` when the bundled browser is missing) → `after/` = 30 shots

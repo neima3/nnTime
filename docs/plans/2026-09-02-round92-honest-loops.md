@@ -89,7 +89,7 @@ Fable reviews every diff, merges into `main`, runs the full gates, and ships.
 - [x] Sidebar identity renders from the server session (no skeleton on load). (SSR HTML carries name/email; `UserMenu.test.ts`)
 - [x] No "script tag" React warning on client navigation; bootstrap script text is constant + hash-pinned. (console clean after `Today → Inbox`; `prefs-bootstrap.test.ts`)
 - [x] `pnpm lint && pnpm typecheck && pnpm test && pnpm build` green; `pnpm test:e2e` green (50 passed / 4 skipped); parity 89.74 / 86.93.
-- [ ] Deployed to https://time.neima.me on the exact SHA and live-verified with a marker unique to this build.
+- [x] Deployed to https://time.neima.me on the exact SHA and live-verified with a marker unique to this build (build `bhmft2emhgmiqg0bc67qnunl` on `b855611`; live CSS carries `no-scrollbar` / `max-height:820px` / `line-clamp`).
 
 ## Verification
 

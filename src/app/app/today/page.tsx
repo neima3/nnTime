@@ -343,10 +343,11 @@ export default async function TodayPage({
             {!emptyDay && <DayProgress activities={activities} />}
             {/* One chip row. On a phone it scrolls sideways — day switcher
                 first, bleeding to the screen edges — instead of wrapping into
-                three rows above the timeline; from md it wraps inline and the
-                switcher takes the far right, beside the title. */}
-            <div className="no-scrollbar -mx-4 -my-2 flex w-[calc(100%+2rem)] items-center gap-2 overflow-x-auto px-4 py-2 *:shrink-0 md:mx-0 md:my-0 md:w-auto md:flex-wrap md:overflow-visible md:px-0 md:py-0">
-            <div className="flex items-center gap-1 rounded-2xl border border-border bg-surface p-1 shadow-card md:order-last">
+                three rows above the timeline. From md the wrapper dissolves
+                (`contents`) so the switcher joins the title row beside the
+                progress ring and the helper chips take one row underneath. */}
+            <div className="no-scrollbar -mx-4 -my-2 flex w-[calc(100%+2rem)] items-center gap-2 overflow-x-auto px-4 py-2 *:shrink-0 md:contents">
+            <div className="flex items-center gap-1 rounded-2xl border border-border bg-surface p-1 shadow-card">
               {prevDate ? (
                 <Link
                   href={`/app/today?date=${prevDate}`}
