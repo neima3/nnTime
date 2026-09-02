@@ -132,33 +132,37 @@ export function RoutinesClient({
   const togglePause = useCallback(
     async (r: RoutineView) => {
       if (!r.scheduleId || r.scheduleRevision == null) return;
-      const res = await fetch(
-        `/api/v1/routines/${r.id}/schedules/${r.scheduleId}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "If-Match": String(r.scheduleRevision),
+      try {
+        const res = await fetch(
+          `/api/v1/routines/${r.id}/schedules/${r.scheduleId}`,
+          {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              "If-Match": String(r.scheduleRevision),
+            },
+            body: JSON.stringify({ paused: !r.paused }),
           },
-          body: JSON.stringify({ paused: !r.paused }),
-        },
-      );
-      if (!res.ok) {
+        );
+        if (!res.ok) {
+          toast("Couldn't update the schedule — try again");
+          return;
+        }
+        setItems((prev) =>
+          prev.map((x) =>
+            x.id === r.id
+              ? {
+                  ...x,
+                  paused: !r.paused,
+                  scheduleRevision: (x.scheduleRevision ?? 1) + 1,
+                }
+              : x,
+          ),
+        );
+        toast(r.paused ? "Schedule resumed" : "Schedule paused");
+      } catch {
         toast("Couldn't update the schedule — try again");
-        return;
       }
-      setItems((prev) =>
-        prev.map((x) =>
-          x.id === r.id
-            ? {
-                ...x,
-                paused: !r.paused,
-                scheduleRevision: (x.scheduleRevision ?? 1) + 1,
-              }
-            : x,
-        ),
-      );
-      toast(r.paused ? "Schedule resumed" : "Schedule paused");
     },
     [],
   );
@@ -166,17 +170,21 @@ export function RoutinesClient({
   const remove = useCallback(
     async (r: RoutineView) => {
       if (!confirm(`Delete “${r.title}”?`)) return;
-      const res = await fetch(`/api/v1/routines/${r.id}`, {
-        method: "DELETE",
-        headers: { "If-Match": String(r.revision) },
-      });
-      if (!res.ok && res.status !== 204) {
+      try {
+        const res = await fetch(`/api/v1/routines/${r.id}`, {
+          method: "DELETE",
+          headers: { "If-Match": String(r.revision) },
+        });
+        if (!res.ok && res.status !== 204) {
+          toast("Couldn't delete it — try again");
+          return;
+        }
+        setItems((prev) => prev.filter((x) => x.id !== r.id));
+        toast("Deleted");
+        router.refresh();
+      } catch {
         toast("Couldn't delete it — try again");
-        return;
       }
-      setItems((prev) => prev.filter((x) => x.id !== r.id));
-      toast("Deleted");
-      router.refresh();
     },
     [router],
   );

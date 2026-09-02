@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Coffee, Gamepad2, Pause, Play, Plus, SkipForward } from "lucide-react";
 import { celebrate } from "./Celebration";
+import { toast } from "./Toast";
 import { companionLine, readCompanionPref, writeCompanionPref } from "@/lib/companion";
 
 /**
@@ -139,6 +140,9 @@ export function FocusClient({
   const [durationMin, setDurationMin] = useState(defaultDurationMin);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  /** Set when the initial hydrate fails for a non-auth reason — the idle
+   *  screen would silently claim no session exists. */
+  const [hydrateError, setHydrateError] = useState(false);
   /** Seconds past the target while the session keeps running (hyperfocus guard). */
   const [overtimeSec, setOvertimeSec] = useState(0);
   /** Post-session flow: null = none, else the finished session's focused minutes. */
@@ -214,12 +218,14 @@ export function FocusClient({
         });
         if (!res.ok) {
           setChecklist(checklist);
+          toast("Couldn't save that step — try again");
           return;
         }
         const updated = await res.json();
         if (updated?.revision != null) setChecklistRev(updated.revision);
       } catch {
         setChecklist(checklist);
+        toast("Couldn't save that step — try again");
       }
     },
     [activityId, checklist, checklistRev, occurrenceKey],
@@ -244,7 +250,9 @@ export function FocusClient({
         const res = await fetch("/api/v1/focus-sessions");
         if (stale()) return false;
         if (!res.ok) {
-          // 401 included: nothing to show, but stop blocking on the skeleton.
+          // 401 keeps the current behaviour (SignedInOnly guards the page);
+          // any other failure must not masquerade as "no session exists".
+          if (res.status !== 401) setHydrateError(true);
           setLoading(false);
           return false;
         }
@@ -256,16 +264,26 @@ export function FocusClient({
         } else {
           setSession(null);
         }
+        setHydrateError(false);
         setLoading(false);
         return true;
       } catch {
         /* offline */
-        if (!stale()) setLoading(false);
+        if (!stale()) {
+          setHydrateError(true);
+          setLoading(false);
+        }
         return false;
       }
     },
     [],
   );
+
+  const retryHydrate = useCallback(() => {
+    setHydrateError(false);
+    setLoading(true);
+    void hydrate();
+  }, [hydrate]);
 
   useEffect(() => {
     // Load active session after mount (auth-bound fetch; no SSR session object).
@@ -384,6 +402,7 @@ export function FocusClient({
       const data = await res.json();
       setSession(data.session);
       setRemainingSec(data.remainingSec);
+      setHydrateError(false);
       startAttemptRef.current = null;
     } catch {
       setError("You're offline. Reconnect and try again.");
@@ -436,6 +455,7 @@ export function FocusClient({
           return;
         }
         const data = await res.json();
+        setHydrateError(false);
         if (data.session.state === "completed") {
           // Post-session flow: celebrate, then offer a break / keep going / done.
           const focusedMin = Math.max(
@@ -484,6 +504,32 @@ export function FocusClient({
         <div className="mt-3 h-8 w-48 animate-pulse rounded-xl bg-surface-sunken" />
         <div className="mt-6 size-[232px] animate-pulse rounded-full border-[18px] border-surface-sunken sm:mt-10 sm:size-[300px]" />
         <div className="mt-10 h-12 w-40 animate-pulse rounded-2xl bg-surface-sunken" />
+      </div>
+    );
+  }
+
+  // ---- Hydrate failure (not a session problem) — offer a retry ----
+  if (!session && hydrateError) {
+    return (
+      <div className="mx-auto flex min-h-[calc(100dvh-6rem)] max-w-2xl flex-col items-center justify-center px-4 py-6 sm:py-10 md:min-h-dvh">
+        <section
+          role="alert"
+          className="w-full max-w-sm rounded-3xl border border-border bg-surface p-5 text-center shadow-card"
+        >
+          <p className="text-[13px] font-semibold text-danger">
+            Couldn&apos;t reach your focus session.
+          </p>
+          <p className="mt-1 text-[13px] text-ink-soft">
+            Nothing is lost — check the connection and try again.
+          </p>
+          <button
+            type="button"
+            onClick={retryHydrate}
+            className="mt-4 inline-flex min-h-11 items-center rounded-xl bg-iris px-5 py-2.5 text-[14px] font-semibold text-ink-inverse shadow-card transition-transform hover:scale-[1.03] focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+          >
+            Retry
+          </button>
+        </section>
       </div>
     );
   }

@@ -20,6 +20,7 @@ import {
   writeIntentions,
   type Intention,
 } from "@/lib/intentions";
+import { toast } from "./Toast";
 
 export function WeeklyIntentions({ weekStart }: { weekStart: string }) {
   const [items, setItems] = useState<Intention[]>([]);
@@ -28,30 +29,48 @@ export function WeeklyIntentions({ weekStart }: { weekStart: string }) {
   const [prefs, setPrefs] = useState<Record<string, unknown>>({});
   const [loaded, setLoaded] = useState(false);
   const [authed, setAuthed] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
+    let signedOut = false;
     fetch("/api/v1/settings")
       .then((r) => {
         if (r.status === 401) {
           setAuthed(false);
+          signedOut = true;
           return null;
         }
         return r.ok ? r.json() : null;
       })
       .then((s) => {
-        if (cancelled || !s) return;
+        if (cancelled) return;
+        if (!s) {
+          // 401 already renders the signed-out null; any other empty response
+          // is a load failure — show it instead of staying invisible forever.
+          if (!signedOut) {
+            setLoaded(true);
+            setLoadFailed(true);
+          }
+          return;
+        }
         setRevision(s.revision ?? null);
         const np = (s.notificationPrefs ?? {}) as Record<string, unknown>;
         setPrefs(np);
         setItems(parseIntentions(np, weekStart));
         setLoaded(true);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) {
+          setLoaded(true);
+          setLoadFailed(true);
+        }
+      });
     return () => {
       cancelled = true;
     };
-  }, [weekStart]);
+  }, [weekStart, retryKey]);
 
   async function persist(next: Intention[]) {
     setItems(next);
@@ -67,9 +86,12 @@ export function WeeklyIntentions({ weekStart }: { weekStart: string }) {
       if (res.ok) {
         const s = await res.json();
         if (s?.revision != null) setRevision(s.revision);
+      } else {
+        toast("Couldn't save it just now — kept on this device");
       }
     } catch {
-      /* offline — kept locally for this view */
+      // Offline — kept locally for this view, so say so instead of failing silently.
+      toast("Couldn't save it just now — kept on this device");
     }
   }
 
@@ -89,7 +111,29 @@ export function WeeklyIntentions({ weekStart }: { weekStart: string }) {
     void persist(removeIntention(items, i));
   }
 
+  function retryLoad() {
+    setLoadFailed(false);
+    setRetryKey((k) => k + 1);
+  }
+
   if (!authed || !loaded) return null;
+
+  if (loadFailed) {
+    return (
+      <section className="mb-6 rounded-3xl border border-dashed border-border bg-surface/60 p-5 text-center">
+        <p className="text-[14px] font-semibold text-ink-soft">
+          Couldn&apos;t load your intentions — they&apos;re safe on the server.
+        </p>
+        <button
+          type="button"
+          onClick={retryLoad}
+          className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-iris-soft px-4 py-2 text-[13px] font-semibold text-iris focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+        >
+          Retry
+        </button>
+      </section>
+    );
+  }
 
   return (
     <section className="mb-6 rounded-3xl border border-border bg-surface p-5 shadow-card">

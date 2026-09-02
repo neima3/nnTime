@@ -946,6 +946,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
                     <button
                       key={e}
                       type="button"
+                      aria-label={`Use ${e} as the icon`}
                       className="grid size-9 place-items-center rounded-lg text-lg hover:bg-surface-sunken"
                       onClick={() => {
                         setEmoji(e);

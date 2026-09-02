@@ -204,9 +204,29 @@ export function StatsClient() {
     completed: stats.byDate[d.key]?.completed ?? 0,
   }));
   const maxC = Math.max(1, ...last7.map((d) => d.completed));
+  const brandNew = stats.totalCompleted === 0;
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
+      {brandNew && (
+        <div className="sm:col-span-2">
+          <div className="grid place-items-center rounded-3xl border border-dashed border-border bg-surface/60 px-6 py-20 text-center">
+            <span
+              className="grid size-14 place-items-center rounded-2xl bg-iris-soft text-2xl"
+              aria-hidden
+            >
+              ✨
+            </span>
+            <p className="mt-4 font-display text-xl font-bold">
+              Nothing to reflect yet
+            </p>
+            <p className="mt-1.5 max-w-xs text-[14.5px] text-ink-soft">
+              Finish one planned thing and this page starts to fill in.
+            </p>
+          </div>
+        </div>
+      )}
+
       <RewardGarden
         totalCompleted={stats.totalCompleted}
         totalFocusMin={stats.totalFocusMin}

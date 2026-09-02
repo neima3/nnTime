@@ -135,10 +135,18 @@ export function DayRituals({
         });
         if (create.ok) copied++;
       }
-      toast(`Copied ${copied} from yesterday`);
-      dismiss("morning");
-      notifyDayChanged();
-      router.refresh();
+      // Only close the ritual when every copy landed — a partial copy is not
+      // a done day, and the card staying up is the retry affordance.
+      if (copied === toCopy.length) {
+        toast(`Copied ${copied} from yesterday`);
+        dismiss("morning");
+        notifyDayChanged();
+        router.refresh();
+      } else {
+        toast(
+          `Copied ${copied} of ${toCopy.length} — ${toCopy.length - copied} didn't make it, try again`,
+        );
+      }
     } catch {
       toast("Couldn't copy yesterday — try Plan my day instead");
     }
@@ -168,14 +176,18 @@ export function DayRituals({
         });
         if (res.ok) moved++;
       }
-      toast(
-        moved > 0
-          ? `Moved ${moved} to tomorrow — today is closed`
-          : "Nothing needed moving",
-      );
-      dismiss("evening");
-      notifyDayChanged();
-      router.refresh();
+      // Only close the day when everything moved — stranding items silently
+      // is exactly what this card exists to prevent.
+      if (moved === unfinished.length) {
+        toast(`Moved ${moved} to tomorrow — today is closed`);
+        dismiss("evening");
+        notifyDayChanged();
+        router.refresh();
+      } else {
+        toast(
+          `Moved ${moved} of ${unfinished.length} — ${unfinished.length - moved} didn't move, try again`,
+        );
+      }
     } catch {
       toast("Couldn't move everything — try the review flow");
     }

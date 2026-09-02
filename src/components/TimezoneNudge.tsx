@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation";
 import { Globe, Loader2 } from "lucide-react";
 import { detectTimezone } from "@/lib/timezone";
 import { getSettingsCached, invalidateSettingsCache } from "@/lib/settings-cache";
+import { toast } from "./Toast";
 import { notifyDayChanged } from "./NowBar";
 
 const DISMISS_KEY = "kairo-tz-nudge-dismissed";
@@ -46,6 +47,7 @@ export function TimezoneNudge({ zone }: { zone: string }) {
     try {
       const current = await getSettingsCached();
       if (!current) {
+        toast("Couldn't change the timezone — try again?");
         setPending(false);
         return;
       }
@@ -65,7 +67,17 @@ export function TimezoneNudge({ zone }: { zone: string }) {
         router.refresh();
         return;
       }
-    } catch {}
+      if (res.status === 409) {
+        // Someone changed settings elsewhere — drop the cached revision so the
+        // next attempt reads fresh, and leave the banner up to try again.
+        invalidateSettingsCache();
+        toast("Your settings changed elsewhere — we re-read them, try again");
+      } else {
+        toast("Couldn't change the timezone — try again?");
+      }
+    } catch {
+      toast("Couldn't change the timezone — try again?");
+    }
     setPending(false);
   };
 

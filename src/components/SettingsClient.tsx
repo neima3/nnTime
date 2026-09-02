@@ -498,40 +498,44 @@ export function SettingsClient({
       if (partial.notificationPrefs !== undefined)
         body.notificationPrefs = partial.notificationPrefs;
 
-      const res = await fetch("/api/v1/settings", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "If-Match": String(settings.revision),
-        },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        setStatus("Couldn't save your settings — try again");
-        return;
+      try {
+        const res = await fetch("/api/v1/settings", {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            "If-Match": String(settings.revision),
+          },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          setStatus("Couldn't save your settings — try again");
+          return;
+        }
+        invalidateSettingsCache();
+        const next = await res.json();
+        const s: Settings = {
+          timezone: next.timezone,
+          theme: next.theme,
+          reducedStimulation: next.reducedStimulation,
+          hourCycle: next.hourCycle,
+          weekStart: next.weekStart,
+          notificationPrefs:
+            (next.notificationPrefs as Record<string, unknown>) ?? {},
+          revision: next.revision,
+        };
+        setSettings(s);
+        if (partial.theme !== undefined) applyTheme(s.theme);
+        // Every time label reads this off <html>; republish so 12/24-hour takes
+        // effect across the app immediately instead of on the next full load.
+        if (partial.hourCycle !== undefined) publishHourCycle(toHourCycle(s.hourCycle));
+        // Reconcile against what the server actually stored — cheap, and it keeps
+        // the optimistic class from sticking around if a PATCH was rejected.
+        syncA11y(parseA11yPrefs(s));
+        setStatus("Saved");
+        setTimeout(() => setStatus(null), 1500);
+      } catch {
+        setStatus("Couldn't reach the server — try again?");
       }
-      invalidateSettingsCache();
-      const next = await res.json();
-      const s: Settings = {
-        timezone: next.timezone,
-        theme: next.theme,
-        reducedStimulation: next.reducedStimulation,
-        hourCycle: next.hourCycle,
-        weekStart: next.weekStart,
-        notificationPrefs:
-          (next.notificationPrefs as Record<string, unknown>) ?? {},
-        revision: next.revision,
-      };
-      setSettings(s);
-      if (partial.theme !== undefined) applyTheme(s.theme);
-      // Every time label reads this off <html>; republish so 12/24-hour takes
-      // effect across the app immediately instead of on the next full load.
-      if (partial.hourCycle !== undefined) publishHourCycle(toHourCycle(s.hourCycle));
-      // Reconcile against what the server actually stored — cheap, and it keeps
-      // the optimistic class from sticking around if a PATCH was rejected.
-      syncA11y(parseA11yPrefs(s));
-      setStatus("Saved");
-      setTimeout(() => setStatus(null), 1500);
     },
     [settings],
   );
@@ -564,19 +568,23 @@ export function SettingsClient({
   );
 
   const exportData = useCallback(async () => {
-    const res = await fetch("/api/v1/privacy/export");
-    if (!res.ok) {
-      setStatus("Couldn't export — sign in?");
-      return;
+    try {
+      const res = await fetch("/api/v1/privacy/export");
+      if (!res.ok) {
+        setStatus("Couldn't export — sign in?");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "kairo-export.json";
+      a.click();
+      URL.revokeObjectURL(url);
+      setStatus("Export downloaded");
+    } catch {
+      setStatus("Couldn't reach the server — try again?");
     }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "kairo-export.json";
-    a.click();
-    URL.revokeObjectURL(url);
-    setStatus("Export downloaded");
   }, []);
 
   const [deleteConfirm, setDeleteConfirm] = useState("");
@@ -617,16 +625,21 @@ export function SettingsClient({
       return;
     }
     setDeleteBusy(true);
-    const res = await fetch("/api/v1/privacy/account", {
-      method: "DELETE",
-      headers: { Confirm: "delete-my-account" },
-    });
-    setDeleteBusy(false);
-    if (!res.ok && res.status !== 204) {
-      setStatus("Couldn't delete your account — try again or reach out");
-      return;
+    try {
+      const res = await fetch("/api/v1/privacy/account", {
+        method: "DELETE",
+        headers: { Confirm: "delete-my-account" },
+      });
+      if (!res.ok && res.status !== 204) {
+        setStatus("Couldn't delete your account — try again or reach out");
+        return;
+      }
+      window.location.href = "/";
+    } catch {
+      setStatus("Couldn't reach the server — try again?");
+    } finally {
+      setDeleteBusy(false);
     }
-    window.location.href = "/";
   }, [deleteConfirm]);
 
   const linkGoogle = useCallback(() => {
@@ -716,6 +729,7 @@ export function SettingsClient({
           hint={THEME_HINTS[settings.theme]}
           right={
             <select
+              aria-label="Theme"
               value={settings.theme}
               onChange={(e) =>
                 void patch({
@@ -748,6 +762,7 @@ export function SettingsClient({
           label="Hour cycle"
           right={
             <select
+              aria-label="Hour cycle"
               value={settings.hourCycle}
               onChange={(e) =>
                 void patch({
@@ -765,6 +780,7 @@ export function SettingsClient({
           label="Week starts"
           right={
             <select
+              aria-label="Week starts"
               value={settings.weekStart}
               onChange={(e) => void patch({ weekStart: Number(e.target.value) })}
               className="rounded-xl border border-border bg-surface px-3 py-2 text-[13px] font-semibold"
@@ -939,6 +955,7 @@ export function SettingsClient({
           </p>
           <input
             type="url"
+            aria-label="ICS calendar URL"
             value={icsUrl}
             onChange={(e) => setIcsUrl(e.target.value)}
             placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"
