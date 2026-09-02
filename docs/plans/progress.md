@@ -75,10 +75,20 @@ build `bhmft2emhgmiqg0bc67qnunl`, status `finished` at 13:02Z.
 https://time.neima.me → 200, `/api/health` ok (migrate/db/ai/scheduler). The
 served stylesheet (`/_next/static/chunks/32avww4_6n4x6.css`) contains
 `no-scrollbar`, `max-height:820px`, `min-height:940px` and `line-clamp` —
-rules that exist only in this build. A follow-up commit (desktop header:
-switcher joins the title row via `md:contents`) was verified locally with the
-Today/Review/editor e2e specs and deployed the same way — see the line below
-this note once it landed.
+rules that exist only in this build. Follow-up `16547d0` (desktop header:
+the day switcher joins the title row via `md:contents`, verified locally
+with the Today/Review/editor e2e specs — 9 passed) → build
+`tupkdcd3q1aqeio9ltdvvgid`, `finished` 13:07Z; the stylesheet changed to
+`/_next/static/chunks/0iy-16wkbcn1b.css` and carries
+`md\:contents{display:contents}`. Live evidence with the prod QA account:
+`browser-qa/r92/before-live/` (old build — sidebar footer flush against the
+bottom edge at 1440×760, co-planner button clipped) vs
+`browser-qa/r92/after-live/`. CI run 33633015166 (first push) was superseded
+and cancelled by the second push; run **33633606682** on `16547d0`:
+`build-test` ✅ and `e2e` ✅ (both ~13:06Z); `native-contract` was still
+running on a cold runner at hand-off (~25 min in) — no Swift source changed
+this round, so a failure there would be runner health, not this SHA.
+Check: `gh run view 33633606682`.
 
 **Evidence** (`browser-qa/r92/`, git-ignored): `shoot.mjs` (Playwright,
 `PW_CHANNEL=chrome` when the bundled browser is missing) → `after/` = 30 shots
