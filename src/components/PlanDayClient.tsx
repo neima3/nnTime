@@ -72,6 +72,7 @@ export function PlanDayClient() {
     const [h, m] = start.split(":").map(Number);
     const mins = (h ?? 10) * 60 + (m ?? 0);
     const params = new URLSearchParams({
+      taskId: item.taskId,
       title: item.title ?? "Planned task",
       date: clientToday(),
       start: String(mins),

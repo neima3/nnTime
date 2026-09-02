@@ -6,6 +6,7 @@ import { Pause, Play, PlayCircle, Plus, Trash2 } from "lucide-react";
 import { clientToday } from "@/lib/client-date";
 import { useFocusTrap } from "@/lib/useFocusTrap";
 import { sendReplaySafeCreate } from "@/lib/offline-mutation";
+import { createdRoutineToView } from "@/lib/routine-editor-defaults";
 import { toast } from "./Toast";
 import { RoutinePlayer } from "./RoutinePlayer";
 
@@ -47,6 +48,11 @@ export function RoutinesClient({
 }) {
   const router = useRouter();
   const [items, setItems] = useState(initial);
+  const [prevInitial, setPrevInitial] = useState(initial);
+  if (initial !== prevInitial) {
+    setPrevInitial(initial);
+    setItems(initial);
+  }
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [emoji, setEmoji] = useState("🔁");
@@ -97,36 +103,43 @@ export function RoutinesClient({
       .filter(Boolean)
       .map((s) => ({ title: s, durationMin: 10 }));
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const delivery = await sendReplaySafeCreate({
-      path: "/api/v1/routines",
-      body: {
-        title: t,
-        emoji,
-        steps,
-        schedule: { tz, rrule: "FREQ=DAILY", paused: false },
-      },
-    });
-    setBusy(false);
-    if (delivery.state === "queued") {
-      toast("Saved on this device — your routine will appear when you’re back");
+    try {
+      const delivery = await sendReplaySafeCreate({
+        path: "/api/v1/routines",
+        body: {
+          title: t,
+          emoji,
+          steps,
+          schedule: { tz, rrule: "FREQ=DAILY", paused: false },
+        },
+      });
+      if (delivery.state === "queued") {
+        toast("Saved on this device — your routine will appear when you’re back");
+        closeDialog();
+        setTitle("");
+        setStepsText("");
+        return;
+      }
+      if (delivery.state === "unavailable") {
+        toast("You’re offline and this device couldn’t save the routine");
+        return;
+      }
+      if (!delivery.response.ok) {
+        toast("Couldn't create it — try again");
+        return;
+      }
+      const created = await delivery.response.json();
+      setItems((prev) => [createdRoutineToView(created, steps), ...prev]);
+      toast("Routine created");
       closeDialog();
       setTitle("");
       setStepsText("");
-      return;
+      router.refresh();
+    } catch {
+      toast("Couldn't reach the server — try again?");
+    } finally {
+      setBusy(false);
     }
-    if (delivery.state === "unavailable") {
-      toast("You’re offline and this device couldn’t save the routine");
-      return;
-    }
-    if (!delivery.response.ok) {
-      toast("Couldn't create it — try again");
-      return;
-    }
-    toast("Routine created");
-    closeDialog();
-    setTitle("");
-    setStepsText("");
-    router.refresh();
   }, [authed, title, emoji, stepsText, router, closeDialog]);
 
   const togglePause = useCallback(
@@ -192,7 +205,7 @@ export function RoutinesClient({
   const scheduleToday = useCallback(
     (r: RoutineView) => {
       const params = new URLSearchParams({
-        title: r.title,
+        routineId: r.id,
         date: clientToday(),
         start: String(8 * 60),
       });

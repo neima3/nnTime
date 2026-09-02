@@ -409,6 +409,11 @@ export function ActivityEditor(props: ActivityEditorProps) {
   const [revision, setRevision] = useState(props.initialRevision);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "failed">(
+    props.mode === "edit" && props.activityId && !props.initialTitle
+      ? "loading"
+      : "ready",
+  );
   const [showEmoji, setShowEmoji] = useState(false);
   const scheduleIdempotencyKey = useRef<string | null>(null);
   const [estimateRatio, setEstimateRatio] = useState<number | null>(null);
@@ -492,78 +497,90 @@ export function ActivityEditor(props: ActivityEditorProps) {
     if (props.initialTitle) return;
     let cancelled = false;
     (async () => {
-      const res = await fetch(`/api/v1/activities/${props.activityId}`);
-      if (!res.ok || cancelled) return;
-      const a = await res.json();
-      if (cancelled) return;
-      // The load lands after first paint, so anything already typed wins —
-      // otherwise a fast typist watches their title get wiped.
-      if (!textTouched.current) {
-        setTitle(a.title ?? "");
-        setNotes(a.notes ?? "");
-      }
-      setEmoji(a.emoji ?? "📋");
-      setDurationMin(a.durationMin ?? 45);
-      setEnergy(a.energy ?? null);
-      setPriority(a.priority ?? "none");
-      setRevision(a.revision);
-      const zone: string = a.tz ?? tz;
-      setTz(zone);
-      const parsed = parseRrule(a.rrule);
-      setRepeat(parsed.kind);
-      setRepeatN(parsed.n);
-      setCustomRrule(parsed.kind === "custom" ? a.rrule : null);
-      if (Array.isArray(a.checklistTemplate)) {
-        setSteps(normalizeEditorSteps(a.checklistTemplate));
-      }
-      setSaved({
-        rrule: a.rrule ?? null,
-        emoji: a.emoji ?? "📋",
-        categoryId: a.categoryId ?? null,
-        priority: a.priority ?? "none",
-        notes: a.notes ?? "",
-      });
-      setSeriesRepeats(Boolean(a.rrule));
-      if (a.categoryId) setServerCategoryId(a.categoryId as string);
+      try {
+        const res = await fetch(`/api/v1/activities/${props.activityId}`);
+        if (cancelled) return;
+        if (!res.ok) {
+          setLoadState("failed");
+          setError("Couldn't load this activity — reopen it from the day view?");
+          return;
+        }
+        const a = await res.json();
+        if (cancelled) return;
+        // The load lands after first paint, so anything already typed wins —
+        // otherwise a fast typist watches their title get wiped.
+        if (!textTouched.current) {
+          setTitle(a.title ?? "");
+          setNotes(a.notes ?? "");
+        }
+        setEmoji(a.emoji ?? "📋");
+        setDurationMin(a.durationMin ?? 45);
+        setEnergy(a.energy ?? null);
+        setPriority(a.priority ?? "none");
+        setRevision(a.revision);
+        const zone: string = a.tz ?? tz;
+        setTz(zone);
+        const parsed = parseRrule(a.rrule);
+        setRepeat(parsed.kind);
+        setRepeatN(parsed.n);
+        setCustomRrule(parsed.kind === "custom" ? a.rrule : null);
+        if (Array.isArray(a.checklistTemplate)) {
+          setSteps(normalizeEditorSteps(a.checklistTemplate));
+        }
+        setSaved({
+          rrule: a.rrule ?? null,
+          emoji: a.emoji ?? "📋",
+          categoryId: a.categoryId ?? null,
+          priority: a.priority ?? "none",
+          notes: a.notes ?? "",
+        });
+        setSeriesRepeats(Boolean(a.rrule));
+        if (a.categoryId) setServerCategoryId(a.categoryId as string);
 
-      /* Which day is open?
-       *
-       * The URL carries it when the caller knows (Today, Week). When it
-       * doesn't — a bare /app/editor?id= — resolve it from the day the user
-       * came from rather than guessing: the series' own dtstartLocal is the
-       * FIRST day, so a "just this time" edit would land on the wrong one.
-       */
-      let key = props.initialOccurrenceKey ?? null;
-      let startsAt: Date | null = null;
-      if (a.rrule && !key && props.initialDate) {
-        const day = await fetch(
-          `/api/v1/day/${props.initialDate}`,
-        ).catch(() => null);
-        if (day?.ok) {
-          const body = await day.json().catch(() => null);
-          const match = (body?.activities as { id: string; occurrenceKey: string; dtstartLocal: string }[] | undefined)
-            ?.find((row) => row.id === props.activityId);
-          if (match) {
-            key = match.occurrenceKey;
-            startsAt = new Date(match.dtstartLocal);
+        /* Which day is open?
+         *
+         * The URL carries it when the caller knows (Today, Week). When it
+         * doesn't — a bare /app/editor?id= — resolve it from the day the user
+         * came from rather than guessing: the series' own dtstartLocal is the
+         * FIRST day, so a "just this time" edit would land on the wrong one.
+         */
+        let key = props.initialOccurrenceKey ?? null;
+        let startsAt: Date | null = null;
+        if (a.rrule && !key && props.initialDate) {
+          const day = await fetch(
+            `/api/v1/day/${props.initialDate}`,
+          ).catch(() => null);
+          if (day?.ok) {
+            const body = await day.json().catch(() => null);
+            const match = (body?.activities as { id: string; occurrenceKey: string; dtstartLocal: string }[] | undefined)
+              ?.find((row) => row.id === props.activityId);
+            if (match) {
+              key = match.occurrenceKey;
+              startsAt = new Date(match.dtstartLocal);
+            }
           }
         }
-      }
-      if (cancelled) return;
-      if (key) setOccurrenceKey(key);
+        if (cancelled) return;
+        if (key) setOccurrenceKey(key);
 
-      // Show the day and time this occurrence actually sits at. Without this
-      // the editor opened every activity at its default 09:00 and saving
-      // moved it there.
-      if (!timeTouched.current && props.initialStartMin == null) {
-        const anchor =
-          startsAt ??
-          (key ? new Date(key) : null) ??
-          (a.dtstartLocal ? new Date(a.dtstartLocal) : null);
-        if (anchor && !Number.isNaN(anchor.getTime())) {
-          setDate(instantToLocalDateStr(anchor, zone));
-          setStartMin(dateToMinutesFromMidnight(anchor, zone));
+        // Show the day and time this occurrence actually sits at. Without this
+        // the editor opened every activity at its default 09:00 and saving
+        // moved it there.
+        if (!timeTouched.current && props.initialStartMin == null) {
+          const anchor =
+            startsAt ??
+            (key ? new Date(key) : null) ??
+            (a.dtstartLocal ? new Date(a.dtstartLocal) : null);
+          if (anchor && !Number.isNaN(anchor.getTime())) {
+            setDate(instantToLocalDateStr(anchor, zone));
+            setStartMin(dateToMinutesFromMidnight(anchor, zone));
+          }
         }
+        setLoadState("ready");
+      } catch {
+        if (cancelled) return;
+        setLoadState("failed");
+        setError("Couldn't load this activity — reopen it from the day view?");
       }
     })();
     return () => {
@@ -820,22 +837,27 @@ export function ActivityEditor(props: ActivityEditorProps) {
       }
       setSaving(true);
       setError(null);
-      const query =
-        editScope === "all"
-          ? "editScope=all"
-          : `editScope=${editScope}&occurrenceKey=${encodeURIComponent(occurrenceKey!)}`;
-      const res = await fetch(
-        `/api/v1/activities/${props.activityId}?${query}`,
-        { method: "DELETE", headers: { "If-Match": String(revision) } },
-      );
-      if (!res.ok && res.status !== 204) {
+      try {
+        const query =
+          editScope === "all"
+            ? "editScope=all"
+            : `editScope=${editScope}&occurrenceKey=${encodeURIComponent(occurrenceKey!)}`;
+        const res = await fetch(
+          `/api/v1/activities/${props.activityId}?${query}`,
+          { method: "DELETE", headers: { "If-Match": String(revision) } },
+        );
+        if (!res.ok && res.status !== 204) {
+          setError("Couldn't delete it — try again");
+          return;
+        }
+        setScopeAsk(null);
+        router.push(`/app/today?date=${date}`);
+        router.refresh();
+      } catch {
         setError("Couldn't delete it — try again");
+      } finally {
         setSaving(false);
-        return;
       }
-      setScopeAsk(null);
-      router.push(`/app/today?date=${date}`);
-      router.refresh();
     },
     [props.mode, props.activityId, revision, router, date, occurrenceKey],
   );
@@ -959,17 +981,26 @@ export function ActivityEditor(props: ActivityEditorProps) {
                 </div>
               )}
             </div>
-            <input
-              aria-label="Activity title"
-              value={title}
-              onChange={(e) => {
-                textTouched.current = true;
-                setTitle(e.target.value);
-              }}
-              placeholder="What are you doing?"
-              className="w-full rounded-2xl border border-border bg-surface-raised px-4 py-3.5 text-[17px] font-semibold outline-none focus:ring-2 focus:ring-iris"
-              autoFocus
-            />
+            {loadState === "loading" ? (
+              <p
+                className="w-full rounded-2xl border border-border bg-surface-raised px-4 py-3.5 text-[17px] font-semibold text-ink-faint"
+                aria-busy="true"
+              >
+                Loading…
+              </p>
+            ) : (
+              <input
+                aria-label="Activity title"
+                value={title}
+                onChange={(e) => {
+                  textTouched.current = true;
+                  setTitle(e.target.value);
+                }}
+                placeholder="What are you doing?"
+                className="w-full rounded-2xl border border-border bg-surface-raised px-4 py-3.5 text-[17px] font-semibold outline-none focus:ring-2 focus:ring-iris"
+                autoFocus
+              />
+            )}
           </div>
 
           <Field label="Category">
@@ -1367,7 +1398,11 @@ export function ActivityEditor(props: ActivityEditorProps) {
             <button
               type="button"
               onClick={save}
-              disabled={saving}
+              disabled={
+                saving ||
+                loadState !== "ready" ||
+                (props.mode === "edit" && revision == null)
+              }
               className="rounded-xl bg-iris px-6 py-2.5 text-[14px] font-semibold text-ink-inverse shadow-card transition-colors hover:bg-iris-deep disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
             >
               {saving ? "Saving…" : "Save"}

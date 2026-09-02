@@ -4,9 +4,16 @@ import { ActivityEditor } from "@/components/ActivityEditor";
 import { SignedOutCard } from "@/components/EmptyState";
 import { CalendarPlus } from "lucide-react";
 import { getSession } from "@/server/auth-session";
-import { getTask, listCategories, listChecklistItems } from "@/server/dal";
+import {
+  getTask,
+  listCategories,
+  listChecklistItems,
+  getRoutine,
+  listRoutineSteps,
+} from "@/server/dal";
 import { buildCategoryMap } from "@/lib/adapters";
 import { appReturnTo } from "@/lib/auth-return";
+import { routineToEditorDefaults } from "@/lib/routine-editor-defaults";
 
 /**
  * Activity editor route — create (?start=&date=) or edit (?id=).
@@ -20,6 +27,7 @@ export default async function EditorPage({
   const sp = await searchParams;
   const id = typeof sp.id === "string" ? sp.id : undefined;
   const taskId = typeof sp.taskId === "string" ? sp.taskId : undefined;
+  const routineId = typeof sp.routineId === "string" ? sp.routineId : undefined;
   const start = typeof sp.start === "string" ? Number(sp.start) : undefined;
   const date = typeof sp.date === "string" ? sp.date : undefined;
   const title = typeof sp.title === "string" ? sp.title : undefined;
@@ -31,6 +39,7 @@ export default async function EditorPage({
   const returnTo = appReturnTo("/app/editor", {
     id,
     taskId,
+    routineId,
     start: Number.isFinite(start) ? start : undefined,
     date,
     title,
@@ -42,6 +51,17 @@ export default async function EditorPage({
     session && taskId
       ? await getTask(session.userId, taskId).catch(() => null)
       : null;
+  const routine =
+    session && routineId
+      ? await getRoutine(session.userId, routineId).catch(() => null)
+      : null;
+  const routineSteps =
+    session && routine
+      ? await listRoutineSteps(session.userId, routine.id).catch(() => [])
+      : [];
+  const routineDefaults = routine
+    ? routineToEditorDefaults(routine, routineSteps)
+    : null;
   const categories = session
     ? await listCategories(session.userId)
     : [];
@@ -80,8 +100,11 @@ export default async function EditorPage({
           initialDate={date}
           initialOccurrenceKey={occurrenceKey}
           initialRepeats={repeats}
-          initialTitle={task?.title ?? title}
-          initialEmoji={task?.emoji ?? undefined}
+          initialTitle={task?.title ?? routineDefaults?.initialTitle ?? title}
+          initialEmoji={
+            task?.emoji ?? routineDefaults?.initialEmoji ?? undefined
+          }
+          initialDurationMin={routineDefaults?.initialDurationMin}
           initialCategoryKey={categoryKey}
           initialCategoryId={task?.categoryId ?? undefined}
           initialCategories={categories.map(({ id, key, label }) => ({
@@ -92,10 +115,14 @@ export default async function EditorPage({
           initialEnergy={task?.energy ?? undefined}
           initialPriority={task?.priority ?? undefined}
           initialNotes={task?.notes ?? undefined}
-          initialSteps={checklist.map((item) => ({
-            label: item.label,
-            done: item.done,
-          }))}
+          initialSteps={
+            checklist.length
+              ? checklist.map((item) => ({
+                  label: item.label,
+                  done: item.done,
+                }))
+              : routineDefaults?.initialSteps
+          }
         />
       </SignedInOnly>
     </AppShell>

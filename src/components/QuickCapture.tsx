@@ -9,7 +9,7 @@
  * chain-dumping. Voice uses the Web Speech API where the browser has it.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useFocusTrap } from "@/lib/useFocusTrap";
 import { Loader2, Mic, MicOff, PenLine, Sparkles, X } from "lucide-react";
 import { toast } from "./Toast";
@@ -57,6 +57,7 @@ function getSpeechRecognition(): (new () => SpeechRecognitionLike) | null {
 }
 
 export function QuickCapture() {
+  const router = useRouter();
   const hourCycle = useHourCycle();
   const pathname = usePathname();
   // The editor and Focus are capture/attention surfaces of their own; the
@@ -155,6 +156,72 @@ export function QuickCapture() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, close]);
 
+  const save = useCallback(
+    async (keepOpen: boolean) => {
+      const title = text.trim();
+      if (!title || saving) return;
+      setSaving(true);
+
+      try {
+        const delivery = await sendReplaySafeCreate({
+          path: "/api/v1/tasks",
+          body: { bucket: "inbox", title },
+        });
+        if (delivery.state === "queued") {
+          setSaving(false);
+          setText("");
+          setCaptured((n) => n + 1);
+          toast("Saved on this device — it'll land in your inbox when you're back");
+          window.dispatchEvent(new Event("kairo:inbox-changed"));
+          if (!keepOpen) setOpen(false);
+          return;
+        }
+        if (delivery.state === "unavailable") {
+          setSaving(false);
+          toast("You're offline and this device can't hold it — copy it somewhere safe");
+          return;
+        }
+
+        const res = delivery.response;
+        if (res.status === 401) {
+          toast("Sign in to capture thoughts");
+          setSaving(false);
+          return;
+        }
+        if (!res.ok) {
+          toast("Couldn't save — try again");
+          setSaving(false);
+          return;
+        }
+        const created = await res.json();
+        setSaving(false);
+        setText("");
+        setCaptured((n) => n + 1);
+        toast(`Captured — it's in your inbox`, {
+          actionLabel: "Undo",
+          onAction: () => {
+            void fetch(`/api/v1/tasks/${created.id}`, {
+              method: "DELETE",
+              headers: { "If-Match": String(created.revision) },
+            });
+          },
+        });
+        window.dispatchEvent(new Event("kairo:inbox-changed"));
+        router.refresh();
+        if (!keepOpen) {
+          setOpen(false);
+          setCaptured(0);
+        } else {
+          inputRef.current?.focus();
+        }
+      } catch {
+        toast("Couldn't save — try again");
+        setSaving(false);
+      }
+    },
+    [text, saving, router],
+  );
+
   /** "Magic add": parse the text; render a confirm chip. Never auto-saves. */
   const magicParse = useCallback(async () => {
     const input = text.trim();
@@ -168,17 +235,19 @@ export function QuickCapture() {
         body: JSON.stringify({ input }),
       });
       if (!res.ok) {
-        toast("Magic add is resting — captured as plain text instead");
-        setParsing(false);
+        toast("Magic add is resting — saving as plain text");
+        await save(false);
         return;
       }
       const draft = (await res.json()) as Proposal;
       setProposal(draft);
     } catch {
-      toast("Magic add is resting — captured as plain text instead");
+      toast("Magic add is resting — saving as plain text");
+      await save(false);
+    } finally {
+      setParsing(false);
     }
-    setParsing(false);
-  }, [text, parsing]);
+  }, [text, parsing, save]);
 
   /** Accept the AI proposal → scheduled activity or dated/loose task. */
   const acceptProposal = useCallback(async () => {
@@ -291,69 +360,6 @@ export function QuickCapture() {
       setListening(false);
     }
   }, [listening, stopListening]);
-
-  const save = useCallback(
-    async (keepOpen: boolean) => {
-      const title = text.trim();
-      if (!title || saving) return;
-      setSaving(true);
-
-      try {
-        const delivery = await sendReplaySafeCreate({
-          path: "/api/v1/tasks",
-          body: { bucket: "inbox", title },
-        });
-        if (delivery.state === "queued") {
-          setSaving(false);
-          setText("");
-          setCaptured((n) => n + 1);
-          toast("Saved on this device — it'll land in your inbox when you're back");
-          if (!keepOpen) setOpen(false);
-          return;
-        }
-        if (delivery.state === "unavailable") {
-          setSaving(false);
-          toast("You're offline and this device can't hold it — copy it somewhere safe");
-          return;
-        }
-
-        const res = delivery.response;
-        if (res.status === 401) {
-          toast("Sign in to capture thoughts");
-          setSaving(false);
-          return;
-        }
-        if (!res.ok) {
-          toast("Couldn't save — try again");
-          setSaving(false);
-          return;
-        }
-        const created = await res.json();
-        setSaving(false);
-        setText("");
-        setCaptured((n) => n + 1);
-        toast(`Captured — it's in your inbox`, {
-          actionLabel: "Undo",
-          onAction: () => {
-            void fetch(`/api/v1/tasks/${created.id}`, {
-              method: "DELETE",
-              headers: { "If-Match": String(created.revision) },
-            });
-          },
-        });
-        if (!keepOpen) {
-          setOpen(false);
-          setCaptured(0);
-        } else {
-          inputRef.current?.focus();
-        }
-      } catch {
-        toast("Couldn't save — try again");
-        setSaving(false);
-      }
-    },
-    [text, saving],
-  );
 
   return (
     <>

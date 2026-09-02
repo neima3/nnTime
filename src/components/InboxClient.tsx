@@ -4,7 +4,7 @@
  * Inbox write path — create / promote / delete (10× Phase 5).
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -61,6 +61,12 @@ export function InboxClient({
 }) {
   const router = useRouter();
   const [items, setItems] = useState(initialItems);
+  const [prevInitial, setPrevInitial] = useState(initialItems);
+  const inboxRefreshGuard = useRef(false);
+  if (initialItems !== prevInitial) {
+    setPrevInitial(initialItems);
+    setItems(initialItems);
+  }
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   /** Index into the old-items list while tending; null = not tending. */
@@ -79,6 +85,20 @@ export function InboxClient({
   const [groupMsg, setGroupMsg] = useState<string | null>(null);
   const signInHref = authPageHref("sign-in", "/app/inbox");
   const signUpHref = authPageHref("sign-up", "/app/inbox");
+
+  useEffect(() => {
+    inboxRefreshGuard.current = false;
+  }, [initialItems]);
+
+  useEffect(() => {
+    const onChanged = () => {
+      if (inboxRefreshGuard.current) return;
+      inboxRefreshGuard.current = true;
+      router.refresh();
+    };
+    window.addEventListener("kairo:inbox-changed", onChanged);
+    return () => window.removeEventListener("kairo:inbox-changed", onChanged);
+  }, [router]);
 
   const groupByPriority = useCallback(async () => {
     if (!authed) {

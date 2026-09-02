@@ -59,7 +59,7 @@ export function AnytimeRail({
           setSlotting(null);
           return;
         }
-        const res = await fetch("/api/v1/activities", {
+        const res = await fetch(`/api/v1/tasks/${item.id}/schedule`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -72,10 +72,6 @@ export function AnytimeRail({
           }),
         });
         if (!res.ok) throw new Error();
-        await fetch(`/api/v1/tasks/${item.id}`, {
-          method: "DELETE",
-          headers: { "If-Match": String(item.revision) },
-        });
         setItems((prev) => prev.filter((x) => x.id !== item.id));
         toast(`Slotted at ${formatTime(start, hourCycle)} — no deciding required`);
         notifyDayChanged();
@@ -91,6 +87,7 @@ export function AnytimeRail({
   const schedule = useCallback(
     (item: AnytimeItem) => {
       const params = new URLSearchParams({
+        taskId: item.id,
         title: item.title,
         date,
         start: String(10 * 60),
