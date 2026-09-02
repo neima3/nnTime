@@ -85,10 +85,11 @@ with the Today/Review/editor e2e specs — 9 passed) → build
 bottom edge at 1440×760, co-planner button clipped) vs
 `browser-qa/r92/after-live/`. CI run 33633015166 (first push) was superseded
 and cancelled by the second push; run **33633606682** on `16547d0`:
-`build-test` ✅ and `e2e` ✅ (both ~13:06Z); `native-contract` was still
-running on a cold runner at hand-off (~25 min in) — no Swift source changed
-this round, so a failure there would be runner health, not this SHA.
-Check: `gh run view 33633606682`.
+`build-test` ✅ and `e2e` ✅; its `native-contract` job was cancelled at
+19 min by the concurrency group when the docs-only pushes followed. The final
+run **33635572680** on `9b089c5` (same app code, docs only on top) is fully
+green: build-test ✅, e2e ✅, native-contract ✅ (21 min on a cold runner;
+the last green run took 12). Nothing in `ios/` changed this round.
 
 **Evidence** (`browser-qa/r92/`, git-ignored): `shoot.mjs` (Playwright,
 `PW_CHANNEL=chrome` when the bundled browser is missing) → `after/` = 30 shots
