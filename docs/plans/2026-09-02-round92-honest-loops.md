@@ -1,6 +1,9 @@
 # Round 92 — Honest loops (end-user polish across the core loops)
 
-Status: IN PROGRESS — 2026-09-02 (Fable, with grok-4.6 + glm-5.3-flash workers)
+Status: SHIPPED — 2026-09-02, live on https://time.neima.me at `16547d0`
+(Fable, with grok-4.6 + glm-5.3-flash workers). See progress.md for the
+deploy record; open follow-ups: Focus `activityOccurrenceId` linking (contract
+change), CSP Stages 2–3, B6-gated branches.
 
 > **Goal:** make the product Neima opens every morning look and function better
 > for an actual end user — no new surfaces, no new games, no new Today cards.
