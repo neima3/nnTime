@@ -210,7 +210,7 @@ export function StatsClient() {
     <div className="grid gap-4 sm:grid-cols-2">
       {brandNew && (
         <div className="sm:col-span-2">
-          <div className="grid place-items-center rounded-3xl border border-dashed border-border bg-surface/60 px-6 py-20 text-center">
+          <div className="grid place-items-center rounded-3xl border border-dashed border-border bg-surface/60 px-6 py-12 text-center">
             <span
               className="grid size-14 place-items-center rounded-2xl bg-iris-soft text-2xl"
               aria-hidden
