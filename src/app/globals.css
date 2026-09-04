@@ -203,6 +203,27 @@ body {
   animation: kairo-rise 0.32s var(--ease-spring) backwards;
 }
 
+/* Slow drift for the clay objects around the landing hero card. Purely
+   decorative; collapsed by reduced-motion (below) and reduced-stimulation. */
+@keyframes kairo-float {
+  0%,
+  100% {
+    translate: 0 0;
+    rotate: -2deg;
+  }
+  50% {
+    translate: 0 -10px;
+    rotate: 2deg;
+  }
+}
+.kairo-float,
+.kairo-float-late {
+  animation: kairo-float 7s ease-in-out infinite;
+}
+.kairo-float-late {
+  animation-delay: -3.5s;
+}
+
 /* Scroll reveal — elements start hidden+risen and settle into place once,
    staggered via inline --reveal-delay. Collapsed by reduced-motion (below)
    and by reduced-stimulation (the .reveal rule lives next to its kin). */
@@ -315,6 +336,8 @@ input:focus-visible,
 .reduced-stimulation .rise-in,
 .reduced-stimulation .sheet-up,
 .reduced-stimulation .kairo-particle,
+.reduced-stimulation .kairo-float,
+.reduced-stimulation .kairo-float-late,
 .reduced-stimulation .animate-pulse,
 .reduced-stimulation .motion-safe\:animate-pulse,
 .reduced-stimulation .animate-ping,
@@ -327,6 +350,13 @@ input:focus-visible,
   opacity: 1 !important;
   translate: 0 0 !important;
   transition: none !important;
+}
+
+/* Illustrated objects (Illustration.tsx) are decoration by definition — the
+   calmer interface simply doesn't have them. The words they sit beside carry
+   the meaning on their own. */
+.reduced-stimulation .kairo-illo {
+  display: none !important;
 }
 
 /* Skeletons and ping dots lose their animation above, so give them a settled

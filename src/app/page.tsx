@@ -14,6 +14,7 @@ import {
 import { catClasses } from "@/lib/mock";
 import { Reveal } from "@/components/Reveal";
 import { KairoMark } from "@/components/KairoMark";
+import { Illustration } from "@/components/Illustration";
 
 const heroBlocks = [
   { emoji: "🌤️", title: "Morning reset", time: "8:00 – 8:45", category: "butter" as const, done: true },
@@ -191,6 +192,14 @@ export default function LandingPage() {
             <div className="absolute size-[38rem] rounded-full border border-iris/5" />
           </div>
           <div className="absolute -inset-6 -z-10 rounded-[3rem] bg-iris-soft/60 blur-2xl" aria-hidden />
+          {/* clay objects drifting around the day card — the product's own
+              illustration language, not stock art (docs/design/illustrations.md) */}
+          <div className="kairo-float absolute -right-9 -top-12 z-10 hidden sm:block">
+            <Illustration name="focus-ring" size={116} glow="none" priority />
+          </div>
+          <div className="kairo-float-late absolute -bottom-9 -left-10 z-10 hidden sm:block">
+            <Illustration name="today-open" size={96} glow="none" priority />
+          </div>
           <div className="relative rounded-[2rem] border border-border bg-surface p-5 shadow-float">
             <div className="flex items-baseline justify-between px-1">
               <div>
@@ -439,7 +448,8 @@ export default function LandingPage() {
                 Growth a missed day can&apos;t undo
               </h3>
               <div className="mt-5 flex items-center gap-3.5">
-                <div className="grid size-16 shrink-0 place-items-center rounded-3xl bg-cat-mint/50 text-4xl">
+                <Illustration name="garden" size={84} glow="none" />
+                <div className="hidden size-16 shrink-0 place-items-center rounded-3xl bg-cat-mint/50 text-4xl [.reduced-stimulation_&]:grid">
                   <span aria-hidden>🌷</span>
                 </div>
                 <div>
@@ -568,10 +578,11 @@ export default function LandingPage() {
         <Ambient variant={1} />
         <div className="mx-auto w-full max-w-6xl px-5 py-20 text-center">
           <Reveal>
-            <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-iris text-ink-inverse shadow-float">
+            <Illustration name="mark" size={176} className="mx-auto" />
+            <span className="mx-auto hidden size-14 place-items-center rounded-2xl bg-iris text-ink-inverse shadow-float [.reduced-stimulation_&]:grid">
               <KairoMark size={28} />
             </span>
-            <h2 className="mx-auto mt-6 max-w-xl font-display text-3xl font-bold tracking-tight md:text-4xl">
+            <h2 className="mx-auto mt-4 max-w-xl font-display text-3xl font-bold tracking-tight md:text-4xl">
               A gentler way to plan the day starts here.
             </h2>
             <p className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed text-ink-soft">

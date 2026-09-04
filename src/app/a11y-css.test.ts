@@ -87,6 +87,9 @@ describe("accessibility mode CSS", () => {
       expect(css).toMatch(new RegExp(`\\.reduced-stimulation\\s+\\.${util}`));
     }
     expect(css).toMatch(/\.reduced-stimulation[\s\S]{0,400}animation:\s*none/);
+    expect(css).toMatch(
+      /\.reduced-stimulation\s+\.kairo-illo\s*\{[^}]*display:\s*none\s*!important/,
+    );
   });
 
   it("keeps spinners moving under reduced stimulation, just slower", () => {

@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CloudOff, X } from "lucide-react";
+import { Illustration } from "./Illustration";
 import {
   dismissTerminalMutations,
   getQueueSummary,
@@ -80,11 +81,13 @@ export function OfflineIndicator({ userId }: { userId: string | null }) {
       <div className="flex items-start gap-2.5 text-[13px] font-semibold">
         {terminal > 0 ? (
           <AlertTriangle size={17} className="mt-0.5 shrink-0 text-danger" />
+        ) : !online ? (
+          <>
+            <Illustration name="offline-cloud" size={44} glow="none" className="-my-2 -ml-1" />
+            <CloudOff size={17} className="mt-0.5 hidden shrink-0 text-danger [.reduced-stimulation_&]:block" />
+          </>
         ) : (
-          <CloudOff
-            size={17}
-            className={`mt-0.5 shrink-0 ${online ? "text-iris" : "text-danger"}`}
-          />
+          <CloudOff size={17} className="mt-0.5 shrink-0 text-iris" />
         )}
         <div className="min-w-0 flex-1">
           {terminal > 0 ? (

@@ -17,6 +17,7 @@ import { detectTimezone } from "@/lib/timezone";
 import { clientToday } from "@/lib/client-date";
 import { KairoMark } from "@/components/KairoMark";
 import { AmbientBackdrop } from "@/components/AmbientBackdrop";
+import { Illustration } from "@/components/Illustration";
 import { localMinutesToInstant } from "@/lib/adapters";
 import { useSession } from "@/lib/auth-client";
 import { authPageHref } from "@/lib/auth-return";
@@ -210,6 +211,7 @@ export default function OnboardingPage() {
 
           {step === 1 && (
             <div className="rise-in">
+              <Illustration name="sunrise" size={168} glow="peach" priority className="mx-auto mb-4 block" />
               <h1
                 ref={stepHeading}
                 tabIndex={-1}
@@ -251,6 +253,7 @@ export default function OnboardingPage() {
 
           {step === 2 && (
             <div className="rise-in">
+              <Illustration name="today-open" size={120} glow="sky" className="mx-auto mb-3 block" />
               <h1
                 ref={stepHeading}
                 tabIndex={-1}
@@ -337,6 +340,7 @@ export default function OnboardingPage() {
 
           {step === 3 && (
             <div className="rise-in">
+              <Illustration name="pick-for-me" size={132} glow="lilac" className="mx-auto mb-3 block" />
               <h1
                 ref={stepHeading}
                 tabIndex={-1}

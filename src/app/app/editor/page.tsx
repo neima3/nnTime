@@ -82,6 +82,7 @@ export default async function EditorPage({
           <div className="mx-auto max-w-2xl px-4 py-10 md:px-8">
             <SignedOutCard
               icon={CalendarPlus}
+              art="today-open"
               title="Plan after you sign in"
               body="Create activities, choose gentle reminders, and keep your plan synced across devices."
               returnTo={returnTo}

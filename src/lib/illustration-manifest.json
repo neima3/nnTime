@@ -1,0 +1,130 @@
+{
+  "capture": {
+    "w": 540,
+    "h": 705
+  },
+  "focus-ring": {
+    "w": 617,
+    "h": 517
+  },
+  "garden": {
+    "w": 511,
+    "h": 559
+  },
+  "inbox-clear": {
+    "w": 633,
+    "h": 550
+  },
+  "mark": {
+    "w": 681,
+    "h": 657
+  },
+  "offline-cloud": {
+    "w": 601,
+    "h": 503
+  },
+  "pick-for-me": {
+    "w": 527,
+    "h": 530
+  },
+  "play": {
+    "w": 720,
+    "h": 476
+  },
+  "review-rest": {
+    "w": 647,
+    "h": 629
+  },
+  "routines-loop": {
+    "w": 479,
+    "h": 513
+  },
+  "stats-seed": {
+    "w": 464,
+    "h": 667
+  },
+  "sunrise": {
+    "w": 629,
+    "h": 555
+  },
+  "tile-color-clash": {
+    "w": 256,
+    "h": 250
+  },
+  "tile-digit-span": {
+    "w": 256,
+    "h": 170
+  },
+  "tile-emoji-match": {
+    "w": 220,
+    "h": 256
+  },
+  "tile-grammar-snap": {
+    "w": 256,
+    "h": 221
+  },
+  "tile-green-light": {
+    "w": 133,
+    "h": 256
+  },
+  "tile-in-order": {
+    "w": 244,
+    "h": 256
+  },
+  "tile-letter-soup": {
+    "w": 220,
+    "h": 256
+  },
+  "tile-memory-trail": {
+    "w": 195,
+    "h": 256
+  },
+  "tile-night-sky": {
+    "w": 256,
+    "h": 243
+  },
+  "tile-number-hunt": {
+    "w": 256,
+    "h": 238
+  },
+  "tile-number-ladder": {
+    "w": 242,
+    "h": 256
+  },
+  "tile-odd-one-out": {
+    "w": 256,
+    "h": 225
+  },
+  "tile-pattern-tiles": {
+    "w": 256,
+    "h": 247
+  },
+  "tile-proof-it": {
+    "w": 199,
+    "h": 256
+  },
+  "tile-quick-tap": {
+    "w": 182,
+    "h": 256
+  },
+  "tile-spell-check": {
+    "w": 256,
+    "h": 223
+  },
+  "tile-steady-breath": {
+    "w": 256,
+    "h": 245
+  },
+  "tile-time-feel": {
+    "w": 171,
+    "h": 256
+  },
+  "today-open": {
+    "w": 466,
+    "h": 557
+  },
+  "week-quiet": {
+    "w": 720,
+    "h": 272
+  }
+}

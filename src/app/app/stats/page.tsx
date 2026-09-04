@@ -21,6 +21,7 @@ export default function StatsPage() {
           fallback={
             <SignedOutCard
               icon={BarChart3}
+              art="stats-seed"
               title="See your gentle numbers"
               body="Completions, focus time, soft streaks, and mood — described, never judged. Sign in to start collecting yours."
               returnTo="/app/stats"

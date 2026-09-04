@@ -36,6 +36,7 @@ import { AnytimeRail } from "@/components/AnytimeRail";
 import { instantToDateStr } from "@/server/temporal/zone";
 import { formatDayLabel, formatTime, toHourCycle, type HourCycle } from "@/lib/time-format";
 import { SignedOutCard } from "@/components/EmptyState";
+import { Illustration } from "@/components/Illustration";
 import { appReturnTo } from "@/lib/auth-return";
 import { getMagicLinkRedirectError } from "@/lib/auth-redirect-error";
 
@@ -250,6 +251,7 @@ export default async function TodayPage({
         <div className="mx-auto max-w-2xl px-4 py-10 md:px-8">
           <SignedOutCard
             icon={PenLine}
+            art="capture"
             title="Capture after you sign in"
             body="Sign in, and Kairo will bring you straight back to a blank quick capture."
             returnTo={appReturnTo("/app/today", { capture: 1 })}
@@ -471,25 +473,28 @@ export default async function TodayPage({
             )}
 
           {emptyDay ? (
-            <div className="grid place-items-center rounded-3xl border border-dashed border-border bg-surface/60 px-6 py-20 text-center">
-              <span
-                className="grid size-14 place-items-center rounded-2xl bg-iris-soft text-2xl"
-                aria-hidden
-              >
-                ✨
-              </span>
-              <p className="mt-4 font-display text-xl font-bold">Your day is clear</p>
+            <div className="grid place-items-center rounded-3xl border border-dashed border-border bg-surface/60 px-6 py-16 text-center">
+              <Illustration name="today-open" size={200} glow="peach" priority />
+              <p className="mt-3 font-display text-xl font-bold">Your day is clear</p>
               <p className="mt-1.5 max-w-xs text-[14.5px] text-ink-soft">
                 Nothing scheduled yet. Add your first activity and watch it take
                 shape on the timeline.
               </p>
-              <Link
-                href={`/app/editor?date=${date}&start=${9 * 60}`}
-                className="mt-5 inline-flex items-center gap-2 rounded-xl bg-iris px-5 py-2.5 text-sm font-semibold text-ink-inverse shadow-card hover:bg-iris-deep focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
-              >
-                <Plus size={16} />
-                Add activity
-              </Link>
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                <Link
+                  href={`/app/editor?date=${date}&start=${9 * 60}`}
+                  className="inline-flex items-center gap-2 rounded-xl bg-iris px-5 py-2.5 text-sm font-semibold text-ink-inverse shadow-card hover:bg-iris-deep focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+                >
+                  <Plus size={16} />
+                  Add activity
+                </Link>
+                <Link
+                  href="/app/templates"
+                  className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-semibold text-ink-soft shadow-card transition-colors hover:bg-surface-sunken hover:text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+                >
+                  Drop in a routine
+                </Link>
+              </div>
             </div>
           ) : (
             <TodayTimeline

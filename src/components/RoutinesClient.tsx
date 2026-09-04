@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Illustration } from "./Illustration";
 import { useRouter } from "next/navigation";
 import { Pause, Play, PlayCircle, Plus, Trash2 } from "lucide-react";
 import { clientToday } from "@/lib/client-date";
@@ -346,10 +347,8 @@ export function RoutinesClient({
         ))}
         {items.length === 0 && (
           <div className="rounded-3xl border border-dashed border-border px-6 py-12 text-center sm:col-span-2">
-            <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-iris-ghost text-xl" aria-hidden>
-              🔁
-            </span>
-            <p className="mt-3 text-[15px] font-semibold">No routines yet</p>
+            <Illustration name="routines-loop" size={176} glow="sky" className="mx-auto" />
+            <p className="mt-3 font-display text-lg font-bold">No routines yet</p>
             <p className="mx-auto mt-1 max-w-xs text-[13px] leading-relaxed text-ink-soft">
               A routine is a sequence you can drop into any day — mornings, wind-downs, gym blocks.
             </p>

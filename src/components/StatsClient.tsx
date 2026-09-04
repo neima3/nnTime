@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Illustration } from "./Illustration";
 import { BarChart3, Flame, RefreshCw } from "lucide-react";
 import { toast } from "./Toast";
 import { SignedOutCard, SkeletonCards } from "./EmptyState";
@@ -185,6 +186,7 @@ export function StatsClient() {
     return (
       <SignedOutCard
         icon={BarChart3}
+        art="stats-seed"
         title="See your gentle numbers"
         body="Completions, focus time, soft streaks, and mood — described, never judged. Sign in to start collecting yours."
         returnTo="/app/stats"
@@ -210,13 +212,8 @@ export function StatsClient() {
     <div className="grid gap-4 sm:grid-cols-2">
       {brandNew && (
         <div className="sm:col-span-2">
-          <div className="grid place-items-center rounded-3xl border border-dashed border-border bg-surface/60 px-6 py-12 text-center">
-            <span
-              className="grid size-14 place-items-center rounded-2xl bg-iris-soft text-2xl"
-              aria-hidden
-            >
-              ✨
-            </span>
+          <div className="grid place-items-center rounded-3xl border border-dashed border-border bg-surface/60 px-6 py-10 text-center">
+            <Illustration name="stats-seed" size={176} />
             <p className="mt-4 font-display text-xl font-bold">
               Nothing to reflect yet
             </p>

@@ -12,6 +12,7 @@
  */
 
 import { gardenState } from "@/lib/insights";
+import { Illustration } from "./Illustration";
 
 const MEADOW_BLOOMS = ["🌸", "🌼", "🌻", "🌷", "🪻", "🌺"];
 
@@ -43,7 +44,14 @@ export function RewardGarden({
         </p>
 
         <div className="mt-4 flex items-center gap-4">
-          <div className="grid size-20 shrink-0 place-items-center rounded-3xl bg-cat-mint/50 text-5xl">
+          {/* Seed → sprout in a pot; anything planted → the meadow. The emoji
+              tile returns under reduced-stimulation, where illustrations go. */}
+          <Illustration
+            name={points === 0 ? "stats-seed" : "garden"}
+            size={points === 0 ? 72 : 96}
+            glow="none"
+          />
+          <div className="hidden size-20 shrink-0 place-items-center rounded-3xl bg-cat-mint/50 text-5xl [.reduced-stimulation_&]:grid">
             <span aria-hidden>{stage.emoji}</span>
           </div>
           <div className="min-w-0">

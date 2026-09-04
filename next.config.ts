@@ -22,6 +22,8 @@ const nextConfig: NextConfig = {
     "/app/routines": ["./node_modules/postgres/**/*", "./node_modules/drizzle-orm/**/*", "./node_modules/better-auth/**/*"],
     "/api/auth/**/*": ["./node_modules/better-auth/**/*"],
     "/api/v1/**/*": ["./node_modules/postgres/**/*", "./node_modules/drizzle-orm/**/*", "./node_modules/better-auth/**/*"],
+    "/opengraph-image": ["./src/app/_og/**/*"],
+    "/twitter-image": ["./src/app/_og/**/*"],
   },
 };
 

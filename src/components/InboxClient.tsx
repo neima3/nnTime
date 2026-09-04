@@ -5,6 +5,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Illustration } from "./Illustration";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -580,8 +581,13 @@ export function InboxClient({
           );
         })}
         {items.length === 0 && (
-          <li className="rounded-2xl border border-dashed border-border px-4 py-10 text-center text-[14px] text-ink-soft">
-            Inbox is empty. Dump a thought above — head stays clear.
+          <li className="grid place-items-center rounded-3xl border border-dashed border-border px-4 py-10 text-center">
+            <Illustration name="inbox-clear" size={172} glow="lilac" />
+            <p className="mt-3 font-display text-lg font-bold">Head&apos;s clear</p>
+            <p className="mt-1 max-w-xs text-[14px] leading-relaxed text-ink-soft">
+              Nothing waiting here. Dump the next thought above the moment it
+              shows up — it lands here, not in your working memory.
+            </p>
           </li>
         )}
       </ul>

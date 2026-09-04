@@ -5,6 +5,7 @@
  */
 
 import { useCallback, useState } from "react";
+import { Illustration } from "./Illustration";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check, LogIn, SkipForward } from "lucide-react";
@@ -135,7 +136,13 @@ export function ReviewClient({
 
   if (!current) {
     return (
-      <div className="mx-auto flex max-w-lg flex-col items-center px-4 py-20 text-center">
+      <div className="mx-auto flex max-w-lg flex-col items-center px-4 py-16 text-center">
+        <Illustration
+          name={upcoming > 0 ? "today-open" : "review-rest"}
+          size={200}
+          glow={upcoming > 0 ? "peach" : "lilac"}
+          className="mb-2"
+        />
         <p className="font-display text-2xl font-bold">
           {upcoming > 0 ? "Nothing to review yet" : "All done ✨"}
         </p>

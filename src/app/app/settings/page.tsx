@@ -39,6 +39,7 @@ export default async function SettingsPage({
           fallback={
             <SignedOutCard
               icon={Palette}
+              art="week-quiet"
               title="Make Kairo yours"
               body="Theme, quiet notifications, reduced stimulation, calendars — sign in to personalize and sync across your devices."
               returnTo="/app/settings"

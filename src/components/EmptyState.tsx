@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { LogIn, type LucideIcon } from "lucide-react";
 import { authPageHref } from "@/lib/auth-return";
+import { Illustration, type IllustrationName } from "./Illustration";
+import manifest from "@/lib/illustration-manifest.json";
 
 /**
  * Shared signed-out + loading presentation for client screens.
@@ -9,12 +11,15 @@ import { authPageHref } from "@/lib/auth-return";
 
 export function SignedOutCard({
   icon: Icon,
+  art,
   title,
   body,
   returnTo,
   headingLevel = "h2",
 }: {
   icon: LucideIcon;
+  /** Clay illustration for the screen's moment; the icon is the fallback. */
+  art?: IllustrationName;
   title: string;
   body: string;
   returnTo: string;
@@ -24,9 +29,24 @@ export function SignedOutCard({
 
   return (
     <section className="mx-auto max-w-md rounded-3xl border border-border bg-surface px-6 py-10 text-center shadow-card">
-      <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-iris-ghost text-iris">
-        <Icon size={26} strokeWidth={2.2} />
-      </span>
+      {art ? (
+        <>
+          <Illustration
+            name={art}
+            size={manifest[art].w / manifest[art].h > 1.8 ? 240 : 148}
+            className="mx-auto"
+          />
+          {/* The icon tile stays as the calm-mode stand-in: illustrations are
+              removed under reduced-stimulation, so the card keeps its anchor. */}
+          <span className="mx-auto hidden size-14 place-items-center rounded-2xl bg-iris-ghost text-iris [.reduced-stimulation_&]:grid">
+            <Icon size={26} strokeWidth={2.2} />
+          </span>
+        </>
+      ) : (
+        <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-iris-ghost text-iris">
+          <Icon size={26} strokeWidth={2.2} />
+        </span>
+      )}
       <Heading className="mt-4 font-display text-xl font-bold tracking-tight">{title}</Heading>
       <p className="mx-auto mt-1.5 max-w-xs text-[14px] leading-relaxed text-ink-soft">{body}</p>
       <Link

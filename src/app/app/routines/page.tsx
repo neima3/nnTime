@@ -87,6 +87,7 @@ export default async function RoutinesPage() {
           <div className="mb-6">
             <SignedOutCard
               icon={Repeat2}
+              art="routines-loop"
               title="Build routines after you sign in"
               body="Turn the preview into your own gentle sequences, play each step, and keep them synced across devices."
               returnTo="/app/routines"

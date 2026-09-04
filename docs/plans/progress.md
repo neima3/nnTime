@@ -1,5 +1,50 @@
 # Progress log
 
+## 2026-09-03 — Round 93: Clay illustration language (Higgsfield) + OG card + brand icons
+
+Plan: `docs/plans/2026-09-03-round93-higgsfield-illustrations.md`. Art direction:
+`docs/design/illustrations.md`. Brief was "use higgsfield to make this entire app
+look and function better like a 10x developer. commit/push/deploy when done."
+Claude Code session `session_01PyXD1StF9x7uLGK2MLxpAt` generated the set and
+wired the surfaces, then died on a subscription lock mid-gate (OG 500,
+uncommitted). This session finished the gates and the ship.
+
+**What landed:**
+- 32 transparent WebP cutouts in `public/illustrations/` (the ◔ mark, 13
+  product moments, 18 arcade tiles) plus `<Illustration>` and a size manifest.
+  Same asset on light and dark; token glow behind it; `.reduced-stimulation`
+  removes every `.kairo-illo` (emoji/icon stand-ins stay).
+- Empty / signed-out art on Inbox, Today, Routines, Stats, Review, Focus,
+  Settings, editor, planner, offline banner, Reward Garden, onboarding, landing
+  hero floats + closer, Play header and game cards.
+- Social card: `opengraph-image.tsx` / `twitter-image.tsx` (ImageResponse, the
+  clay mark, Bricolage + Onest). `fetch(import.meta.url)` 500'd in Next 16 —
+  switched to `readFile` + `outputFileTracingIncludes` for standalone. Mark PNG
+  kept at 340px / ~38kB so the ImageResponse bundle stays under 500kB. Layout
+  stacks "Time you can / see." so the headline no longer collides with the mark.
+- PWA icons regenerated from the ◔ glyph (`scripts/brand-icons.mjs`);
+  `apple-touch-icon.png`; `metadataBase` for absolute OG URLs.
+- Proxy matcher skips `.webp` the same way it already skipped `.png`/`.svg`.
+- Landing floats wrap `hidden sm:block` on a parent — `Illustration`'s
+  `inline-block` was winning over `hidden` on the component itself.
+
+**Gates:** `pnpm lint`, `pnpm typecheck`, `pnpm test` — **158 files / 1389
+tests**, `pnpm build` green (`/opengraph-image` and `/twitter-image` prerender
+as static). Local OG curl: 200 `image/png` 1200×630. Browser evidence in
+`browser-qa/r93/` (git-ignored): landing desktop light+dark + closer, mobile
+landing (floats hidden), onboarding sunrise, Play tiles, signed-out Settings /
+Focus / Routines / Stats, reduced-stimulation (illustrations gone, emoji
+stand-ins on Play cards), Today (signed-in timeline still intact).
+
+**Honest notes:**
+- Leftover `kairo_eph_*` databases (~160) made `createEphemeralDb` hang past
+  the 60s hook timeout; dropping them recovered the suite. Not caused by this
+  round's code.
+- Dev-only Next overlay "1 Issue" is the existing CSP `eval()` warning
+  (`script-src` has no `unsafe-eval`). Production does not need eval.
+- Hex in `opengraph-image.tsx` is copied token values — satori cannot read
+  `globals.css`. Same exception as `scripts/brand-icons.mjs`.
+
 ## 2026-09-02 — Round 92: Honest loops — the app looks and works better for a person using it (Fable + grok-4.6 + glm-5.3-flash)
 
 Plan: `docs/plans/2026-09-02-round92-honest-loops.md` (+ `round92-agent-prompt.md`).

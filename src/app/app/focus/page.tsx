@@ -35,6 +35,7 @@ export default async function FocusPage({
           <div className="mx-auto max-w-2xl px-4 py-10 md:px-8">
             <SignedOutCard
               icon={Timer}
+              art="focus-ring"
               title="Focus after you sign in"
               body="Start a session, keep the timer in sync, and return to it from any Kairo screen."
               returnTo={returnTo}

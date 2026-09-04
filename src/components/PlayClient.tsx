@@ -15,6 +15,7 @@ import {
 } from "react";
 import dynamic from "next/dynamic";
 import { dailyThree, dailyThreeKey, readBest, type GameId } from "@/lib/games";
+import { hasIllustration, Illustration } from "./Illustration";
 
 /* Games load on tap, not with the arcade — the grid stays feather-light
    and each game's chunk (plus the quiz banks) arrives only when chosen. */
@@ -268,6 +269,38 @@ const SECTIONS: { label: string; blurb: string; games: GameCard[] }[] = [
 
 const ALL_GAMES = SECTIONS.flatMap((s) => s.games);
 
+/**
+ * Card art: the game's clay tile (docs/design/illustrations.md) on its tint,
+ * with the emoji as the reduced-stimulation stand-in — illustrations are
+ * removed in calm mode, and a bare tinted square reads as broken.
+ */
+function GameArt({
+  game,
+  size,
+  box,
+}: {
+  game: GameCard;
+  size: number;
+  box: string;
+}) {
+  const art = `tile-${game.id}`;
+  return (
+    <span
+      className={`grid shrink-0 place-items-center overflow-hidden ${box} ${game.tint}`}
+      aria-hidden
+    >
+      {hasIllustration(art) ? (
+        <>
+          <Illustration name={art} size={size} glow="none" className="scale-[1.12]" />
+          <span className="hidden [.reduced-stimulation_&]:inline">{game.emoji}</span>
+        </>
+      ) : (
+        game.emoji
+      )}
+    </span>
+  );
+}
+
 export function PlayClient() {
   const [active, setActive] = useState<GameId | null>(null);
   const [bests, setBests] = useState<Record<string, number | null>>({});
@@ -363,12 +396,7 @@ export function PlayClient() {
                 onClick={() => openGame(g.id)}
                 className="rise-in group flex items-center gap-3 rounded-2xl border border-iris/25 bg-surface px-4 py-3 text-left shadow-card transition-all hover:-translate-y-0.5 hover:shadow-float active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
               >
-                <span
-                  className={`grid size-9 shrink-0 place-items-center rounded-xl text-lg ${g.tint}`}
-                  aria-hidden
-                >
-                  {g.emoji}
-                </span>
+                <GameArt game={g} size={36} box="size-9 rounded-xl text-lg" />
                 <span className="min-w-0">
                   <span className="block truncate font-display text-[15px] font-bold">
                     {g.title}
@@ -404,12 +432,7 @@ export function PlayClient() {
                   className="rise-in group rounded-3xl border border-border bg-surface p-5 text-left shadow-card transition-all hover:-translate-y-0.5 hover:shadow-float active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
                 >
                   <div className="flex items-start justify-between">
-                    <span
-                      className={`grid size-12 place-items-center rounded-2xl text-2xl ${g.tint}`}
-                      aria-hidden
-                    >
-                      {g.emoji}
-                    </span>
+                    <GameArt game={g} size={54} box="size-14 rounded-2xl text-2xl" />
                     {best != null && (
                       <span className="tnum rounded-lg bg-surface-sunken px-2 py-1 text-[11px] font-bold text-ink-soft">
                         {g.bestLabel(best)}

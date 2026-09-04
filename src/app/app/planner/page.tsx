@@ -13,6 +13,7 @@ export default function PlannerPage() {
           <div className="mx-auto max-w-2xl px-4 py-10 md:px-8">
             <SignedOutCard
               icon={Sparkles}
+              art="capture"
               title="Plan with Kairo after you sign in"
               body="Turn your real Inbox into a gentle day plan while keeping every suggestion under your control."
               returnTo="/app/planner"
