@@ -45,9 +45,13 @@ stylesheet `/_next/static/chunks/19q-nm7201oqw.css` contains `kairo-illo` and
 1200×630 (161811 bytes, clay mark, "Time you can / see.");
 `/illustrations/mark.webp` 200. Live landing screenshot in `browser-qa/r93/`.
 
-CI run **33833915749** on `0d10c8a`: `build-test` ✅, `e2e` ✅;
-`native-contract` still running at the first live check (iOS job, ~20 min on a
-cold runner). Follow-up if it fails.
+CI: run **33833915749** on `0d10c8a` had `build-test` ✅ and `e2e` ✅; its
+`native-contract` was cancelled by the docs-push concurrency group. Run
+**33834649105** on the docs commit: `build-test` ✅, `native-contract` ✅, `e2e`
+❌ — one flake in `review-actions.spec.ts` around local midnight (Review only
+lists blocks whose end has passed; the spec seeded 00:05–00:15 × 15 min).
+Fixed in `da383b7`. Final run **33836083885** on `da383b7`: `build-test` ✅,
+`e2e` ✅ (53 passed, 1 skipped), `native-contract` ✅.
 
 **Honest notes:**
 - Leftover `kairo_eph_*` databases (~160) made `createEphemeralDb` hang past
