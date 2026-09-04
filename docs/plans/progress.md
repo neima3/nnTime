@@ -36,6 +36,19 @@ landing (floats hidden), onboarding sunrise, Play tiles, signed-out Settings /
 Focus / Routines / Stats, reduced-stimulation (illustrations gone, emoji
 stand-ins on Play cards), Today (signed-in timeline still intact).
 
+**Deployed + live-verified:** push of `0d10c8a` triggered Coolify webhook
+build `xxfa8ufqfvonvdkndk5bdvew`, status `finished`. https://time.neima.me → 200,
+`/api/health` ok (migrate/db/ai/scheduler). Unique-to-this-build markers:
+`kairo-illo`, `kairo-float`, `/illustrations/mark.webp` in the homepage HTML;
+stylesheet `/_next/static/chunks/19q-nm7201oqw.css` contains `kairo-illo` and
+`kairo-float`; `/opengraph-image` and `/twitter-image` return 200 `image/png`
+1200×630 (161811 bytes, clay mark, "Time you can / see.");
+`/illustrations/mark.webp` 200. Live landing screenshot in `browser-qa/r93/`.
+
+CI run **33833915749** on `0d10c8a`: `build-test` ✅, `e2e` ✅;
+`native-contract` still running at the first live check (iOS job, ~20 min on a
+cold runner). Follow-up if it fails.
+
 **Honest notes:**
 - Leftover `kairo_eph_*` databases (~160) made `createEphemeralDb` hang past
   the 60s hook timeout; dropping them recovered the suite. Not caused by this

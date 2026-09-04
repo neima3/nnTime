@@ -59,5 +59,4 @@ person is most likely to bounce (empty inbox, first day, first stats).
 - [x] Phase 3 cutouts + pipeline
 - [x] Phase 4 surfaces
 - [x] Phase 5 function
-- [x] Phase 6 gates (lint / typecheck / 158 files · 1389 tests / build).
-      Deploy record: see progress.md after the Coolify build finishes.
+- [x] Phase 6 gates + ship (see progress.md for the deploy record)
