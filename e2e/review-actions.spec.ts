@@ -15,8 +15,8 @@ test.use({
  * Scope title assertions to <main>. The now-bar (rendered as a sibling of
  * <main> in AppShell) also shows the current activity's title, so an unscoped
  * getByText matched twice and failed strict mode whenever the seeded block
- * happened to be happening right now — this spec seeds blocks at 00:05-00:15
- * local, so it only fired in the few minutes after local midnight.
+ * happened to be happening right now — this spec seeds one-minute blocks at
+ * 00:00–00:02 local so they have already ended after 00:03.
  */
 function reviewCard(page: import("@playwright/test").Page, title: string) {
   return page.locator("main").getByText(title);
@@ -41,7 +41,12 @@ test("authenticated Review decisions persist before celebrating", async ({
     const statuses: number[] = [];
 
     for (const [index, title] of activityTitles.entries()) {
-      const start = new Date(`${localDate}T00:${String(5 + index * 5).padStart(2, "0")}:00`);
+      // One-minute blocks at 00:00 / 00:01 / 00:02 local so they sit on
+      // today's date and have already ended for every CI minute after 00:03.
+      // (00:05–00:15 × 15 min used to miss the review window around midnight.)
+      const start = new Date(
+        `${localDate}T00:${String(index).padStart(2, "0")}:00`,
+      );
       const response = await fetch("/api/v1/activities", {
         method: "POST",
         headers: {
@@ -53,7 +58,7 @@ test("authenticated Review decisions persist before celebrating", async ({
           title,
           emoji: "🧭",
           dtstartLocal: start.toISOString(),
-          durationMin: 15,
+          durationMin: 1,
         }),
       });
       statuses.push(response.status);
@@ -62,6 +67,11 @@ test("authenticated Review decisions persist before celebrating", async ({
     return statuses;
   }, titles);
   expect(createStatuses).toEqual([201, 201, 201]);
+
+  await page.waitForFunction(() => {
+    const now = new Date();
+    return now.getHours() > 0 || now.getMinutes() >= 3;
+  });
 
   await gotoHydrated(page, "/app/review");
   await expect(reviewCard(page, titles[0]!)).toBeVisible();
