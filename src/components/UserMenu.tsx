@@ -75,7 +75,11 @@ export function UserMenu() {
           window.removeEventListener("online", retry);
           void signOut().catch(() => {});
         };
-        window.addEventListener("online", retry);
+        if (navigator.onLine) {
+          retry();
+        } else {
+          window.addEventListener("online", retry);
+        }
       }
     }
     router.push("/");

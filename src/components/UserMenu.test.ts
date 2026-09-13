@@ -59,6 +59,7 @@ describe("UserMenu", () => {
     const source = readFileSync(new URL("./UserMenu.tsx", import.meta.url), "utf8");
     expect(source).toContain("await signOut()");
     expect(source).toContain("addEventListener(\"online\", retry)");
+    expect(source).toContain("navigator.onLine");
     expect(source).toContain("router.push(\"/\")");
     expect(source.indexOf("try {")).toBeLessThan(source.indexOf("await signOut()"));
     expect(source.indexOf("await signOut()")).toBeLessThan(source.indexOf("router.push(\"/\")"));
