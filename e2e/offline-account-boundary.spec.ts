@@ -68,11 +68,16 @@ test("A→B switch after logout does not replay A's pending capture as B", async
     () => {},
   );
   await expect.poll(async () => {
-    const cookies = await context.cookies();
-    return cookies.filter((cookie) =>
-      cookie.name.includes("session") || cookie.name.includes("better-auth"),
-    ).length;
-  }, { timeout: 20_000 }).toBe(0);
+    const pending = await page.evaluate(() =>
+      sessionStorage.getItem("kairo-pending-sign-out"),
+    );
+    const cookies = (await context.cookies()).filter(
+      (cookie) =>
+        cookie.name.includes("session_token") ||
+        cookie.name.includes("session_data"),
+    );
+    return { pending, sessionCookies: cookies.map((cookie) => cookie.name) };
+  }, { timeout: 20_000 }).toEqual({ pending: null, sessionCookies: [] });
   expect(await readOfflineQueue(page)).toEqual([]);
   const leftover = await page.evaluate(() => {
     const keys: string[] = [];

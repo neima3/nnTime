@@ -1,4 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("./auth-client", () => ({
+  signOut: vi.fn(async () => {
+    throw new TypeError("Failed to fetch");
+  }),
+}));
+
 import {
   clearPendingSignOut,
   completeServerSignOut,
@@ -55,16 +62,17 @@ describe("pending sign-out", () => {
     expect(fetchMock).toHaveBeenLastCalledWith("/api/auth/sign-out", {
       method: "POST",
       credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
     });
   });
 
-  it("does not fire the server sign-out while still offline", async () => {
+  it("keeps the flag when the network request cannot complete", async () => {
     markPendingSignOut();
-    vi.stubGlobal("navigator", { onLine: false });
-    const fetchMock = vi.fn();
-    vi.stubGlobal("fetch", fetchMock);
-    await flushPendingSignOut();
-    expect(fetchMock).not.toHaveBeenCalled();
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    }));
+    await expect(flushPendingSignOut()).rejects.toThrow(/Failed to fetch/);
     expect(hasPendingSignOut()).toBe(true);
   });
 

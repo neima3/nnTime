@@ -33,11 +33,30 @@ export function clearPendingSignOut(): void {
   }
 }
 
-/** POST /api/auth/sign-out so the server can expire the HttpOnly cookie. */
+/** Expire the HttpOnly session cookie via the Better Auth sign-out route. */
 export async function completeServerSignOut(): Promise<void> {
+  try {
+    const { signOut } = await import("./auth-client");
+    const result = await signOut();
+    const error =
+      result && typeof result === "object" && "error" in result
+        ? (result as { error?: { message?: string } | null }).error
+        : null;
+    if (error) {
+      throw new Error(error.message ?? "sign-out failed");
+    }
+    clearPendingSignOut();
+    return;
+  } catch {
+    // Client helper can fail offline or on a stale chunk; the cookie-clearing
+    // POST is the source of truth.
+  }
+
   const res = await fetch("/api/auth/sign-out", {
     method: "POST",
     credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
   });
   if (!res.ok && res.status !== 400 && res.status !== 401) {
     throw new Error(`sign-out HTTP ${res.status}`);
@@ -47,15 +66,25 @@ export async function completeServerSignOut(): Promise<void> {
 
 export async function flushPendingSignOut(): Promise<void> {
   if (!hasPendingSignOut()) return;
-  if (typeof navigator !== "undefined" && !navigator.onLine) return;
+  // Do not trust navigator.onLine — Playwright can restore the network
+  // before the document's onLine flag and `online` event catch up.
   await completeServerSignOut();
 }
 
 export function initPendingSignOutFlush(): () => void {
-  const onOnline = () => {
+  const tryFlush = () => {
     void flushPendingSignOut().catch(() => {});
   };
-  window.addEventListener("online", onOnline);
-  void flushPendingSignOut().catch(() => {});
-  return () => window.removeEventListener("online", onOnline);
+  window.addEventListener("online", tryFlush);
+  window.addEventListener("pageshow", tryFlush);
+  const interval = window.setInterval(() => {
+    if (!hasPendingSignOut()) return;
+    tryFlush();
+  }, 400);
+  tryFlush();
+  return () => {
+    window.removeEventListener("online", tryFlush);
+    window.removeEventListener("pageshow", tryFlush);
+    window.clearInterval(interval);
+  };
 }
