@@ -22,6 +22,7 @@ import { catClasses, type CategoryId } from "@/lib/mock";
 import { clientToday } from "@/lib/client-date";
 import { authPageHref } from "@/lib/auth-return";
 import { sendReplaySafeCreate } from "@/lib/offline-mutation";
+import { mutationFailureMessage } from "@/lib/mutation-failure";
 import { toast } from "./Toast";
 import { PickForMe, type PickCandidate } from "./PickForMe";
 
@@ -175,7 +176,12 @@ export function InboxClient({
       }
       const res = delivery.response;
       if (!res.ok) {
-        setError("Couldn't add it — try again");
+        setError(
+          mutationFailureMessage(res.status, {
+            fallback: "Couldn't add it — try again",
+            unauthorized: "Sign in to capture",
+          }),
+        );
         setBusy(null);
         return;
       }
@@ -249,11 +255,14 @@ export function InboxClient({
               })();
             },
           });
-        } else if (res.status === 409 || res.status === 412) {
-          setError("That one changed somewhere else — reload and try again");
-          router.refresh();
         } else {
-          setError("Couldn't delete it — try again");
+          setError(
+            mutationFailureMessage(res.status, {
+              fallback: "Couldn't delete it — try again",
+              unauthorized: "Sign in to capture",
+            }),
+          );
+          if (res.status === 409 || res.status === 412) router.refresh();
         }
       } catch {
         setError("Couldn't reach the server — try again?");
@@ -295,7 +304,12 @@ export function InboxClient({
           return;
         }
         if (res.status !== 400 && res.status !== 422) {
-          setError("Couldn't move it — try again");
+          setError(
+            mutationFailureMessage(res.status, {
+              fallback: "Couldn't move it — try again",
+              unauthorized: "Sign in to capture",
+            }),
+          );
           return;
         }
         // Only a schema rejection (nothing changed server-side) is safe to

@@ -56,7 +56,18 @@ export async function POST(request: Request) {
         },
         { db },
       );
-      return Response.json(routine, { status: 201 });
+      const steps = await listRoutineSteps(userId, routine.id, { db });
+      const schedules = await listRoutineSchedules(userId, routine.id, { db });
+      return Response.json(
+        {
+          ...routine,
+          steps,
+          schedules,
+          stepCount: steps.length,
+          totalMin: sumRoutineDurationMinutes(steps),
+        },
+        { status: 201 },
+      );
     });
   });
 }

@@ -26,5 +26,12 @@ describe("Anytime rail scheduling adoption", () => {
     expect(slotIt).not.toContain('fetch("/api/v1/activities"');
     expect(slotIt).not.toContain('method: "DELETE"');
     expect(slotIt).toContain("Couldn't slot it — try Schedule instead");
+    expect(slotIt).toContain('"Idempotency-Key": key');
+    expect(slotIt).toContain("shouldRetainIdempotencyKey(res.status)");
+    expect(slotIt).toContain("slottingRef.current === item.id");
+    expect(slotIt).not.toContain("energy:");
+    expect(slotIt).not.toContain("priority:");
+    expect(slotIt).not.toContain("notes:");
+    expect(slotIt).not.toContain("checklistTemplate");
   });
 });

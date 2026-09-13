@@ -459,6 +459,57 @@ describe("scheduleTask atomic conversion", () => {
     expect(after).toEqual(before);
   });
 
+  itDb("inherits unspecified energy, priority, notes, and checklist from the source", async () => {
+    const task = await createTask(
+      userId,
+      {
+        bucket: "anytime",
+        title: "Slot-it inherit",
+        emoji: "📌",
+        priority: "high",
+        energy: "medium",
+        notes: "Keep these notes",
+      },
+      { db: env!.db },
+    );
+    await env!.db.insert(schema.checklistItems).values({
+      id: crypto.randomUUID(),
+      userId,
+      parentType: "task",
+      parentId: task.id,
+      label: "Pack the bag",
+      done: true,
+    });
+
+    const series = await scheduleTask(
+      userId,
+      task.id,
+      {
+        tz: "America/New_York",
+        dtstartLocal: new Date("2026-08-02T15:00:00.000Z"),
+        title: task.title,
+        durationMin: 30,
+        source: "manual",
+      },
+      { db: env!.db },
+    );
+
+    expect(series).toMatchObject({
+      title: "Slot-it inherit",
+      emoji: "📌",
+      energy: "medium",
+      priority: "high",
+      notes: "Keep these notes",
+      checklistTemplate: [{ label: "Pack the bag", done: true }],
+    });
+    const [source] = await env!.db
+      .select()
+      .from(schema.tasks)
+      .where(eq(schema.tasks.id, task.id));
+    expect(source).toMatchObject({ convertedTo: series.id });
+    expect(source?.deletedAt).toBeInstanceOf(Date);
+  });
+
   itDb("rolls the source claim back when series creation fails", async () => {
     const task = await createTask(
       userId,

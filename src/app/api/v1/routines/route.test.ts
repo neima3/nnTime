@@ -40,6 +40,13 @@ describe("POST /api/v1/routines", () => {
       title: "Morning reset",
       revision: 1,
     });
+    mocks.listRoutineSteps.mockResolvedValue([
+      { title: "Stretch", durationMin: 5 },
+      { title: "Plan", durationMin: 10 },
+    ]);
+    mocks.listRoutineSchedules.mockResolvedValue([
+      { id: "sched-1", revision: 1, rrule: "FREQ=DAILY" },
+    ]);
     mocks.withIdempotency.mockImplementation(
       async (
         _userId: string,
@@ -103,6 +110,21 @@ describe("POST /api/v1/routines", () => {
       { db: "transaction-db" },
     );
     expect(mocks.createRoutineSchedule).not.toHaveBeenCalled();
+    expect(mocks.listRoutineSteps).toHaveBeenCalledWith(
+      "user-1",
+      "01980000-7000-8000-8000-000000000001",
+      { db: "transaction-db" },
+    );
+    await expect(response.json()).resolves.toMatchObject({
+      id: "01980000-7000-8000-8000-000000000001",
+      steps: [
+        { title: "Stretch", durationMin: 5 },
+        { title: "Plan", durationMin: 10 },
+      ],
+      schedules: [{ id: "sched-1", revision: 1 }],
+      stepCount: 2,
+      totalMin: 15,
+    });
   });
 });
 

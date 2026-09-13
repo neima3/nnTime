@@ -42,6 +42,7 @@ describe("Routine → editor adoption", () => {
       "const togglePause = useCallback",
     );
     expect(create).toContain("createdRoutineToView(created, steps)");
+    expect(create).toContain("mutationFailureMessage(delivery.response.status");
     expect(create).toContain("Couldn't reach the server — try again?");
     expect(create).toContain("finally {");
     expect(create).toContain("setBusy(false)");

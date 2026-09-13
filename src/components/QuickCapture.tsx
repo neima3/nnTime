@@ -17,6 +17,7 @@ import { notifyDayChanged } from "./NowBar";
 import { localMinutesToInstant } from "@/lib/adapters";
 import { clientToday } from "@/lib/client-date";
 import { sendReplaySafeCreate } from "@/lib/offline-mutation";
+import { mutationFailureMessage } from "@/lib/mutation-failure";
 import { formatTime } from "@/lib/time-format";
 import { useHourCycle } from "@/lib/use-hour-cycle";
 
@@ -189,7 +190,12 @@ export function QuickCapture() {
           return;
         }
         if (!res.ok) {
-          toast("Couldn't save — try again");
+          toast(
+            mutationFailureMessage(res.status, {
+              fallback: "Couldn't save — try again",
+              unauthorized: "Sign in to capture thoughts",
+            }),
+          );
           setSaving(false);
           return;
         }

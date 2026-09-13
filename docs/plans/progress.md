@@ -1,5 +1,62 @@
 # Progress log
 
+## 2026-09-13 — P2.1 NO-GO: duplicate Save conversion flake
+
+GHA e2e [34783596327](https://github.com/neima3/nnTime/actions/runs/34783596327)
+failed `conversion-families` “lost schedule response and a duplicate save
+reuse one conversion” (62 pass / 1 fail). Playwright
+`Promise.all([save.click(), save.click()])` waited ~90s on a button that
+had already become disabled `Saving…`.
+
+**Fix:** `ActivityEditor` `savingRef` ignores a second commit while
+in-flight (same idea as Anytime `slottingRef`); retry still
+`leavePending()` so a lost response can reuse the Idempotency-Key.
+E2E now double-dispatches in one DOM task, force-clicks while pending,
+and asserts exactly one schedule POST / one destination.
+
+Same draft PR #2; no deploy; not P2.2.
+
+## 2026-09-13 — P2.1 capture, scheduling, and routines regression tour
+
+Task: `2026-09-13-core-workflows-plan.md` 2.1, from merged main `6aeef37`
+(PR #1). New branch; P0–P1.3 behavior kept. No deploy, no secrets.
+
+**What shipped:**
+- `scheduleTask` inherits unspecified energy/priority/notes/emoji/category
+  and the source checklist so Slot it cannot drop metadata.
+- Anytime Slot it sends a stable Idempotency-Key, ignores a duplicate click,
+  and maps 401/409/429/500/offline to truthful copy without leaving pending.
+- Editor conversion keeps the key on retryable failures (lost response / 429 /
+  5xx). Inbox/routine/capture families share the same status map.
+- Routine create returns the step + schedule bundle so Pause is available
+  immediately. Paused materializer ticks create no series.
+
+**Tests:** DAL inherit + paused double-tick; mutation-failure unit;
+Anytime/editor source pins (Round 92 pins kept). New e2e:
+`core-workflows-tour`, `conversion-families`, `routines-tour`,
+`mutation-families`. Focused Playwright (Chromium desktop):
+**14 passed / 0 failed** (`core-loop`, `inbox-schedule`, `review-actions`
+plus the four new specs).
+
+**Gates (this host):** `pnpm lint` 0, `pnpm typecheck` 0, `pnpm build` 0,
+`pnpm api:check-ios` 0, `pnpm api:check-ios-client` 0.
+CI-equivalent Vitest: **160 files passed / 1 failed** — **1409 passed,
+1 failed** (`swift package dump-package` in
+`ios-generated-client-adoption.test.ts`). `pnpm ios:release:preflight` 1
+(`plutil` ENOENT). Gates were not lowered.
+
+**CI:** First e2e on `fc10445` failed
+([34782880127](https://github.com/neima3/nnTime/actions/runs/34782880127)):
+`getByRole('alert')` collided with the Next route announcer, isolated
+`signUp` hit the 10/10min auth cap, and Review needed a TZ-local seed.
+`01a01b1` addresses those. Follow-up docs commit records Linux gate counts.
+
+**Not done:** Task 2.2 recurrence/DST/review-window. Linux host has no Swift;
+`native-contract` owns that compile. Jobs tick is 503 in production e2e
+without `CRON_SECRET` — materialize-twice lives in the DB suite. No deploy.
+
+**Next:** P2.2 or CoS review of this PR.
+
 ## 2026-09-13 — native-contract timestamp assertion triage
 
 Formal NO-GO on run [34778984403](https://github.com/neima3/nnTime/actions/runs/34778984403):
