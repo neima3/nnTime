@@ -325,7 +325,7 @@ final class KairoAPITransportTests: XCTestCase {
         )
         XCTAssertEqual(
             linked["occurrenceKey"] as? String,
-            "2026-07-28T14:00:00.000Z"
+            "2026-07-28T14:00:00Z"
         )
         XCTAssertEqual(starts[0].headers["idempotency-key"], stableKey)
         let adHoc = try starts[1].jsonBody()
