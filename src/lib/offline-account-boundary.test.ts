@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { IDBFactory } from "fake-indexeddb";
 import {
   adoptQueueUser,
+  clearSignedOutBarrier,
   enqueueMutation,
   executeMutation,
   flushQueue,
@@ -81,10 +82,12 @@ function jsonResponse(status: number, body: unknown = {}): Response {
 }
 
 beforeEach(() => {
+  clearSignedOutBarrier();
   installHarness();
 });
 
 afterEach(() => {
+  clearSignedOutBarrier();
   delete (globalThis as { localStorage?: Storage }).localStorage;
   delete (globalThis as { sessionStorage?: Storage }).sessionStorage;
   vi.useRealTimers();
@@ -127,6 +130,22 @@ describe("purgeUserCache and account switch", () => {
     vi.stubGlobal("navigator", { onLine: true });
     await flushQueue("user-b");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not re-remember a user that just signed out while the session is stale", async () => {
+    rememberUser("user-a");
+    await queueCapture("user-a", "Signing out");
+    await purgeUserCache("user-a");
+    await expect(adoptQueueUser("user-a")).resolves.toBeNull();
+    expect(peekRememberedUser()).toBeNull();
+    rememberUser("user-a");
+    expect(peekRememberedUser()).toBeNull();
+    await expect(adoptQueueUser(null)).resolves.toBeNull();
+    await expect(adoptQueueUser("user-a")).resolves.toBeNull();
+    expect(peekRememberedUser()).toBeNull();
+    clearSignedOutBarrier();
+    await expect(adoptQueueUser("user-a")).resolves.toBe("user-a");
+    expect(peekRememberedUser()).toBe("user-a");
   });
 
   it("keeps the remembered owner when the live session probe is empty", async () => {

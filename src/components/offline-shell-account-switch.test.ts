@@ -8,4 +8,9 @@ describe("OfflineShell account-boundary adoption", () => {
     expect(source).toContain("peekRememberedUser");
     expect(source).not.toContain("resolveQueueUser");
   });
+
+  it("clears the sign-out barrier only on a successful new auth", () => {
+    const source = readFileSync(new URL("./AuthForm.tsx", import.meta.url), "utf8");
+    expect(source).toContain("clearSignedOutBarrier");
+  });
 });

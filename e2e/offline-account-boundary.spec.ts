@@ -1,5 +1,5 @@
 /**
- * P3.1 — logout, expired session, and A→B isolation.
+ * P3.1 — logout + A→B isolation.
  * Isolated storage so we never sign the shared suite account out.
  */
 import { expect, test } from "@playwright/test";
@@ -20,111 +20,83 @@ test.use({
 
 test.setTimeout(90_000);
 
-test("logout with pending work purges queue, last-user, and onboarding draft", async ({
-  page,
-  context,
-}) => {
-  await signUp(page, "p31-logout");
-  const title = `Logout pending ${Date.now()}`;
-  await gotoHydrated(page, "/app/today");
-  await page.evaluate(() => {
-    localStorage.setItem("kairo:onboarding", JSON.stringify({ draft: "A leftover" }));
-  });
-
+async function captureInboxOffline(
+  page: import("@playwright/test").Page,
+  context: import("@playwright/test").BrowserContext,
+  title: string,
+) {
+  await gotoHydrated(page, "/app/inbox");
   await setBrowserOffline(page, context, true);
   await expect(page.getByText("You're offline")).toBeVisible({ timeout: 10_000 });
-  await page.keyboard.press("c");
-  await page.getByPlaceholder("One thought, then let it go…").fill(title);
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByPlaceholder("Get it out of your head…").fill(title);
+  await page.getByRole("button", { name: "Add" }).click();
   await expect(page.getByText("Saved on this device", { exact: false })).toBeVisible();
   await expect.poll(async () => (await readOfflineQueue(page)).length).toBe(1);
+}
 
-  await setBrowserOffline(page, context, false);
-  await page.getByRole("button", { name: "Sign out" }).click();
-  await page.waitForURL(/^\//, { timeout: 20_000 });
-
-  expect(await readOfflineQueue(page)).toEqual([]);
-  const leftover = await page.evaluate(() => ({
-    lastUser: localStorage.getItem("kairo-last-user"),
-    onboarding: localStorage.getItem("kairo:onboarding"),
-  }));
-  expect(leftover.lastUser).toBeNull();
-  expect(leftover.onboarding).toBeNull();
-});
-
-test("expired session keeps pending work and does not create it anonymously", async ({
+test("A→B switch after logout does not replay A's pending capture as B", async ({
   page,
   context,
-}) => {
-  await signUp(page, "p31-expiry");
-  const title = `Expiry pending ${Date.now()}`;
-  await gotoHydrated(page, "/app/today");
-
-  await setBrowserOffline(page, context, true);
-  await page.keyboard.press("c");
-  await page.getByPlaceholder("One thought, then let it go…").fill(title);
-  await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByText("Saved on this device", { exact: false })).toBeVisible();
-
-  const cookies = await context.cookies();
-  await context.clearCookies();
-  await setBrowserOffline(page, context, false);
-  await page.waitForTimeout(1500);
-
-  const queued = await readOfflineQueue(page);
-  expect(queued).toHaveLength(1);
-  expect(queued[0]).toMatchObject({ status: "pending" });
-
-  await context.addCookies(cookies);
-  await page.evaluate(() => window.dispatchEvent(new Event("online")));
-  await expect.poll(async () => (await readOfflineQueue(page)).length, {
-    timeout: 15_000,
-  }).toBe(0);
-  expect(
-    (await listTasks(page, "inbox")).filter((task) => task.title === title),
-  ).toHaveLength(1);
-});
-
-test("A→B switch does not replay A's pending capture as B", async ({
-  browser,
 }) => {
   const titleA = `Account A ${Date.now()}`;
   const titleB = `Account B ${Date.now()}`;
 
-  const contextA = await browser.newContext({
-    locale: "en-US",
-    timezoneId: "America/New_York",
-    serviceWorkers: "block",
+  await signUp(page, "p31-a");
+  await captureInboxOffline(page, context, titleA);
+  await page.evaluate(() => {
+    const userId = localStorage.getItem("kairo-last-user");
+    localStorage.setItem(
+      "kairo:onboarding",
+      JSON.stringify({ draft: "A leftover" }),
+    );
+    if (userId) {
+      localStorage.setItem(`kairo:${userId}:secret`, "private");
+      sessionStorage.setItem(`kairo:${userId}:widget`, "widget");
+    }
   });
-  const pageA = await contextA.newPage();
-  await signUp(pageA, "p31-a");
-  await gotoHydrated(pageA, "/app/today");
-  await setBrowserOffline(pageA, contextA, true);
-  await pageA.keyboard.press("c");
-  await pageA.getByPlaceholder("One thought, then let it go…").fill(titleA);
-  await pageA.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(pageA.getByText("Saved on this device", { exact: false })).toBeVisible();
-  await expect.poll(async () => (await readOfflineQueue(pageA)).length).toBe(1);
 
-  await setBrowserOffline(pageA, contextA, false);
-  await pageA.getByRole("button", { name: "Sign out" }).click();
-  await pageA.waitForURL(/^\//, { timeout: 20_000 });
-  expect(await readOfflineQueue(pageA)).toEqual([]);
+  // Purge while still offline so reconnect cannot flush A's capture first.
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect.poll(async () => (await readOfflineQueue(page)).length).toBe(0);
+  await setBrowserOffline(page, context, false);
+  await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible({
+    timeout: 20_000,
+  });
+  expect(await readOfflineQueue(page)).toEqual([]);
+  const leftover = await page.evaluate(() => {
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key) keys.push(key);
+    }
+    for (let i = 0; i < sessionStorage.length; i += 1) {
+      const key = sessionStorage.key(i);
+      if (key) keys.push(key);
+    }
+    return {
+      lastUser: localStorage.getItem("kairo-last-user"),
+      onboarding: localStorage.getItem("kairo:onboarding"),
+      personal: keys.filter(
+        (key) => key.endsWith(":secret") || key.endsWith(":widget"),
+      ),
+    };
+  });
+  expect(leftover.lastUser).toBeNull();
+  expect(leftover.onboarding).toBeNull();
+  expect(leftover.personal).toEqual([]);
 
-  await signUp(pageA, "p31-b");
-  await gotoHydrated(pageA, "/app/inbox");
-  await expect(pageA.getByText(titleA, { exact: true })).toHaveCount(0);
+  await signUp(page, "p31-b");
+  await gotoHydrated(page, "/app/inbox");
+  await expect(page.getByText(titleA, { exact: true })).toHaveCount(0);
   expect(
-    (await listTasks(pageA, "inbox")).filter((task) => task.title === titleA),
+    (await listTasks(page, "inbox")).filter((task) => task.title === titleA),
   ).toHaveLength(0);
 
-  await pageA.keyboard.press("c");
-  await pageA.getByPlaceholder("One thought, then let it go…").fill(titleB);
-  await pageA.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(pageA.getByText(titleB, { exact: true })).toBeVisible();
+  await page.getByPlaceholder("Get it out of your head…").fill(titleB);
+  await page.getByRole("button", { name: "Add" }).click();
+  await expect(page.getByText(titleB, { exact: true })).toBeVisible();
   expect(
-    (await listTasks(pageA, "inbox")).filter((task) => task.title === titleA),
+    (await listTasks(page, "inbox")).filter((task) => task.title === titleA),
   ).toHaveLength(0);
-  expect(await readOfflineQueue(pageA)).toEqual([]);
-  await contextA.close();
+  expect(await readOfflineQueue(page)).toEqual([]);
 });

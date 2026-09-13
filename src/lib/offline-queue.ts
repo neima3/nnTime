@@ -55,7 +55,17 @@ function dispatchQueueChanged(): void {
  */
 const LAST_USER_KEY = "kairo-last-user";
 
+/** The account we just signed out of. Live session can still report this id
+ *  until `signOut()` finishes — do not remember it again. */
+let signedOutUserId: string | null = null;
+
+/** Allow a later explicit sign-in (including the same account) to bind again. */
+export function clearSignedOutBarrier(): void {
+  signedOutUserId = null;
+}
+
 export function rememberUser(userId: string): void {
+  if (signedOutUserId === userId) return;
   try {
     localStorage.setItem(LAST_USER_KEY, userId);
   } catch {}
@@ -95,15 +105,22 @@ export function resolveQueueUser(userId: string | null | undefined): string | nu
 export async function adoptQueueUser(
   liveUserId: string | null | undefined,
 ): Promise<string | null> {
-  const previous = peekRememberedUser();
-  if (liveUserId) {
-    if (previous && previous !== liveUserId) {
-      await purgeUserCache(previous);
-    }
-    rememberUser(liveUserId);
-    return liveUserId;
+  if (!liveUserId) {
+    // Keep the sign-out barrier. A stale empty probe must not unlock
+    // rememberUser(A) on the next tick while cookies are still A's.
+    return peekRememberedUser();
   }
-  return previous;
+  if (liveUserId === signedOutUserId) {
+    return null;
+  }
+  signedOutUserId = null;
+  const previous = peekRememberedUser();
+  if (previous && previous !== liveUserId) {
+    await purgeUserCache(previous);
+    signedOutUserId = null;
+  }
+  rememberUser(liveUserId);
+  return liveUserId;
 }
 
 export interface QueuedMutation {
@@ -410,6 +427,7 @@ export async function purgeUserCache(userId: string): Promise<void> {
   if (peekRememberedUser() === userId) {
     forgetUser();
   }
+  signedOutUserId = userId;
   invalidateSettingsCache();
   invalidateStatsCache();
   dispatchQueueChanged();

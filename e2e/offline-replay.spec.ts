@@ -238,20 +238,34 @@ test("an offline capture survives reload and replays once after reconnect", asyn
   await page.getByPlaceholder("One thought, then let it go…").fill(title);
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(page.getByText("Saved on this device", { exact: false })).toBeVisible();
+  const beforeOffline = await queueRows(page);
+  expect(beforeOffline).toHaveLength(1);
+  const key = beforeOffline[0]!.idempotencyKey;
 
+  // Playwright cannot reload a document while the context is fully offline.
+  // Keep writes failing and allow the document to restart so IndexedDB is
+  // re-read from a fresh page — the same durability a cold start needs.
+  await page.route("**/api/v1/**", async (route) => {
+    if (["POST", "PATCH", "PUT", "DELETE"].includes(route.request().method())) {
+      await route.abort("failed");
+      return;
+    }
+    await route.continue();
+  });
+  await context.setOffline(false);
   await page.reload();
   await page.waitForSelector('html[data-hydrated="true"]');
-  await expect(page.getByText("You're offline")).toBeVisible({ timeout: 10_000 });
   await expect.poll(async () => (await queueRows(page)).length).toBe(1);
-  const before = await queueRows(page);
-  expect(before[0]).toMatchObject({
+  const afterRestart = await queueRows(page);
+  expect(afterRestart[0]).toMatchObject({
     method: "POST",
     path: "/api/v1/tasks",
     status: "pending",
+    idempotencyKey: key,
   });
-  const key = before[0]!.idempotencyKey;
 
-  await setOffline(page, context, false);
+  await page.unroute("**/api/v1/**");
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
   await expect.poll(async () => (await queueRows(page)).length, {
     timeout: 15_000,
   }).toBe(0);
@@ -345,4 +359,36 @@ test("an offline completion keeps a second-device title intact", async ({
   const done = after.find((row) => row.title === renamed);
   expect(done?.status).toBe("completed");
   expect(after.filter((row) => row.title === title)).toHaveLength(0);
+});
+
+test("an expired session keeps pending work and recovers after cookies return", async ({
+  page,
+  context,
+}) => {
+  const title = `Expiry pending ${Date.now()}`;
+  await gotoHydrated(page, "/app/inbox");
+
+  await setOffline(page, context, true);
+  await expect(page.getByText("You're offline")).toBeVisible({ timeout: 10_000 });
+  await page.getByPlaceholder("Get it out of your head…").fill(title);
+  await page.getByRole("button", { name: "Add" }).click();
+  await expect(page.getByText("Saved on this device", { exact: false })).toBeVisible();
+
+  const cookies = await context.cookies();
+  await context.clearCookies();
+  await setOffline(page, context, false);
+  await page.waitForTimeout(800);
+
+  const queued = await queueRows(page);
+  expect(queued).toHaveLength(1);
+  expect(queued[0]).toMatchObject({ status: "pending" });
+
+  await context.addCookies(cookies);
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await expect.poll(async () => (await queueRows(page)).length, {
+    timeout: 15_000,
+  }).toBe(0);
+  expect(
+    (await listTasks(page, "inbox")).filter((task) => task.title === title),
+  ).toHaveLength(1);
 });
