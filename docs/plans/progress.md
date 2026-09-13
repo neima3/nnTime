@@ -18,8 +18,22 @@ Task: `2026-09-13-core-workflows-plan.md` 2.1, from merged main `6aeef37`
 **Tests:** DAL inherit + paused double-tick; mutation-failure unit;
 Anytime/editor source pins (Round 92 pins kept). New e2e:
 `core-workflows-tour`, `conversion-families`, `routines-tour`,
-`mutation-families`. Existing `core-loop`, `inbox-schedule`, `review-actions`
-still the focused suite.
+`mutation-families`. Focused Playwright (Chromium desktop):
+**14 passed / 0 failed** (`core-loop`, `inbox-schedule`, `review-actions`
+plus the four new specs).
+
+**Gates (this host):** `pnpm lint` 0, `pnpm typecheck` 0, `pnpm build` 0,
+`pnpm api:check-ios` 0, `pnpm api:check-ios-client` 0.
+CI-equivalent Vitest: **160 files passed / 1 failed** — **1409 passed,
+1 failed** (`swift package dump-package` in
+`ios-generated-client-adoption.test.ts`). `pnpm ios:release:preflight` 1
+(`plutil` ENOENT). Gates were not lowered.
+
+**CI:** First e2e on `fc10445` failed
+([34782880127](https://github.com/neima3/nnTime/actions/runs/34782880127)):
+`getByRole('alert')` collided with the Next route announcer, isolated
+`signUp` hit the 10/10min auth cap, and Review needed a TZ-local seed.
+`01a01b1` addresses those. Follow-up docs commit records Linux gate counts.
 
 **Not done:** Task 2.2 recurrence/DST/review-window. Linux host has no Swift;
 `native-contract` owns that compile. Jobs tick is 503 in production e2e
