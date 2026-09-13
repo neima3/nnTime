@@ -1,5 +1,19 @@
 # Progress log
 
+## 2026-09-13 — native-contract timestamp assertion triage
+
+Formal NO-GO on run [34778984403](https://github.com/neima3/nnTime/actions/runs/34778984403):
+`KairoAPITransportTests.testStartFocusSendsPairedSelectorAndCallerOwnedIdempotencyKey`
+expected `occurrenceKey` `…14:00:00.000Z`. Generated `RFC3339DateTranscoder`
+encodes whole seconds (`…14:00:00Z`), same as activity PATCH `startAt` and
+scoped DELETE query keys. `KairoAPI.date` still parses both forms.
+
+Fix: `0aa88fd` — test assertion only. Selector + caller-owned Idempotency-Key
+kept. Production encoding unchanged.
+
+Green rerun: [34779807625](https://github.com/neima3/nnTime/actions/runs/34779807625)
+(`build-test`, `e2e`, `native-contract` including Test shipping application).
+
 ## 2026-09-13 — P1.3 client linkage + Mark done (same PR as P1.1/P1.2)
 
 Task: `2026-09-13-core-workflows-plan.md` 1.3, on
