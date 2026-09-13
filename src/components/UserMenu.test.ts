@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -52,5 +53,14 @@ describe("UserMenu", () => {
     expect(markup).toContain("animate-pulse");
     expect(markup).not.toContain("Ada Lovelace");
     expect(markup).not.toContain("Sign in");
+  });
+
+  it("still navigates home when signOut rejects offline", () => {
+    const source = readFileSync(new URL("./UserMenu.tsx", import.meta.url), "utf8");
+    expect(source).toContain("await signOut()");
+    expect(source).toContain("addEventListener(\"online\", retry)");
+    expect(source).toContain("router.push(\"/\")");
+    expect(source.indexOf("try {")).toBeLessThan(source.indexOf("await signOut()"));
+    expect(source.indexOf("await signOut()")).toBeLessThan(source.indexOf("router.push(\"/\")"));
   });
 });

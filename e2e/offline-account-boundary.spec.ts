@@ -59,6 +59,12 @@ test("A→B switch after logout does not replay A's pending capture as B", async
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect.poll(async () => (await readOfflineQueue(page)).length).toBe(0);
   await setBrowserOffline(page, context, false);
+  await expect.poll(async () => {
+    const cookies = await context.cookies();
+    return cookies.filter((cookie) =>
+      cookie.name.includes("session") || cookie.name.includes("better-auth"),
+    ).length;
+  }).toBe(0);
   await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible({
     timeout: 20_000,
   });

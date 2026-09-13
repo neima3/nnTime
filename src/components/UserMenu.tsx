@@ -63,7 +63,21 @@ export function UserMenu() {
     const userId = data?.user.id ?? contextUser?.id;
     if (userId) await purgeUserCache(userId).catch(() => {});
     forgetUser();
-    await signOut();
+    try {
+      await signOut();
+    } catch {
+      // Offline / dropped network: local purge already happened. Still leave
+      // the session UI so a later sign-in cannot inherit this account's queue.
+      // Retry the server sign-out once the device is back online so the
+      // session cookie does not survive as a credential leak.
+      if (typeof window !== "undefined") {
+        const retry = () => {
+          window.removeEventListener("online", retry);
+          void signOut().catch(() => {});
+        };
+        window.addEventListener("online", retry);
+      }
+    }
     router.push("/");
     router.refresh();
   }
