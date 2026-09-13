@@ -1,41 +1,32 @@
 # Progress log
 
-## 2026-09-13 — P0 readiness ledger + P1.1 focus occurrence ownership
+## 2026-09-13 — Production completion plans and Grokbot handoff (planning only)
 
-Plan pack (was untracked on the Mac tree, missing from `6d3000d` / origin):
-`docs/plans/2026-09-13-production-completion-program.md`,
-`2026-09-13-core-workflows.md`, `2026-09-13-production-release.md`,
-`2026-09-13-p0-readiness-ledger.md`.
+**Created:** `2026-09-13-production-completion-program.md`,
+`2026-09-13-core-workflows-plan.md`, `2026-09-13-production-release-plan.md`,
+and `2026-09-13-grokbot-development-prompt.md` in this directory.
 
-**What shipped (PR branch, not `main`):**
-- P0 ledger with actual gate exits. Gates were not lowered. Linux host has no
-  `plutil` / Xcode; those suites stay Mac/`native-contract` as CI already
-  splits them. Postgres was provisioned locally so DB integration tests run
-  instead of skip.
-- **P1.1:** `startFocusSession` now proves occurrence ownership
-  (`getOccurrence` + `user_id` + not tombstoned) **before** yielding the
-  caller's active session. Cross-user / unknown IDs throw `NotFoundError` and
-  leave the existing session running.
-- **P1.1b:** removed the swallowed `appendPlannerEvent(...).catch(() => {})`
-  on focus POST and terminal PATCH. Event-write failure now fails the request;
-  a same-transaction rollback keeps the prior active session.
+**Grounding:** inspected clean HEAD `6d3000d2a7d5580f581a5edf7911346f70103ec5`,
+original roadmap, ADRs 001–005, design foundations, deployment/owner gates,
+latest Round 92/93 records, parity implementation, focus service/routes and
+web/native callers, native test inventory and CI. Fresh parity command prints
+web 89.74% / iOS 86.93%; its `planned: 1` scoring is a planning convention,
+not fresh release evidence. Plans add a separate evidence-based audit.
 
-**Gates (this host, actual exits — see P0 ledger):**
-- `pnpm lint` **0**, `pnpm typecheck` **0**, `pnpm build` **0**.
-- CI-equivalent Vitest (excludes the two `plutil` files, same as
-  `build-test`): **1375 passed / 1 failed / 0 skipped** (157 files). The
-  single fail is `swift package dump-package` (no Swift on this Linux
-  agent). Baseline `pnpm test` on passwordless Postgres was 1239 / 6 / 144
-  — the 144 were DB skips, not passes.
-- New tests this branch: **8** (all executed).
+**Priorities:** validate focus occurrence ownership before adding cross-client
+linkage; prove event/retry consistency; complete core workflows and recovery;
+then security/CSP, operations, accessibility/performance, real provider/device
+proof and release acceptance. HealthKit is already implemented; its remaining
+physical interaction proof must not be confused with older exploration notes.
 
-**Not done:** P1.2 virtual-occurrence / web-native linkage. Web `FocusClient`
-and iOS `KairoAPI.startFocus` still send title/emoji/minutes only. No deploy.
-7B/8B still human-gated.
+**Scope/verification:** documentation only. No application code, credentials,
+production settings or planner data changed; no app gates/browser/device/live
+verification rerun; no commit/push/deploy/upload performed. Historical gates
+are labeled historical. Program checkboxes remain open, including 7B/8B.
 
-**Next step:** P1.2 — address or materialize a day-expanded occurrence by
-`(seriesId, occurrenceKey)` inside the focus-start transaction, then wire
-web + iOS. Do not guess a UUID for a virtual instance.
+**Next:** give Grokbot the dated prompt. Execute P0 baseline/ledger and P1 Task
+1.1's DB-backed occurrence-ownership regression; complete independent local
+work while preserving B1–B6 and explicit release authority boundaries.
 
 ## 2026-09-03 — Round 93: Clay illustration language (Higgsfield) + OG card + brand icons
 
