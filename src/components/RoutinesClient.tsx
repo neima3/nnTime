@@ -7,6 +7,7 @@ import { Pause, Play, PlayCircle, Plus, Trash2 } from "lucide-react";
 import { clientToday } from "@/lib/client-date";
 import { useFocusTrap } from "@/lib/useFocusTrap";
 import { sendReplaySafeCreate } from "@/lib/offline-mutation";
+import { mutationFailureMessage } from "@/lib/mutation-failure";
 import { createdRoutineToView } from "@/lib/routine-editor-defaults";
 import { toast } from "./Toast";
 import { RoutinePlayer } from "./RoutinePlayer";
@@ -126,7 +127,16 @@ export function RoutinesClient({
         return;
       }
       if (!delivery.response.ok) {
-        toast("Couldn't create it — try again");
+        const body = (await delivery.response.json().catch(() => null)) as {
+          error?: { message?: string };
+        } | null;
+        toast(
+          mutationFailureMessage(delivery.response.status, {
+            fallback: "Couldn't create it — try again",
+            unauthorized: "Sign in to save routines",
+            serverMessage: body?.error?.message,
+          }),
+        );
         return;
       }
       const created = await delivery.response.json();
@@ -159,7 +169,16 @@ export function RoutinesClient({
           },
         );
         if (!res.ok) {
-          toast("Couldn't update the schedule — try again");
+          const body = (await res.json().catch(() => null)) as {
+            error?: { message?: string };
+          } | null;
+          toast(
+            mutationFailureMessage(res.status, {
+              fallback: "Couldn't update the schedule — try again",
+              unauthorized: "Sign in to save routines",
+              serverMessage: body?.error?.message,
+            }),
+          );
           return;
         }
         setItems((prev) =>

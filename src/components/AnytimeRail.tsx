@@ -4,12 +4,16 @@
  * Anytime sidebar — schedule into editor or dismiss (complete) a task.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarPlus, Check, Wand2 } from "lucide-react";
 import { catClasses, type CategoryId } from "@/lib/mock";
 import { localMinutesToInstant } from "@/lib/adapters";
 import { nowMinutesInZone } from "@/lib/client-now";
+import {
+  mutationFailureMessage,
+  shouldRetainIdempotencyKey,
+} from "@/lib/mutation-failure";
 import { toast } from "./Toast";
 import { firstFreeSlot } from "@/lib/slots";
 import { notifyDayChanged } from "./NowBar";
@@ -43,25 +47,42 @@ export function AnytimeRail({
   const router = useRouter();
   const [items, setItems] = useState(initial);
   const [slotting, setSlotting] = useState<string | null>(null);
+  const slotKeys = useRef<Map<string, string>>(new Map());
+  const slottingRef = useRef<string | null>(null);
 
   /** Zero decisions: drop the task into the first real gap of the day. */
   const slotIt = useCallback(
     async (item: AnytimeItem) => {
       if (!authed || !zone) return;
+      if (slottingRef.current === item.id) return;
+      slottingRef.current = item.id;
       setSlotting(item.id);
       try {
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          toast(
+            mutationFailureMessage(null, {
+              fallback: "Couldn't slot it — try Schedule instead",
+              offlineNow: true,
+            }),
+          );
+          return;
+        }
         // "Now" in the account's planning zone — the busy ranges and the
         // instant we POST are both zone-local, so this must be too.
         const nowMin = nowMinutesInZone(zone);
         const start = firstFreeSlot(busy, nowMin, 30);
         if (start == null) {
           toast("Today's pretty full — tomorrow-you can have this one");
-          setSlotting(null);
           return;
         }
+        const key = slotKeys.current.get(item.id) ?? crypto.randomUUID();
+        slotKeys.current.set(item.id, key);
         const res = await fetch(`/api/v1/tasks/${item.id}/schedule`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Idempotency-Key": key,
+          },
           body: JSON.stringify({
             tz: zone,
             dtstartLocal: localMinutesToInstant(date, start, zone),
@@ -71,15 +92,33 @@ export function AnytimeRail({
             source: "manual",
           }),
         });
-        if (!res.ok) throw new Error();
+        if (!res.ok) {
+          if (!shouldRetainIdempotencyKey(res.status)) {
+            slotKeys.current.delete(item.id);
+          }
+          const body = (await res.json().catch(() => null)) as {
+            error?: { message?: string };
+          } | null;
+          toast(
+            mutationFailureMessage(res.status, {
+              fallback: "Couldn't slot it — try Schedule instead",
+              unauthorized: "Sign in to update Anytime",
+              serverMessage: body?.error?.message,
+            }),
+          );
+          return;
+        }
+        slotKeys.current.delete(item.id);
         setItems((prev) => prev.filter((x) => x.id !== item.id));
         toast(`Slotted at ${formatTime(start, hourCycle)} — no deciding required`);
         notifyDayChanged();
         router.refresh();
       } catch {
-        toast("Couldn't slot it — try Schedule instead");
+        toast("Couldn't reach the server — try again?");
+      } finally {
+        slottingRef.current = null;
+        setSlotting(null);
       }
-      setSlotting(null);
     },
     [authed, zone, busy, date, router, hourCycle],
   );

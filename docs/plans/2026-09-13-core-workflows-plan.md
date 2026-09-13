@@ -86,11 +86,11 @@ Exit: one scheduled occurrence remains identifiable across both clients, reloads
 
 Existing files: `src/components/QuickCapture.tsx`, `AnytimeRail.tsx`, `PlanDayClient.tsx`, `RoutinesClient.tsx`, `ActivityEditor.tsx`; `src/server/dal/tasks.ts`, `src/server/services/routine-materializer.ts`; `e2e/core-loop.spec.ts`, `inbox-schedule.spec.ts`, `review-actions.spec.ts`; task/routine DAL integration tests.
 
-- [ ] Seed a synthetic account and perform quick plain capture, failed AI parse fallback, Inbox edit, move to Anytime, schedule, focus, completion, and review. Assert persisted data after reload at each transition.
-- [ ] Exercise AI confirmation, Anytime schedule and slot-it independently. Each conversion leaves exactly one destination activity, consumes the source once, preserves checklist/tags/priority/notes and records history. Retry after a lost response and after a duplicate click.
-- [ ] Create a routine with multiple steps, apply “Use today,” schedule recurrence, pause it, then run materialization twice. Assert step preservation, correct duration, no duplicate instances and paused schedules produce no new work.
-- [ ] Inject 401/409/429/500 and offline failures at each mutation family. The input remains recoverable, controls leave pending state, a truthful error appears, and retry cannot double-write.
-- [ ] Add behavioral regressions only for missing coverage/reproduced failures. Preserve the Round 92 fixes instead of repeating them based on old findings.
+- [x] Seed a synthetic account and perform quick plain capture, failed AI parse fallback, Inbox edit, move to Anytime, schedule, focus, completion, and review. Assert persisted data after reload at each transition.
+- [x] Exercise AI confirmation, Anytime schedule and slot-it independently. Each conversion leaves exactly one destination activity, consumes the source once, preserves checklist/tags/priority/notes and records history. Retry after a lost response and after a duplicate click.
+- [x] Create a routine with multiple steps, apply “Use today,” schedule recurrence, pause it, then run materialization twice. Assert step preservation, correct duration, no duplicate instances and paused schedules produce no new work.
+- [x] Inject 401/409/429/500 and offline failures at each mutation family. The input remains recoverable, controls leave pending state, a truthful error appears, and retry cannot double-write.
+- [x] Add behavioral regressions only for missing coverage/reproduced failures. Preserve the Round 92 fixes instead of repeating them based on old findings.
 
 ### Task 2.2 — Recurrence, timezone and review correctness
 

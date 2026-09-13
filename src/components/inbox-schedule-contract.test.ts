@@ -21,5 +21,7 @@ describe("Inbox task scheduling adoption", () => {
     expect(editor).toContain("/api/v1/tasks/${props.sourceTaskId}/schedule");
     expect(editor).toContain("Task scheduling needs a connection");
     expect(editor).toContain("props.initialCategoryId");
+    expect(editor).toContain("shouldRetainIdempotencyKey(res.status)");
+    expect(editor).toContain("Couldn't schedule it — try again");
   });
 });

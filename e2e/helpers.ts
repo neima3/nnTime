@@ -74,6 +74,54 @@ export async function createActivity(
  */
 let capabilitiesCache: Promise<{ magicLink: boolean }> | null = null;
 
+type TaskRow = {
+  id: string;
+  title: string;
+  bucket: "inbox" | "anytime";
+  priority: "none" | "low" | "high";
+  energy: "low" | "medium" | "high" | null;
+  notes: string | null;
+  revision: number;
+  convertedTo: string | null;
+  deletedAt: string | null;
+};
+
+export async function listTasks(
+  page: Page,
+  bucket?: "inbox" | "anytime",
+): Promise<TaskRow[]> {
+  const path = bucket ? `/api/v1/tasks?bucket=${bucket}` : "/api/v1/tasks";
+  const res = await page.request.get(path);
+  expect(res.ok()).toBe(true);
+  const body = (await res.json()) as { items: TaskRow[] };
+  return body.items;
+}
+
+export async function listDayActivities(
+  page: Page,
+  date: string,
+): Promise<{ id: string; title: string; status: string; durationMin?: number }[]> {
+  const res = await page.request.get(`/api/v1/day/${date}`);
+  expect(res.ok()).toBe(true);
+  const body = (await res.json()) as {
+    activities: { id: string; title: string; status: string; durationMin?: number }[];
+  };
+  return body.activities;
+}
+
+export async function listChangeOps(page: Page): Promise<string[]> {
+  const res = await page.request.get("/api/v1/changes?cursor=0&limit=200");
+  expect(res.ok()).toBe(true);
+  const body = (await res.json()) as {
+    items: { entityType: string; op: string }[];
+  };
+  return body.items.map((item) => `${item.entityType}:${item.op}`);
+}
+
+export function planningToday(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+}
+
 export function authCapabilities(
   request: { get: (url: string) => Promise<{ json: () => Promise<unknown> }> },
 ): Promise<{ magicLink: boolean }> {

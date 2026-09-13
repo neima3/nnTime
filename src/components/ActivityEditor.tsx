@@ -23,6 +23,10 @@ import { nowMinutesInZone } from "@/lib/client-now";
 import { useFocusTrap } from "@/lib/useFocusTrap";
 import { sendReplaySafeCreate } from "@/lib/offline-mutation";
 import {
+  mutationFailureMessage,
+  shouldRetainIdempotencyKey,
+} from "@/lib/mutation-failure";
+import {
   buildChecklistTemplate,
   normalizeEditorSteps,
   type EditorStepInput,
@@ -681,12 +685,20 @@ export function ActivityEditor(props: ActivityEditorProps) {
             }),
           });
           if (!res.ok) {
-            scheduleIdempotencyKey.current = null;
-            const body = await res.json().catch(() => null);
+            if (!shouldRetainIdempotencyKey(res.status)) {
+              scheduleIdempotencyKey.current = null;
+            }
+            const body = (await res.json().catch(() => null)) as {
+              error?: { message?: string };
+            } | null;
             setError(
               res.status === 404
                 ? "This task was already moved or deleted. Return to Inbox and choose another."
-                : body?.error?.message ?? "Couldn't schedule it — try again",
+                : mutationFailureMessage(res.status, {
+                    fallback: "Couldn't schedule it — try again",
+                    unauthorized: "Sign in to save activities.",
+                    serverMessage: body?.error?.message,
+                  }),
             );
             setSaving(false);
             return;

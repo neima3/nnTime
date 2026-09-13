@@ -1,5 +1,32 @@
 # Progress log
 
+## 2026-09-13 — P2.1 capture, scheduling, and routines regression tour
+
+Task: `2026-09-13-core-workflows-plan.md` 2.1, from merged main `6aeef37`
+(PR #1). New branch; P0–P1.3 behavior kept. No deploy, no secrets.
+
+**What shipped:**
+- `scheduleTask` inherits unspecified energy/priority/notes/emoji/category
+  and the source checklist so Slot it cannot drop metadata.
+- Anytime Slot it sends a stable Idempotency-Key, ignores a duplicate click,
+  and maps 401/409/429/500/offline to truthful copy without leaving pending.
+- Editor conversion keeps the key on retryable failures (lost response / 429 /
+  5xx). Inbox/routine/capture families share the same status map.
+- Routine create returns the step + schedule bundle so Pause is available
+  immediately. Paused materializer ticks create no series.
+
+**Tests:** DAL inherit + paused double-tick; mutation-failure unit;
+Anytime/editor source pins (Round 92 pins kept). New e2e:
+`core-workflows-tour`, `conversion-families`, `routines-tour`,
+`mutation-families`. Existing `core-loop`, `inbox-schedule`, `review-actions`
+still the focused suite.
+
+**Not done:** Task 2.2 recurrence/DST/review-window. Linux host has no Swift;
+`native-contract` owns that compile. Jobs tick is 503 in production e2e
+without `CRON_SECRET` — materialize-twice lives in the DB suite. No deploy.
+
+**Next:** P2.2 or CoS review of this PR.
+
 ## 2026-09-13 — native-contract timestamp assertion triage
 
 Formal NO-GO on run [34778984403](https://github.com/neima3/nnTime/actions/runs/34778984403):

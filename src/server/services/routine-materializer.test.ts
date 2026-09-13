@@ -195,6 +195,51 @@ describe("ADR-004 routine materializer", () => {
     expect(sched!.nextRunAt).not.toBeNull();
   });
 
+  itDb("paused schedules produce no new work across a double tick", async () => {
+    const { scheduleId } = await seedRoutineWithSchedule({
+      steps: [
+        { title: "Water", durationMin: 5 },
+        { title: "Stretch", durationMin: 10 },
+        { title: "Plan", durationMin: 15 },
+      ],
+    });
+    await env!.db
+      .update(schema.routineSchedules)
+      .set({ paused: true, updatedAt: new Date() })
+      .where(eq(schema.routineSchedules.id, scheduleId));
+
+    const before = await env!.db
+      .select()
+      .from(schema.activitySeries)
+      .where(
+        and(
+          eq(schema.activitySeries.userId, userId),
+          eq(schema.activitySeries.source, "routine"),
+          isNull(schema.activitySeries.deletedAt),
+        ),
+      );
+    const oursBefore = before.filter((row) =>
+      row.sourceRef?.startsWith(`${scheduleId}|`),
+    ).length;
+
+    await materializeRoutines({ db: env!.db });
+    await materializeRoutines({ db: env!.db });
+
+    const after = await env!.db
+      .select()
+      .from(schema.activitySeries)
+      .where(
+        and(
+          eq(schema.activitySeries.userId, userId),
+          eq(schema.activitySeries.source, "routine"),
+          isNull(schema.activitySeries.deletedAt),
+        ),
+      );
+    expect(
+      after.filter((row) => row.sourceRef?.startsWith(`${scheduleId}|`)),
+    ).toHaveLength(oursBefore);
+  });
+
   itDb("sourceRef is scheduleId|occurrenceKey ISO", async () => {
     const { scheduleId } = await seedRoutineWithSchedule();
     await materializeRoutines({ db: env!.db });
