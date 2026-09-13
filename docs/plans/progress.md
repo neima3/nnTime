@@ -1,5 +1,21 @@
 # Progress log
 
+## 2026-09-13 — P2.1 NO-GO: duplicate Save conversion flake
+
+GHA e2e [34783596327](https://github.com/neima3/nnTime/actions/runs/34783596327)
+failed `conversion-families` “lost schedule response and a duplicate save
+reuse one conversion” (62 pass / 1 fail). Playwright
+`Promise.all([save.click(), save.click()])` waited ~90s on a button that
+had already become disabled `Saving…`.
+
+**Fix:** `ActivityEditor` `savingRef` ignores a second commit while
+in-flight (same idea as Anytime `slottingRef`); retry still
+`leavePending()` so a lost response can reuse the Idempotency-Key.
+E2E now double-dispatches in one DOM task, force-clicks while pending,
+and asserts exactly one schedule POST / one destination.
+
+Same draft PR #2; no deploy; not P2.2.
+
 ## 2026-09-13 — P2.1 capture, scheduling, and routines regression tour
 
 Task: `2026-09-13-core-workflows-plan.md` 2.1, from merged main `6aeef37`
