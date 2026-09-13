@@ -39,6 +39,7 @@ export {
   deleteActivitySeries,
   listOccurrences,
   listUserOccurrences,
+  getOccurrence,
   upsertOccurrence,
 } from "./activities";
 

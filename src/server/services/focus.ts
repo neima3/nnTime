@@ -17,7 +17,7 @@ import dbDefault from "../db";
 import type { Db } from "../dal";
 import * as schema from "../db/schema";
 import { and, eq, inArray } from "drizzle-orm";
-import { appendChangeLog, ConflictError } from "../dal";
+import { appendChangeLog, ConflictError, getOccurrence } from "../dal";
 
 export type FocusState = "running" | "paused" | "completed" | "skipped" | "cancelled";
 
@@ -51,6 +51,13 @@ export async function startFocusSession(
   // it would be released immediately and the sync cursor could skip this row.
   return db.transaction(async (tx) => {
     const tdb = tx as unknown as Db;
+
+    // ADR-005 SEC-01: prove occurrence ownership BEFORE yielding the caller's
+    // active session. A foreign / missing / tombstoned ID is 404 and must
+    // leave the existing session running.
+    if (input.activityOccurrenceId) {
+      await getOccurrence(userId, input.activityOccurrenceId, { db: tdb });
+    }
 
     // Yield any existing active session (two-device contention: the new one wins).
     await tdb

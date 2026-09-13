@@ -131,4 +131,35 @@ describe("PATCH /api/v1/focus-sessions/{id}", () => {
     });
     expect(mocks.transitionFocusSession).not.toHaveBeenCalled();
   });
+
+  it("fails a terminal transition when the planner event write fails (no swallow)", async () => {
+    mocks.transitionFocusSession.mockResolvedValue({
+      ...sessionRow,
+      state: "completed",
+    });
+    mocks.appendPlannerEvent.mockRejectedValue(
+      new Error("planner event write failed"),
+    );
+
+    const response = await PATCH(
+      new Request(
+        `https://time.neima.me/api/v1/focus-sessions/${sessionRow.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            "if-match": "2",
+            "idempotency-key": "01980000-7000-8000-8000-000000000099",
+          },
+          body: JSON.stringify({ action: "transition", state: "completed" }),
+        },
+      ),
+      { params: Promise.resolve({ id: sessionRow.id }) },
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({
+      error: { code: "internal", retryable: false },
+    });
+  });
 });

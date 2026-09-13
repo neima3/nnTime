@@ -18,6 +18,11 @@ import {
   getRemainingSec,
   getActiveSession,
 } from "./focus";
+import {
+  createActivitySeries,
+  upsertOccurrence,
+  NotFoundError,
+} from "../dal";
 
 let env: EphemeralDb | null = null;
 let dbAvailable = false;
@@ -197,6 +202,103 @@ describe("ADR-004 focus state machine", () => {
     expect(paused.state).toBe("paused");
     expect(paused.accumulatedPauseSec).toBe(0);
     expect(paused.currentIntervalStartedAt).not.toBeNull();
+  });
+});
+
+describe("P1.1 SEC-01: focus start occurrence ownership", () => {
+  const future = () => new Date(Date.now() + 60 * 60 * 1000);
+
+  async function materializeOccurrence(
+    ownerId: string,
+    title: string,
+  ) {
+    const series = await createActivitySeries(
+      ownerId,
+      {
+        tz: "America/New_York",
+        dtstartLocal: future(),
+        rrule: null,
+        title,
+        durationMin: 25,
+      },
+      { db: env!.db },
+    );
+    return upsertOccurrence(
+      ownerId,
+      series.id,
+      series.dtstartLocal,
+      { startAt: series.dtstartLocal, durationMin: series.durationMin },
+      { db: env!.db },
+    );
+  }
+
+  itDb("rejects another user's occurrence id and keeps the caller's active session", async () => {
+    const alice = userId;
+    const mallory = crypto.randomUUID();
+    await insertUser(env!.db, mallory, `mallory-${mallory}@test.com`);
+
+    const aliceSession = await startFocusSession(
+      alice,
+      { targetDurationMin: 25 },
+      { db: env!.db },
+    );
+    const malloryOcc = await materializeOccurrence(mallory, "Mallory block");
+
+    await expect(
+      startFocusSession(
+        alice,
+        {
+          targetDurationMin: 15,
+          activityOccurrenceId: malloryOcc.id,
+        },
+        { db: env!.db },
+      ),
+    ).rejects.toThrow(NotFoundError);
+
+    const active = await getActiveSession(alice, { db: env!.db });
+    expect(active?.id).toBe(aliceSession.id);
+    expect(active?.state).toBe("running");
+    expect(active?.targetDurationMin).toBe(25);
+    expect(active?.activityOccurrenceId).toBeNull();
+  });
+
+  itDb("rejects an unknown occurrence id and keeps the caller's active session", async () => {
+    const existing = await startFocusSession(
+      userId,
+      { targetDurationMin: 20 },
+      { db: env!.db },
+    );
+
+    await expect(
+      startFocusSession(
+        userId,
+        {
+          targetDurationMin: 10,
+          activityOccurrenceId: crypto.randomUUID(),
+        },
+        { db: env!.db },
+      ),
+    ).rejects.toThrow(NotFoundError);
+
+    const active = await getActiveSession(userId, { db: env!.db });
+    expect(active?.id).toBe(existing.id);
+    expect(active?.state).toBe("running");
+  });
+
+  itDb("starts against the caller's own materialized occurrence", async () => {
+    const occ = await materializeOccurrence(userId, "Owned block");
+    const session = await startFocusSession(
+      userId,
+      {
+        targetDurationMin: 25,
+        activityOccurrenceId: occ.id,
+      },
+      { db: env!.db },
+    );
+    expect(session.activityOccurrenceId).toBe(occ.id);
+    expect(session.state).toBe("running");
+    const active = await getActiveSession(userId, { db: env!.db });
+    expect(active?.id).toBe(session.id);
   });
 });
 

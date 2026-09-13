@@ -130,4 +130,27 @@ describe("/api/v1/focus-sessions wire responses", () => {
       { db: mocks.database },
     );
   });
+
+  it("fails the start when the planner event write fails (no swallow)", async () => {
+    mocks.startFocusSession.mockResolvedValue(sessionRow);
+    mocks.appendPlannerEvent.mockRejectedValue(
+      new Error("planner event write failed"),
+    );
+
+    const response = await POST(
+      new Request("https://time.neima.me/api/v1/focus-sessions", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": "01980000-7000-8000-8000-000000000099",
+        },
+        body: JSON.stringify({ targetDurationMin: 25 }),
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({
+      error: { code: "internal", retryable: false },
+    });
+  });
 });

@@ -21,6 +21,8 @@ import {
   getActivitySeries,
   listActivitySeries,
   listOccurrences,
+  getOccurrence,
+  upsertOccurrence,
   createRoutine,
   getRoutine,
   updateRoutine,
@@ -115,6 +117,22 @@ describe("SEC-01: activity series are scoped to their owner", () => {
     await expect(
       listOccurrences(mallory, series.id, { db: e.db }),
     ).rejects.toThrow(NotFoundError);
+  });
+
+  itDb("mallory cannot load alice's occurrence by id", async (e) => {
+    const series = await aliceSeries(e);
+    const occ = await upsertOccurrence(
+      alice,
+      series.id,
+      series.dtstartLocal,
+      { startAt: series.dtstartLocal, durationMin: series.durationMin },
+      { db: e.db },
+    );
+    await expect(
+      getOccurrence(mallory, occ.id, { db: e.db }),
+    ).rejects.toThrow(NotFoundError);
+    const owned = await getOccurrence(alice, occ.id, { db: e.db });
+    expect(owned.id).toBe(occ.id);
   });
 });
 

@@ -70,7 +70,7 @@ export async function POST(request: Request) {
             targetDurationMin: body.targetDurationMin,
             title: body.title,
           },
-        }, { db }).catch(() => {});
+        }, { db });
         const remainingSec = getRemainingSec({
           state: session.state as FocusState,
           startedAt: session.startedAt,

@@ -203,6 +203,28 @@ export async function deleteActivitySeries(
 /* Activity occurrences                                                       */
 /* -------------------------------------------------------------------------- */
 
+/** Load one occurrence the caller owns. Cross-user / missing / tombstoned → 404. */
+export async function getOccurrence(
+  userId: string,
+  id: string,
+  opts: { db?: Db } = {},
+) {
+  const db = opts.db ?? dbDefault;
+  const [occ] = await db
+    .select()
+    .from(schema.activityOccurrences)
+    .where(
+      and(
+        eq(schema.activityOccurrences.id, id),
+        eq(schema.activityOccurrences.userId, userId),
+        isNull(schema.activityOccurrences.deletedAt),
+      ),
+    )
+    .limit(1);
+  if (!occ) throw new NotFoundError("activity_occurrence");
+  return occ;
+}
+
 export async function listOccurrences(
   userId: string,
   seriesId: string,

@@ -84,7 +84,7 @@ export async function PATCH(
                   targetDurationMin: session.targetDurationMin,
                   elapsedMin,
                 },
-              }, { db }).catch(() => {});
+              }, { db });
             }
           } else {
             session = await extendFocusSession(

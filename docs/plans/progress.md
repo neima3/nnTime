@@ -1,5 +1,42 @@
 # Progress log
 
+## 2026-09-13 — P0 readiness ledger + P1.1 focus occurrence ownership
+
+Plan pack (was untracked on the Mac tree, missing from `6d3000d` / origin):
+`docs/plans/2026-09-13-production-completion-program.md`,
+`2026-09-13-core-workflows.md`, `2026-09-13-production-release.md`,
+`2026-09-13-p0-readiness-ledger.md`.
+
+**What shipped (PR branch, not `main`):**
+- P0 ledger with actual gate exits. Gates were not lowered. Linux host has no
+  `plutil` / Xcode; those suites stay Mac/`native-contract` as CI already
+  splits them. Postgres was provisioned locally so DB integration tests run
+  instead of skip.
+- **P1.1:** `startFocusSession` now proves occurrence ownership
+  (`getOccurrence` + `user_id` + not tombstoned) **before** yielding the
+  caller's active session. Cross-user / unknown IDs throw `NotFoundError` and
+  leave the existing session running.
+- **P1.1b:** removed the swallowed `appendPlannerEvent(...).catch(() => {})`
+  on focus POST and terminal PATCH. Event-write failure now fails the request;
+  a same-transaction rollback keeps the prior active session.
+
+**Gates (this host, actual exits — see P0 ledger):**
+- `pnpm lint` **0**, `pnpm typecheck` **0**, `pnpm build` **0**.
+- CI-equivalent Vitest (excludes the two `plutil` files, same as
+  `build-test`): **1375 passed / 1 failed / 0 skipped** (157 files). The
+  single fail is `swift package dump-package` (no Swift on this Linux
+  agent). Baseline `pnpm test` on passwordless Postgres was 1239 / 6 / 144
+  — the 144 were DB skips, not passes.
+- New tests this branch: **8** (all executed).
+
+**Not done:** P1.2 virtual-occurrence / web-native linkage. Web `FocusClient`
+and iOS `KairoAPI.startFocus` still send title/emoji/minutes only. No deploy.
+7B/8B still human-gated.
+
+**Next step:** P1.2 — address or materialize a day-expanded occurrence by
+`(seriesId, occurrenceKey)` inside the focus-start transaction, then wire
+web + iOS. Do not guess a UUID for a virtual instance.
+
 ## 2026-09-03 — Round 93: Clay illustration language (Higgsfield) + OG card + brand icons
 
 Plan: `docs/plans/2026-09-03-round93-higgsfield-illustrations.md`. Art direction:
