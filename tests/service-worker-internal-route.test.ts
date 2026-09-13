@@ -49,6 +49,28 @@ function loadWorker() {
 }
 
 describe("service worker internal route boundary", () => {
+  it("purges every old shared navigation cache on install and activation", async () => {
+    const { caches, listeners } = loadWorker();
+    let install: Promise<unknown> | undefined;
+    listeners.get("install")?.({
+      waitUntil: (work) => {
+        install = work;
+      },
+    });
+    await install;
+    expect(caches.delete).toHaveBeenCalledWith("kairo-v5-boundaries");
+    caches.delete.mockClear();
+
+    let activation: Promise<unknown> | undefined;
+    listeners.get("activate")?.({
+      waitUntil: (work) => {
+        activation = work;
+      },
+    });
+    await activation;
+    expect(caches.delete).toHaveBeenCalledWith("kairo-v5-boundaries");
+  });
+
   it("purges every old shared navigation cache on activation", async () => {
     const { caches, currentCache, listeners } = loadWorker();
     let activation: Promise<unknown> | undefined;

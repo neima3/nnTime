@@ -21,22 +21,25 @@ function isCacheablePublicAsset(request, url) {
   );
 }
 
+function evictForeignCaches() {
+  return caches.keys().then((keys) =>
+    Promise.all(
+      keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k)),
+    ),
+  );
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) => cache.addAll(APP_SHELL).catch(() => {})),
+    evictForeignCaches()
+      .then(() => caches.open(CACHE_VERSION))
+      .then((cache) => cache.addAll(APP_SHELL).catch(() => {}))
+      .then(() => self.skipWaiting()),
   );
-  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k)),
-      ),
-    ),
-  );
-  self.clients.claim();
+  event.waitUntil(evictForeignCaches().then(() => self.clients.claim()));
 });
 
 self.addEventListener("fetch", (event) => {

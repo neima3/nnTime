@@ -17,6 +17,11 @@ vi.mock("@/lib/offline-queue", () => ({
   purgeUserCache: vi.fn(),
 }));
 
+vi.mock("@/lib/pending-sign-out", () => ({
+  markPendingSignOut: vi.fn(),
+  completeServerSignOut: vi.fn(),
+}));
+
 import { AppSessionProvider } from "./AppSessionBoundary";
 import { UserMenu } from "./UserMenu";
 
@@ -57,11 +62,15 @@ describe("UserMenu", () => {
 
   it("still navigates home when signOut rejects offline", () => {
     const source = readFileSync(new URL("./UserMenu.tsx", import.meta.url), "utf8");
+    expect(source).toContain("markPendingSignOut");
+    expect(source).toContain("completeServerSignOut");
     expect(source).toContain("await signOut()");
-    expect(source).toContain("addEventListener(\"online\", retry)");
-    expect(source).toContain("navigator.onLine");
     expect(source).toContain("router.push(\"/\")");
-    expect(source.indexOf("try {")).toBeLessThan(source.indexOf("await signOut()"));
-    expect(source.indexOf("await signOut()")).toBeLessThan(source.indexOf("router.push(\"/\")"));
+    expect(source.indexOf("markPendingSignOut()")).toBeLessThan(
+      source.indexOf("await completeServerSignOut()"),
+    );
+    expect(source.indexOf("await completeServerSignOut()")).toBeLessThan(
+      source.indexOf("router.push(\"/\")"),
+    );
   });
 });

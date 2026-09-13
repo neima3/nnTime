@@ -43,9 +43,24 @@ test("upgrade evicts prior sensitive caches and never stores auth or private HTM
 
     await navigator.serviceWorker.register("/sw.js");
     await navigator.serviceWorker.ready;
-    await new Promise((resolve) => setTimeout(resolve, 250));
-
-    const afterActivate = await caches.keys();
+    if (navigator.serviceWorker.controller == null) {
+      await new Promise<void>((resolve) => {
+        navigator.serviceWorker.addEventListener(
+          "controllerchange",
+          () => resolve(),
+          { once: true },
+        );
+      });
+    }
+    const deadline = Date.now() + 8_000;
+    let afterActivate = await caches.keys();
+    while (
+      afterActivate.includes("kairo-v5-boundaries") &&
+      Date.now() < deadline
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      afterActivate = await caches.keys();
+    }
     await fetch("/api/auth/get-session", { cache: "reload" });
     await fetch("/app/today", {
       cache: "reload",

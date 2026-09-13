@@ -13,4 +13,9 @@ describe("OfflineShell account-boundary adoption", () => {
     const source = readFileSync(new URL("./AuthForm.tsx", import.meta.url), "utf8");
     expect(source).toContain("clearSignedOutBarrier");
   });
+
+  it("mounts the durable sign-out flusher on every page including landing", () => {
+    const source = readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
+    expect(source).toContain("PendingSignOutFlush");
+  });
 });
