@@ -1,5 +1,23 @@
 # Progress log
 
+## 2026-09-13 — P3.1 NO-GO: session cookie + stale SW cache
+
+Formal no-go on draft PR #4 (`017fcef`). Same branch. No deploy.
+
+**Cookie:** Offline Sign out purged the queue and showed Sign in, but the
+HttpOnly `better-auth` session cookie survived reconnect because the
+in-memory retry died with the landing fallback navigation.
+Fix: durable `kairo-pending-sign-out` + root `PendingSignOutFlush` that
+POSTs `/api/auth/sign-out` until the cookie expires; hard-navigate home
+when the server call cannot complete.
+
+**SW:** `kairo-v5-boundaries` stayed beside `kairo-v6-private-shell`
+because activate eviction could race `ready`. Evict foreign caches on
+both install and activate (`skipWaiting` / `claim` inside `waitUntil`).
+
+**Verify:** lint/typecheck 0. A→B + SW privacy **3/3** (incl. setup).
+Related offline-replay + never-queued **9/9**. ADR-002 classes unchanged.
+
 ## 2026-09-13 — P3.1 offline and account-boundary matrix
 
 Task: `2026-09-13-core-workflows-plan.md` 3.1, from merged main `3af36ef`
