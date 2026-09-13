@@ -8,6 +8,7 @@ import {
   transitionFocusSession,
   extendFocusSession,
   getRemainingSec,
+  presentFocusSession,
   type FocusState,
 } from "@/server/services/focus";
 import { NotFoundError, appendPlannerEvent } from "@/server/dal";
@@ -103,7 +104,10 @@ export async function PATCH(
             currentIntervalStartedAt: session.currentIntervalStartedAt,
           });
           return Response.json(
-            focusSnapshotResponse.parse({ session, remainingSec }),
+            focusSnapshotResponse.parse({
+              session: await presentFocusSession(userId, session, { db }),
+              remainingSec,
+            }),
             { headers: { "cache-control": "private, no-store" } },
           );
         } catch (e) {

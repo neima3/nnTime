@@ -1,5 +1,41 @@
 # Progress log
 
+## 2026-09-13 — P1.2 virtual-occurrence focus selector (same PR as P1.1)
+
+Task: `2026-09-13-core-workflows-plan.md` 1.2, on
+`cursor/p0-p11-focus-ownership-8a4c` (P0 ledger + P1.1 ownership kept).
+
+**Identity trace:** `GET /api/v1/day/{date}` `DayActivity.id` is the **series**
+id plus `occurrenceKey` (stable instant). Virtual instances have no
+`activity_occurrences` row, so there is no UUID to send. Today already links
+`/app/focus?activityId=<seriesId>&occurrenceKey=<iso>`. Naming on create is
+`activitySeriesId` + `occurrenceKey` to sit beside existing
+`activityOccurrenceId`. Incomplete pairs and mixed selectors → 400.
+Cross-user / unknown / cancelled / deleted parent → 404, active session kept.
+
+**What shipped:**
+- Additive create selector; no migration.
+- `startFocusSession` resolves/materializes inside the same transaction as
+  ownership (before yield). Existing override rows are reused, not clobbered.
+- Snapshot read-model adds optional `activitySeriesId` / `occurrenceKey`;
+  `activityOccurrenceId` remains authoritative. Old clients still start ad-hoc.
+- OpenAPI synced to iOS yaml. `pnpm api:check-ios` + `api:check-ios-client` 0.
+
+**Tests:** `focus-virtual-occurrence.test.ts` (one-off, recurring, reschedule,
+DST gap/fold, cancel, completed, split, deleted parent, unknown key,
+cross-user). Plus create-request contract + day “no occurrence UUID” pin.
+
+**Gates:** `pnpm lint` 0, `pnpm typecheck` 0, `pnpm build` 0.
+CI-equivalent Vitest: **1388 passed / 1 failed / 0 skipped** (158 files).
+The one fail is still `swift package dump-package` (no Swift).
+`pnpm api:sync-ios` / `api:check-ios` / `api:check-ios-client` 0.
+
+**Not done:** Task 1.3 client wiring (web `FocusClient` / iOS `startFocus`
+still send title/emoji/minutes only). No Swift compile on this Linux host
+(same as P0 ledger). No deploy.
+
+**Next:** Task 1.3 — send the selector from Today/Focus on both clients.
+
 ## 2026-09-13 — Production completion plans and Grokbot handoff (planning only)
 
 **Created:** `2026-09-13-production-completion-program.md`,

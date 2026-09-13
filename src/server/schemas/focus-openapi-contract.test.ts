@@ -28,7 +28,10 @@ interface Spec {
   components?: {
     schemas?: Record<
       string,
-      { properties?: Record<string, { type?: string; format?: string }> }
+      {
+        properties?: Record<string, { type?: string; format?: string }>;
+        required?: string[];
+      }
     >;
   };
 }
@@ -77,5 +80,22 @@ describe("focus OpenAPI contract", () => {
     expect(
       spec.components?.schemas?.FocusSession?.properties?.userId,
     ).toEqual({ type: "string" });
+    expect(
+      spec.components?.schemas?.FocusSessionCreateRequest?.properties
+        ?.activitySeriesId,
+    ).toEqual({ type: "string", format: "uuid" });
+    expect(
+      spec.components?.schemas?.FocusSessionCreateRequest?.properties
+        ?.occurrenceKey,
+    ).toEqual({ type: "string", format: "date-time" });
+    expect(
+      spec.components?.schemas?.FocusSession?.properties?.activitySeriesId,
+    ).toMatchObject({ type: ["string", "null"], format: "uuid" });
+    expect(
+      spec.components?.schemas?.FocusSession?.properties?.occurrenceKey,
+    ).toMatchObject({ type: ["string", "null"], format: "date-time" });
+    expect(
+      spec.components?.schemas?.FocusSession?.required,
+    ).not.toContain("activitySeriesId");
   });
 });

@@ -101,6 +101,22 @@ function occurrencePosition(series: ActivitySeriesRow, occurrenceKey: Date) {
   };
 }
 
+/** True when `occurrenceKey` is a generated (or RDATE) instance of this series. */
+export function seriesGeneratesOccurrenceKey(
+  series: ActivitySeriesRow,
+  occurrenceKey: Date,
+): boolean {
+  try {
+    occurrencePosition(series, occurrenceKey);
+    return true;
+  } catch (error) {
+    if (error instanceof ConflictError && error.message === "invalid occurrence key") {
+      return false;
+    }
+    throw error;
+  }
+}
+
 function remainingRrule(rrule: string | null, generatedBefore: number): string | null {
   if (!rrule) return null;
   const count = parseRrule(rrule).count;

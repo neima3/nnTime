@@ -30,6 +30,9 @@ export const focusSessionResponse = z.object({
   userId: z.string().min(1),
   /** Nullable for ad-hoc sessions not tied to an occurrence. */
   activityOccurrenceId: uuid.nullable(),
+  /** Additive identity for reload reconstruction. Null on ad-hoc sessions. */
+  activitySeriesId: uuid.nullable().optional(),
+  occurrenceKey: databaseInstant.nullable().optional(),
   state: focusStateEnum,
   startedAt: databaseInstant,
   targetDurationMin: pgInteger,
@@ -41,12 +44,36 @@ export const focusSessionResponse = z.object({
 });
 
 /** POST /api/v1/focus-sessions body. Server time owns `startedAt`. */
-export const focusSessionCreateRequest = z.object({
-  activityOccurrenceId: uuid.optional(),
-  targetDurationMin: pgInteger.min(1).max(24 * 60),
-  title: z.string().optional(),
-  emoji: z.string().optional(),
-});
+export const focusSessionCreateRequest = z
+  .object({
+    activityOccurrenceId: uuid.optional(),
+    /** Paired with `occurrenceKey` to address a (possibly virtual) instance. */
+    activitySeriesId: uuid.optional(),
+    occurrenceKey: instant.optional(),
+    targetDurationMin: pgInteger.min(1).max(24 * 60),
+    title: z.string().optional(),
+    emoji: z.string().optional(),
+  })
+  .superRefine((value, ctx) => {
+    const hasSeries = value.activitySeriesId != null;
+    const hasKey = value.occurrenceKey != null;
+    const hasRow = value.activityOccurrenceId != null;
+    if (hasSeries !== hasKey) {
+      ctx.addIssue({
+        code: "custom",
+        message: "activitySeriesId and occurrenceKey must be provided together",
+        path: hasSeries ? ["occurrenceKey"] : ["activitySeriesId"],
+      });
+    }
+    if (hasRow && (hasSeries || hasKey)) {
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "activityOccurrenceId cannot be combined with activitySeriesId/occurrenceKey",
+        path: ["activityOccurrenceId"],
+      });
+    }
+  });
 
 /** PATCH /api/v1/focus-sessions/{id} body. */
 export const focusSessionPatchRequest = z.discriminatedUnion("action", [

@@ -23,3 +23,11 @@ export class NotFoundError extends Error {
     this.name = "NotFoundError";
   }
 }
+
+/** Thrown for malformed client selectors / mutually exclusive fields → 400. */
+export class BadRequestError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BadRequestError";
+  }
+}

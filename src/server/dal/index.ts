@@ -20,7 +20,7 @@
 import "server-only";
 
 export type { Db } from "./types";
-export { ConflictError, NotFoundError } from "./errors";
+export { ConflictError, NotFoundError, BadRequestError } from "./errors";
 
 export {
   listTasks,
@@ -40,6 +40,8 @@ export {
   listOccurrences,
   listUserOccurrences,
   getOccurrence,
+  getOccurrenceByKey,
+  materializeOccurrenceIfAbsent,
   upsertOccurrence,
 } from "./activities";
 

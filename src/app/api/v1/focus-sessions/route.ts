@@ -9,6 +9,7 @@ import {
   startFocusSession,
   getActiveSession,
   getRemainingSec,
+  presentFocusSession,
   type FocusState,
 } from "@/server/services/focus";
 import { appendPlannerEvent } from "@/server/dal";
@@ -36,7 +37,10 @@ export async function GET() {
       currentIntervalStartedAt: session.currentIntervalStartedAt,
     });
     return Response.json(
-      focusSnapshotResponse.parse({ session, remainingSec }),
+      focusSnapshotResponse.parse({
+        session: await presentFocusSession(userId, session),
+        remainingSec,
+      }),
       { headers: { "cache-control": "private, no-store" } },
     );
   });
@@ -59,6 +63,8 @@ export async function POST(request: Request) {
           {
             targetDurationMin: body.targetDurationMin,
             activityOccurrenceId: body.activityOccurrenceId,
+            activitySeriesId: body.activitySeriesId,
+            occurrenceKey: body.occurrenceKey,
           },
           { db },
         );
@@ -79,7 +85,10 @@ export async function POST(request: Request) {
           currentIntervalStartedAt: session.currentIntervalStartedAt,
         });
         return Response.json(
-          focusSnapshotResponse.parse({ session, remainingSec }),
+          focusSnapshotResponse.parse({
+            session: await presentFocusSession(userId, session, { db }),
+            remainingSec,
+          }),
           {
             status: 201,
             headers: { "cache-control": "private, no-store" },
