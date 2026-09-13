@@ -282,7 +282,7 @@ test("a lost create response replays once with the same Idempotency-Key", async 
   page,
 }) => {
   const title = `Lost response ${Date.now()}`;
-  await gotoHydrated(page, "/app/today");
+  await gotoHydrated(page, "/app/inbox");
 
   const keys: string[] = [];
   let dropOnce = true;
@@ -301,9 +301,8 @@ test("a lost create response replays once with the same Idempotency-Key", async 
     await route.continue();
   });
 
-  await page.keyboard.press("c");
-  await page.getByPlaceholder("One thought, then let it go…").fill(title);
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByPlaceholder("Get it out of your head…").fill(title);
+  await page.getByRole("button", { name: "Add" }).click();
   await expect(page.getByText("Saved on this device", { exact: false })).toBeVisible();
 
   await expect.poll(async () => (await queueRows(page)).length, {
