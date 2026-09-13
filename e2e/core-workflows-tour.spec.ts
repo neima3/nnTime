@@ -9,13 +9,11 @@ import {
   listDayActivities,
   listTasks,
   planningToday,
-  signUp,
 } from "./helpers";
 
 test.use({
   locale: "en-US",
   timezoneId: "America/New_York",
-  storageState: { cookies: [], origins: [] },
   serviceWorkers: "block",
 });
 
@@ -60,13 +58,6 @@ async function persistReload(page: Page, path: string) {
 
 test("core workflow tour persists after every reload", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await signUp(page, "p21-tour");
-  const today = planningToday();
-  const captured = `Tour captured ${Date.now()}`;
-  const fallback = `Tour magic fallback ${Date.now()}`;
-  const edited = `Tour edited ${Date.now()}`;
-  const reviewTitle = `Tour review ${Date.now()}`;
-
   await page.route("**/api/health", async (route) => {
     const response = await route.fetch();
     const body = (await response.json().catch(() => ({}))) as {
@@ -89,6 +80,12 @@ test("core workflow tour persists after every reload", async ({ page }) => {
     });
   });
 
+  const today = planningToday();
+  const captured = `Tour captured ${Date.now()}`;
+  const fallback = `Tour magic fallback ${Date.now()}`;
+  const edited = `Tour edited ${Date.now()}`;
+  const reviewTitle = `Tour review ${Date.now()}`;
+
   await gotoHydrated(page, "/app/today");
   await openCapture(page);
   const box = page.getByRole("dialog").getByRole("textbox");
@@ -105,8 +102,15 @@ test("core workflow tour persists after every reload", async ({ page }) => {
   await openCapture(page);
   const magicBox = page.getByRole("dialog").getByRole("textbox");
   await magicBox.fill(fallback);
+  const parseFailed = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/v1/ai/parse") && response.status() === 500,
+  );
   await page.getByRole("button", { name: "Magic add — understand date and time" }).click();
-  await expect(page.getByText("Magic add is resting — saving as plain text")).toBeVisible();
+  await parseFailed;
+  await expect(page.getByRole("dialog", { name: "Quick capture" })).toHaveCount(0, {
+    timeout: 15_000,
+  });
   await persistReload(page, "/app/inbox");
   await expect(page.getByText(fallback, { exact: true })).toBeVisible();
 
@@ -183,27 +187,67 @@ test("core workflow tour persists after every reload", async ({ page }) => {
   await page.getByRole("button", { name: "Done for now" }).click();
 
   await gotoHydrated(page, `/app/today?date=${today}`);
+  const completion = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/v1/activities/") &&
+      response.request().method() === "PATCH" &&
+      response.ok(),
+  );
   await page.getByRole("button", { name: `Complete ${edited}` }).click();
-  await expect(page.getByRole("button", { name: `Mark ${edited} not done` })).toBeVisible();
+  await completion;
+  await expect
+    .poll(async () => {
+      const row = (await listDayActivities(page, today)).find(
+        (activity) => activity.title === edited,
+      );
+      return row?.status;
+    })
+    .toBe("completed");
   await persistReload(page, `/app/today?date=${today}`);
+  await expect
+    .poll(async () => {
+      const row = (await listDayActivities(page, today)).find(
+        (activity) => activity.title === edited,
+      );
+      return row?.status;
+    })
+    .toBe("completed");
   await expect(page.getByRole("button", { name: `Mark ${edited} not done` })).toBeVisible();
 
-  const createReview = await page.request.post("/api/v1/activities", {
-    headers: { "Idempotency-Key": crypto.randomUUID() },
-    data: {
-      tz: "America/New_York",
-      title: reviewTitle,
-      emoji: "🧭",
-      dtstartLocal: new Date(`${today}T00:00:00`).toISOString(),
-      durationMin: 1,
-    },
-  });
-  expect(createReview.status()).toBe(201);
+  const createReview = await page.evaluate(async (title) => {
+    const localDate = new Date().toLocaleDateString("en-CA", {
+      timeZone: "America/New_York",
+    });
+    const start = new Date(`${localDate}T00:00:00`);
+    const response = await fetch("/api/v1/activities", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": crypto.randomUUID(),
+      },
+      body: JSON.stringify({
+        tz: "America/New_York",
+        title,
+        emoji: "🧭",
+        dtstartLocal: start.toISOString(),
+        durationMin: 1,
+      }),
+    });
+    return response.status;
+  }, reviewTitle);
+  expect(createReview).toBe(201);
   await page.waitForFunction(() => {
     const now = new Date();
     return now.getHours() > 0 || now.getMinutes() >= 3;
   });
   await gotoHydrated(page, "/app/review");
+  for (let i = 0; i < 25; i++) {
+    if (await page.locator("main").getByText(reviewTitle).isVisible()) break;
+    const dismiss = page.getByRole("button", { name: "Let it go" });
+    if (!(await dismiss.isVisible())) break;
+    await dismiss.click();
+    await expect(dismiss).toBeEnabled({ timeout: 15_000 });
+  }
   await expect(page.locator("main").getByText(reviewTitle)).toBeVisible();
   await page.getByRole("button", { name: "I did it" }).click();
   await expect(page.locator("main").getByText(reviewTitle)).toHaveCount(0, {

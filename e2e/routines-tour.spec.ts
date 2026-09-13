@@ -4,18 +4,16 @@
  * standalone is production and rejects /jobs/tick without CRON_SECRET).
  */
 import { expect, test } from "@playwright/test";
-import { gotoHydrated, listDayActivities, planningToday, signUp } from "./helpers";
+import { gotoHydrated, listDayActivities, planningToday } from "./helpers";
 
 test.use({
   locale: "en-US",
   timezoneId: "America/New_York",
-  storageState: { cookies: [], origins: [] },
 });
 
 test("routine steps survive Use today and a paused schedule stays paused", async ({
   page,
 }) => {
-  await signUp(page, "p21-routines");
   const today = planningToday();
   const title = `Morning reset ${Date.now()}`;
 
@@ -25,14 +23,15 @@ test("routine steps survive Use today and a paused schedule stays paused", async
   await page.getByLabel("Steps, one per line").fill("Water + meds\nStretch\nMake bed");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("Routine created")).toBeVisible();
-  await expect(page.getByRole("heading", { name: title })).toBeVisible();
-  await expect(page.getByText("3 steps · 30 min · Daily")).toBeVisible();
+  const card = page.locator("article").filter({ hasText: title });
+  await expect(card.getByRole("heading", { name: title })).toBeVisible();
+  await expect(card.getByText("3 steps · 30 min · Daily")).toBeVisible();
 
   await page.reload();
   await page.waitForSelector('html[data-hydrated="true"]');
-  await expect(page.getByText("3 steps · 30 min · Daily")).toBeVisible();
+  await expect(card.getByText("3 steps · 30 min · Daily")).toBeVisible();
 
-  await page.getByRole("button", { name: "Use today" }).click();
+  await card.getByRole("button", { name: "Use today" }).click();
   await expect(page).toHaveURL(/routineId=/);
   await expect(page.getByPlaceholder("What are you doing?")).toHaveValue(title);
   await expect(page.getByLabel("Duration in minutes")).toHaveValue("30");
@@ -54,10 +53,10 @@ test("routine steps survive Use today and a paused schedule stays paused", async
   expect(applied[0]?.durationMin).toBe(30);
 
   await gotoHydrated(page, "/app/routines");
-  await page.getByRole("button", { name: "Pause" }).click();
+  await card.getByRole("button", { name: "Pause" }).click();
   await expect(page.getByText("Schedule paused")).toBeVisible();
   await page.reload();
   await page.waitForSelector('html[data-hydrated="true"]');
-  await expect(page.getByText("3 steps · 30 min · Daily · paused")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Resume" })).toBeVisible();
+  await expect(card.getByText("3 steps · 30 min · Daily · paused")).toBeVisible();
+  await expect(card.getByRole("button", { name: "Resume" })).toBeVisible();
 });

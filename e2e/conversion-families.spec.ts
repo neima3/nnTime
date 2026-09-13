@@ -10,13 +10,11 @@ import {
   listDayActivities,
   listTasks,
   planningToday,
-  signUp,
 } from "./helpers";
 
 test.use({
   locale: "en-US",
   timezoneId: "America/New_York",
-  storageState: { cookies: [], origins: [] },
   serviceWorkers: "block",
 });
 
@@ -65,7 +63,6 @@ test("AI confirmation, Anytime schedule, and Slot it each convert once", async (
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await signUp(page, "p21-convert");
   const today = planningToday();
   const ai = await seedTask(page, `AI convert ${Date.now()}`);
   const scheduled = await seedTask(page, `Schedule convert ${Date.now()}`);
@@ -140,7 +137,6 @@ test("lost schedule response and a duplicate save reuse one conversion", async (
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await signUp(page, "p21-retry");
   const today = planningToday();
   const lost = await seedTask(page, `Lost convert ${Date.now()}`);
   const dup = await seedTask(page, `Dup convert ${Date.now()}`);
@@ -166,7 +162,9 @@ test("lost schedule response and a duplicate save reuse one conversion", async (
   await gotoHydrated(page, `/app/editor?taskId=${lost.id}&date=${today}&start=600`);
   await expect(page.getByPlaceholder("What are you doing?")).toHaveValue(lost.title);
   await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("Couldn't reach the server");
+  await expect(page.locator('p[role="alert"]')).toContainText(
+    "Couldn't reach the server",
+  );
   await expect(page.getByPlaceholder("What are you doing?")).toHaveValue(lost.title);
   await expect(page.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "Save", exact: true }).click();
