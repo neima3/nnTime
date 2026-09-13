@@ -281,9 +281,13 @@ test.describe("shared-account midday review", () => {
   const skipped = (await dayAfterSkip.json()) as {
     activities: { title: string; status: string }[];
   };
-  expect(skipped.activities.find((a) => a.title === endedTitle)?.status).toBe(
-    "skipped",
-  );
+  // Skipped occurrences are omitted from the day timeline (not listed pending).
+  expect(skipped.activities.find((a) => a.title === endedTitle)).toBeUndefined();
+  if (seeded.futureStart) {
+    expect(skipped.activities.find((a) => a.title === futureTitle)?.status).toBe(
+      "pending",
+    );
+  }
   await page.locator("main").getByRole("button", { name: "Undo" }).click();
   await expect(reviewCard(page, endedTitle)).toBeVisible({ timeout: 15_000 });
   await gotoHydrated(page, "/app/review");
