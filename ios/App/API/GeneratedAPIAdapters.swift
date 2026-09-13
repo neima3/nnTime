@@ -706,7 +706,10 @@ enum GeneratedAPIAdapters {
                     state: $0.state.rawValue,
                     targetDurationMin: Int($0.targetDurationMin),
                     startedAt: $0.startedAt,
-                    revision: Int($0.revision)
+                    revision: Int($0.revision),
+                    activityOccurrenceId: $0.activityOccurrenceId,
+                    activitySeriesId: $0.activitySeriesId,
+                    occurrenceKey: $0.occurrenceKey
                 )
             },
             remainingSec: value.remainingSec

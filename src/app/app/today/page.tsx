@@ -39,6 +39,7 @@ import { SignedOutCard } from "@/components/EmptyState";
 import { Illustration } from "@/components/Illustration";
 import { appReturnTo } from "@/lib/auth-return";
 import { getMagicLinkRedirectError } from "@/lib/auth-redirect-error";
+import { focusHrefFromActivity } from "@/lib/focus-linkage";
 
 function shiftDate(dateStr: string, deltaDays: number): string {
   const [y, m, d] = dateStr.split("-").map(Number);
@@ -284,14 +285,14 @@ export default async function TodayPage({
         ? `${formatTime(upNext.start, hourCycle)} · ${upNext.start + upNext.duration - nowMinutes} min left`
         : `${formatTime(upNext.start, hourCycle)} · in ${upNext.start - nowMinutes} min`
       : "";
-  const focusParams = upNext
-    ? new URLSearchParams({
+  const focusHref = upNext
+    ? focusHrefFromActivity({
         title: upNext.title,
         emoji: upNext.emoji,
-        duration: String(upNext.duration),
+        durationMin: upNext.duration,
         activityId: upNext.id,
-        ...(upNext.occurrenceKey ? { occurrenceKey: upNext.occurrenceKey } : {}),
-      }).toString()
+        occurrenceKey: upNext.occurrenceKey,
+      })
     : "";
 
   // "Pick for me" candidates: now → next → slipped-today → loose tasks.
@@ -314,6 +315,7 @@ export default async function TodayPage({
                 emoji: a.emoji,
                 kind,
                 durationMin: Math.min(a.duration, 60),
+                occurrenceKey: a.occurrenceKey ?? null,
                 energy: a.energy ?? null,
               };
             }),
@@ -536,7 +538,7 @@ export default async function TodayPage({
               </p>
               <p className="tnum mt-1 text-sm opacity-80">{upNextMeta}</p>
               <Link
-                href={`/app/focus?${focusParams}`}
+                href={focusHref}
                 className="mt-4 block w-full rounded-xl bg-surface-raised/20 py-2.5 text-center text-sm font-semibold backdrop-blur transition-colors hover:bg-surface-raised/30 focus-visible:ring-2 focus-visible:ring-now focus-visible:outline-none"
               >
                 Start focus

@@ -71,11 +71,11 @@ Prefer no migration if existing rows/keys suffice. If schema changes prove neces
 Existing files: `src/components/FocusClient.tsx`, `src/components/TodayTimeline.tsx`, `src/app/app/focus/page.tsx`, `ios/App/API/KairoAPI.swift`, `ios/App/API/Models.swift`, `ios/App/API/GeneratedAPIAdapters.swift`, `ios/App/Features/Focus/FocusView.swift`, `ios/App/Features/Today/TodayView.swift`, `ios/UnitTests/KairoAPITransportTests.swift`.
 Proposed tests: `e2e/focus-occurrence-link.spec.ts`, additional native transport/model cases in existing suites.
 
-- [ ] Preserve the stable source identity when starting focus from Today and other activity entry points. Send the new selector with a stable per-attempt idempotency key; include selector identity in the web request fingerprint.
-- [ ] Reload/relaunch during focus and recover the same linked occurrence from server state. Starting ad-hoc focus remains valid and has no fabricated activity association.
-- [ ] On finish, retain the explicit occurrence-scoped “Mark done” choice. Finishing a timer alone must not silently mark a task complete. Confirmation uses server identity and the existing conditional/idempotent completion path.
-- [ ] Simulate completion network failure and stale revision; show retry/reconciliation, retain identity, and celebrate only the confirmed write. Deleted or moved source identity must not complete a different occurrence.
-- [ ] Verify web → native and native → web focus adoption/rehydration against the agreed policy, including pause, extend, background return, cancellation and source deletion.
+- [x] Preserve the stable source identity when starting focus from Today and other activity entry points. Send the new selector with a stable per-attempt idempotency key; include selector identity in the web request fingerprint.
+- [x] Reload/relaunch during focus and recover the same linked occurrence from server state. Starting ad-hoc focus remains valid and has no fabricated activity association.
+- [x] On finish, retain the explicit occurrence-scoped “Mark done” choice. Finishing a timer alone must not silently mark a task complete. Confirmation uses server identity and the existing conditional/idempotent completion path.
+- [x] Simulate completion network failure and stale revision; show retry/reconciliation, retain identity, and celebrate only the confirmed write. Deleted or moved source identity must not complete a different occurrence.
+- [x] Verify web → native and native → web focus adoption/rehydration against the agreed policy, including pause, extend, background return, cancellation and source deletion.
 - [ ] Run focused focus/contract tests, `pnpm test:e2e -- e2e/focus-occurrence-link.spec.ts e2e/focus-concurrency.spec.ts`, native gates, and global commit gates. Capture desktop/mobile actual use and label native simulator versus physical evidence separately.
 
 Exit: one scheduled occurrence remains identifiable across both clients, reloads, timer completion and review; source siblings remain unchanged.

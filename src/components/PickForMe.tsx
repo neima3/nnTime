@@ -15,6 +15,7 @@ import { Dices, Play, X } from "lucide-react";
 import { useLowBattery } from "./LowBattery";
 import { useFocusTrap } from "@/lib/useFocusTrap";
 import { clientToday } from "@/lib/client-date";
+import { focusHrefFromActivity } from "@/lib/focus-linkage";
 
 export interface PickCandidate {
   id: string;
@@ -24,6 +25,8 @@ export interface PickCandidate {
   kind: "now" | "next" | "slipped" | "task";
   /** Focus length to suggest (activity duration or 25 for tasks). */
   durationMin: number;
+  /** Day-block occurrence identity; omitted for loose tasks. */
+  occurrenceKey?: string | null;
   /** Priority weight for tasks (2 high, 1 low, 0 none). */
   weight?: number;
   /** Energy cost, when known — low-battery days prefer lighter picks. */
@@ -89,14 +92,14 @@ export function PickForMe({
   if (ordered.length === 0) return null;
   const pick = ordered[index % ordered.length];
 
-  const focusHref = `/app/focus?${new URLSearchParams({
+  const focusHref = focusHrefFromActivity({
     title: pick.title,
     emoji: pick.emoji,
-    duration: String(pick.durationMin),
-    // Activities carry their id so the session links back for time-truth
-    // logging; loose tasks have no activity to link.
-    ...(pick.kind !== "task" ? { activityId: pick.id } : {}),
-  })}`;
+    durationMin: pick.durationMin,
+    // Activities carry series id + occurrenceKey; loose tasks stay ad-hoc.
+    activityId: pick.kind !== "task" ? pick.id : undefined,
+    occurrenceKey: pick.kind !== "task" ? pick.occurrenceKey : undefined,
+  });
 
   return (
     <>

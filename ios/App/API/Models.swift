@@ -161,6 +161,32 @@ struct FocusSession: Decodable, Identifiable {
     let targetDurationMin: Int
     let startedAt: Date?
     let revision: Int
+    /// Authoritative occurrence row once the server materialized it.
+    let activityOccurrenceId: String?
+    /// Additive series identity for reload reconstruction. Nil on ad-hoc.
+    let activitySeriesId: String?
+    /// Additive occurrence identity (ADR-001). Nil on ad-hoc.
+    let occurrenceKey: Date?
+
+    init(
+        id: String,
+        state: String,
+        targetDurationMin: Int,
+        startedAt: Date?,
+        revision: Int,
+        activityOccurrenceId: String? = nil,
+        activitySeriesId: String? = nil,
+        occurrenceKey: Date? = nil
+    ) {
+        self.id = id
+        self.state = state
+        self.targetDurationMin = targetDurationMin
+        self.startedAt = startedAt
+        self.revision = revision
+        self.activityOccurrenceId = activityOccurrenceId
+        self.activitySeriesId = activitySeriesId
+        self.occurrenceKey = occurrenceKey
+    }
 }
 
 // MARK: - Typed mutation models

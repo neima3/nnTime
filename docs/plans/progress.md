@@ -1,5 +1,32 @@
 # Progress log
 
+## 2026-09-13 — P1.3 client linkage + Mark done (same PR as P1.1/P1.2)
+
+Task: `2026-09-13-core-workflows-plan.md` 1.3, on
+`cursor/p0-p11-focus-ownership-8a4c`. P0 ledger + P1.1 ownership + P1.2
+server selector kept.
+
+**What shipped:**
+- Web Today / Up next / One Thing / Pick for me carry series id +
+  `occurrenceKey`. `FocusClient` POSTs the P1.2 pair and fingerprints it
+  with the per-attempt idempotency key.
+- Hydrate/start adopt `activitySeriesId` / `occurrenceKey` from the server
+  snapshot. Ad-hoc sessions stay unlinked.
+- Timer Complete does not patch the occurrence. “Mark done” uses
+  `completeLinkedOccurrence` (GET + If-Match + Idempotency-Key, 409 rebase).
+  404 is terminal and does not complete a sibling.
+- iOS `startFocus` sends the same pair + caller-owned key; FocusView adopts
+  server identity and offers Mark done. Today already posted `occurrenceKey`.
+
+**Tests:** `src/lib/focus-linkage.test.ts`, FocusClient source pins,
+`tests/focus-ios-linkage-source.test.ts`, iOS transport/model/adapter cases,
+`e2e/focus-occurrence-link.spec.ts`.
+
+**Not done:** physical iPhone / simulator evidence (Linux host has no Swift
+or Xcode). `native-contract` owns that compile. No deploy.
+
+**Next:** P2 everyday planner loops, or CoS review of this PR.
+
 ## 2026-09-13 — P1.2 virtual-occurrence focus selector (same PR as P1.1)
 
 Task: `2026-09-13-core-workflows-plan.md` 1.2, on

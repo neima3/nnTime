@@ -31,4 +31,21 @@ describe("FocusClient step saves and hydrate failures", () => {
     expect(source).toContain("onClick={retryHydrate}");
     expect(source).toContain("setLoading(true)");
   });
+
+  it("starts with the paired selector and fingerprints that identity", () => {
+    expect(source).toContain("focusStartBody({");
+    expect(source).toContain("focusStartFingerprint(body)");
+    expect(source).toContain("activitySeriesId: confirmedLink?.activitySeriesId ?? activityId");
+    expect(source).toContain("occurrenceKey: confirmedLink?.occurrenceKey ?? occurrenceKey");
+  });
+
+  it("adopts server linkage on hydrate and never marks done from the timer", () => {
+    expect(source).toContain("setConfirmedLink(adoptFocusLinkage(data.session))");
+    expect(source).toContain("canMarkOccurrenceDone(confirmedLink)");
+    const complete = source.slice(
+      source.indexOf('onClick={() => void patch({ action: "transition", state: "completed" })}'),
+    );
+    expect(complete).not.toContain("completeLinkedOccurrence");
+    expect(source).toContain("completeLinkedOccurrence({");
+  });
 });
