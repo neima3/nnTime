@@ -24,8 +24,16 @@ spring-gap and autumn-fold daily expansion; ReviewWindow Swift; e2e
 
 **Gates (this host):** `pnpm lint` 0, `pnpm typecheck` 0, `pnpm build` 0,
 `pnpm api:check-ios` 0, `pnpm api:check-ios-client` 0.
-CI-equivalent Vitest: **160 files passed / 2 failed** — **1422 passed,
-2 failed** (`swift package dump-package` in
+Focused Vitest (day / temporal / `recurrence-p22` / review-window):
+**4 files / 49 tests passed**.
+Focused Playwright Chromium: `editor-edit-scope` **4/4** and
+`review-actions` original **1/1** in one run; midday review **1/1** on a
+follow-up after the skip assertion (skipped occurrences are omitted from
+`GET /api/v1/day`, so persist evidence is absence + still-pending future).
+All six product cases plus setup auth are green. New cases reuse
+`setup.auth` to stay under ADR-003's 10/10min sign-up cap.
+CI-equivalent Vitest from the earlier host pass: **160 files passed /
+2 failed** — **1422 passed, 2 failed** (`swift package dump-package` in
 `ios-generated-client-adoption.test.ts`; one
 `notification-delivery.integration` claim-state assertion, unrelated to
 this slice). `pnpm ios:release:preflight` 1 (`plutil` ENOENT). Gates were
@@ -33,7 +41,9 @@ not lowered. Linux host has no Swift; `native-contract` owns that compile.
 
 **Not done:** P3 offline/account-boundary. No deploy.
 
-**Next:** focused e2e + CoS review of this PR.
+**PR:** https://github.com/neima3/nnTime/pull/3 (draft)
+**SHA:** `64f1d4faad70272b7075d6a29b3540fcf2cd2a1e`
+**CI:** https://github.com/neima3/nnTime/actions/runs/34786574444
 
 ## 2026-09-13 — P2.1 NO-GO: duplicate Save conversion flake
 
