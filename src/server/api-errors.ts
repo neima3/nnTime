@@ -3,6 +3,7 @@
  * exceptions to the ADR-002 error envelope.
  */
 import { ConflictError, NotFoundError } from "./dal";
+import { BadRequestError } from "./dal/errors";
 
 /** Standard error envelope per ADR-002. */
 export function errorResponse(
@@ -31,6 +32,9 @@ export async function handleErrors(fn: () => Promise<Response>): Promise<Respons
     }
     if (e instanceof NotFoundError) {
       return errorResponse("not_found", e.message, 404);
+    }
+    if (e instanceof BadRequestError) {
+      return errorResponse("bad_request", e.message, 400);
     }
      
     console.error("[api] unhandled error:", e);

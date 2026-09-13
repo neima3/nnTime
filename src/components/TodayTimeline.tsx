@@ -15,6 +15,7 @@ import { notifyDayChanged } from "./NowBar";
 import { useLowBattery } from "./LowBattery";
 import { sendRebasedStatusChange } from "@/lib/offline-mutation";
 import { getStatsCached } from "@/lib/stats-cache";
+import { focusHrefFromActivity } from "@/lib/focus-linkage";
 
 interface TodayTimelineProps {
   activities: Activity[];
@@ -283,14 +284,15 @@ export function TodayTimeline({
     (id: string) => {
       const act = activities.find((a) => a.id === id);
       if (!act) return;
-      const params = new URLSearchParams({
-        title: act.title,
-        emoji: act.emoji,
-        duration: String(act.duration),
-        activityId: act.id,
-        ...(act.occurrenceKey ? { occurrenceKey: act.occurrenceKey } : {}),
-      });
-      router.push(`/app/focus?${params}`);
+      router.push(
+        focusHrefFromActivity({
+          title: act.title,
+          emoji: act.emoji,
+          durationMin: act.duration,
+          activityId: act.id,
+          occurrenceKey: act.occurrenceKey,
+        }),
+      );
     },
     [activities, router],
   );

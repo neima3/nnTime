@@ -1,5 +1,7 @@
 # Kairo (nnTime) — Development Roadmap (v2, post Codex review)
 
+> **2026-09-13 continuation:** See [production completion program](2026-09-13-production-completion-program.md) and its linked core/release plans for the current execution order and [Grokbot prompt](2026-09-13-grokbot-development-prompt.md). This is a planning handoff; existing completion checkboxes and binding contracts are unchanged.
+
 **Goal (full, non-negotiable):** Ship Kairo, a visual daily planner in the Tiimo
 category, at **≥85% scripted feature parity with Tiimo** (source of truth:
 `docs/plans/parity-checklist.md`, computed by `scripts/parity.mjs`; feature

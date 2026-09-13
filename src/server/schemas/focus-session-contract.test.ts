@@ -35,6 +35,43 @@ describe("focus wire contract", () => {
     });
   });
 
+  it("accepts a paired virtual-occurrence selector", () => {
+    expect(
+      focusSessionCreateRequest.parse({
+        targetDurationMin: 25,
+        activitySeriesId: "01980000-7000-8000-8000-000000000010",
+        occurrenceKey: "2026-03-10T13:00:00.000Z",
+      }),
+    ).toMatchObject({
+      targetDurationMin: 25,
+      activitySeriesId: "01980000-7000-8000-8000-000000000010",
+      occurrenceKey: "2026-03-10T13:00:00.000Z",
+    });
+  });
+
+  it("rejects an incomplete selector pair and mixed selectors", () => {
+    expect(
+      focusSessionCreateRequest.safeParse({
+        targetDurationMin: 25,
+        activitySeriesId: "01980000-7000-8000-8000-000000000010",
+      }).success,
+    ).toBe(false);
+    expect(
+      focusSessionCreateRequest.safeParse({
+        targetDurationMin: 25,
+        occurrenceKey: "2026-03-10T13:00:00.000Z",
+      }).success,
+    ).toBe(false);
+    expect(
+      focusSessionCreateRequest.safeParse({
+        targetDurationMin: 25,
+        activityOccurrenceId: "01980000-7000-8000-8000-000000000011",
+        activitySeriesId: "01980000-7000-8000-8000-000000000010",
+        occurrenceKey: "2026-03-10T13:00:00.000Z",
+      }).success,
+    ).toBe(false);
+  });
+
   it("rejects invalid focus durations", () => {
     expect(
       focusSessionCreateRequest.safeParse({ targetDurationMin: 0 }).success,

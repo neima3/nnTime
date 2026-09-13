@@ -198,7 +198,10 @@ final class GeneratedAPIAdapterTests: XCTestCase {
                 "currentIntervalStartedAt":"2026-07-28T13:00:00Z",
                 "revision":1,
                 "createdAt":"2026-07-28T13:00:00Z",
-                "updatedAt":"2026-07-28T13:00:00Z"
+                "updatedAt":"2026-07-28T13:00:00Z",
+                "activityOccurrenceId":"occurrence-1",
+                "activitySeriesId":"activity-1",
+                "occurrenceKey":"2026-07-28T14:00:00Z"
               },
               "remainingSec":1200
             }
@@ -209,6 +212,9 @@ final class GeneratedAPIAdapterTests: XCTestCase {
         )
         XCTAssertEqual(focus.session?.state, "running")
         XCTAssertEqual(focus.remainingSec, 1200)
+        XCTAssertEqual(focus.session?.activityOccurrenceId, "occurrence-1")
+        XCTAssertEqual(focus.session?.activitySeriesId, "activity-1")
+        XCTAssertNotNil(focus.session?.occurrenceKey)
     }
 
     func testTypedMutationModelsAreSendableAndPreservePatchTriState() throws {

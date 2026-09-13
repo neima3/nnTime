@@ -841,7 +841,11 @@ paths:
         Server-authoritative start (ADR-004). At most one
         `running`/`paused` session may exist per user (partial unique
         index). `activityOccurrenceId` is nullable for ad-hoc sessions.
-        Transitions are idempotent and use server time.
+        Virtual day instances (no occurrence row yet) are addressed by the
+        paired `activitySeriesId` + `occurrenceKey` selector; the server
+        materializes the owned occurrence inside this POST. The two
+        selectors are mutually exclusive. Transitions are idempotent and
+        use server time.
       operationId: startFocusSession
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
@@ -2071,6 +2075,18 @@ components:
           type: [string, 'null']
           format: uuid
           description: Nullable for ad-hoc sessions.
+        activitySeriesId:
+          type: [string, 'null']
+          format: uuid
+          description: |
+            Additive read-model identity of the linked series. Null for
+            ad-hoc sessions. `activityOccurrenceId` remains authoritative.
+        occurrenceKey:
+          type: [string, 'null']
+          format: date-time
+          description: |
+            Additive read-model occurrence identity (ADR-001). Null for
+            ad-hoc sessions.
         state: { $ref: '#/components/schemas/FocusState' }
         startedAt: { type: string, format: date-time }
         targetDurationMin: { type: integer, format: int32 }
@@ -2086,10 +2102,16 @@ components:
       description: |
         Starts a server-authoritative focus session. Server time owns
         `startedAt`; the client supplies only intent and optional presentation
-        context.
+        context. Optional `activityOccurrenceId` attaches a materialized
+        row. Optional paired `activitySeriesId` + `occurrenceKey` addresses
+        a virtual day instance (ADR-001). The two selectors must not be
+        combined; an incomplete pair is a validation error. Omitted
+        selectors start an ad-hoc session.
       required: [targetDurationMin]
       properties:
         activityOccurrenceId: { type: string, format: uuid }
+        activitySeriesId: { type: string, format: uuid }
+        occurrenceKey: { type: string, format: date-time }
         targetDurationMin:
           type: integer
           minimum: 1

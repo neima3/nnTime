@@ -98,6 +98,9 @@ describe("day OpenAPI contract", () => {
     expect(dayActivity?.properties?.status).toEqual({
       $ref: "#/components/schemas/OccurrenceStatus",
     });
+    // Canonical day identity is series id + occurrenceKey. Virtual instances
+    // have no activity_occurrences row and therefore no occurrence UUID.
+    expect(dayActivity?.properties).not.toHaveProperty("activityOccurrenceId");
     expect(responseSchemaRegistry).toHaveProperty("DayActivity");
   });
 

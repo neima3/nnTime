@@ -203,6 +203,98 @@ export async function deleteActivitySeries(
 /* Activity occurrences                                                       */
 /* -------------------------------------------------------------------------- */
 
+/** Load one occurrence the caller owns. Cross-user / missing / tombstoned → 404. */
+export async function getOccurrence(
+  userId: string,
+  id: string,
+  opts: { db?: Db } = {},
+) {
+  const db = opts.db ?? dbDefault;
+  const [occ] = await db
+    .select()
+    .from(schema.activityOccurrences)
+    .where(
+      and(
+        eq(schema.activityOccurrences.id, id),
+        eq(schema.activityOccurrences.userId, userId),
+        isNull(schema.activityOccurrences.deletedAt),
+      ),
+    )
+    .limit(1);
+  if (!occ) throw new NotFoundError("activity_occurrence");
+  return occ;
+}
+
+/** Owned occurrence by stable ADR-001 identity. Tombstoned rows are omitted. */
+export async function getOccurrenceByKey(
+  userId: string,
+  seriesId: string,
+  occurrenceKey: Date,
+  opts: { db?: Db } = {},
+) {
+  const db = opts.db ?? dbDefault;
+  const [occ] = await db
+    .select()
+    .from(schema.activityOccurrences)
+    .where(
+      and(
+        eq(schema.activityOccurrences.userId, userId),
+        eq(schema.activityOccurrences.seriesId, seriesId),
+        eq(schema.activityOccurrences.occurrenceKey, occurrenceKey),
+        isNull(schema.activityOccurrences.deletedAt),
+      ),
+    )
+    .limit(1);
+  return occ ?? null;
+}
+
+/**
+ * Insert a pending occurrence row for an owned series+key if none exists.
+ * Repeat calls keep the existing row and its overrides (no clobber).
+ */
+export async function materializeOccurrenceIfAbsent(
+  userId: string,
+  seriesId: string,
+  occurrenceKey: Date,
+  opts: { db?: Db } = {},
+) {
+  const existing = await getOccurrenceByKey(userId, seriesId, occurrenceKey, opts);
+  if (existing) return existing;
+
+  const db = opts.db ?? dbDefault;
+  const id = crypto.randomUUID();
+  const [inserted] = await db
+    .insert(schema.activityOccurrences)
+    .values({
+      id,
+      userId,
+      seriesId,
+      occurrenceKey,
+      status: "pending",
+    })
+    .onConflictDoNothing({
+      target: [
+        schema.activityOccurrences.seriesId,
+        schema.activityOccurrences.occurrenceKey,
+      ],
+    })
+    .returning();
+  if (inserted) {
+    await appendChangeLog(
+      db,
+      userId,
+      "activity_occurrences",
+      inserted.id,
+      "upsert",
+      inserted.revision,
+    );
+    return inserted;
+  }
+  const raced = await getOccurrenceByKey(userId, seriesId, occurrenceKey, opts);
+  if (!raced) throw new NotFoundError("activity_occurrence");
+  return raced;
+}
+
 export async function listOccurrences(
   userId: string,
   seriesId: string,

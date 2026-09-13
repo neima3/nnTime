@@ -265,6 +265,30 @@ final class ModelDecodingTests: XCTestCase {
 
     // MARK: - Page<T>
 
+    func testFocusSession_decodesAdditiveIdentityAndAdHocNulls() throws {
+        let linked = """
+        {
+          "id":"focus-1","state":"running","targetDurationMin":25,
+          "startedAt":"2026-07-28T13:00:00.000Z","revision":1,
+          "activityOccurrenceId":"occurrence-1",
+          "activitySeriesId":"activity-1",
+          "occurrenceKey":"2026-07-28T14:00:00.000Z"
+        }
+        """
+        let session = try decode(FocusSession.self, linked)
+        XCTAssertEqual(session.activityOccurrenceId, "occurrence-1")
+        XCTAssertEqual(session.activitySeriesId, "activity-1")
+        XCTAssertEqual(session.occurrenceKey, utcDate(2026, 7, 28, 14, 0, 0))
+
+        let adHoc = """
+        {"id":"focus-2","state":"running","targetDurationMin":15,"revision":1}
+        """
+        let bare = try decode(FocusSession.self, adHoc)
+        XCTAssertNil(bare.activityOccurrenceId)
+        XCTAssertNil(bare.activitySeriesId)
+        XCTAssertNil(bare.occurrenceKey)
+    }
+
     func testPage_decodesItemsArray() throws {
         let json = """
         {

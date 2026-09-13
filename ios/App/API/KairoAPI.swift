@@ -842,14 +842,30 @@ actor KairoAPI: NativeSyncTransport {
     func startFocus(
         minutes: Int,
         title: String,
-        emoji: String
+        emoji: String,
+        activitySeriesId: String? = nil,
+        occurrenceKey: String? = nil,
+        idempotencyKey: String? = nil
     ) async throws -> FocusSnapshot {
-        let key = idempotencyKeyProvider()
+        let key = idempotencyKey ?? idempotencyKeyProvider()
+        let seriesId = activitySeriesId?.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        let occurrence = try occurrenceKey.flatMap { raw -> Date? in
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : try Self.date(trimmed)
+        }
+        let pairedSeries = (seriesId?.isEmpty == false && occurrence != nil)
+            ? seriesId
+            : nil
+        let pairedKey = pairedSeries == nil ? nil : occurrence
         return try await plannerCall {
             try GeneratedAPIAdapters.startedFocus(
                 await planner.startFocusSession(
                     headers: .init(Idempotency_hyphen_Key: key),
                     body: .json(.init(
+                        activitySeriesId: pairedSeries,
+                        occurrenceKey: pairedKey,
                         targetDurationMin: minutes,
                         title: title,
                         emoji: emoji

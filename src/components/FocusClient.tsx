@@ -12,6 +12,15 @@ import { celebrate } from "./Celebration";
 import { toast } from "./Toast";
 import { notifyDayChanged } from "./NowBar";
 import { companionLine, readCompanionPref, writeCompanionPref } from "@/lib/companion";
+import {
+  adoptFocusLinkage,
+  canMarkOccurrenceDone,
+  completeLinkedOccurrence,
+  focusStartBody,
+  focusStartFingerprint,
+  markDoneErrorMessage,
+  type FocusSessionIdentity,
+} from "@/lib/focus-linkage";
 
 /**
  * Named session presets (P14 — rituals). One tap sets the whole frame: what
@@ -41,6 +50,9 @@ type Session = {
   targetDurationMin: number;
   startedAt: string;
   revision: number;
+  activityOccurrenceId?: string | null;
+  activitySeriesId?: string | null;
+  occurrenceKey?: string | null;
 };
 
 function fmtRemain(sec: number) {
@@ -150,6 +162,11 @@ export function FocusClient({
   const [finished, setFinished] = useState<{ focusedMin: number } | null>(null);
   /** One-tap "mark the block done" from the finished screen is in flight. */
   const [markingDone, setMarkingDone] = useState(false);
+  /** Server-confirmed occurrence identity. URL params only seed the start. */
+  const [confirmedLink, setConfirmedLink] = useState<FocusSessionIdentity | null>(
+    null,
+  );
+  const [markDoneError, setMarkDoneError] = useState<string | null>(null);
   /** Local break countdown (no server session): seconds left, null = no break. */
   const [breakSec, setBreakSec] = useState<number | null>(null);
   /** Linked activity's checklist (wave 4: tick steps mid-session). */
@@ -177,14 +194,23 @@ export function FocusClient({
     });
   }, []);
 
+  const seriesIdForLink = confirmedLink?.activitySeriesId ?? activityId;
+
   useEffect(() => {
-    if (!activityId) return;
+    if (!seriesIdForLink) return;
     let cancelled = false;
-    fetch(`/api/v1/activities/${activityId}`)
+    fetch(`/api/v1/activities/${seriesIdForLink}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((a) => {
         if (cancelled || !a) return;
-        if (typeof a.title === "string") setLinkedTitle(a.title);
+        if (typeof a.title === "string") {
+          setLinkedTitle(a.title);
+          // Reload/relaunch has no URL title — recover the linked name.
+          if (confirmedLink) setTitle(a.title);
+        }
+        if (typeof a.emoji === "string" && a.emoji && confirmedLink) {
+          setEmoji(a.emoji);
+        }
         if (Array.isArray(a.checklistTemplate) && a.checklistTemplate.length > 0) {
           setChecklist(
             a.checklistTemplate.map((x: { label?: string; done?: boolean }) => ({
@@ -199,15 +225,15 @@ export function FocusClient({
     return () => {
       cancelled = true;
     };
-  }, [activityId]);
+  }, [seriesIdForLink, confirmedLink]);
 
   const toggleStep = useCallback(
     async (i: number) => {
-      if (!activityId || !checklist || checklistRev == null) return;
+      if (!seriesIdForLink || !checklist || checklistRev == null) return;
       const next = checklist.map((c, k) => (k === i ? { ...c, done: !c.done } : c));
       setChecklist(next);
       try {
-        const res = await fetch(`/api/v1/activities/${activityId}`, {
+        const res = await fetch(`/api/v1/activities/${seriesIdForLink}`, {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
@@ -215,7 +241,8 @@ export function FocusClient({
           },
           body: JSON.stringify({
             editScope: "this",
-            occurrenceKey: occurrenceKey || undefined,
+            occurrenceKey:
+              confirmedLink?.occurrenceKey || occurrenceKey || undefined,
             checklistOverride: next,
           }),
         });
@@ -231,48 +258,35 @@ export function FocusClient({
         toast("Couldn't save that step — try again");
       }
     },
-    [activityId, checklist, checklistRev, occurrenceKey],
+    [seriesIdForLink, checklist, checklistRev, occurrenceKey, confirmedLink],
   );
 
   /**
    * A session started from a Today block should be able to close that block.
    * Same occurrence-scoped write the timeline's ✓ makes; the day is then
-   * refreshed so Today agrees with what just happened here.
+   * refreshed so Today agrees with what just happened here. Timer finish
+   * never calls this — Mark done is an explicit second choice.
    */
   const markLinkedDone = useCallback(async () => {
-    if (!activityId || !occurrenceKey || markingDone) return;
+    if (!canMarkOccurrenceDone(confirmedLink) || markingDone) return;
     setMarkingDone(true);
-    try {
-      const current = await fetch(`/api/v1/activities/${activityId}`);
-      if (!current.ok) throw new Error("load");
-      const a = await current.json();
-      const res = await fetch(`/api/v1/activities/${activityId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "If-Match": String(a.revision),
-        },
-        body: JSON.stringify({
-          editScope: "this",
-          occurrenceKey,
-          status: "completed",
-          completedAt: new Date().toISOString(),
-        }),
-      });
-      if (!res.ok) {
-        toast("Couldn't mark it done here — tap ✓ on Today instead");
-        return;
-      }
-      toast("Nice — marked done");
-      notifyDayChanged();
-      router.push("/app/today");
-      router.refresh();
-    } catch {
-      toast("Couldn't reach the server — tap ✓ on Today instead");
-    } finally {
-      setMarkingDone(false);
+    setMarkDoneError(null);
+    const result = await completeLinkedOccurrence({
+      activitySeriesId: confirmedLink?.activitySeriesId,
+      occurrenceKey: confirmedLink?.occurrenceKey,
+    });
+    setMarkingDone(false);
+    if (!result.ok) {
+      const message = markDoneErrorMessage(result);
+      setMarkDoneError(message);
+      toast(message);
+      return;
     }
-  }, [activityId, occurrenceKey, markingDone, router]);
+    toast("Nice — marked done");
+    notifyDayChanged();
+    router.push("/app/today");
+    router.refresh();
+  }, [confirmedLink, markingDone, router]);
 
   /**
    * Bumped by every hydrate and every mutation. A poll that started before the
@@ -304,6 +318,7 @@ export function FocusClient({
         if (data.session) {
           setSession(data.session);
           setRemainingSec(data.remainingSec ?? 0);
+          setConfirmedLink(adoptFocusLinkage(data.session));
         } else {
           setSession(null);
         }
@@ -410,14 +425,17 @@ export function FocusClient({
     hydrateGenRef.current++;
     setMutationPending(true);
     setError(null);
+    setMarkDoneError(null);
     setFinished(null);
     setBreakSec(null);
-    const body = {
+    const body = focusStartBody({
       targetDurationMin: minutes ?? durationMin,
       title,
       emoji,
-    };
-    const fingerprint = JSON.stringify(body);
+      activitySeriesId: confirmedLink?.activitySeriesId ?? activityId,
+      occurrenceKey: confirmedLink?.occurrenceKey ?? occurrenceKey,
+    });
+    const fingerprint = focusStartFingerprint(body);
     if (startAttemptRef.current?.fingerprint !== fingerprint) {
       startAttemptRef.current = {
         fingerprint,
@@ -445,6 +463,7 @@ export function FocusClient({
       const data = await res.json();
       setSession(data.session);
       setRemainingSec(data.remainingSec);
+      setConfirmedLink(adoptFocusLinkage(data.session));
       setHydrateError(false);
       startAttemptRef.current = null;
     } catch {
@@ -453,7 +472,7 @@ export function FocusClient({
       mutationInFlightRef.current = false;
       setMutationPending(false);
     }
-  }, [durationMin, title, emoji]);
+  }, [durationMin, title, emoji, activityId, occurrenceKey, confirmedLink]);
 
   const patch = useCallback(
     async (body: Record<string, unknown>) => {
@@ -680,7 +699,7 @@ export function FocusClient({
           That counted. What now?
         </p>
         <div className="mt-8 grid w-full max-w-sm gap-2">
-          {activityId && occurrenceKey && (
+          {canMarkOccurrenceDone(confirmedLink) && (
             <button
               type="button"
               onClick={() => void markLinkedDone()}
@@ -692,6 +711,11 @@ export function FocusClient({
                 {markingDone ? "Marking…" : `Mark “${linkedTitle ?? title}” done`}
               </span>
             </button>
+          )}
+          {markDoneError && (
+            <p role="alert" className="text-[13px] font-semibold text-danger">
+              {markDoneError}
+            </p>
           )}
           <button
             type="button"

@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getActiveSession: vi.fn(),
   startFocusSession: vi.fn(),
   getRemainingSec: vi.fn(),
+  presentFocusSession: vi.fn(),
   appendPlannerEvent: vi.fn(),
   withIdempotency: vi.fn(),
   database: {},
@@ -18,12 +19,14 @@ vi.mock("@/server/services/focus", () => ({
   getActiveSession: mocks.getActiveSession,
   startFocusSession: mocks.startFocusSession,
   getRemainingSec: mocks.getRemainingSec,
+  presentFocusSession: mocks.presentFocusSession,
 }));
 
 vi.mock("@/server/dal", () => ({
   appendPlannerEvent: mocks.appendPlannerEvent,
   ConflictError: class ConflictError extends Error {},
   NotFoundError: class NotFoundError extends Error {},
+  BadRequestError: class BadRequestError extends Error {},
 }));
 
 vi.mock("@/server/idempotency", () => ({
@@ -52,6 +55,13 @@ describe("/api/v1/focus-sessions wire responses", () => {
     vi.clearAllMocks();
     mocks.requireSession.mockResolvedValue({ userId: sessionRow.userId });
     mocks.getRemainingSec.mockReturnValue(1499);
+    mocks.presentFocusSession.mockImplementation(
+      async (_userId: string, session: typeof sessionRow) => ({
+        ...session,
+        activitySeriesId: null,
+        occurrenceKey: null,
+      }),
+    );
     mocks.appendPlannerEvent.mockResolvedValue(undefined);
     mocks.withIdempotency.mockImplementation(
       async (
@@ -118,6 +128,8 @@ describe("/api/v1/focus-sessions wire responses", () => {
       {
         targetDurationMin: 25,
         activityOccurrenceId: undefined,
+        activitySeriesId: undefined,
+        occurrenceKey: undefined,
       },
       { db: mocks.database },
     );
@@ -129,5 +141,50 @@ describe("/api/v1/focus-sessions wire responses", () => {
       }),
       { db: mocks.database },
     );
+  });
+
+  it("rejects an incomplete virtual-occurrence selector before starting", async () => {
+    const response = await POST(
+      new Request("https://time.neima.me/api/v1/focus-sessions", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": "01980000-7000-8000-8000-000000000099",
+        },
+        body: JSON.stringify({
+          targetDurationMin: 25,
+          activitySeriesId: "01980000-7000-8000-8000-000000000010",
+        }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: { code: "bad_request" },
+    });
+    expect(mocks.startFocusSession).not.toHaveBeenCalled();
+  });
+
+  it("fails the start when the planner event write fails (no swallow)", async () => {
+    mocks.startFocusSession.mockResolvedValue(sessionRow);
+    mocks.appendPlannerEvent.mockRejectedValue(
+      new Error("planner event write failed"),
+    );
+
+    const response = await POST(
+      new Request("https://time.neima.me/api/v1/focus-sessions", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "idempotency-key": "01980000-7000-8000-8000-000000000099",
+        },
+        body: JSON.stringify({ targetDurationMin: 25 }),
+      }),
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({
+      error: { code: "internal", retryable: false },
+    });
   });
 });

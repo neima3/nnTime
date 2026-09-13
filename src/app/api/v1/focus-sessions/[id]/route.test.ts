@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   transitionFocusSession: vi.fn(),
   extendFocusSession: vi.fn(),
   getRemainingSec: vi.fn(),
+  presentFocusSession: vi.fn(),
   appendPlannerEvent: vi.fn(),
   withIdempotency: vi.fn(),
   database: {},
@@ -18,12 +19,14 @@ vi.mock("@/server/services/focus", () => ({
   transitionFocusSession: mocks.transitionFocusSession,
   extendFocusSession: mocks.extendFocusSession,
   getRemainingSec: mocks.getRemainingSec,
+  presentFocusSession: mocks.presentFocusSession,
 }));
 
 vi.mock("@/server/dal", () => ({
   appendPlannerEvent: mocks.appendPlannerEvent,
   ConflictError: class ConflictError extends Error {},
   NotFoundError: class NotFoundError extends Error {},
+  BadRequestError: class BadRequestError extends Error {},
 }));
 
 vi.mock("@/server/idempotency", () => ({
@@ -53,6 +56,13 @@ describe("PATCH /api/v1/focus-sessions/{id}", () => {
     mocks.requireSession.mockResolvedValue({ userId: sessionRow.userId });
     mocks.transitionFocusSession.mockResolvedValue(sessionRow);
     mocks.getRemainingSec.mockReturnValue(899);
+    mocks.presentFocusSession.mockImplementation(
+      async (_userId: string, session: typeof sessionRow) => ({
+        ...session,
+        activitySeriesId: null,
+        occurrenceKey: null,
+      }),
+    );
     mocks.appendPlannerEvent.mockResolvedValue(undefined);
     mocks.withIdempotency.mockImplementation(
       async (
@@ -130,5 +140,36 @@ describe("PATCH /api/v1/focus-sessions/{id}", () => {
       },
     });
     expect(mocks.transitionFocusSession).not.toHaveBeenCalled();
+  });
+
+  it("fails a terminal transition when the planner event write fails (no swallow)", async () => {
+    mocks.transitionFocusSession.mockResolvedValue({
+      ...sessionRow,
+      state: "completed",
+    });
+    mocks.appendPlannerEvent.mockRejectedValue(
+      new Error("planner event write failed"),
+    );
+
+    const response = await PATCH(
+      new Request(
+        `https://time.neima.me/api/v1/focus-sessions/${sessionRow.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            "if-match": "2",
+            "idempotency-key": "01980000-7000-8000-8000-000000000099",
+          },
+          body: JSON.stringify({ action: "transition", state: "completed" }),
+        },
+      ),
+      { params: Promise.resolve({ id: sessionRow.id }) },
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({
+      error: { code: "internal", retryable: false },
+    });
   });
 });

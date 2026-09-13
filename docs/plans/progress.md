@@ -1,5 +1,112 @@
 # Progress log
 
+## 2026-09-13 — native-contract timestamp assertion triage
+
+Formal NO-GO on run [34778984403](https://github.com/neima3/nnTime/actions/runs/34778984403):
+`KairoAPITransportTests.testStartFocusSendsPairedSelectorAndCallerOwnedIdempotencyKey`
+expected `occurrenceKey` `…14:00:00.000Z`. Generated `RFC3339DateTranscoder`
+encodes whole seconds (`…14:00:00Z`), same as activity PATCH `startAt` and
+scoped DELETE query keys. `KairoAPI.date` still parses both forms.
+
+Fix: `0aa88fd` — test assertion only. Selector + caller-owned Idempotency-Key
+kept. Production encoding unchanged.
+
+Green rerun: [34779807625](https://github.com/neima3/nnTime/actions/runs/34779807625)
+(`build-test`, `e2e`, `native-contract` including Test shipping application).
+
+## 2026-09-13 — P1.3 client linkage + Mark done (same PR as P1.1/P1.2)
+
+Task: `2026-09-13-core-workflows-plan.md` 1.3, on
+`cursor/p0-p11-focus-ownership-8a4c`. P0 ledger + P1.1 ownership + P1.2
+server selector kept.
+
+**What shipped:**
+- Web Today / Up next / One Thing / Pick for me carry series id +
+  `occurrenceKey`. `FocusClient` POSTs the P1.2 pair and fingerprints it
+  with the per-attempt idempotency key.
+- Hydrate/start adopt `activitySeriesId` / `occurrenceKey` from the server
+  snapshot. Ad-hoc sessions stay unlinked.
+- Timer Complete does not patch the occurrence. “Mark done” uses
+  `completeLinkedOccurrence` (GET + If-Match + Idempotency-Key, 409 rebase).
+  404 is terminal and does not complete a sibling.
+- iOS `startFocus` sends the same pair + caller-owned key; FocusView adopts
+  server identity and offers Mark done. Today already posted `occurrenceKey`.
+
+**Tests:** `src/lib/focus-linkage.test.ts`, FocusClient source pins,
+`tests/focus-ios-linkage-source.test.ts`, iOS transport/model/adapter cases,
+`e2e/focus-occurrence-link.spec.ts` + `e2e/focus-concurrency.spec.ts`
+(9 passed, Playwright Chromium desktop). Reload recovers the linked title
+from the server series id, not URL params.
+
+**Not done:** physical iPhone / simulator evidence (Linux host has no Swift
+or Xcode). `native-contract` owns that compile. No deploy.
+
+**Next:** P2 everyday planner loops, or CoS review of this PR.
+
+## 2026-09-13 — P1.2 virtual-occurrence focus selector (same PR as P1.1)
+
+Task: `2026-09-13-core-workflows-plan.md` 1.2, on
+`cursor/p0-p11-focus-ownership-8a4c` (P0 ledger + P1.1 ownership kept).
+
+**Identity trace:** `GET /api/v1/day/{date}` `DayActivity.id` is the **series**
+id plus `occurrenceKey` (stable instant). Virtual instances have no
+`activity_occurrences` row, so there is no UUID to send. Today already links
+`/app/focus?activityId=<seriesId>&occurrenceKey=<iso>`. Naming on create is
+`activitySeriesId` + `occurrenceKey` to sit beside existing
+`activityOccurrenceId`. Incomplete pairs and mixed selectors → 400.
+Cross-user / unknown / cancelled / deleted parent → 404, active session kept.
+
+**What shipped:**
+- Additive create selector; no migration.
+- `startFocusSession` resolves/materializes inside the same transaction as
+  ownership (before yield). Existing override rows are reused, not clobbered.
+- Snapshot read-model adds optional `activitySeriesId` / `occurrenceKey`;
+  `activityOccurrenceId` remains authoritative. Old clients still start ad-hoc.
+- OpenAPI synced to iOS yaml. `pnpm api:check-ios` + `api:check-ios-client` 0.
+
+**Tests:** `focus-virtual-occurrence.test.ts` (one-off, recurring, reschedule,
+DST gap/fold, cancel, completed, split, deleted parent, unknown key,
+cross-user). Plus create-request contract + day “no occurrence UUID” pin.
+
+**Gates:** `pnpm lint` 0, `pnpm typecheck` 0, `pnpm build` 0.
+CI-equivalent Vitest: **1388 passed / 1 failed / 0 skipped** (158 files).
+The one fail is still `swift package dump-package` (no Swift).
+`pnpm api:sync-ios` / `api:check-ios` / `api:check-ios-client` 0.
+
+**Not done:** Task 1.3 client wiring (web `FocusClient` / iOS `startFocus`
+still send title/emoji/minutes only). No Swift compile on this Linux host
+(same as P0 ledger). No deploy.
+
+**Next:** Task 1.3 — send the selector from Today/Focus on both clients.
+
+## 2026-09-13 — Production completion plans and Grokbot handoff (planning only)
+
+**Created:** `2026-09-13-production-completion-program.md`,
+`2026-09-13-core-workflows-plan.md`, `2026-09-13-production-release-plan.md`,
+and `2026-09-13-grokbot-development-prompt.md` in this directory.
+
+**Grounding:** inspected clean HEAD `6d3000d2a7d5580f581a5edf7911346f70103ec5`,
+original roadmap, ADRs 001–005, design foundations, deployment/owner gates,
+latest Round 92/93 records, parity implementation, focus service/routes and
+web/native callers, native test inventory and CI. Fresh parity command prints
+web 89.74% / iOS 86.93%; its `planned: 1` scoring is a planning convention,
+not fresh release evidence. Plans add a separate evidence-based audit.
+
+**Priorities:** validate focus occurrence ownership before adding cross-client
+linkage; prove event/retry consistency; complete core workflows and recovery;
+then security/CSP, operations, accessibility/performance, real provider/device
+proof and release acceptance. HealthKit is already implemented; its remaining
+physical interaction proof must not be confused with older exploration notes.
+
+**Scope/verification:** documentation only. No application code, credentials,
+production settings or planner data changed; no app gates/browser/device/live
+verification rerun; no commit/push/deploy/upload performed. Historical gates
+are labeled historical. Program checkboxes remain open, including 7B/8B.
+
+**Next:** give Grokbot the dated prompt. Execute P0 baseline/ledger and P1 Task
+1.1's DB-backed occurrence-ownership regression; complete independent local
+work while preserving B1–B6 and explicit release authority boundaries.
+
 ## 2026-09-03 — Round 93: Clay illustration language (Higgsfield) + OG card + brand icons
 
 Plan: `docs/plans/2026-09-03-round93-higgsfield-illustrations.md`. Art direction:

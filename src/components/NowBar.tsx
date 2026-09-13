@@ -25,6 +25,7 @@ import { formatTime, type HourCycle } from "@/lib/time-format";
 import { useHourCycle } from "@/lib/use-hour-cycle";
 
 interface DayActivity {
+  id?: string;
   title: string;
   emoji: string;
   startMin: number;
@@ -32,6 +33,7 @@ interface DayActivity {
   done: boolean;
   /** Remaining (not-done) checklist labels, if any. */
   nextSteps: string[];
+  occurrenceKey?: string | null;
 }
 
 interface NowInfo {
@@ -96,11 +98,13 @@ export function NowProvider({
         const z: string = data.zone;
         knownZone = z;
         interface WireActivity {
+          id?: string;
           title: string;
           emoji: string | null;
           dtstartLocal: string;
           durationMin: number;
           status: string;
+          occurrenceKey?: string | null;
           checklistTemplate?: { label: string; done: boolean }[] | null;
         }
         const acts: DayActivity[] = (data.activities as WireActivity[]).map(
@@ -110,6 +114,7 @@ export function NowProvider({
               z,
             );
             return {
+              id: a.id,
               title: a.title,
               emoji: a.emoji ?? "📋",
               startMin,
@@ -118,6 +123,7 @@ export function NowProvider({
               nextSteps: (a.checklistTemplate ?? [])
                 .filter((c) => !c.done)
                 .map((c) => c.label),
+              occurrenceKey: a.occurrenceKey ?? null,
             };
           },
         );

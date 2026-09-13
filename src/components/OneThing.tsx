@@ -15,6 +15,7 @@ import { useNowInfo } from "./NowBar";
 import { useFocusTrap } from "@/lib/useFocusTrap";
 import { formatTime } from "@/lib/time-format";
 import { useHourCycle } from "@/lib/use-hour-cycle";
+import { focusHrefFromActivity } from "@/lib/focus-linkage";
 
 const EVENT = "kairo:one-thing";
 
@@ -121,13 +122,16 @@ export function OneThing() {
           <div className="mt-10 flex items-center gap-3">
             <Link
               ref={primaryRef}
-              href={`/app/focus?${new URLSearchParams({
+              href={focusHrefFromActivity({
                 title: subject.title,
                 emoji: subject.emoji,
-                duration: String(
-                  Math.min(60, Math.max(5, subject.endMin - subject.startMin)),
+                durationMin: Math.min(
+                  60,
+                  Math.max(5, subject.endMin - subject.startMin),
                 ),
-              })}`}
+                activityId: subject.id,
+                occurrenceKey: subject.occurrenceKey,
+              })}
               className="inline-flex items-center gap-2 rounded-2xl bg-iris px-6 py-3 text-[15px] font-semibold text-ink-inverse shadow-card transition-all hover:bg-iris-deep focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none active:scale-[0.98]"
               onClick={() => setOpen(false)}
             >

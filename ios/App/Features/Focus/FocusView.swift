@@ -29,6 +29,13 @@ struct FocusView: View {
     @State private var linkedActivityId: String?
     @State private var linkedOccurrenceKey: String?
     @State private var linkedRevision = 1
+    /// Server-confirmed identity for this session; URL/notification only seeds start.
+    @State private var sessionSeriesId: String?
+    @State private var sessionOccurrenceKey: String?
+    @State private var startAttemptFingerprint: String?
+    @State private var startAttemptKey: String?
+    @State private var markingDone = false
+    @State private var markDoneError: String?
     @State private var checklist: [(label: String, done: Bool)] = []
     @State private var scene: SoundscapeScene?
     /// Companion mode (T11 / R10) — mirrors the web toggle + presence card.
@@ -153,6 +160,11 @@ struct FocusView: View {
                             remaining = r.min * 60
                             // A ritual is a fresh, unlinked session.
                             linkedActivityId = nil
+                            linkedOccurrenceKey = nil
+                            sessionSeriesId = nil
+                            sessionOccurrenceKey = nil
+                            startAttemptFingerprint = nil
+                            startAttemptKey = nil
                             checklist = []
                             // The body-double ritual is the companion's front door.
                             if r.id == "double" && !companion {
@@ -411,6 +423,29 @@ struct FocusView: View {
                 .font(.kBody(14.5))
                 .foregroundStyle(Color.kInkSoft)
             VStack(spacing: 10) {
+                if sessionSeriesId != nil, sessionOccurrenceKey != nil {
+                    Button {
+                        Task { await markLinkedDone() }
+                    } label: {
+                        Label(
+                            markingDone ? "Marking…" : "Mark done",
+                            systemImage: "checkmark"
+                        )
+                        .font(.kBody(15, weight: .semibold))
+                        .foregroundStyle(Color.kSuccess)
+                        .frame(maxWidth: .infinity).padding(.vertical, 14)
+                        .background(Capsule().fill(Color.kSuccessSoft))
+                    }
+                    .disabled(markingDone)
+                    .accessibilityIdentifier("focus-mark-done")
+                }
+                if let markDoneError {
+                    Text(markDoneError)
+                        .font(.kBody(13, weight: .semibold))
+                        .foregroundStyle(Color.kDanger)
+                        .multilineTextAlignment(.center)
+                        .accessibilityIdentifier("focus-mark-done-error")
+                }
                 Button {
                     breakSec = 5 * 60
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -525,6 +560,7 @@ struct FocusView: View {
             if let s = state.session, s.state == "running" || s.state == "paused" {
                 session = s
                 remaining = state.remainingSec ?? 0
+                adoptSessionIdentity(s)
             } else if !silent {
                 session = nil
             }
@@ -533,14 +569,109 @@ struct FocusView: View {
     }
 
     private func start() async {
+        let fingerprint = [
+            String(duration), pendingTitle, pendingEmoji,
+            linkedActivityId ?? "", linkedOccurrenceKey ?? "",
+        ].joined(separator: "\u{1e}")
+        if startAttemptFingerprint != fingerprint {
+            startAttemptFingerprint = fingerprint
+            startAttemptKey = UUID().uuidString
+        }
         do {
-            let state = try await KairoAPI.shared.startFocus(minutes: duration, title: pendingTitle, emoji: pendingEmoji)
+            let state = try await KairoAPI.shared.startFocus(
+                minutes: duration,
+                title: pendingTitle,
+                emoji: pendingEmoji,
+                activitySeriesId: linkedActivityId,
+                occurrenceKey: linkedOccurrenceKey,
+                idempotencyKey: startAttemptKey
+            )
             session = state.session
             remaining = state.remainingSec ?? duration * 60
             overtime = 0
+            adoptSessionIdentity(state.session)
+            startAttemptFingerprint = nil
+            startAttemptKey = nil
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             startLiveActivity(remainingSec: remaining)
         } catch {}
+    }
+
+    private func adoptSessionIdentity(_ s: FocusSession?) {
+        guard let s else {
+            sessionSeriesId = nil
+            sessionOccurrenceKey = nil
+            return
+        }
+        sessionSeriesId = s.activitySeriesId
+        if let key = s.occurrenceKey {
+            sessionOccurrenceKey = Self.isoString(key)
+        } else {
+            sessionOccurrenceKey = nil
+        }
+        if let seriesId = s.activitySeriesId {
+            linkedActivityId = seriesId
+            linkedOccurrenceKey = sessionOccurrenceKey
+        } else if s.activityOccurrenceId == nil {
+            linkedActivityId = nil
+            linkedOccurrenceKey = nil
+        }
+    }
+
+    private static func isoString(_ date: Date) -> String {
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return iso.string(from: date)
+    }
+
+    private func markLinkedDone() async {
+        guard let seriesId = sessionSeriesId,
+              let occurrenceKey = sessionOccurrenceKey,
+              !markingDone else { return }
+        markingDone = true
+        markDoneError = nil
+        defer { markingDone = false }
+        do {
+            let current = try await KairoAPI.shared.activity(id: seriesId)
+            _ = try await KairoAPI.shared.setStatus(
+                activityId: seriesId,
+                revision: current.revision,
+                occurrenceKey: occurrenceKey,
+                status: .completed,
+                completedAt: Self.isoString(Date())
+            )
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            finishedMin = nil
+            sessionSeriesId = nil
+            sessionOccurrenceKey = nil
+        } catch let error as APIError {
+            if error.statusCode == 404 {
+                markDoneError = "That block is gone — nothing else was marked done."
+            } else if error.statusCode == 409 {
+                do {
+                    let current = try await KairoAPI.shared.activity(id: seriesId)
+                    _ = try await KairoAPI.shared.setStatus(
+                        activityId: seriesId,
+                        revision: current.revision,
+                        occurrenceKey: occurrenceKey,
+                        status: .completed,
+                        completedAt: Self.isoString(Date())
+                    )
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    finishedMin = nil
+                    sessionSeriesId = nil
+                    sessionOccurrenceKey = nil
+                    return
+                } catch {
+                    markDoneError = "The plan changed elsewhere — try again."
+                    return
+                }
+            } else {
+                markDoneError = "Couldn't mark it done here — try again."
+            }
+        } catch {
+            markDoneError = "Couldn't reach the server — try again."
+        }
     }
 
     private func action(_ command: FocusCommand) async {

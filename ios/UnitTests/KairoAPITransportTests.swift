@@ -264,6 +264,10 @@ final class KairoAPITransportTests: XCTestCase {
             25
         )
         XCTAssertEqual(try focusStart.jsonBody()["title"] as? String, "Plan")
+        XCTAssertNil(try focusStart.jsonBody()["activitySeriesId"])
+        XCTAssertNil(try focusStart.jsonBody()["occurrenceKey"])
+        XCTAssertEqual(started.session?.activitySeriesId, "activity-1")
+        XCTAssertEqual(started.session?.activityOccurrenceId, "occurrence-1")
         let focusUpdate = try XCTUnwrap(
             captures.first { $0.operationID == "updateFocusSession" }
         )
@@ -276,6 +280,58 @@ final class KairoAPITransportTests: XCTestCase {
             try focusUpdate.jsonBody()["state"] as? String,
             "paused"
         )
+    }
+
+    func testStartFocusSendsPairedSelectorAndCallerOwnedIdempotencyKey() async throws {
+        let recorder = PlannerRequestRecorder()
+        let api = KairoAPI(
+            baseURL: URL(string: "http://127.0.0.1:3456")!,
+            plannerTransport: PlannerMockTransport(
+                recorder: recorder,
+                responder: { operation in
+                    Self.successResponse(operation)
+                }
+            ),
+            timezoneIdentifierProvider: { "America/Chicago" },
+            idempotencyKeyProvider: { "must-not-replace-stable-key" }
+        )
+        let stableKey = "01980000-7000-8000-8000-000000000099"
+        let started = try await api.startFocus(
+            minutes: 25,
+            title: "Plan",
+            emoji: "🎯",
+            activitySeriesId: "01980000-7000-8000-8000-000000000010",
+            occurrenceKey: "2026-07-28T14:00:00.000Z",
+            idempotencyKey: stableKey
+        )
+        XCTAssertEqual(started.session?.activitySeriesId, "activity-1")
+        XCTAssertNotNil(started.session?.occurrenceKey)
+
+        let incomplete = try await api.startFocus(
+            minutes: 15,
+            title: "Ad hoc",
+            emoji: "⚡",
+            activitySeriesId: "01980000-7000-8000-8000-000000000010",
+            occurrenceKey: nil
+        )
+
+        let captures = await recorder.captures
+        let starts = captures.filter { $0.operationID == "startFocusSession" }
+        XCTAssertEqual(starts.count, 2)
+        let linked = try starts[0].jsonBody()
+        XCTAssertEqual(
+            linked["activitySeriesId"] as? String,
+            "01980000-7000-8000-8000-000000000010"
+        )
+        XCTAssertEqual(
+            linked["occurrenceKey"] as? String,
+            "2026-07-28T14:00:00Z"
+        )
+        XCTAssertEqual(starts[0].headers["idempotency-key"], stableKey)
+        let adHoc = try starts[1].jsonBody()
+        XCTAssertNil(adHoc["activitySeriesId"])
+        XCTAssertNil(adHoc["occurrenceKey"])
+        XCTAssertNotNil(incomplete.session)
     }
 
     func testNativeSyncTransportUsesGeneratedReadsAndCallerOwnedIdempotencyKeys() async throws {
@@ -1043,7 +1099,10 @@ final class KairoAPITransportTests: XCTestCase {
             "targetDurationMin":25,"accumulatedPauseSec":0,
             "currentIntervalStartedAt":"2026-07-28T13:00:00Z",
             "revision":1,"createdAt":"2026-07-28T13:00:00Z",
-            "updatedAt":"2026-07-28T13:00:00Z"
+            "updatedAt":"2026-07-28T13:00:00Z",
+            "activityOccurrenceId":"occurrence-1",
+            "activitySeriesId":"activity-1",
+            "occurrenceKey":"2026-07-28T14:00:00Z"
           },
           "remainingSec":1200
         }
