@@ -194,14 +194,23 @@ export function FocusClient({
     });
   }, []);
 
+  const seriesIdForLink = confirmedLink?.activitySeriesId ?? activityId;
+
   useEffect(() => {
-    if (!activityId) return;
+    if (!seriesIdForLink) return;
     let cancelled = false;
-    fetch(`/api/v1/activities/${activityId}`)
+    fetch(`/api/v1/activities/${seriesIdForLink}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((a) => {
         if (cancelled || !a) return;
-        if (typeof a.title === "string") setLinkedTitle(a.title);
+        if (typeof a.title === "string") {
+          setLinkedTitle(a.title);
+          // Reload/relaunch has no URL title — recover the linked name.
+          if (confirmedLink) setTitle(a.title);
+        }
+        if (typeof a.emoji === "string" && a.emoji && confirmedLink) {
+          setEmoji(a.emoji);
+        }
         if (Array.isArray(a.checklistTemplate) && a.checklistTemplate.length > 0) {
           setChecklist(
             a.checklistTemplate.map((x: { label?: string; done?: boolean }) => ({
@@ -216,15 +225,15 @@ export function FocusClient({
     return () => {
       cancelled = true;
     };
-  }, [activityId]);
+  }, [seriesIdForLink, confirmedLink]);
 
   const toggleStep = useCallback(
     async (i: number) => {
-      if (!activityId || !checklist || checklistRev == null) return;
+      if (!seriesIdForLink || !checklist || checklistRev == null) return;
       const next = checklist.map((c, k) => (k === i ? { ...c, done: !c.done } : c));
       setChecklist(next);
       try {
-        const res = await fetch(`/api/v1/activities/${activityId}`, {
+        const res = await fetch(`/api/v1/activities/${seriesIdForLink}`, {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
@@ -232,7 +241,8 @@ export function FocusClient({
           },
           body: JSON.stringify({
             editScope: "this",
-            occurrenceKey: occurrenceKey || undefined,
+            occurrenceKey:
+              confirmedLink?.occurrenceKey || occurrenceKey || undefined,
             checklistOverride: next,
           }),
         });
@@ -248,7 +258,7 @@ export function FocusClient({
         toast("Couldn't save that step — try again");
       }
     },
-    [activityId, checklist, checklistRev, occurrenceKey],
+    [seriesIdForLink, checklist, checklistRev, occurrenceKey, confirmedLink],
   );
 
   /**

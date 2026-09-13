@@ -8,7 +8,7 @@ describe("FocusClient step saves and hydrate failures", () => {
 
   it("toasts when a step toggle fails to save", () => {
     const start = source.indexOf("const toggleStep = useCallback(");
-    const end = source.indexOf("const hydrateGenRef = useRef(0);");
+    const end = source.indexOf("const markLinkedDone = useCallback(");
     const toggleStep = source.slice(start, end);
     expect(toggleStep.match(/Couldn't save that step — try again/g)).toHaveLength(2);
     expect(toggleStep).toContain('toast("Couldn\'t save that step — try again")');

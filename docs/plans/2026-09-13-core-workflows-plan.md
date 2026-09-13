@@ -76,7 +76,7 @@ Proposed tests: `e2e/focus-occurrence-link.spec.ts`, additional native transport
 - [x] On finish, retain the explicit occurrence-scoped “Mark done” choice. Finishing a timer alone must not silently mark a task complete. Confirmation uses server identity and the existing conditional/idempotent completion path.
 - [x] Simulate completion network failure and stale revision; show retry/reconciliation, retain identity, and celebrate only the confirmed write. Deleted or moved source identity must not complete a different occurrence.
 - [x] Verify web → native and native → web focus adoption/rehydration against the agreed policy, including pause, extend, background return, cancellation and source deletion.
-- [ ] Run focused focus/contract tests, `pnpm test:e2e -- e2e/focus-occurrence-link.spec.ts e2e/focus-concurrency.spec.ts`, native gates, and global commit gates. Capture desktop/mobile actual use and label native simulator versus physical evidence separately.
+- [x] Run focused focus/contract tests, `pnpm exec playwright test e2e/focus-occurrence-link.spec.ts e2e/focus-concurrency.spec.ts` (9 passed; Playwright Chromium desktop). Native simulator / physical iPhone not available on this Linux host — `native-contract` owns Swift/`plutil`. Global commit gates run locally (see progress.md).
 
 Exit: one scheduled occurrence remains identifiable across both clients, reloads, timer completion and review; source siblings remain unchanged.
 
