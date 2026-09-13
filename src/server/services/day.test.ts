@@ -4,6 +4,8 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  anytimeDateMatches,
+  clipOccurrenceToDayBounds,
   expandActivitiesForDay,
   type ExpandableOccurrence,
   type ExpandableSeries,
@@ -243,5 +245,117 @@ describe("expandActivitiesForDay", () => {
     );
 
     expect(list.map((a) => a.title)).toEqual(["Earlier", "Later"]);
+  });
+
+  it("overnight split: both days show the same occurrenceKey, each clipped at midnight", () => {
+    const start = wallClockToInstant(2026, 6, 18, 22, 30, 0, TZ);
+    const sat = resolveDayBounds("2026-07-18", TZ);
+    const sun = resolveDayBounds("2026-07-19", TZ);
+    const s = series({
+      id: "overnight-1",
+      title: "Movie night",
+      dtstartLocal: start,
+      durationMin: 150,
+    });
+
+    const satList = expandActivitiesForDay([s], [], sat);
+    const sunList = expandActivitiesForDay([s], [], sun);
+    expect(satList).toHaveLength(1);
+    expect(sunList).toHaveLength(1);
+    expect(satList[0].occurrenceKey.toISOString()).toBe(start.toISOString());
+    expect(sunList[0].occurrenceKey.toISOString()).toBe(start.toISOString());
+
+    const satWall = instantToWallFields(satList[0].dtstartLocal, TZ);
+    expect(satWall.hour).toBe(22);
+    expect(satWall.minute).toBe(30);
+    expect(satList[0].durationMin).toBe(90);
+
+    const sunWall = instantToWallFields(sunList[0].dtstartLocal, TZ);
+    expect(sunWall.hour).toBe(0);
+    expect(sunWall.minute).toBe(0);
+    expect(sunList[0].durationMin).toBe(60);
+  });
+
+  it("manual series keep series-zone wall time when the planning day is another zone", () => {
+    const start = wallClockToInstant(2026, 6, 18, 9, 0, 0, TZ);
+    const s = series({
+      id: "manual-1",
+      title: "Wall time stretch",
+      tz: TZ,
+      dtstartLocal: start,
+      durationMin: 30,
+    });
+    const ny = expandActivitiesForDay([s], [], resolveDayBounds("2026-07-18", TZ));
+    const la = expandActivitiesForDay(
+      [s],
+      [],
+      resolveDayBounds("2026-07-18", "America/Los_Angeles"),
+    );
+    expect(ny[0].dtstartLocal.toISOString()).toBe(start.toISOString());
+    expect(la[0].dtstartLocal.toISOString()).toBe(start.toISOString());
+    const nyWall = instantToWallFields(ny[0].dtstartLocal, TZ);
+    expect(nyWall.hour).toBe(9);
+  });
+
+  it("imported calendar instants stay absolute when the planning zone changes", () => {
+    // 14:00Z is 10:00 in New York (EDT) and 07:00 in Los Angeles.
+    const instant = new Date("2026-07-18T14:00:00.000Z");
+    const s = series({
+      id: "cal-1",
+      title: "Imported stand-up",
+      tz: "UTC",
+      dtstartLocal: instant,
+      durationMin: 30,
+    });
+    const ny = expandActivitiesForDay([s], [], resolveDayBounds("2026-07-18", TZ));
+    const la = expandActivitiesForDay(
+      [s],
+      [],
+      resolveDayBounds("2026-07-18", "America/Los_Angeles"),
+    );
+    expect(ny[0].dtstartLocal.toISOString()).toBe(instant.toISOString());
+    expect(la[0].dtstartLocal.toISOString()).toBe(instant.toISOString());
+    expect(ny[0].occurrenceKey.toISOString()).toBe(instant.toISOString());
+  });
+
+  it("all-day style midnight-in-zone lands on the named date, not the UTC day", () => {
+    const start = wallClockToInstant(2026, 6, 18, 0, 0, 0, TZ);
+    const list = expandActivitiesForDay(
+      [
+        series({
+          id: "all-day",
+          title: "Birthday",
+          dtstartLocal: start,
+          durationMin: 24 * 60,
+        }),
+      ],
+      [],
+      resolveDayBounds("2026-07-18", TZ),
+    );
+    expect(list).toHaveLength(1);
+    expect(list[0].title).toBe("Birthday");
+    expect(instantToWallFields(list[0].dtstartLocal, TZ).day).toBe(18);
+  });
+});
+
+describe("anytimeDateMatches / clipOccurrenceToDayBounds", () => {
+  it("treats Anytime dates as calendar dates, never midnight-UTC shifts", () => {
+    expect(anytimeDateMatches("2026-07-18", "2026-07-18")).toBe(true);
+    expect(anytimeDateMatches(new Date("2026-07-18T00:00:00.000Z"), "2026-07-18")).toBe(
+      true,
+    );
+    expect(anytimeDateMatches(new Date("2026-07-18T00:00:00.000Z"), "2026-07-17")).toBe(
+      false,
+    );
+    expect(anytimeDateMatches(null, "2026-07-18")).toBe(true);
+  });
+
+  it("clips an occurrence that starts before the day and ends after midnight", () => {
+    const bounds = resolveDayBounds("2026-07-19", TZ);
+    const start = wallClockToInstant(2026, 6, 18, 22, 30, 0, TZ);
+    const clipped = clipOccurrenceToDayBounds(start, 150, bounds);
+    expect(clipped).not.toBeNull();
+    expect(clipped!.start.toISOString()).toBe(bounds.start.toISOString());
+    expect(clipped!.durationMin).toBe(60);
   });
 });

@@ -1,5 +1,40 @@
 # Progress log
 
+## 2026-09-13 — P2.2 recurrence, timezone, and review correctness
+
+Task: `2026-09-13-core-workflows-plan.md` 2.2, from merged main `ca240a7`
+(PR #2). New branch; P0–P2.1 behavior kept. No deploy, no secrets.
+
+**What shipped:**
+- Series edits stamp inherited fields onto completed occurrences so a
+  title/duration/energy change cannot rewrite completed history.
+- Day expansion clips overnight blocks at midnight; both halves share
+  `occurrenceKey`. Anytime dates stay YYYY-MM-DD.
+- Activity PATCH writes `carryover` history when an occurrence is moved.
+- Review: midday window unchanged; Undo persists complete/skip/carry;
+  iOS `ReviewWindow` matches web and refuses to drop a card on a failed write.
+- Editor still refuses scoped writes without a day identity and surfaces 409
+  without overwriting unrelated fields.
+
+**Tests:** `recurrence-p22` (completed history + two-client conflict);
+overnight / all-day / Anytime / planning-zone / imported-instant day pins;
+spring-gap and autumn-fold daily expansion; ReviewWindow Swift; e2e
+`editor-edit-scope` (this-and-future, missing identity, stale revision) and
+`review-actions` (midday future untouched, undo + carry persist, net stats).
+
+**Gates (this host):** `pnpm lint` 0, `pnpm typecheck` 0, `pnpm build` 0,
+`pnpm api:check-ios` 0, `pnpm api:check-ios-client` 0.
+CI-equivalent Vitest: **160 files passed / 2 failed** — **1422 passed,
+2 failed** (`swift package dump-package` in
+`ios-generated-client-adoption.test.ts`; one
+`notification-delivery.integration` claim-state assertion, unrelated to
+this slice). `pnpm ios:release:preflight` 1 (`plutil` ENOENT). Gates were
+not lowered. Linux host has no Swift; `native-contract` owns that compile.
+
+**Not done:** P3 offline/account-boundary. No deploy.
+
+**Next:** focused e2e + CoS review of this PR.
+
 ## 2026-09-13 — P2.1 NO-GO: duplicate Save conversion flake
 
 GHA e2e [34783596327](https://github.com/neima3/nnTime/actions/runs/34783596327)

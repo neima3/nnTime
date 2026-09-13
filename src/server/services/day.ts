@@ -119,10 +119,39 @@ function exdatesToOccurrenceKeys(
   });
 }
 
-/** `[start, end)` — end is exclusive per ADR-001. */
-function withinBounds(instant: Date, bounds: { start: Date; end: Date }): boolean {
-  const t = instant.getTime();
-  return t >= bounds.start.getTime() && t < bounds.end.getTime();
+/**
+ * Split an occurrence that crosses midnight so each day shows only its half.
+ * Both halves keep the same `occurrenceKey` (ADR-001 overnight split).
+ */
+export function clipOccurrenceToDayBounds(
+  start: Date,
+  durationMin: number,
+  bounds: { start: Date; end: Date },
+): { start: Date; durationMin: number } | null {
+  const endMs = start.getTime() + durationMin * 60_000;
+  const from = bounds.start.getTime();
+  const to = bounds.end.getTime();
+  if (endMs <= from || start.getTime() >= to) return null;
+  const clippedStart = Math.max(start.getTime(), from);
+  const clippedEnd = Math.min(endMs, to);
+  const clippedMin = Math.max(1, Math.round((clippedEnd - clippedStart) / 60_000));
+  return { start: new Date(clippedStart), durationMin: clippedMin };
+}
+
+/**
+ * Anytime / all-day dates are calendar dates, never midnight-UTC instants.
+ * A null date floats on every day; otherwise the stored YYYY-MM-DD must match.
+ */
+export function anytimeDateMatches(
+  taskDate: Date | string | null | undefined,
+  target: string,
+): boolean {
+  if (taskDate == null || taskDate === "") return true;
+  const d =
+    taskDate instanceof Date
+      ? taskDate.toISOString().slice(0, 10)
+      : String(taskDate).slice(0, 10);
+  return d === target;
 }
 
 function resolveChecklist(
@@ -210,17 +239,21 @@ export function expandActivitiesForDay(
       // Cancelled / skipped instances are not shown on the day timeline.
       if (status === "cancelled" || status === "skipped") continue;
 
+      const start = override?.startAt ?? occ.startAt;
+      const duration = override?.durationMin ?? series.durationMin;
       // A "this occurrence" reschedule (e.g. Review → Move to tomorrow) writes
       // override.startAt while the occurrence_key stays put. Bucketing purely
       // by the expanded key kept the instance on its original day at the new
-      // clock time, and it never appeared on the day it was moved to.
-      if (override?.startAt && !withinBounds(override.startAt, bounds)) continue;
+      // clock time, and it never appeared on the day it was moved to. Overnight
+      // blocks are clipped to this day's half so both midnights share the key.
+      const clipped = clipOccurrenceToDayBounds(start, duration, bounds);
+      if (!clipped) continue;
 
       emitted.add(mapKey);
       activities.push({
         ...(series as DbActivitySeries),
-        dtstartLocal: override?.startAt ?? occ.startAt,
-        durationMin: override?.durationMin ?? series.durationMin,
+        dtstartLocal: clipped.start,
+        durationMin: clipped.durationMin,
         title: override?.title ?? series.title,
         energy: override?.energy ?? series.energy,
         checklistTemplate: resolveChecklist(override, series),
@@ -234,7 +267,13 @@ export function expandActivitiesForDay(
   // occurrence_key sits outside the window, so the expansion above never sees
   // them.
   for (const override of overrideByKey.values()) {
-    if (!override.startAt || !withinBounds(override.startAt, bounds)) continue;
+    if (!override.startAt) continue;
+    const clipped = clipOccurrenceToDayBounds(
+      override.startAt,
+      override.durationMin ?? seriesById.get(override.seriesId)?.durationMin ?? 0,
+      bounds,
+    );
+    if (!clipped) continue;
     const mapKey = `${override.seriesId}|${override.occurrenceKey.getTime()}`;
     if (emitted.has(mapKey)) continue;
     const status = (override.status ?? "pending") as ResolvedDayActivity["status"];
@@ -245,8 +284,8 @@ export function expandActivitiesForDay(
     emitted.add(mapKey);
     activities.push({
       ...(series as DbActivitySeries),
-      dtstartLocal: override.startAt,
-      durationMin: override.durationMin ?? series.durationMin,
+      dtstartLocal: clipped.start,
+      durationMin: clipped.durationMin,
       title: override.title ?? series.title,
       energy: override.energy ?? series.energy,
       checklistTemplate: resolveChecklist(override, series),
@@ -296,15 +335,7 @@ export async function getResolvedDay(
   }
 
   // Anytime tasks: bucket anytime with matching date OR null date (floating).
-  const dayAnytime = anytimeTasks.filter((t) => {
-    if (!t.date) return true;
-    // date column is date-only
-    const d =
-      t.date instanceof Date
-        ? t.date.toISOString().slice(0, 10)
-        : String(t.date).slice(0, 10);
-    return d === target;
-  });
+  const dayAnytime = anytimeTasks.filter((t) => anytimeDateMatches(t.date, target));
 
   return {
     userId: session.userId,

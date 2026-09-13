@@ -573,8 +573,8 @@ export function ActivityEditor(props: ActivityEditorProps) {
         // moved it there.
         if (!timeTouched.current && props.initialStartMin == null) {
           const anchor =
-            startsAt ??
             (key ? new Date(key) : null) ??
+            startsAt ??
             (a.dtstartLocal ? new Date(a.dtstartLocal) : null);
           if (anchor && !Number.isNaN(anchor.getTime())) {
             setDate(instantToLocalDateStr(anchor, zone));

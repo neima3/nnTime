@@ -134,3 +134,84 @@ test("deleting the whole series clears every day; a one-off never asks", async (
   await expect(chooser(page)).toBeHidden();
   expect(await titlesOn(page, oneOffDay)).toContain("One-off probe edited");
 });
+
+test("this and future renames the split day and later days only", async ({
+  page,
+}) => {
+  await signUp(page, "edit-scope-future");
+  const [d0, d1, d2] = [dayDate(20), dayDate(21), dayDate(22)];
+
+  await createActivity(page, d0, "Future probe", "Daily");
+  expect(await titlesOn(page, d1)).toContain("Future probe");
+
+  await openBlock(page, d1, "Future probe");
+  await page.getByPlaceholder("What are you doing?").fill("Future probe (after)");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(chooser(page)).toBeVisible();
+  await page.getByRole("radio", { name: /This and every one after/ }).check();
+  await chooser(page).getByRole("button", { name: "Save" }).click();
+  await page.waitForURL(/\/app\/today/, { timeout: 20_000 });
+
+  expect(await titlesOn(page, d0)).toContain("Future probe");
+  expect(await titlesOn(page, d0)).not.toContain("Future probe (after)");
+  expect(await titlesOn(page, d1)).toContain("Future probe (after)");
+  expect(await titlesOn(page, d1)).not.toContain("Future probe");
+  expect(await titlesOn(page, d2)).toContain("Future probe (after)");
+});
+
+test("missing day identity disables scoped answers; stale revision refuses to overwrite", async ({
+  page,
+}) => {
+  await signUp(page, "edit-scope-identity");
+  const d0 = dayDate(20);
+  await createActivity(page, d0, "Identity probe", "Daily");
+  const dayBody = (await page.request.get(`/api/v1/day/${d0}`).then((r) => r.json())) as {
+    activities: { id: string; title: string; revision: number; notes?: string | null }[];
+  };
+  const series = dayBody.activities.find((a) => a.title === "Identity probe");
+  expect(series).toBeTruthy();
+
+  await gotoHydrated(page, `/app/editor?id=${series!.id}`);
+  await expect(page.getByPlaceholder("What are you doing?")).toHaveValue(
+    "Identity probe",
+    { timeout: 20_000 },
+  );
+  await page.getByPlaceholder("What are you doing?").fill("Identity probe (all)");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(chooser(page)).toBeVisible();
+  await expect(page.getByRole("radio", { name: /Just this time/ })).toBeDisabled();
+  await expect(
+    page.getByRole("radio", { name: /This and every one after/ }),
+  ).toBeDisabled();
+  await page.getByRole("radio", { name: /The whole series/ }).check();
+  await chooser(page).getByRole("button", { name: "Save" }).click();
+  await page.waitForURL(/\/app\/today/, { timeout: 20_000 });
+  expect(await titlesOn(page, d0)).toContain("Identity probe (all)");
+  expect(await titlesOn(page, dayDate(21))).toContain("Identity probe (all)");
+
+  await openBlock(page, d0, "Identity probe (all)");
+  const fresh = await page.request.get(`/api/v1/activities/${series!.id}`);
+  expect(fresh.ok()).toBe(true);
+  const body = (await fresh.json()) as { revision: number; notes: string | null };
+  const collide = await page.request.patch(`/api/v1/activities/${series!.id}`, {
+    headers: {
+      "Content-Type": "application/json",
+      "If-Match": String(body.revision),
+    },
+    data: { editScope: "all", notes: "client-A notes" },
+  });
+  expect(collide.ok()).toBe(true);
+
+  await page.getByPlaceholder("What are you doing?").fill("Identity probe (lost)");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(chooser(page)).toBeVisible();
+  await chooser(page).getByRole("button", { name: "Save" }).click();
+  await expect(page.locator('p[role="alert"]')).toContainText(
+    "Someone else changed this",
+  );
+  const after = await page.request.get(`/api/v1/activities/${series!.id}`);
+  const afterBody = (await after.json()) as { title: string; notes: string | null };
+  expect(afterBody.title).toBe("Identity probe (all)");
+  expect(afterBody.notes).toBe("client-A notes");
+  expect(await titlesOn(page, d0)).not.toContain("Identity probe (lost)");
+});

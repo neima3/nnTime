@@ -170,6 +170,46 @@ export function pickSeriesPatch(patch: Record<string, unknown>): Record<string, 
   return out;
 }
 
+/**
+ * ADR-001: completed past occurrences are never mutated by series edits.
+ * Stamp inherited fields onto completed rows before the master changes so
+ * they keep the values they were completed with.
+ */
+async function stampCompletedInherits(
+  db: Db,
+  userId: string,
+  series: ActivitySeriesRow,
+  patch: Record<string, unknown>,
+  opts: { fromKey?: Date } = {},
+): Promise<void> {
+  const base = and(
+    eq(schema.activityOccurrences.seriesId, series.id),
+    eq(schema.activityOccurrences.userId, userId),
+    eq(schema.activityOccurrences.status, "completed"),
+    ...(opts.fromKey
+      ? [gte(schema.activityOccurrences.occurrenceKey, opts.fromKey)]
+      : []),
+  );
+  if (Object.prototype.hasOwnProperty.call(patch, "title")) {
+    await db
+      .update(schema.activityOccurrences)
+      .set({ title: series.title })
+      .where(and(base, isNull(schema.activityOccurrences.title)));
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "durationMin")) {
+    await db
+      .update(schema.activityOccurrences)
+      .set({ durationMin: series.durationMin })
+      .where(and(base, isNull(schema.activityOccurrences.durationMin)));
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "energy")) {
+    await db
+      .update(schema.activityOccurrences)
+      .set({ energy: series.energy })
+      .where(and(base, isNull(schema.activityOccurrences.energy)));
+  }
+}
+
 export function pickOccurrencePatch(patch: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(patch)) {
@@ -345,6 +385,9 @@ async function editThisAndFuture(
         : (series.rdate ?? []).filter((date) => date.getTime() >= occurrenceKey.getTime()),
       ...patch,
     };
+    await stampCompletedInherits(tdb, userId, series, patch, {
+      fromKey: occurrenceKey,
+    });
     await assertOwnedActivityReferences(
       tdb,
       userId,
@@ -398,6 +441,7 @@ async function editAll(
       hasCategory ? (patch.categoryId as string | null) ?? undefined : undefined,
       hasTags ? (patch.tags as string[] | null) ?? undefined : undefined,
     );
+    await stampCompletedInherits(tdb, userId, series, patch);
     const [updated] = await tdb
       .update(schema.activitySeries)
       .set({

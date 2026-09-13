@@ -281,6 +281,40 @@ describe("recurrence expansion — deterministic matrix (ADR-001)", () => {
     ]);
   });
 
+  it("daily recurrence through the spring gap shifts the nonexistent 02:30", () => {
+    const occ = expandSeries({
+      rrule: "FREQ=DAILY;COUNT=3",
+      tz: "America/New_York",
+      dtstart: { year: 2024, month: 2, day: 9, hour: 2, minute: 30, second: 0 },
+      from: new Date("2024-03-01T00:00:00Z"),
+      to: new Date("2024-03-15T00:00:00Z"),
+      durationMin: 30,
+    });
+    // Mar 9 02:30 EST = 07:30 UTC
+    expect(occ[0].startAt.toISOString()).toBe("2024-03-09T07:30:00.000Z");
+    // Mar 10 02:30 does not exist → 03:30 EDT = 07:30 UTC
+    expect(occ[1].startAt.toISOString()).toBe("2024-03-10T07:30:00.000Z");
+    // Mar 11 02:30 EDT = 06:30 UTC
+    expect(occ[2].startAt.toISOString()).toBe("2024-03-11T06:30:00.000Z");
+  });
+
+  it("daily recurrence through the autumn fold takes the first 01:30", () => {
+    const occ = expandSeries({
+      rrule: "FREQ=DAILY;COUNT=3",
+      tz: "America/New_York",
+      dtstart: { year: 2024, month: 10, day: 2, hour: 1, minute: 30, second: 0 },
+      from: new Date("2024-11-01T00:00:00Z"),
+      to: new Date("2024-11-10T00:00:00Z"),
+      durationMin: 30,
+    });
+    // Nov 2 01:30 EDT = 05:30 UTC
+    expect(occ[0].startAt.toISOString()).toBe("2024-11-02T05:30:00.000Z");
+    // Nov 3 01:30 first (EDT) = 05:30 UTC
+    expect(occ[1].startAt.toISOString()).toBe("2024-11-03T05:30:00.000Z");
+    // Nov 4 01:30 EST = 06:30 UTC
+    expect(occ[2].startAt.toISOString()).toBe("2024-11-04T06:30:00.000Z");
+  });
+
   it("planning-zone change keeps wall time (manual activity reflows)", () => {
     // A 09:00 activity defined in UTC, re-expanded in America/New_York, keeps
     // 09:00 wall time in the new zone (ADR-001: manual = local wall time).

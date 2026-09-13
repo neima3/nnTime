@@ -33,4 +33,14 @@ describe("Activity editor load and delete", () => {
     expect(commitDelete).toContain('setError("Couldn\'t delete it — try again")');
     expect(commitDelete).toContain("setSaving(false)");
   });
+
+  it("refuses a scoped write without a day identity and surfaces a stale revision", () => {
+    const editor = source("./ActivityEditor.tsx");
+    expect(editor).toContain(
+      "We lost track of which day this is — reopen it from the day view.",
+    );
+    expect(editor).toContain("Someone else changed this — refresh and try again.");
+    expect(editor).toContain('editScope !== "all" && !occurrenceKey');
+    expect(editor).toContain("res.status === 409");
+  });
 });

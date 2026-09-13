@@ -96,10 +96,10 @@ Existing files: `src/components/QuickCapture.tsx`, `AnytimeRail.tsx`, `PlanDayCl
 
 Existing files: `src/server/temporal/`, `src/server/services/recurrence.ts`, `day.ts`, `src/lib/review-window.ts`, `src/components/ActivityEditor.tsx`, `ios/App/Features/Today/EditScopePrompt.swift`, `ios/UnitTests/EditScopePlanTests.swift`, `e2e/editor-edit-scope.spec.ts`, `e2e/review-actions.spec.ts`.
 
-- [ ] Verify recurring create/edit/delete with “this,” “this and future,” and “all” on web and iOS, including missing identity and stale revision. Compare neighboring days and preserved completed history, not only request bodies.
-- [ ] Exercise spring gap, autumn fold, leap day, month end, overnight split, all-day/Anytime dates, planning-zone change and imported absolute instants. Reuse deterministic service tests; freeze browser time explicitly where needed.
-- [ ] Review at midday lists only ended unfinished blocks; a future block stays untouched. Complete, skip, carry to tomorrow, and undo each have reload-persistent outcomes and correct net history/stats.
-- [ ] Test two clients changing the same occurrence: clear conflict and fresh state, no silent overwrite of unrelated fields.
+- [x] Verify recurring create/edit/delete with “this,” “this and future,” and “all” on web and iOS, including missing identity and stale revision. Compare neighboring days and preserved completed history, not only request bodies.
+- [x] Exercise spring gap, autumn fold, leap day, month end, overnight split, all-day/Anytime dates, planning-zone change and imported absolute instants. Reuse deterministic service tests; freeze browser time explicitly where needed.
+- [x] Review at midday lists only ended unfinished blocks; a future block stays untouched. Complete, skip, carry to tomorrow, and undo each have reload-persistent outcomes and correct net history/stats.
+- [x] Test two clients changing the same occurrence: clear conflict and fresh state, no silent overwrite of unrelated fields.
 
 Exit P2: every capture → plan → do → review scenario has persisted-state evidence on web and applicable native surfaces, without regression of temporal contracts.
 

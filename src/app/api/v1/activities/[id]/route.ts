@@ -175,6 +175,16 @@ async function applyPatch(
       eventType: "uncomplete",
       payload: { occurrenceKey: occurrenceKey.toISOString() },
     }, { db }).catch(() => {});
+  } else if (startAt !== undefined) {
+    await appendPlannerEvent(userId, {
+      entityType: "activity_series",
+      entityId: result.seriesId,
+      eventType: "carryover",
+      payload: {
+        occurrenceKey: occurrenceKey.toISOString(),
+        startAt: new Date(startAt).toISOString(),
+      },
+    }, { db }).catch(() => {});
   }
 
   const updated = await getActivitySeries(userId, result.seriesId, { db });

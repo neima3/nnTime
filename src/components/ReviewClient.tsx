@@ -51,9 +51,90 @@ export function ReviewClient({
   const [index] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastAction, setLastAction] = useState<{
+    kind: "complete" | "skip" | "tomorrow";
+    item: ReviewItem;
+    revision: number;
+  } | null>(null);
 
   const current = items[index];
   const remaining = items.length - index;
+
+  const revisionFrom = async (res: Response, fallback: number) => {
+    const body = (await res.clone().json().catch(() => null)) as {
+      revision?: number;
+    } | null;
+    return typeof body?.revision === "number" ? body.revision : fallback;
+  };
+
+  const undoAction = useCallback(
+    async (
+      kind: "complete" | "skip" | "tomorrow",
+      item: ReviewItem,
+      revision: number,
+    ) => {
+      if (!authed) return;
+      setBusy(true);
+      setError(null);
+      try {
+        if (kind === "tomorrow") {
+          const startAt = localMinutesToInstant(date, item.startMin, zone);
+          const res = await fetch(`/api/v1/activities/${item.id}`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+              "If-Match": String(revision),
+            },
+            body: JSON.stringify({
+              editScope: "this",
+              occurrenceKey: item.occurrenceKey,
+              startAt,
+            }),
+          });
+          if (!res.ok) {
+            setError("Couldn't undo — try again");
+            setBusy(false);
+            return;
+          }
+          item = { ...item, revision: await revisionFrom(res, revision + 1) };
+        } else {
+          const delivery = await sendRebasedStatusChange({
+            path: `/api/v1/activities/${item.id}`,
+            onlineRevision: revision,
+            body: {
+              editScope: "this",
+              occurrenceKey: item.occurrenceKey,
+              status: "pending",
+              completedAt: null,
+            },
+          });
+          if (
+            delivery.state === "unavailable" ||
+            (delivery.state === "server" && !delivery.response.ok)
+          ) {
+            setError("Couldn't undo — try again");
+            setBusy(false);
+            return;
+          }
+          if (delivery.state === "server") {
+            item = {
+              ...item,
+              revision: await revisionFrom(delivery.response, revision + 1),
+            };
+          }
+        }
+        setLastAction(null);
+        setItems((prev) => [item, ...prev.filter((x) => x.id !== item.id)]);
+        setBusy(false);
+        router.refresh();
+        notifyDayChanged();
+      } catch {
+        setError("Couldn't undo — try again");
+        setBusy(false);
+      }
+    },
+    [authed, date, zone, router],
+  );
 
   const act = useCallback(
     async (kind: "complete" | "skip" | "tomorrow") => {
@@ -61,6 +142,7 @@ export function ReviewClient({
       setBusy(true);
       setError(null);
       try {
+        let nextRevision = current.revision + 1;
         if (kind === "complete" || kind === "skip") {
           const delivery = await sendRebasedStatusChange({
             path: `/api/v1/activities/${current.id}`,
@@ -91,6 +173,9 @@ export function ReviewClient({
           if (delivery.state === "queued") {
             toast("Saved on this device — it’ll sync when you’re back");
           }
+          if (delivery.state === "server") {
+            nextRevision = await revisionFrom(delivery.response, nextRevision);
+          }
         } else {
           // Move this occurrence only (occurrence override), not the whole series.
           const [y, m, d] = date.split("-").map(Number);
@@ -118,12 +203,29 @@ export function ReviewClient({
             setBusy(false);
             return false;
           }
+          nextRevision = await revisionFrom(res, nextRevision);
         }
+        const acted = { ...current, revision: nextRevision };
+        setLastAction({ kind, item: acted, revision: nextRevision });
         setItems((prev) => prev.filter((x) => x.id !== current.id));
         // index stays; next item slides into place
         setBusy(false);
         router.refresh();
         notifyDayChanged();
+        toast(
+          kind === "complete"
+            ? "Marked done"
+            : kind === "skip"
+              ? "Let go"
+              : "Moved to tomorrow",
+          {
+            actionLabel: "Undo",
+            onAction: () => {
+              void undoAction(kind, acted, nextRevision);
+            },
+            durationMs: 8000,
+          },
+        );
         return true;
       } catch {
         setError("Couldn't reach the server — try again?");
@@ -131,7 +233,7 @@ export function ReviewClient({
         return false;
       }
     },
-    [current, authed, date, zone, router],
+    [current, authed, date, zone, router, undoAction],
   );
 
   if (!current) {
@@ -151,6 +253,22 @@ export function ReviewClient({
             ? `${upcoming} ${upcoming === 1 ? "thing is" : "things are"} still ahead today — nothing to decide about ${upcoming === 1 ? "it" : "them"} yet.`
             : "Nothing left to review for this day."}
         </p>
+        {lastAction && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              void undoAction(
+                lastAction.kind,
+                lastAction.item,
+                lastAction.revision,
+              )
+            }
+            className="mt-4 rounded-xl border border-border bg-surface px-5 py-2.5 text-sm font-semibold text-ink focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:opacity-50"
+          >
+            Undo
+          </button>
+        )}
         <a
           href="/app/today"
           className="mt-6 rounded-xl bg-iris px-5 py-2.5 text-sm font-semibold text-ink-inverse"
@@ -259,6 +377,22 @@ export function ReviewClient({
             <SkipForward size={18} />
             Let it go
           </button>
+          {lastAction && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                void undoAction(
+                  lastAction.kind,
+                  lastAction.item,
+                  lastAction.revision,
+                )
+              }
+              className="flex items-center justify-center rounded-2xl py-3 text-[14px] font-semibold text-iris focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:opacity-50"
+            >
+              Undo
+            </button>
+          )}
         </div>
       ) : (
         <section
