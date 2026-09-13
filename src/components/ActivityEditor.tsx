@@ -412,6 +412,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
   );
   const [revision, setRevision] = useState(props.initialRevision);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "failed">(
     props.mode === "edit" && props.activityId && !props.initialTitle
@@ -646,8 +647,14 @@ export function ActivityEditor(props: ActivityEditorProps) {
       setError("Give this activity a title.");
       return;
     }
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     setError(null);
+    const leavePending = () => {
+      savingRef.current = false;
+      setSaving(false);
+    };
     try {
       const dtstartLocal = localMinutesToInstant(date, startMin, tz);
       const checklistTemplate = buildChecklistTemplate(steps);
@@ -658,7 +665,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
         if (props.sourceTaskId) {
           if (!navigator.onLine) {
             setError("Task scheduling needs a connection — reconnect and try again.");
-            setSaving(false);
+            leavePending();
             return;
           }
           const key = scheduleIdempotencyKey.current ?? crypto.randomUUID();
@@ -700,7 +707,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
                     serverMessage: body?.error?.message,
                   }),
             );
-            setSaving(false);
+            leavePending();
             return;
           }
         } else {
@@ -732,31 +739,31 @@ export function ActivityEditor(props: ActivityEditorProps) {
             setError(
               "You’re offline and this device couldn’t save it. Keep this open and reconnect.",
             );
-            setSaving(false);
+            leavePending();
             return;
           }
           const res = delivery.response;
           if (res.status === 401) {
             setError("Sign in to save activities.");
-            setSaving(false);
+            leavePending();
             return;
           }
           if (!res.ok) {
             const body = await res.json().catch(() => null);
             setError(body?.error?.message ?? "Couldn't create it — try again");
-            setSaving(false);
+            leavePending();
             return;
           }
         }
       } else {
         if (!props.activityId || revision == null) {
           setError("Lost track of this one — refresh and try again?");
-          setSaving(false);
+          leavePending();
           return;
         }
         if (editScope !== "all" && !occurrenceKey) {
           setError("We lost track of which day this is — reopen it from the day view.");
-          setSaving(false);
+          leavePending();
           return;
         }
         /* "Just this time" writes an occurrence override, and an override can
@@ -799,13 +806,13 @@ export function ActivityEditor(props: ActivityEditorProps) {
         });
         if (res.status === 409) {
           setError("Someone else changed this — refresh and try again.");
-          setSaving(false);
+          leavePending();
           return;
         }
         if (!res.ok) {
           const body = await res.json().catch(() => null);
           setError(body?.error?.message ?? "Couldn't save it — try again");
-          setSaving(false);
+          leavePending();
           return;
         }
       }
@@ -815,7 +822,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
       router.refresh();
     } catch {
       setError("Couldn't reach the server — try again?");
-      setSaving(false);
+      leavePending();
     }
   }, [
     title,
@@ -847,6 +854,8 @@ export function ActivityEditor(props: ActivityEditorProps) {
         setError("We lost track of which day this is — reopen it from the day view.");
         return;
       }
+      if (savingRef.current) return;
+      savingRef.current = true;
       setSaving(true);
       setError(null);
       try {
@@ -868,6 +877,7 @@ export function ActivityEditor(props: ActivityEditorProps) {
       } catch {
         setError("Couldn't delete it — try again");
       } finally {
+        savingRef.current = false;
         setSaving(false);
       }
     },

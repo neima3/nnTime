@@ -176,11 +176,40 @@ test("lost schedule response and a duplicate save reuse one conversion", async (
   expect(keys[1]).toBe(keys[0]);
 
   await page.unroute("**/api/v1/tasks/**/schedule");
+  const dupKeys: string[] = [];
+  let releaseDup = () => {};
+  const holdDup = new Promise<void>((resolve) => {
+    releaseDup = resolve;
+  });
+  await page.route(`**/api/v1/tasks/${dup.id}/schedule`, async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+    dupKeys.push(route.request().headers()["idempotency-key"] ?? "");
+    await holdDup;
+    await route.continue();
+  });
+
   await gotoHydrated(page, `/app/editor?taskId=${dup.id}&date=${today}&start=630`);
   const save = page.getByRole("button", { name: "Save", exact: true });
-  await Promise.all([save.click(), save.click()]);
+  await expect(save).toBeEnabled();
+  // Two DOM clicks in one task — before React can disable — must share one key.
+  await save.evaluate((el) => {
+    (el as HTMLButtonElement).click();
+    (el as HTMLButtonElement).click();
+  });
+  await expect(page.getByRole("button", { name: "Saving…" })).toBeDisabled();
+  // A second press while pending must not start another write.
+  await page.getByRole("button", { name: "Saving…" }).click({ force: true });
+  expect(dupKeys).toHaveLength(1);
+  releaseDup();
   await expect(page.getByRole("button", { name: `Complete ${dup.title}` })).toBeVisible({
     timeout: 15_000,
   });
   await assertConvertedOnce(page, dup.title, dup.id);
+  expect(dupKeys).toHaveLength(1);
+  expect(dupKeys[0]).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+  );
 });

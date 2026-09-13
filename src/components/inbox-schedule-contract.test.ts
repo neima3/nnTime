@@ -23,5 +23,7 @@ describe("Inbox task scheduling adoption", () => {
     expect(editor).toContain("props.initialCategoryId");
     expect(editor).toContain("shouldRetainIdempotencyKey(res.status)");
     expect(editor).toContain("Couldn't schedule it — try again");
+    expect(editor).toContain("if (savingRef.current) return");
+    expect(editor).toContain("scheduleIdempotencyKey.current ?? crypto.randomUUID()");
   });
 });
