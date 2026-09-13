@@ -1,6 +1,9 @@
 "use client";
 
+import { assertQueueableMutation } from "./offline-mutation-class";
 import { QUEUE_OWNER_HEADER } from "./queue-ownership";
+import { invalidateSettingsCache } from "./settings-cache";
+import { invalidateStatsCache } from "./stats-cache";
 
 /**
  * Offline mutation queue — ADR-002 (Phase 6B).
@@ -58,6 +61,14 @@ export function rememberUser(userId: string): void {
   } catch {}
 }
 
+export function peekRememberedUser(): string | null {
+  try {
+    return localStorage.getItem(LAST_USER_KEY);
+  } catch {
+    return null;
+  }
+}
+
 /** Forget the remembered user — called on sign-out so a signed-out device
  *  stops initializing the queue (ADR-002: purge on logout/account switch). */
 export function forgetUser(): void {
@@ -72,11 +83,27 @@ export function resolveQueueUser(userId: string | null | undefined): string | nu
     rememberUser(userId);
     return userId;
   }
-  try {
-    return localStorage.getItem(LAST_USER_KEY);
-  } catch {
-    return null;
+  return peekRememberedUser();
+}
+
+/**
+ * Bind the live session to the device queue. Switching A→B purges A's
+ * IndexedDB rows and in-memory settings/stats so B cannot replay or see them.
+ * A null live session keeps the remembered owner so an expired probe does
+ * not wipe pending work.
+ */
+export async function adoptQueueUser(
+  liveUserId: string | null | undefined,
+): Promise<string | null> {
+  const previous = peekRememberedUser();
+  if (liveUserId) {
+    if (previous && previous !== liveUserId) {
+      await purgeUserCache(previous);
+    }
+    rememberUser(liveUserId);
+    return liveUserId;
   }
+  return previous;
 }
 
 export interface QueuedMutation {
@@ -118,6 +145,7 @@ export async function enqueueMutation(
   mutation: QueuedMutationInput,
   options: EnqueueMutationOptions = {},
 ): Promise<QueuedMutation | null> {
+  assertQueueableMutation(mutation);
   const entry: QueuedMutation = {
     ...mutation,
     userId,
@@ -190,6 +218,11 @@ export async function flushQueue(userId: string): Promise<void> {
         }),
       );
     } else if (!result.success) {
+      if (result.pauseQueue) {
+        // Expired session / owner mismatch: keep the row pending so the same
+        // account can recover. Do not backoff-retry under the wrong cookie.
+        break;
+      }
       // 429/5xx — increment attempts, will retry on next flush.
       const backoff = Math.min(1000 * Math.pow(2, mut.attempts), 30000);
       await updateMutation(mut.id!, {
@@ -218,7 +251,12 @@ export async function flushQueue(userId: string): Promise<void> {
 /** Execute a single mutation via fetch. Exported for tests only. */
 export async function executeMutation(
   mut: QueuedMutation,
-): Promise<{ success: boolean; terminal: boolean; error?: string }> {
+): Promise<{
+  success: boolean;
+  terminal: boolean;
+  pauseQueue?: boolean;
+  error?: string;
+}> {
   try {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -236,6 +274,14 @@ export async function executeMutation(
           success: false,
           terminal: true,
           error: "This item was deleted while you were offline",
+        };
+      }
+      if (readRes.status === 401 || readRes.status === 403) {
+        return {
+          success: false,
+          terminal: false,
+          pauseQueue: true,
+          error: `HTTP ${readRes.status} on re-read`,
         };
       }
       if (readRes.status === 429 || readRes.status >= 500) {
@@ -260,6 +306,15 @@ export async function executeMutation(
     });
 
     if (res.ok) return { success: true, terminal: false };
+    if (res.status === 401 || res.status === 403) {
+      const body = await res.json().catch(() => ({}));
+      return {
+        success: false,
+        terminal: false,
+        pauseQueue: true,
+        error: body?.error?.message ?? `HTTP ${res.status}`,
+      };
+    }
     // Under rebase a 409 means a write landed between our re-read and the
     // replay — the next flush re-reads again, so retry rather than give up.
     if (res.status === 429 || res.status >= 500 || (res.status === 409 && mut.rebasePath)) {
@@ -343,13 +398,31 @@ export async function purgeUserCache(userId: string): Promise<void> {
 
   // Also clear any sessionStorage/localStorage keys prefixed with the user id.
   const prefix = `kairo:${userId}:`;
-  for (let i = sessionStorage.length - 1; i >= 0; i--) {
-    const key = sessionStorage.key(i);
-    if (key?.startsWith(prefix)) sessionStorage.removeItem(key);
+  if (typeof sessionStorage !== "undefined") {
+    clearPrefixedStorage(sessionStorage, prefix);
   }
-  for (let i = localStorage.length - 1; i >= 0; i--) {
-    const key = localStorage.key(i);
-    if (key?.startsWith(prefix)) localStorage.removeItem(key);
+  if (typeof localStorage !== "undefined") {
+    clearPrefixedStorage(localStorage, prefix);
+  }
+  try {
+    localStorage.removeItem("kairo:onboarding");
+  } catch {}
+  if (peekRememberedUser() === userId) {
+    forgetUser();
+  }
+  invalidateSettingsCache();
+  invalidateStatsCache();
+  dispatchQueueChanged();
+}
+
+function clearPrefixedStorage(storage: Storage, prefix: string): void {
+  try {
+    for (let i = storage.length - 1; i >= 0; i--) {
+      const key = storage.key(i);
+      if (key?.startsWith(prefix)) storage.removeItem(key);
+    }
+  } catch {
+    // Private mode / missing Storage — best effort.
   }
 }
 

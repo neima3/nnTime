@@ -188,6 +188,31 @@ describe("executeMutation rebase-on-replay", () => {
     const result = await executeMutation(baseMutation);
     expect(result).toMatchObject({ success: false, terminal: false });
   });
+
+  it("pauses on 401 so an expired session does not become a terminal drop", async () => {
+    vi.stubGlobal("fetch", async () => jsonResponse(401, {
+      error: { message: "Authentication required" },
+    }));
+    const result = await executeMutation({
+      ...baseMutation,
+      rebasePath: undefined,
+    });
+    expect(result).toMatchObject({
+      success: false,
+      terminal: false,
+      pauseQueue: true,
+    });
+  });
+
+  it("pauses when the rebase re-read hits 401", async () => {
+    vi.stubGlobal("fetch", async () => jsonResponse(401, {}));
+    const result = await executeMutation(baseMutation);
+    expect(result).toMatchObject({
+      success: false,
+      terminal: false,
+      pauseQueue: true,
+    });
+  });
 });
 
 describe("durable queue summary and terminal acknowledgment", () => {

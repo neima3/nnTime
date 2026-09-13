@@ -1,7 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useSession } from "@/lib/auth-client";
-import { resolveQueueUser } from "@/lib/offline-queue";
+import { adoptQueueUser, peekRememberedUser } from "@/lib/offline-queue";
 import { OfflineIndicator } from "./OfflineIndicator";
 
 /**
@@ -11,10 +12,18 @@ import { OfflineIndicator } from "./OfflineIndicator";
  * data — offline is exactly when `useSession()` may fail or never resolve,
  * and a null here silently killed the offline banner AND the reconnect
  * flush (found by the offline E2E spec). Sign-out forgets the remembered
- * user, so the fallback can't outlive the account.
+ * user, so the fallback can't outlive the account. A live A→B switch
+ * purges A's queue before B's indicator mounts.
  */
 export function OfflineShell() {
   const { data } = useSession();
-  const userId = resolveQueueUser(data?.user?.id ?? null);
+  const [userId, setUserId] = useState<string | null>(() =>
+    data?.user?.id ?? peekRememberedUser(),
+  );
+
+  useEffect(() => {
+    void adoptQueueUser(data?.user?.id ?? null).then(setUserId);
+  }, [data?.user?.id]);
+
   return <OfflineIndicator userId={userId} />;
 }

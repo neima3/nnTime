@@ -142,6 +142,48 @@ export function planningToday(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 }
 
+export async function readOfflineQueue(
+  page: import("@playwright/test").Page,
+): Promise<Array<Record<string, unknown>>> {
+  return page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("kairo-offline", 1);
+      request.onupgradeneeded = () => {
+        if (!request.result.objectStoreNames.contains("mutations")) {
+          request.result.createObjectStore("mutations", {
+            keyPath: "id",
+            autoIncrement: true,
+          });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const rows = await new Promise<Array<Record<string, unknown>>>((resolve) => {
+      const request = db
+        .transaction("mutations", "readonly")
+        .objectStore("mutations")
+        .getAll();
+      request.onsuccess = () =>
+        resolve(request.result as Array<Record<string, unknown>>);
+    });
+    db.close();
+    return rows;
+  });
+}
+
+export async function setBrowserOffline(
+  page: import("@playwright/test").Page,
+  context: import("@playwright/test").BrowserContext,
+  offline: boolean,
+): Promise<void> {
+  await context.setOffline(offline);
+  await page.evaluate(
+    (eventName) => window.dispatchEvent(new Event(eventName)),
+    offline ? "offline" : "online",
+  );
+}
+
 export function authCapabilities(
   request: { get: (url: string) => Promise<{ json: () => Promise<unknown> }> },
 ): Promise<{ magicLink: boolean }> {

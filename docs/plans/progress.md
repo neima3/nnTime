@@ -1,5 +1,37 @@
 # Progress log
 
+## 2026-09-13 — P3.1 offline and account-boundary matrix
+
+Task: `2026-09-13-core-workflows-plan.md` 3.1, from merged main `3af36ef`
+(PR #3). New branch; P0–P2.2 behavior kept. No deploy, no secrets.
+
+**What shipped:**
+- Explicit ADR-002 mutation classes (`replay-safe-create`, `rebase-status`,
+  `never-queued`). `enqueueMutation` refuses edits/deletes/checklist/focus.
+  ADR-004's older "queue focus offline" wording is not treated as permission.
+- `adoptQueueUser` purges the prior account on A→B. `purgeUserCache` also
+  clears onboarding draft, last-user, and in-memory settings/stats.
+- Flush treats 401/403 as a pause (keep pending) so an expired session does
+  not become a terminal drop or replay as another account. 429/5xx backoff
+  still 1s…30s.
+
+**Tests:** classification + account-boundary + 401 pause + lost-key replay
+units; service pin that a rebased status write keeps a concurrent title;
+e2e restart/lost-response/title+status, logout/expiry/A→B, never-queued
+families, and real Cache Storage SW privacy. Native
+`OfflineAccountBoundaryTests` pins kinds, no pinned revision, and
+cache/queue/cookie purge.
+
+**Gates (this host):** `pnpm lint` 0, `pnpm typecheck` 0, `pnpm build` 0,
+`pnpm api:check-ios` 0, `pnpm api:check-ios-client` 0.
+Focused Vitest (offline queue/class/SW + ownership): **10 files / 80 passed**.
+DB integration (`offline-status-title-conflict`) skipped — no Postgres on
+this Linux host. `pnpm ios:release:preflight` expected 1 (`plutil` ENOENT).
+Linux host has no Swift; `native-contract` owns that compile. Gates were
+not lowered.
+
+**Not done:** P3.2 feature audit. No deploy.
+
 ## 2026-09-13 — P2.2 NO-GO: five-type notification delivery
 
 GHA `build-test` [34786653731](https://github.com/neima3/nnTime/actions/runs/34786653731)
