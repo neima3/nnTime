@@ -20,7 +20,9 @@ server selector kept.
 
 **Tests:** `src/lib/focus-linkage.test.ts`, FocusClient source pins,
 `tests/focus-ios-linkage-source.test.ts`, iOS transport/model/adapter cases,
-`e2e/focus-occurrence-link.spec.ts`.
+`e2e/focus-occurrence-link.spec.ts` + `e2e/focus-concurrency.spec.ts`
+(9 passed, Playwright Chromium desktop). Reload recovers the linked title
+from the server series id, not URL params.
 
 **Not done:** physical iPhone / simulator evidence (Linux host has no Swift
 or Xcode). `native-contract` owns that compile. No deploy.
