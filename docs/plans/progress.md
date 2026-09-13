@@ -3,7 +3,7 @@
 ## 2026-09-13 — P3.1 offline and account-boundary matrix
 
 Task: `2026-09-13-core-workflows-plan.md` 3.1, from merged main `3af36ef`
-(PR #3). New branch; P0–P2.2 behavior kept. No deploy, no secrets.
+(PR #3). Draft PR #4; P0–P2.2 behavior kept. No deploy, no secrets.
 
 **What shipped:**
 - Explicit ADR-002 mutation classes (`replay-safe-create`, `rebase-status`,
@@ -11,6 +11,10 @@ Task: `2026-09-13-core-workflows-plan.md` 3.1, from merged main `3af36ef`
   ADR-004's older "queue focus offline" wording is not treated as permission.
 - `adoptQueueUser` purges the prior account on A→B. `purgeUserCache` also
   clears onboarding draft, last-user, and in-memory settings/stats.
+- Sign-out keeps a barrier so a stale session tick cannot re-bind A.
+  `rememberUser` no-ops for that id; AuthForm clears the barrier on a
+  successful new auth. Offline sign-out still leaves the session UI and
+  retries the server call once online (including if already online).
 - Flush treats 401/403 as a pause (keep pending) so an expired session does
   not become a terminal drop or replay as another account. 429/5xx backoff
   still 1s…30s.
@@ -24,11 +28,18 @@ cache/queue/cookie purge.
 
 **Gates (this host):** `pnpm lint` 0, `pnpm typecheck` 0, `pnpm build` 0,
 `pnpm api:check-ios` 0, `pnpm api:check-ios-client` 0.
-Focused Vitest (offline queue/class/SW + ownership): **10 files / 80 passed**.
-DB integration (`offline-status-title-conflict`) skipped — no Postgres on
-this Linux host. `pnpm ios:release:preflight` expected 1 (`plutil` ENOENT).
+Focused Vitest (offline queue/class/SW + title-conflict + UserMenu):
+**9 files / 79 passed** plus UserMenu **3/3**.
+DB integration `offline-status-title-conflict` **1/1**
+(`TEST_DATABASE_URL=postgresql://kairo:kairo@localhost:5432/kairo_test`).
+Focused e2e (setup + offline-replay + account-boundary + never-queued +
+SW privacy): **11 passed**.
+`pnpm ios:release:preflight` expected 1 (`plutil` ENOENT).
 Linux host has no Swift; `native-contract` owns that compile. Gates were
 not lowered.
+
+**CI:** https://github.com/neima3/nnTime/actions/runs/34790095390
+(in progress on `625c7d0` at handoff; docs commit follows).
 
 **Not done:** P3.2 feature audit. No deploy.
 
