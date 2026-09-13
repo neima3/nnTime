@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { gotoHydrated, signUp } from "./helpers";
 
@@ -20,6 +21,21 @@ test.use({
  */
 function reviewCard(page: import("@playwright/test").Page, title: string) {
   return page.locator("main").getByText(title);
+}
+
+/** Shared-account Review can have leftover ended cards from earlier specs. */
+async function revealReviewCard(
+  page: import("@playwright/test").Page,
+  title: string,
+) {
+  for (let i = 0; i < 25; i++) {
+    if (await reviewCard(page, title).isVisible()) return;
+    const dismiss = page.getByRole("button", { name: "Let it go" });
+    if (!(await dismiss.isVisible())) break;
+    await dismiss.click();
+    await expect(dismiss).toBeEnabled({ timeout: 15_000 });
+  }
+  await expect(reviewCard(page, title)).toBeVisible();
 }
 
 test("authenticated Review decisions persist before celebrating", async ({
@@ -128,4 +144,184 @@ test("authenticated Review decisions persist before celebrating", async ({
 
   await page.getByRole("button", { name: "Let it go" }).click();
   await expect(reviewCard(page, titles[2]!)).toHaveCount(0, { timeout: 15_000 });
+});
+
+/**
+ * Extra sign-ups trip ADR-003's 10/10min cap. Seed on the suite session
+ * after a real app origin exists — about:blank has no crypto.randomUUID
+ * and no session cookies.
+ */
+test.describe("shared-account midday review", () => {
+  test.use({
+    storageState: "browser-qa/e2e-artifacts/.auth/user.json",
+  });
+
+  test("midday review leaves a future block untouched; undo persists with net stats", async ({
+    page,
+  }) => {
+  const suffix = Date.now();
+  const endedTitle = `Review ended ${suffix}`;
+  const futureTitle = `Review future ${suffix}`;
+
+  await gotoHydrated(page, "/app/today");
+  const seeded = await page.evaluate(
+    async ({ ended, future, endedKey, futureKey }) => {
+    const zone = "America/New_York";
+    const localDate = new Date().toLocaleDateString("en-CA", { timeZone: zone });
+    const nowParts = new Intl.DateTimeFormat("en-US", {
+      timeZone: zone,
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(new Date());
+    const hour = Number(nowParts.find((p) => p.type === "hour")?.value ?? "0");
+    const minute = Number(nowParts.find((p) => p.type === "minute")?.value ?? "0");
+    const nowMin = (hour === 24 ? 0 : hour) * 60 + minute;
+    const futureStart = nowMin < 22 * 60 ? "23:00:00" : null;
+
+    const endedStart = new Date(`${localDate}T00:00:00`);
+    const statuses: number[] = [];
+    const create = async (title: string, start: Date, durationMin: number, key: string) => {
+      const response = await fetch("/api/v1/activities", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": key,
+        },
+        body: JSON.stringify({
+          tz: zone,
+          title,
+          emoji: "🧭",
+          dtstartLocal: start.toISOString(),
+          durationMin,
+        }),
+      });
+      statuses.push(response.status);
+    };
+    await create(ended, endedStart, 1, endedKey);
+    if (futureStart) {
+      await create(future, new Date(`${localDate}T${futureStart}`), 30, futureKey);
+    }
+    return { localDate, nowMin, futureStart, statuses };
+  },
+    {
+      ended: endedTitle,
+      future: futureTitle,
+      endedKey: randomUUID(),
+      futureKey: randomUUID(),
+    },
+  );
+
+  expect(seeded.statuses[0]).toBe(201);
+  if (seeded.nowMin < 1) {
+    await page.waitForFunction(() => {
+      const now = new Date();
+      return now.getHours() > 0 || now.getMinutes() >= 1;
+    });
+  }
+
+  await gotoHydrated(page, "/app/review");
+  await revealReviewCard(page, endedTitle);
+  if (seeded.futureStart) {
+    await expect(reviewCard(page, futureTitle)).toHaveCount(0);
+    await expect(page.getByText(/still ahead today/)).toBeVisible();
+  }
+
+  await page.getByRole("button", { name: "I did it" }).click();
+  await expect(reviewCard(page, endedTitle)).toHaveCount(0, { timeout: 15_000 });
+  if (seeded.futureStart) {
+    await expect(reviewCard(page, futureTitle)).toHaveCount(0);
+  }
+
+  const dayAfterComplete = await page.request.get(`/api/v1/day/${seeded.localDate}`);
+  expect(dayAfterComplete.ok()).toBe(true);
+  const dayBody = (await dayAfterComplete.json()) as {
+    activities: { title: string; status: string }[];
+  };
+  expect(dayBody.activities.find((a) => a.title === endedTitle)?.status).toBe(
+    "completed",
+  );
+  if (seeded.futureStart) {
+    expect(dayBody.activities.find((a) => a.title === futureTitle)?.status).toBe(
+      "pending",
+    );
+  }
+
+  const statsDone = await page.request.get("/api/v1/stats?days=7");
+  expect(statsDone.ok()).toBe(true);
+  const statsDoneBody = (await statsDone.json()) as { totalCompleted: number };
+  expect(statsDoneBody.totalCompleted).toBeGreaterThanOrEqual(1);
+
+  await page.locator("main").getByRole("button", { name: "Undo" }).click();
+  await expect(reviewCard(page, endedTitle)).toBeVisible({ timeout: 15_000 });
+
+  await gotoHydrated(page, "/app/review");
+  await revealReviewCard(page, endedTitle);
+
+  const dayAfterUndo = await page.request.get(`/api/v1/day/${seeded.localDate}`);
+  const undone = (await dayAfterUndo.json()) as {
+    activities: { title: string; status: string }[];
+  };
+  expect(undone.activities.find((a) => a.title === endedTitle)?.status).toBe(
+    "pending",
+  );
+  if (seeded.futureStart) {
+    expect(undone.activities.find((a) => a.title === futureTitle)?.status).toBe(
+      "pending",
+    );
+  }
+
+  const statsUndo = await page.request.get("/api/v1/stats?days=7");
+  const statsUndoBody = (await statsUndo.json()) as { totalCompleted: number };
+  expect(statsUndoBody.totalCompleted).toBe(statsDoneBody.totalCompleted - 1);
+
+  await page.getByRole("button", { name: "Let it go" }).click();
+  await expect(reviewCard(page, endedTitle)).toHaveCount(0, { timeout: 15_000 });
+  const dayAfterSkip = await page.request.get(`/api/v1/day/${seeded.localDate}`);
+  const skipped = (await dayAfterSkip.json()) as {
+    activities: { title: string; status: string }[];
+  };
+  // Skipped occurrences are omitted from the day timeline (not listed pending).
+  expect(skipped.activities.find((a) => a.title === endedTitle)).toBeUndefined();
+  if (seeded.futureStart) {
+    expect(skipped.activities.find((a) => a.title === futureTitle)?.status).toBe(
+      "pending",
+    );
+  }
+  await page.locator("main").getByRole("button", { name: "Undo" }).click();
+  await expect(reviewCard(page, endedTitle)).toBeVisible({ timeout: 15_000 });
+  await gotoHydrated(page, "/app/review");
+  await revealReviewCard(page, endedTitle);
+  const dayAfterSkipUndo = await page.request.get(`/api/v1/day/${seeded.localDate}`);
+  const unskipped = (await dayAfterSkipUndo.json()) as {
+    activities: { title: string; status: string }[];
+  };
+  expect(unskipped.activities.find((a) => a.title === endedTitle)?.status).toBe(
+    "pending",
+  );
+
+  await page.getByRole("button", { name: "Move to tomorrow" }).click();
+  await expect(reviewCard(page, endedTitle)).toHaveCount(0, { timeout: 15_000 });
+  const [y, m, d] = seeded.localDate.split("-").map(Number);
+  const tomorrow = new Date(Date.UTC(y!, m! - 1, d! + 1)).toISOString().slice(0, 10);
+  await gotoHydrated(page, "/app/review");
+  await expect(reviewCard(page, endedTitle)).toHaveCount(0);
+  const todayAfterCarry = await page.request.get(`/api/v1/day/${seeded.localDate}`);
+  const tomorrowAfterCarry = await page.request.get(`/api/v1/day/${tomorrow}`);
+  const todayActs = (await todayAfterCarry.json()) as {
+    activities: { title: string; status: string }[];
+  };
+  const tomorrowActs = (await tomorrowAfterCarry.json()) as {
+    activities: { title: string; status: string }[];
+  };
+  expect(todayActs.activities.find((a) => a.title === endedTitle)).toBeUndefined();
+  expect(tomorrowActs.activities.find((a) => a.title === endedTitle)?.status).toBe(
+    "pending",
+  );
+  if (seeded.futureStart) {
+    expect(todayActs.activities.find((a) => a.title === futureTitle)?.status).toBe(
+      "pending",
+    );
+  }
+  });
 });

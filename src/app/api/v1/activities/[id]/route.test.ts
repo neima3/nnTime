@@ -232,6 +232,15 @@ describe("DELETE /api/v1/activities/{id} idempotency", () => {
     expect(mocks.deleteActivitySeries).not.toHaveBeenCalled();
   });
 
+  it("rejects a scoped patch without occurrence identity", async () => {
+    const response = await patchRequest(
+      { "if-match": "4" },
+      { editScope: "this", title: "No day" },
+    );
+    expect(response.status).toBe(400);
+    expect(mocks.editSeriesOccurrence).not.toHaveBeenCalled();
+  });
+
   it("rejects incompatible occurrence and master fields", async () => {
     const occurrenceKey = "2026-08-05T13:00:00.000Z";
     const occurrenceResponse = await patchRequest(

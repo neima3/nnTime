@@ -100,11 +100,31 @@ export async function listTasks(
 export async function listDayActivities(
   page: Page,
   date: string,
-): Promise<{ id: string; title: string; status: string; durationMin?: number }[]> {
+): Promise<
+  {
+    id: string;
+    title: string;
+    status: string;
+    durationMin?: number;
+    occurrenceKey?: string;
+    dtstartLocal?: string;
+    notes?: string | null;
+    revision?: number;
+  }[]
+> {
   const res = await page.request.get(`/api/v1/day/${date}`);
   expect(res.ok()).toBe(true);
   const body = (await res.json()) as {
-    activities: { id: string; title: string; status: string; durationMin?: number }[];
+    activities: {
+      id: string;
+      title: string;
+      status: string;
+      durationMin?: number;
+      occurrenceKey?: string;
+      dtstartLocal?: string;
+      notes?: string | null;
+      revision?: number;
+    }[];
   };
   return body.activities;
 }

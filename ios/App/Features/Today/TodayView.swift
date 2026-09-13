@@ -219,7 +219,12 @@ struct TodayView: View {
                 PickForMeSheet(blocks: blocks, nowMin: nowMin, lowBattery: lowBattery && dayOffset == 0)
             }
             .sheet(isPresented: $showReview, onDismiss: { Task { await load() } }) {
-                ReviewSheet(date: date, zone: app.timezone, items: blocks) { }
+                ReviewSheet(
+                    date: date,
+                    zone: app.timezone,
+                    items: blocks,
+                    nowMin: dayOffset == 0 ? nowMin : nil
+                ) { }
             }
             .sheet(isPresented: $showTemplates, onDismiss: { Task { await load() } }) {
                 NavigationStack { TemplatesView() }

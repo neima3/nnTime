@@ -134,3 +134,100 @@ test("deleting the whole series clears every day; a one-off never asks", async (
   await expect(chooser(page)).toBeHidden();
   expect(await titlesOn(page, oneOffDay)).toContain("One-off probe edited");
 });
+
+/**
+ * Extra sign-ups trip ADR-003's 10/10min cap. These cases reuse the suite
+ * session from setup.auth (this file otherwise wipes storage so the older
+ * tests can still own a throwaway account).
+ */
+test.describe("shared-account recurrence scopes", () => {
+  test.use({
+    storageState: "browser-qa/e2e-artifacts/.auth/user.json",
+  });
+
+  test("this and future renames the split day and later days only", async ({
+    page,
+  }) => {
+    const stamp = Date.now();
+    const before = `Future probe ${stamp}`;
+    const after = `Future probe (after) ${stamp}`;
+    const [d0, d1, d2] = [dayDate(30), dayDate(31), dayDate(32)];
+
+    await createActivity(page, d0, before, "Daily");
+    expect(await titlesOn(page, d1)).toContain(before);
+
+    await openBlock(page, d1, before);
+    await page.getByPlaceholder("What are you doing?").fill(after);
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(chooser(page)).toBeVisible();
+    await page.getByRole("radio", { name: /This and every one after/ }).check();
+    await chooser(page).getByRole("button", { name: "Save" }).click();
+    await page.waitForURL(/\/app\/today/, { timeout: 20_000 });
+
+    expect(await titlesOn(page, d0)).toContain(before);
+    expect(await titlesOn(page, d0)).not.toContain(after);
+    expect(await titlesOn(page, d1)).toContain(after);
+    expect(await titlesOn(page, d1)).not.toContain(before);
+    expect(await titlesOn(page, d2)).toContain(after);
+  });
+
+  test("missing day identity disables scoped answers; stale revision refuses to overwrite", async ({
+    page,
+  }) => {
+    const stamp = Date.now();
+    const name = `Identity probe ${stamp}`;
+    const renamed = `${name} (all)`;
+    const lost = `${name} (lost)`;
+    const d0 = dayDate(40);
+    const neighbor = dayDate(41);
+    await createActivity(page, d0, name, "Daily");
+    const dayBody = (await page.request.get(`/api/v1/day/${d0}`).then((r) => r.json())) as {
+      activities: { id: string; title: string; revision: number; notes?: string | null }[];
+    };
+    const series = dayBody.activities.find((a) => a.title === name);
+    expect(series).toBeTruthy();
+
+    await gotoHydrated(page, `/app/editor?id=${series!.id}`);
+    await expect(page.getByPlaceholder("What are you doing?")).toHaveValue(name, {
+      timeout: 20_000,
+    });
+    await page.getByPlaceholder("What are you doing?").fill(renamed);
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(chooser(page)).toBeVisible();
+    await expect(page.getByRole("radio", { name: /Just this time/ })).toBeDisabled();
+    await expect(
+      page.getByRole("radio", { name: /This and every one after/ }),
+    ).toBeDisabled();
+    await page.getByRole("radio", { name: /The whole series/ }).check();
+    await chooser(page).getByRole("button", { name: "Save" }).click();
+    await page.waitForURL(/\/app\/today/, { timeout: 20_000 });
+    expect(await titlesOn(page, d0)).toContain(renamed);
+    expect(await titlesOn(page, neighbor)).toContain(renamed);
+
+    await openBlock(page, d0, renamed);
+    const fresh = await page.request.get(`/api/v1/activities/${series!.id}`);
+    expect(fresh.ok()).toBe(true);
+    const body = (await fresh.json()) as { revision: number; notes: string | null };
+    const collide = await page.request.patch(`/api/v1/activities/${series!.id}`, {
+      headers: {
+        "Content-Type": "application/json",
+        "If-Match": String(body.revision),
+      },
+      data: { editScope: "all", notes: "client-A notes" },
+    });
+    expect(collide.ok()).toBe(true);
+
+    await page.getByPlaceholder("What are you doing?").fill(lost);
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(chooser(page)).toBeVisible();
+    await chooser(page).getByRole("button", { name: "Save" }).click();
+    await expect(page.locator('p[role="alert"]')).toContainText(
+      "Someone else changed this",
+    );
+    const afterRes = await page.request.get(`/api/v1/activities/${series!.id}`);
+    const afterBody = (await afterRes.json()) as { title: string; notes: string | null };
+    expect(afterBody.title).toBe(renamed);
+    expect(afterBody.notes).toBe("client-A notes");
+    expect(await titlesOn(page, d0)).not.toContain(lost);
+  });
+});

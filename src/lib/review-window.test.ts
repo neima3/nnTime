@@ -42,5 +42,7 @@ describe("partitionReviewItems", () => {
       "utf8",
     );
     expect(client).toContain("still ahead today");
+    expect(client).toContain("Undo");
+    expect(client).toContain('status: "pending"');
   });
 });
