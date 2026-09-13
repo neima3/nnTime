@@ -66,11 +66,12 @@ describe("UserMenu", () => {
     expect(source).toContain("completeServerSignOut");
     expect(source).toContain("await signOut()");
     expect(source).toContain("router.push(\"/\")");
+    expect(source).toContain("window.location.assign(\"/\")");
     expect(source.indexOf("markPendingSignOut()")).toBeLessThan(
       source.indexOf("await completeServerSignOut()"),
     );
     expect(source.indexOf("await completeServerSignOut()")).toBeLessThan(
-      source.indexOf("router.push(\"/\")"),
+      source.indexOf("window.location.assign(\"/\")"),
     );
   });
 });

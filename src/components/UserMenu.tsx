@@ -68,20 +68,25 @@ export function UserMenu() {
     markPendingSignOut();
     if (userId) await purgeUserCache(userId).catch(() => {});
     forgetUser();
+    let serverDone = false;
     try {
       await completeServerSignOut();
+      serverDone = true;
     } catch {
       // Offline / dropped network: the durable flag stays set so the root
-      // flusher can expire the HttpOnly cookie after reconnect. In-memory
-      // listeners do not survive the landing-page fallback navigation.
+      // flusher can expire the HttpOnly cookie after reconnect.
     }
     try {
       await signOut();
     } catch {
       // Client session cache — best effort; cookie expiry is the server POST.
     }
-    router.push("/");
-    router.refresh();
+    if (serverDone) {
+      router.push("/");
+      router.refresh();
+      return;
+    }
+    window.location.assign("/");
   }
 
   return (

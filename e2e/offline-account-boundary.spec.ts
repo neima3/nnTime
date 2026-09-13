@@ -58,9 +58,9 @@ test("A→B switch after logout does not replay A's pending capture as B", async
   // Purge while still offline so reconnect cannot flush A's capture first.
   await page.getByRole("button", { name: "Sign out" }).click();
   await expect.poll(async () => (await readOfflineQueue(page)).length).toBe(0);
-  // Restore the network without evaluating in a document that may be navigating
-  // home after a rejected signOut.
   await context.setOffline(false);
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+  await page.waitForSelector('html[data-hydrated="true"]', { timeout: 30_000 });
   await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible({
     timeout: 20_000,
   });
