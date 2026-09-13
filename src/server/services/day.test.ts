@@ -350,6 +350,17 @@ describe("anytimeDateMatches / clipOccurrenceToDayBounds", () => {
     expect(anytimeDateMatches(null, "2026-07-18")).toBe(true);
   });
 
+  it("a 1ms identity window clips duration to 1 minute — not a fire-time input", () => {
+    const start = new Date("2026-07-28T22:30:00.000Z");
+    const clipped = clipOccurrenceToDayBounds(start, 30, {
+      start,
+      end: new Date(start.getTime() + 1),
+    });
+    expect(clipped).not.toBeNull();
+    expect(clipped!.durationMin).toBe(1);
+    expect(clipped!.start.toISOString()).toBe(start.toISOString());
+  });
+
   it("clips an occurrence that starts before the day and ends after midnight", () => {
     const bounds = resolveDayBounds("2026-07-19", TZ);
     const start = wallClockToInstant(2026, 6, 18, 22, 30, 0, TZ);

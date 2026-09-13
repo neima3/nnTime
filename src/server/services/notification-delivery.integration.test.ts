@@ -610,7 +610,19 @@ describe("deliverDueNotificationJobs", () => {
       .from(notificationJobs)
       .where(inArray(notificationJobs.id, ids));
 
-    expect(jobs.every((job) => job.state === "sent")).toBe(true);
+    expect(
+      jobs
+        .map((job) => `${job.type}:${job.state}:${job.lastError ?? ""}`)
+        .sort(),
+    ).toEqual(
+      [
+        "halfway:sent:",
+        "review-today:sent:",
+        "start:sent:",
+        "weekly-review:sent:",
+        "wrap-up:sent:",
+      ].sort(),
+    );
     expect(jobs.every((job) => job.claimedAt === null)).toBe(true);
     expect(jobs.every((job) => job.claimToken === null)).toBe(true);
     expect(seenTags).toEqual(

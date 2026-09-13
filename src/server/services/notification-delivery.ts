@@ -352,11 +352,17 @@ export async function deliverDueNotificationJobs(
           end: new Date(occurrenceKey.getTime() + 1),
         },
       );
+      // Day expansion clips to the lookup window. A 1ms identity probe
+      // (or an overnight half) would shrink duration to 1 minute and make
+      // halfway / wrap-up look obsolete. Fire times use the live
+      // unclipped start + duration.
+      const liveStart = occurrence?.startAt ?? occurrenceKey;
+      const liveDuration = occurrence?.durationMin ?? series.durationMin;
       const stillDesired =
         activity?.status === "pending" &&
         activityFireTimes(
-          activity.dtstartLocal,
-          activity.durationMin,
+          liveStart,
+          liveDuration,
           prefs,
         ).some(
           (candidate) =>

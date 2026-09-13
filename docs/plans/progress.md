@@ -1,5 +1,26 @@
 # Progress log
 
+## 2026-09-13 — P2.2 NO-GO: five-type notification delivery
+
+GHA `build-test` [34786653731](https://github.com/neima3/nnTime/actions/runs/34786653731)
+failed `notification-delivery.integration` “delivers all five notification
+types…” (`jobs.every(state === "sent")`).
+
+**Cause:** P2.2 overnight clip in `expandActivitiesForDay` is applied to the
+delivery 1ms identity window, so a 30-minute block becomes 1 minute.
+Halfway / wrap-up fire times no longer match and were suppressed as
+`source-missing`.
+
+**Fix:** revalidate fire times from the live unclipped start + duration
+(`occurrence.startAt` / series duration), not the clipped day half.
+Contract unchanged: all five types `sent`, claims cleared.
+
+Local: `notification-delivery.integration` + `day` **28/28**; CI-equivalent
+Vitest **161 files passed / 1 failed** (1424 passed) — remaining fail is
+`swift package dump-package` (Linux; not lowered). lint/typecheck 0.
+
+Same draft PR #3; no deploy.
+
 ## 2026-09-13 — P2.2 recurrence, timezone, and review correctness
 
 Task: `2026-09-13-core-workflows-plan.md` 2.2, from merged main `ca240a7`
