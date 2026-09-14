@@ -75,8 +75,24 @@ test("A→B switch after logout does not replay A's pending capture as B", async
   });
 
   // Purge while still offline so reconnect cannot flush A's capture first.
-  // Do not read IndexedDB here — hard-nav to "/" destroys this document.
+  // Click returns before handleSignOut's await purge finishes; the test
+  // used to goto("/") immediately and abort that purge. last-user is
+  // cleared only after purge, and location.assign may already be in flight.
   await page.getByRole("button", { name: "Sign out" }).click();
+  await expect
+    .poll(
+      async () => {
+        try {
+          return await page.evaluate(() =>
+            localStorage.getItem("kairo-last-user"),
+          );
+        } catch {
+          return null;
+        }
+      },
+      { timeout: 10_000 },
+    )
+    .toBeNull();
   await context.setOffline(false);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.waitForSelector('html[data-hydrated="true"]', { timeout: 30_000 });
