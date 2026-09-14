@@ -16,8 +16,10 @@ set; SW evicts then replies `PURGE_FOREIGN_CACHES_DONE` with the remaining
 `caches.keys()`. `skipWaiting` stays inside install `waitUntil`; activate
 still evicts after `claim`. Auth / `/app` HTML stay uncached.
 
-**A→B:** Toast auto-hides in ~2.4s. Wait for “Saved on this device” from
-before Add so a slow queue poll cannot miss it.
+**A→B:** Wait for `kairo-last-user` before going offline so capture can
+queue; start the 2.4s toast waiter before Add; treat queue length as the
+contract. Reset `context.setOffline(false)` at the start so retries do
+not inherit a dead network.
 
 ## 2026-09-13 — P3.1 NO-GO: session cookie + stale SW cache
 
