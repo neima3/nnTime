@@ -29,13 +29,20 @@ async function captureInboxOffline(
   await setBrowserOffline(page, context, true);
   await expect(page.getByText("You're offline")).toBeVisible({ timeout: 10_000 });
   await page.getByPlaceholder("Get it out of your head…").fill(title);
+  // Toast auto-dismisses in ~2.4s. Wait for it before Add so a slow
+  // queue poll cannot miss a toast that already came and went.
+  const toastVisible = page
+    .getByText("Saved on this device", { exact: false })
+    .waitFor({ state: "visible", timeout: 15_000 });
   await page.getByRole("button", { name: "Add" }).click();
-  await expect
-    .poll(async () => (await readOfflineQueue(page)).length, { timeout: 15_000 })
-    .toBe(1);
-  await expect(
-    page.getByText("Saved on this device", { exact: false }),
-  ).toBeVisible({ timeout: 10_000 });
+  await Promise.all([
+    toastVisible,
+    expect
+      .poll(async () => (await readOfflineQueue(page)).length, {
+        timeout: 15_000,
+      })
+      .toBe(1),
+  ]);
 }
 
 test("A→B switch after logout does not replay A's pending capture as B", async ({

@@ -1,5 +1,24 @@
 # Progress log
 
+## 2026-09-13 — P3.1 NO-GO: SW eviction must be page-awaitable
+
+Formal no-go on draft PR #4 tip `8f004ec` (GHA
+[34790984918](https://github.com/neima3/nnTime/actions/runs/34790984918)).
+Same branch. No deploy.
+
+**SW:** CI standalone already registers `/sw.js` before the spec seeds
+`kairo-v5-boundaries`. Re-register does not re-run activate, so v5 stayed
+beside v6 after `ready` + an 8s poll. `event.source.postMessage` acks were
+not reliably awaitable from Playwright.
+
+Fix: `PURGE_FOREIGN_CACHES` over a MessageChannel after the controller is
+set; SW evicts then replies `PURGE_FOREIGN_CACHES_DONE` with the remaining
+`caches.keys()`. `skipWaiting` stays inside install `waitUntil`; activate
+still evicts after `claim`. Auth / `/app` HTML stay uncached.
+
+**A→B:** Toast auto-hides in ~2.4s. Wait for “Saved on this device” from
+before Add so a slow queue poll cannot miss it.
+
 ## 2026-09-13 — P3.1 NO-GO: session cookie + stale SW cache
 
 Formal no-go on draft PR #4 (`017fcef`). Same branch. No deploy.

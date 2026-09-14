@@ -24,6 +24,7 @@ describe("OfflineShell account-boundary adoption", () => {
       new URL("./ServiceWorkerRegister.tsx", import.meta.url),
       "utf8",
     );
-    expect(source).toContain("kairo:evict-foreign-caches");
+    expect(source).toContain("PURGE_FOREIGN_CACHES");
+    expect(source).toContain("MessageChannel");
   });
 });

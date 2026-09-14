@@ -45,43 +45,57 @@ test("upgrade evicts prior sensitive caches and never stores auth or private HTM
       );
     })();
 
-    const registration = await navigator.serviceWorker.register(
-      `/sw.js?p31=${Date.now()}`,
-    );
+    // Canonical URL matches production. A query-string bypass can leave
+    // the already-active /sw.js controlling without a new activate.
+    await navigator.serviceWorker.register("/sw.js");
     const ready = await navigator.serviceWorker.ready;
-    const worker = ready.active ?? registration.active;
-    if (worker) {
-      await new Promise<void>((resolve) => {
-        const finish = () => {
-          navigator.serviceWorker.removeEventListener("message", onMsg);
+
+    if (!navigator.serviceWorker.controller) {
+      await new Promise<void>((resolve, reject) => {
+        const timer = window.setTimeout(() => {
+          reject(new Error("service worker did not claim the page"));
+        }, 8_000);
+        navigator.serviceWorker.addEventListener(
+          "controllerchange",
+          () => {
+            window.clearTimeout(timer);
+            resolve();
+          },
+          { once: true },
+        );
+        if (navigator.serviceWorker.controller) {
+          window.clearTimeout(timer);
           resolve();
-        };
-        const onMsg = (event: MessageEvent) => {
-          if (event.data && event.data.type === "kairo:caches-evicted") {
-            finish();
-          }
-        };
-        navigator.serviceWorker.addEventListener("message", onMsg);
-        worker.postMessage({ type: "kairo:evict-foreign-caches" });
-        setTimeout(finish, 4_000);
+        }
       });
     }
 
-    const deadline = Date.now() + 8_000;
-    let afterActivate = await caches.keys();
-    let staleStillOpen =
+    const worker = navigator.serviceWorker.controller ?? ready.active;
+    if (!worker) {
+      throw new Error("no controlling service worker after ready");
+    }
+
+    const channel = new MessageChannel();
+    const purgeAck = await new Promise<{ type?: string; keys?: string[] }>(
+      (resolve, reject) => {
+        const timer = window.setTimeout(() => {
+          reject(new Error("PURGE_FOREIGN_CACHES was not acknowledged"));
+        }, 8_000);
+        channel.port1.onmessage = (event) => {
+          window.clearTimeout(timer);
+          resolve(
+            (event.data ?? {}) as { type?: string; keys?: string[] },
+          );
+        };
+        worker.postMessage({ type: "PURGE_FOREIGN_CACHES" }, [channel.port2]);
+      },
+    );
+
+    const afterActivate = await caches.keys();
+    const staleStillOpen =
       typeof caches.has === "function"
         ? await caches.has("kairo-v5-boundaries")
         : afterActivate.includes("kairo-v5-boundaries");
-    while (staleStillOpen && Date.now() < deadline) {
-      ready.active?.postMessage({ type: "kairo:evict-foreign-caches" });
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      afterActivate = await caches.keys();
-      staleStillOpen =
-        typeof caches.has === "function"
-          ? await caches.has("kairo-v5-boundaries")
-          : afterActivate.includes("kairo-v5-boundaries");
-    }
 
     await fetch("/api/auth/get-session", { cache: "reload" });
     await fetch("/app/today", {
@@ -101,9 +115,13 @@ test("upgrade evicts prior sensitive caches and never stores auth or private HTM
       afterActivate,
       staleStillOpen,
       cachedUrls,
+      purgeAck,
     };
   });
 
+  expect(report.purgeAck.type).toBe("PURGE_FOREIGN_CACHES_DONE");
+  expect(report.purgeAck.keys ?? []).not.toContain("kairo-v5-boundaries");
+  expect(report.purgeAck.keys ?? []).toContain("kairo-v6-private-shell");
   expect(report.staleStillOpen).toBe(false);
   expect(report.afterActivate).not.toContain("kairo-v5-boundaries");
   expect(report.afterActivate).toContain("kairo-v6-private-shell");

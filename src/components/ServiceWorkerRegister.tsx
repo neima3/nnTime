@@ -5,6 +5,11 @@
  */
 import { useEffect } from "react";
 
+function requestForeignCachePurge(worker: ServiceWorker) {
+  const channel = new MessageChannel();
+  worker.postMessage({ type: "PURGE_FOREIGN_CACHES" }, [channel.port2]);
+}
+
 export function ServiceWorkerRegister() {
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -14,9 +19,9 @@ export function ServiceWorkerRegister() {
       .register("/sw.js")
       .then(async (registration) => {
         await navigator.serviceWorker.ready;
-        registration.active?.postMessage({
-          type: "kairo:evict-foreign-caches",
-        });
+        const worker =
+          navigator.serviceWorker.controller ?? registration.active;
+        if (worker) requestForeignCachePurge(worker);
       })
       .catch(() => {
         /* non-fatal */
