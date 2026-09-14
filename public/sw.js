@@ -42,6 +42,20 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(evictForeignCaches().then(() => self.clients.claim()));
 });
 
+// Production already has an active worker before a test (or a later
+// tab) can seed a stale cache. Activate will not run again for the same
+// script, so the page asks the controlling worker to evict on upgrade.
+self.addEventListener("message", (event) => {
+  if (!event.data || event.data.type !== "kairo:evict-foreign-caches") return;
+  event.waitUntil(
+    evictForeignCaches().then(() => {
+      if (event.source && typeof event.source.postMessage === "function") {
+        event.source.postMessage({ type: "kairo:caches-evicted" });
+      }
+    }),
+  );
+});
+
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   // API/auth data: always network-first, never served from the SW cache.

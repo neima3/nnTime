@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 
 type WorkerListener = (event: {
   request?: { mode: string; url: string };
+  data?: { type?: string };
+  source?: { postMessage: (value: unknown) => void };
   respondWith?: (response: Promise<Response>) => void;
   waitUntil?: (work: Promise<unknown>) => void;
 }) => void;
@@ -69,6 +71,24 @@ describe("service worker internal route boundary", () => {
     });
     await activation;
     expect(caches.delete).toHaveBeenCalledWith("kairo-v5-boundaries");
+  });
+
+  it("evicts stale caches when the page asks the controlling worker", async () => {
+    const { caches, listeners } = loadWorker();
+    const source = { postMessage: vi.fn() };
+    let work: Promise<unknown> | undefined;
+    listeners.get("message")?.({
+      data: { type: "kairo:evict-foreign-caches" },
+      source,
+      waitUntil: (value) => {
+        work = value;
+      },
+    });
+    await work;
+    expect(caches.delete).toHaveBeenCalledWith("kairo-v5-boundaries");
+    expect(source.postMessage).toHaveBeenCalledWith({
+      type: "kairo:caches-evicted",
+    });
   });
 
   it("purges every old shared navigation cache on activation", async () => {

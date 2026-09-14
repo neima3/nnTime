@@ -18,4 +18,12 @@ describe("OfflineShell account-boundary adoption", () => {
     const source = readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
     expect(source).toContain("PendingSignOutFlush");
   });
+
+  it("asks the controlling worker to evict stale caches after register", () => {
+    const source = readFileSync(
+      new URL("./ServiceWorkerRegister.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain("kairo:evict-foreign-caches");
+  });
 });

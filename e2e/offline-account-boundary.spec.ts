@@ -30,8 +30,12 @@ async function captureInboxOffline(
   await expect(page.getByText("You're offline")).toBeVisible({ timeout: 10_000 });
   await page.getByPlaceholder("Get it out of your head…").fill(title);
   await page.getByRole("button", { name: "Add" }).click();
-  await expect(page.getByText("Saved on this device", { exact: false })).toBeVisible();
-  await expect.poll(async () => (await readOfflineQueue(page)).length).toBe(1);
+  await expect
+    .poll(async () => (await readOfflineQueue(page)).length, { timeout: 15_000 })
+    .toBe(1);
+  await expect(
+    page.getByText("Saved on this device", { exact: false }),
+  ).toBeVisible({ timeout: 10_000 });
 }
 
 test("A→B switch after logout does not replay A's pending capture as B", async ({

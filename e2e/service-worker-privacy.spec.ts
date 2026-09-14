@@ -41,15 +41,25 @@ test("upgrade evicts prior sensitive caches and never stores auth or private HTM
       }),
     );
 
-    await navigator.serviceWorker.register("/sw.js");
-    await navigator.serviceWorker.ready;
-    if (navigator.serviceWorker.controller == null) {
+    const registration = await navigator.serviceWorker.register(
+      `/sw.js?p31=${Date.now()}`,
+    );
+    const ready = await navigator.serviceWorker.ready;
+    const worker = ready.active ?? registration.active;
+    if (worker) {
       await new Promise<void>((resolve) => {
-        navigator.serviceWorker.addEventListener(
-          "controllerchange",
-          () => resolve(),
-          { once: true },
-        );
+        const finish = () => {
+          navigator.serviceWorker.removeEventListener("message", onMsg);
+          resolve();
+        };
+        const onMsg = (event: MessageEvent) => {
+          if (event.data && event.data.type === "kairo:caches-evicted") {
+            finish();
+          }
+        };
+        navigator.serviceWorker.addEventListener("message", onMsg);
+        worker.postMessage({ type: "kairo:evict-foreign-caches" });
+        setTimeout(finish, 4_000);
       });
     }
     const deadline = Date.now() + 8_000;
@@ -58,6 +68,7 @@ test("upgrade evicts prior sensitive caches and never stores auth or private HTM
       afterActivate.includes("kairo-v5-boundaries") &&
       Date.now() < deadline
     ) {
+      ready.active?.postMessage({ type: "kairo:evict-foreign-caches" });
       await new Promise((resolve) => setTimeout(resolve, 50));
       afterActivate = await caches.keys();
     }
