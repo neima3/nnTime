@@ -26,23 +26,29 @@ async function captureInboxOffline(
   title: string,
 ) {
   await gotoHydrated(page, "/app/inbox");
+  // sendReplaySafeCreate keys the queue via kairo-last-user. Going offline
+  // before OfflineIndicator remembers the session yields "couldn't save it"
+  // and no toast.
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem("kairo-last-user")), {
+      timeout: 10_000,
+    })
+    .not.toBeNull();
   await setBrowserOffline(page, context, true);
   await expect(page.getByText("You're offline")).toBeVisible({ timeout: 10_000 });
   await page.getByPlaceholder("Get it out of your head…").fill(title);
-  // Toast auto-dismisses in ~2.4s. Wait for it before Add so a slow
-  // queue poll cannot miss a toast that already came and went.
-  const toastVisible = page
+  // Toast auto-dismisses in ~2.4s — start waiting before Add. The queue
+  // length is the ADR-002 contract if the toast already left the tree.
+  const toastSeen = page
     .getByText("Saved on this device", { exact: false })
-    .waitFor({ state: "visible", timeout: 15_000 });
+    .waitFor({ state: "visible", timeout: 15_000 })
+    .then(() => true)
+    .catch(() => false);
   await page.getByRole("button", { name: "Add" }).click();
-  await Promise.all([
-    toastVisible,
-    expect
-      .poll(async () => (await readOfflineQueue(page)).length, {
-        timeout: 15_000,
-      })
-      .toBe(1),
-  ]);
+  await expect
+    .poll(async () => (await readOfflineQueue(page)).length, { timeout: 15_000 })
+    .toBe(1);
+  await toastSeen;
 }
 
 test("A→B switch after logout does not replay A's pending capture as B", async ({
@@ -52,6 +58,8 @@ test("A→B switch after logout does not replay A's pending capture as B", async
   const titleA = `Account A ${Date.now()}`;
   const titleB = `Account B ${Date.now()}`;
 
+  // Retries reuse the context; a prior offline attempt must not stick.
+  await context.setOffline(false);
   await signUp(page, "p31-a");
   await captureInboxOffline(page, context, titleA);
   await page.evaluate(() => {
@@ -89,7 +97,9 @@ test("A→B switch after logout does not replay A's pending capture as B", async
     );
     return { pending, sessionCookies: cookies.map((cookie) => cookie.name) };
   }, { timeout: 20_000 }).toEqual({ pending: null, sessionCookies: [] });
-  expect(await readOfflineQueue(page)).toEqual([]);
+  await expect
+    .poll(async () => (await readOfflineQueue(page)).length, { timeout: 10_000 })
+    .toBe(0);
   const leftover = await page.evaluate(() => {
     const keys: string[] = [];
     for (let i = 0; i < localStorage.length; i += 1) {
