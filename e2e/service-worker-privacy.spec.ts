@@ -27,19 +27,23 @@ test("upgrade evicts prior sensitive caches and never stores auth or private HTM
     const names = await caches.keys();
     await Promise.all(names.map((name) => caches.delete(name)));
 
-    const stale = await caches.open("kairo-v5-boundaries");
-    await stale.put(
-      "/app/today",
-      new Response("<html>prior private shell</html>", {
-        headers: { "content-type": "text/html" },
-      }),
-    );
-    await stale.put(
-      "/api/auth/get-session",
-      new Response(JSON.stringify({ user: { id: "leaked" } }), {
-        headers: { "content-type": "application/json" },
-      }),
-    );
+    // Seed, then drop the Cache handle. Chromium can keep a name in
+    // caches.keys() while any page still holds the Cache object.
+    await (async () => {
+      const stale = await caches.open("kairo-v5-boundaries");
+      await stale.put(
+        "/app/today",
+        new Response("<html>prior private shell</html>", {
+          headers: { "content-type": "text/html" },
+        }),
+      );
+      await stale.put(
+        "/api/auth/get-session",
+        new Response(JSON.stringify({ user: { id: "leaked" } }), {
+          headers: { "content-type": "application/json" },
+        }),
+      );
+    })();
 
     const registration = await navigator.serviceWorker.register(
       `/sw.js?p31=${Date.now()}`,
@@ -62,16 +66,23 @@ test("upgrade evicts prior sensitive caches and never stores auth or private HTM
         setTimeout(finish, 4_000);
       });
     }
+
     const deadline = Date.now() + 8_000;
     let afterActivate = await caches.keys();
-    while (
-      afterActivate.includes("kairo-v5-boundaries") &&
-      Date.now() < deadline
-    ) {
+    let staleStillOpen =
+      typeof caches.has === "function"
+        ? await caches.has("kairo-v5-boundaries")
+        : afterActivate.includes("kairo-v5-boundaries");
+    while (staleStillOpen && Date.now() < deadline) {
       ready.active?.postMessage({ type: "kairo:evict-foreign-caches" });
       await new Promise((resolve) => setTimeout(resolve, 50));
       afterActivate = await caches.keys();
+      staleStillOpen =
+        typeof caches.has === "function"
+          ? await caches.has("kairo-v5-boundaries")
+          : afterActivate.includes("kairo-v5-boundaries");
     }
+
     await fetch("/api/auth/get-session", { cache: "reload" });
     await fetch("/app/today", {
       cache: "reload",
@@ -86,9 +97,14 @@ test("upgrade evicts prior sensitive caches and never stores auth or private HTM
       }
     }
 
-    return { afterActivate, cachedUrls };
+    return {
+      afterActivate,
+      staleStillOpen,
+      cachedUrls,
+    };
   });
 
+  expect(report.staleStillOpen).toBe(false);
   expect(report.afterActivate).not.toContain("kairo-v5-boundaries");
   expect(report.afterActivate).toContain("kairo-v6-private-shell");
   expect(report.cachedUrls).not.toContain("/api/auth/get-session");

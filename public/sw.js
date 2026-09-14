@@ -39,7 +39,9 @@ self.addEventListener("install", (event) => {
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(evictForeignCaches().then(() => self.clients.claim()));
+  event.waitUntil(
+    Promise.resolve(self.clients.claim()).then(() => evictForeignCaches()),
+  );
 });
 
 // Production already has an active worker before a test (or a later

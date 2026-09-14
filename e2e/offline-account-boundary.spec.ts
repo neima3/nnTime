@@ -60,8 +60,8 @@ test("A→B switch after logout does not replay A's pending capture as B", async
   });
 
   // Purge while still offline so reconnect cannot flush A's capture first.
+  // Do not read IndexedDB here — hard-nav to "/" destroys this document.
   await page.getByRole("button", { name: "Sign out" }).click();
-  await expect.poll(async () => (await readOfflineQueue(page)).length).toBe(0);
   await context.setOffline(false);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await page.waitForSelector('html[data-hydrated="true"]', { timeout: 30_000 });
