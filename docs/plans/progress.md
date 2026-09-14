@@ -1,5 +1,87 @@
 # Progress log
 
+## 2026-09-13 — P3.1 NO-GO: SW eviction must be page-awaitable
+
+Formal no-go on draft PR #4 tip `8f004ec` (GHA
+[34790984918](https://github.com/neima3/nnTime/actions/runs/34790984918)).
+Same branch. No deploy.
+
+**SW:** CI standalone already registers `/sw.js` before the spec seeds
+`kairo-v5-boundaries`. Re-register does not re-run activate, so v5 stayed
+beside v6 after `ready` + an 8s poll. `event.source.postMessage` acks were
+not reliably awaitable from Playwright.
+
+Fix: `PURGE_FOREIGN_CACHES` over a MessageChannel after the controller is
+set; SW evicts then replies `PURGE_FOREIGN_CACHES_DONE` with the remaining
+`caches.keys()`. `skipWaiting` stays inside install `waitUntil`; activate
+still evicts after `claim`. Auth / `/app` HTML stay uncached.
+
+**A→B:** Wait for `kairo-last-user` before going offline so capture can
+queue; start the 2.4s toast waiter before Add; treat queue length as the
+contract. After Sign out, wait for last-user to clear so purge finishes
+before the test’s `goto("/")` aborts it. Reset context online on retry.
+
+## 2026-09-13 — P3.1 NO-GO: session cookie + stale SW cache
+
+Formal no-go on draft PR #4 (`017fcef`). Same branch. No deploy.
+
+**Cookie:** Offline Sign out purged the queue and showed Sign in, but the
+HttpOnly `better-auth` session cookie survived reconnect because the
+in-memory retry died with the landing fallback navigation.
+Fix: durable `kairo-pending-sign-out` + root `PendingSignOutFlush` that
+POSTs `/api/auth/sign-out` until the cookie expires; hard-navigate home
+when the server call cannot complete.
+
+**SW:** `kairo-v5-boundaries` stayed beside `kairo-v6-private-shell`
+because activate eviction could race `ready`. Evict foreign caches on
+both install and activate (`skipWaiting` / `claim` inside `waitUntil`).
+
+**Verify:** lint/typecheck 0. A→B + SW privacy **3/3** (incl. setup).
+Related offline-replay + never-queued **9/9**. ADR-002 classes unchanged.
+
+## 2026-09-13 — P3.1 offline and account-boundary matrix
+
+Task: `2026-09-13-core-workflows-plan.md` 3.1, from merged main `3af36ef`
+(PR #3). Draft PR #4; P0–P2.2 behavior kept. No deploy, no secrets.
+
+**What shipped:**
+- Explicit ADR-002 mutation classes (`replay-safe-create`, `rebase-status`,
+  `never-queued`). `enqueueMutation` refuses edits/deletes/checklist/focus.
+  ADR-004's older "queue focus offline" wording is not treated as permission.
+- `adoptQueueUser` purges the prior account on A→B. `purgeUserCache` also
+  clears onboarding draft, last-user, and in-memory settings/stats.
+- Sign-out keeps a barrier so a stale session tick cannot re-bind A.
+  `rememberUser` no-ops for that id; AuthForm clears the barrier on a
+  successful new auth. Offline sign-out still leaves the session UI and
+  retries the server call once online (including if already online).
+- Flush treats 401/403 as a pause (keep pending) so an expired session does
+  not become a terminal drop or replay as another account. 429/5xx backoff
+  still 1s…30s.
+
+**Tests:** classification + account-boundary + 401 pause + lost-key replay
+units; service pin that a rebased status write keeps a concurrent title;
+e2e restart/lost-response/title+status, logout/expiry/A→B, never-queued
+families, and real Cache Storage SW privacy. Native
+`OfflineAccountBoundaryTests` pins kinds, no pinned revision, and
+cache/queue/cookie purge.
+
+**Gates (this host):** `pnpm lint` 0, `pnpm typecheck` 0, `pnpm build` 0,
+`pnpm api:check-ios` 0, `pnpm api:check-ios-client` 0.
+Focused Vitest (offline queue/class/SW + title-conflict + UserMenu):
+**9 files / 79 passed** plus UserMenu **3/3**.
+DB integration `offline-status-title-conflict` **1/1**
+(`TEST_DATABASE_URL=postgresql://kairo:kairo@localhost:5432/kairo_test`).
+Focused e2e (setup + offline-replay + account-boundary + never-queued +
+SW privacy): **11 passed**.
+`pnpm ios:release:preflight` expected 1 (`plutil` ENOENT).
+Linux host has no Swift; `native-contract` owns that compile. Gates were
+not lowered.
+
+**CI:** https://github.com/neima3/nnTime/actions/runs/34790095390
+(in progress on `625c7d0` at handoff; docs commit follows).
+
+**Not done:** P3.2 feature audit. No deploy.
+
 ## 2026-09-13 — P2.2 NO-GO: five-type notification delivery
 
 GHA `build-test` [34786653731](https://github.com/neima3/nnTime/actions/runs/34786653731)

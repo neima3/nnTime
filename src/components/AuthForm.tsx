@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useId, useRef, useState } from "react";
 import { ArrowRight, Loader2, Mail } from "lucide-react";
 import { signIn, signUp } from "@/lib/auth-client";
+import { clearSignedOutBarrier } from "@/lib/offline-queue";
 import { detectTimezone } from "@/lib/timezone";
 import type { AuthCapabilities } from "@/server/auth-capabilities";
 import {
@@ -79,6 +80,8 @@ export function AuthForm({
         finishAuthRequest();
         return;
       }
+      // A same-account sign-in after logout is a new session — allow bind.
+      clearSignedOutBarrier();
       // Seed the planning timezone before Today first renders — settings are
       // created on first touch, and without this hint new accounts plan in UTC.
       try {

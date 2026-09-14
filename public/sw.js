@@ -21,22 +21,65 @@ function isCacheablePublicAsset(request, url) {
   );
 }
 
+function evictForeignCaches() {
+  return caches.keys().then((keys) =>
+    Promise.all(
+      keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k)),
+    ),
+  );
+}
+
+function evictForeignCachesThenList() {
+  return evictForeignCaches()
+    .then(() => caches.open(CACHE_VERSION))
+    .then(() => caches.keys());
+}
+
+function isPurgeRequest(data) {
+  return (
+    data &&
+    (data.type === "PURGE_FOREIGN_CACHES" ||
+      data.type === "kairo:evict-foreign-caches")
+  );
+}
+
+function ackPurge(event, keys) {
+  const payload = { type: "PURGE_FOREIGN_CACHES_DONE", keys };
+  const port = event.ports && event.ports[0];
+  if (port && typeof port.postMessage === "function") {
+    port.postMessage(payload);
+    return;
+  }
+  if (event.source && typeof event.source.postMessage === "function") {
+    event.source.postMessage(payload);
+    event.source.postMessage({ type: "kairo:caches-evicted" });
+  }
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) => cache.addAll(APP_SHELL).catch(() => {})),
+    evictForeignCaches()
+      .then(() => caches.open(CACHE_VERSION))
+      .then((cache) => cache.addAll(APP_SHELL).catch(() => {}))
+      .then(() => self.skipWaiting()),
   );
-  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k)),
-      ),
-    ),
+    Promise.resolve(self.clients.claim()).then(() => evictForeignCachesThenList()),
   );
-  self.clients.claim();
+});
+
+// Production (and Playwright against standalone) often already has this
+// script controlling the page before a later seed of a stale cache.
+// Re-registering /sw.js does not re-run activate, so the page awaits
+// PURGE_FOREIGN_CACHES over a MessageChannel after controller is set.
+self.addEventListener("message", (event) => {
+  if (!isPurgeRequest(event.data)) return;
+  event.waitUntil(
+    evictForeignCachesThenList().then((keys) => ackPurge(event, keys)),
+  );
 });
 
 self.addEventListener("fetch", (event) => {

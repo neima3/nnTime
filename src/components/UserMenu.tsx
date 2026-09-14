@@ -6,6 +6,10 @@ import { useSyncExternalStore } from "react";
 import { LogIn, LogOut } from "lucide-react";
 import { signOut, useSession } from "@/lib/auth-client";
 import { forgetUser, purgeUserCache } from "@/lib/offline-queue";
+import {
+  completeServerSignOut,
+  markPendingSignOut,
+} from "@/lib/pending-sign-out";
 import { useAppSession } from "./AppSessionBoundary";
 
 function subscribeOnline(onChange: () => void): () => void {
@@ -61,11 +65,28 @@ export function UserMenu() {
   async function handleSignOut() {
     // ADR-002: offline caches are personal data — purge them with the session.
     const userId = data?.user.id ?? contextUser?.id;
+    markPendingSignOut();
     if (userId) await purgeUserCache(userId).catch(() => {});
     forgetUser();
-    await signOut();
-    router.push("/");
-    router.refresh();
+    let serverDone = false;
+    try {
+      await completeServerSignOut();
+      serverDone = true;
+    } catch {
+      // Offline / dropped network: the durable flag stays set so the root
+      // flusher can expire the HttpOnly cookie after reconnect.
+    }
+    try {
+      await signOut();
+    } catch {
+      // Client session cache — best effort; cookie expiry is the server POST.
+    }
+    if (serverDone) {
+      router.push("/");
+      router.refresh();
+      return;
+    }
+    window.location.assign("/");
   }
 
   return (

@@ -5,6 +5,7 @@ import {
   Onest,
   Spline_Sans_Mono,
 } from "next/font/google";
+import { PendingSignOutFlush } from "@/components/PendingSignOutFlush";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { HydrationMarker } from "@/components/HydrationMarker";
@@ -86,6 +87,7 @@ export default function RootLayout({
         <ThemeScript />
       </head>
       <body className="min-h-full flex flex-col">
+        <PendingSignOutFlush />
         <ServiceWorkerRegister />
         <InstallPrompt />
         <HydrationMarker />

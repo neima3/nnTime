@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -14,6 +15,11 @@ vi.mock("@/lib/auth-client", () => ({
 vi.mock("@/lib/offline-queue", () => ({
   forgetUser: vi.fn(),
   purgeUserCache: vi.fn(),
+}));
+
+vi.mock("@/lib/pending-sign-out", () => ({
+  markPendingSignOut: vi.fn(),
+  completeServerSignOut: vi.fn(),
 }));
 
 import { AppSessionProvider } from "./AppSessionBoundary";
@@ -52,5 +58,20 @@ describe("UserMenu", () => {
     expect(markup).toContain("animate-pulse");
     expect(markup).not.toContain("Ada Lovelace");
     expect(markup).not.toContain("Sign in");
+  });
+
+  it("still navigates home when signOut rejects offline", () => {
+    const source = readFileSync(new URL("./UserMenu.tsx", import.meta.url), "utf8");
+    expect(source).toContain("markPendingSignOut");
+    expect(source).toContain("completeServerSignOut");
+    expect(source).toContain("await signOut()");
+    expect(source).toContain("router.push(\"/\")");
+    expect(source).toContain("window.location.assign(\"/\")");
+    expect(source.indexOf("markPendingSignOut()")).toBeLessThan(
+      source.indexOf("await completeServerSignOut()"),
+    );
+    expect(source.indexOf("await completeServerSignOut()")).toBeLessThan(
+      source.indexOf("window.location.assign(\"/\")"),
+    );
   });
 });

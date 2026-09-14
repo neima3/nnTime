@@ -116,6 +116,8 @@ describe("service-worker cache privacy", () => {
     expect(worker.cacheDeletes).toEqual([
       "kairo-v5-boundaries",
       "kairo-v4-push",
+      "kairo-v5-boundaries",
+      "kairo-v4-push",
     ]);
   });
 

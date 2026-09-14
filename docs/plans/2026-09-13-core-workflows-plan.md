@@ -109,11 +109,11 @@ Exit P2: every capture → plan → do → review scenario has persisted-state e
 
 Files: locate web queue/store modules via `rg --files src/lib | rg 'offline|queue|sync'`; `public/sw.js`; `ios/App/API/NativeSyncStore.swift`, `NativeSyncCoordinator.swift`, `NativeSessionController.swift`, `ios/Shared/DayCache.swift`; `e2e/offline-replay.spec.ts`, native sync/session tests.
 
-- [ ] Test offline capture → restart → reconnect, lost server response → replay, and status changes concurrent with a second-device title edit. One mutation/key survives and non-status fields remain intact.
-- [ ] Test expired session, logout and A→B account switch with pending work. No prior-user cache, queue, widget or credential leaks; no old operation replays as B.
-- [ ] Prove 429/5xx backoff, 409 re-read/retry for allowed status changes, terminal deleted-resource conflict, durable conflict presentation and user recovery.
-- [ ] General edits/deletes/checklist overrides/focus transitions fail honestly offline under ADR-002's later explicit mutation classification. ADR-004's older queue wording is not permission to broaden replay.
-- [ ] Verify service-worker upgrade evicts prior sensitive caches and caches neither auth responses nor private route HTML. Browser tests must use real IndexedDB/service-worker behavior where supported.
+- [x] Test offline capture → restart → reconnect, lost server response → replay, and status changes concurrent with a second-device title edit. One mutation/key survives and non-status fields remain intact.
+- [x] Test expired session, logout and A→B account switch with pending work. No prior-user cache, queue, widget or credential leaks; no old operation replays as B.
+- [x] Prove 429/5xx backoff, 409 re-read/retry for allowed status changes, terminal deleted-resource conflict, durable conflict presentation and user recovery.
+- [x] General edits/deletes/checklist overrides/focus transitions fail honestly offline under ADR-002's later explicit mutation classification. ADR-004's older queue wording is not permission to broaden replay.
+- [x] Verify service-worker upgrade evicts prior sensitive caches and caches neither auth responses nor private route HTML. Browser tests must use real IndexedDB/service-worker behavior where supported.
 
 ### Task 3.2 — Feature capability audit and targeted completion
 

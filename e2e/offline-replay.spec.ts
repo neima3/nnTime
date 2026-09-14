@@ -7,49 +7,24 @@
  * If-Match PATCH) and the server ends up with exactly the completed state.
  */
 import { test, expect } from "@playwright/test";
-import { createActivity, dayUrl, gotoHydrated } from "./helpers";
+import {
+  createActivity,
+  dayUrl,
+  gotoHydrated,
+  listDayActivities,
+  listTasks,
+  readOfflineQueue,
+  setBrowserOffline,
+} from "./helpers";
 
-test.use({ locale: "en-US", timezoneId: "America/New_York" });
+test.use({
+  locale: "en-US",
+  timezoneId: "America/New_York",
+  serviceWorkers: "block",
+});
 
-async function queueRows(page: import("@playwright/test").Page) {
-  return page.evaluate(async () => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open("kairo-offline", 1);
-      request.onupgradeneeded = () => {
-        if (!request.result.objectStoreNames.contains("mutations")) {
-          request.result.createObjectStore("mutations", {
-            keyPath: "id",
-            autoIncrement: true,
-          });
-        }
-      };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    const rows = await new Promise<Array<Record<string, unknown>>>((resolve) => {
-      const request = db
-        .transaction("mutations", "readonly")
-        .objectStore("mutations")
-        .getAll();
-      request.onsuccess = () =>
-        resolve(request.result as Array<Record<string, unknown>>);
-    });
-    db.close();
-    return rows;
-  });
-}
-
-async function setOffline(
-  page: import("@playwright/test").Page,
-  context: import("@playwright/test").BrowserContext,
-  offline: boolean,
-) {
-  await context.setOffline(offline);
-  await page.evaluate(
-    (eventName) => window.dispatchEvent(new Event(eventName)),
-    offline ? "offline" : "online",
-  );
-}
+const queueRows = readOfflineQueue;
+const setOffline = setBrowserOffline;
 
 test("an offline inbox capture replays once and appears after reconnect", async ({
   page,
@@ -247,4 +222,172 @@ test("a terminal conflict survives reload and stays dismissed", async ({
   await page.reload();
   await page.waitForSelector('html[data-hydrated="true"]');
   await expect(copy).toHaveCount(0);
+});
+
+test("an offline capture survives reload and replays once after reconnect", async ({
+  page,
+  context,
+}) => {
+  const title = `Offline restart ${Date.now()}`;
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await gotoHydrated(page, "/app/today");
+
+  await setOffline(page, context, true);
+  await expect(page.getByText("You're offline")).toBeVisible({ timeout: 10_000 });
+  await page.keyboard.press("c");
+  await page.getByPlaceholder("One thought, then let it go…").fill(title);
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText("Saved on this device", { exact: false })).toBeVisible();
+  const beforeOffline = await queueRows(page);
+  expect(beforeOffline).toHaveLength(1);
+  const key = beforeOffline[0]!.idempotencyKey;
+
+  // Playwright cannot reload a document while the context is fully offline.
+  // Keep writes failing and allow the document to restart so IndexedDB is
+  // re-read from a fresh page — the same durability a cold start needs.
+  await page.route("**/api/v1/**", async (route) => {
+    if (["POST", "PATCH", "PUT", "DELETE"].includes(route.request().method())) {
+      await route.abort("failed");
+      return;
+    }
+    await route.continue();
+  });
+  await context.setOffline(false);
+  await page.reload();
+  await page.waitForSelector('html[data-hydrated="true"]');
+  await expect.poll(async () => (await queueRows(page)).length).toBe(1);
+  const afterRestart = await queueRows(page);
+  expect(afterRestart[0]).toMatchObject({
+    method: "POST",
+    path: "/api/v1/tasks",
+    status: "pending",
+    idempotencyKey: key,
+  });
+
+  await page.unroute("**/api/v1/**");
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await expect.poll(async () => (await queueRows(page)).length, {
+    timeout: 15_000,
+  }).toBe(0);
+
+  await gotoHydrated(page, "/app/inbox");
+  await expect(page.getByText(title, { exact: true })).toBeVisible();
+  expect(
+    (await listTasks(page, "inbox")).filter((task) => task.title === title),
+  ).toHaveLength(1);
+  expect(key).toEqual(expect.any(String));
+});
+
+test("a lost create response replays once with the same Idempotency-Key", async ({
+  page,
+}) => {
+  const title = `Lost response ${Date.now()}`;
+  await gotoHydrated(page, "/app/inbox");
+
+  const keys: string[] = [];
+  let dropOnce = true;
+  await page.route("**/api/v1/tasks", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+    keys.push(route.request().headers()["idempotency-key"] ?? "");
+    if (dropOnce) {
+      dropOnce = false;
+      await route.fetch();
+      await route.abort("failed");
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.getByPlaceholder("Get it out of your head…").fill(title);
+  await page.getByRole("button", { name: "Add" }).click();
+  await expect(page.getByText("Saved on this device", { exact: false })).toBeVisible();
+
+  await expect.poll(async () => (await queueRows(page)).length, {
+    timeout: 15_000,
+  }).toBe(0);
+
+  expect(keys.length).toBeGreaterThanOrEqual(2);
+  expect(keys[0]).toBe(keys[1]);
+  expect(
+    (await listTasks(page, "inbox")).filter((task) => task.title === title),
+  ).toHaveLength(1);
+});
+
+test("an offline completion keeps a second-device title intact", async ({
+  page,
+  context,
+}, testInfo) => {
+  const title = `Status vs title ${Date.now()}`;
+  const renamed = `${title} (device B)`;
+  const path = dayUrl(40 + testInfo.retry);
+  const date = new URL(path, "http://kairo.test").searchParams.get("date")!;
+  await createActivity(page, path, title);
+
+  await setOffline(page, context, true);
+  await expect(page.getByText("You're offline")).toBeVisible({ timeout: 10_000 });
+  await page.getByRole("button", { name: `Complete ${title}` }).click();
+  await expect(page.getByText("saved on this device", { exact: false })).toBeVisible();
+
+  const before = await listDayActivities(page, date);
+  const activity = before.find((row) => row.title === title);
+  expect(activity?.id).toBeTruthy();
+  const patch = await page.request.patch(`/api/v1/activities/${activity!.id}`, {
+    headers: { "If-Match": String(activity!.revision ?? 1) },
+    data: {
+      editScope: "this",
+      occurrenceKey: activity!.occurrenceKey,
+      title: renamed,
+    },
+  });
+  expect(patch.ok()).toBe(true);
+
+  await setOffline(page, context, false);
+  await expect.poll(async () => (await queueRows(page)).length, {
+    timeout: 15_000,
+  }).toBe(0);
+
+  await page.reload();
+  await page.waitForSelector('html[data-hydrated="true"]');
+  await expect(
+    page.getByRole("button", { name: `Mark ${renamed} not done` }),
+  ).toBeVisible();
+  const after = await listDayActivities(page, date);
+  const done = after.find((row) => row.title === renamed);
+  expect(done?.status).toBe("completed");
+  expect(after.filter((row) => row.title === title)).toHaveLength(0);
+});
+
+test("an expired session keeps pending work and recovers after cookies return", async ({
+  page,
+  context,
+}) => {
+  const title = `Expiry pending ${Date.now()}`;
+  await gotoHydrated(page, "/app/inbox");
+
+  await setOffline(page, context, true);
+  await expect(page.getByText("You're offline")).toBeVisible({ timeout: 10_000 });
+  await page.getByPlaceholder("Get it out of your head…").fill(title);
+  await page.getByRole("button", { name: "Add" }).click();
+  await expect(page.getByText("Saved on this device", { exact: false })).toBeVisible();
+
+  const cookies = await context.cookies();
+  await context.clearCookies();
+  await setOffline(page, context, false);
+  await page.waitForTimeout(800);
+
+  const queued = await queueRows(page);
+  expect(queued).toHaveLength(1);
+  expect(queued[0]).toMatchObject({ status: "pending" });
+
+  await context.addCookies(cookies);
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await expect.poll(async () => (await queueRows(page)).length, {
+    timeout: 15_000,
+  }).toBe(0);
+  expect(
+    (await listTasks(page, "inbox")).filter((task) => task.title === title),
+  ).toHaveLength(1);
 });

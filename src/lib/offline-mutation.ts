@@ -1,6 +1,10 @@
 "use client";
 
 import {
+  isReplaySafeCreatePath,
+  isStatusOnlyBody,
+} from "./offline-mutation-class";
+import {
   enqueueMutation,
   resolveQueueUser,
   type EnqueueMutationOptions,
@@ -39,22 +43,8 @@ export interface OfflineMutationDependencies {
   uuid: () => string;
 }
 
-const replaySafeCreatePaths = new Set<string>([
-  "/api/v1/tasks",
-  "/api/v1/activities",
-  "/api/v1/routines",
-  "/api/v1/mood",
-]);
-
-const statusKeys = new Set([
-  "editScope",
-  "occurrenceKey",
-  "status",
-  "completedAt",
-]);
-
 function assertReplaySafeCreatePath(path: string): asserts path is ReplaySafeCreatePath {
-  if (!replaySafeCreatePaths.has(path)) {
+  if (!isReplaySafeCreatePath(path)) {
     throw new TypeError(`${path} is not replay-safe`);
   }
 }
@@ -66,15 +56,7 @@ function assertRebasedStatusInput(
   if (!/^\/api\/v1\/activities\/[^/?#]+$/.test(path)) {
     throw new TypeError(`${path} is not a replay-safe activity status path`);
   }
-  const keys = Object.keys(body);
-  if (
-    keys.some((key) => !statusKeys.has(key)) ||
-    body.editScope !== "this" ||
-    typeof body.occurrenceKey !== "string" ||
-    body.occurrenceKey.length === 0 ||
-    !["pending", "completed", "skipped"].includes(body.status) ||
-    (body.completedAt !== null && typeof body.completedAt !== "string")
-  ) {
+  if (!isStatusOnlyBody(body)) {
     throw new TypeError("Body is not a status-only mutation");
   }
 }
