@@ -55,7 +55,7 @@ async function loadReview(): Promise<{
   );
 
   const items: ReviewItem[] = resolved.activities
-    .map((s) => {
+    .map((s): ReviewItem | null => {
       if (
         s.status === "completed" ||
         s.status === "skipped" ||
@@ -77,6 +77,7 @@ async function loadReview(): Promise<{
         occurrenceKey: s.occurrenceKey.toISOString(),
         startMin,
         durationMin: s.durationMin,
+        recurring: Boolean(s.rrule),
       } satisfies ReviewItem;
     })
     .filter((x): x is ReviewItem => x !== null);

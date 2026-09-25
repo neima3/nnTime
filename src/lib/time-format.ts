@@ -80,3 +80,26 @@ export function formatDayLabel(dateStr: string): {
     }),
   };
 }
+
+/** "45 min", "1 hr", "2 hr 5 min" — a spoken-length span for glance copy. */
+export function formatSpan(minutes: number): string {
+  const m = Math.max(0, Math.round(minutes));
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  return r === 0 ? `${h} hr` : `${h} hr ${r} min`;
+}
+
+/** "September 20 – 26", "Sep 28 – Oct 4", "Dec 28 – Jan 3, 2027" for YYYY-MM-DD bounds. */
+export function weekRangeLabel(startStr: string, endStr: string): string {
+  const s = new Date(`${startStr}T12:00:00Z`);
+  const e = new Date(`${endStr}T12:00:00Z`);
+  const fmt = (d: Date, month: "long" | "short") =>
+    d.toLocaleDateString("en-US", { month, timeZone: "UTC" });
+  const sameMonth =
+    s.getUTCMonth() === e.getUTCMonth() && s.getUTCFullYear() === e.getUTCFullYear();
+  if (sameMonth) return `${fmt(s, "long")} ${s.getUTCDate()} – ${e.getUTCDate()}`;
+  const tail =
+    s.getUTCFullYear() === e.getUTCFullYear() ? "" : `, ${e.getUTCFullYear()}`;
+  return `${fmt(s, "short")} ${s.getUTCDate()} – ${fmt(e, "short")} ${e.getUTCDate()}${tail}`;
+}

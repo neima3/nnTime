@@ -12,7 +12,7 @@ import {
 import { buildCategoryMap, dateToMinutesFromMidnight } from "@/lib/adapters";
 import { expandActivitiesForDay } from "@/server/services/day";
 import { instantToDateStr, resolveDayBounds } from "@/server/temporal/zone";
-import { formatTime, toHourCycle } from "@/lib/time-format";
+import { formatTime, toHourCycle, weekRangeLabel } from "@/lib/time-format";
 import { WeeklyIntentions } from "@/components/WeeklyIntentions";
 import { SignedInOnly } from "@/components/AppSessionBoundary";
 
@@ -28,6 +28,7 @@ type Block = {
   title: string;
   time: string;
   category: CategoryId;
+  done?: boolean;
 };
 
 type DayCol = {
@@ -169,6 +170,7 @@ async function loadWeek(weekParam?: string) {
         title: s.title,
         time: formatTime(startMin, toHourCycle(settings.hourCycle)),
         category: cat,
+        done: s.status === "completed",
       };
     });
     days.push({
@@ -181,7 +183,7 @@ async function loadWeek(weekParam?: string) {
   }
 
   const end = shiftDate(weekStart, 6);
-  const label = `${weekStart.slice(5).replace("-", "/")} – ${end.slice(5).replace("-", "/")}`;
+  const label = weekRangeLabel(weekStart, end);
   return { days, label, weekStart, isPreview: false };
 }
 
@@ -303,7 +305,10 @@ export default async function WeekPage({
                   <Link
                     key={b.id}
                     href={`/app/editor?${editorParams}`}
-                    className={`block rounded-xl px-2.5 py-2 ${cat.fill} focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none`}
+                    aria-label={b.done ? `${b.title}, ${b.time}, done` : undefined}
+                    className={`block rounded-xl px-2.5 py-2 ${cat.fill} focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none ${
+                      b.done ? "opacity-70" : ""
+                    }`}
                   >
                     {/* Emoji and start time share the top line so the title
                         keeps the chip's full width — sharing a row with them
@@ -328,7 +333,9 @@ export default async function WeekPage({
                       </span>
                     </span>
                     <span
-                      className={`mt-0.5 block truncate text-[12.5px] font-semibold leading-tight ${cat.ink}`}
+                      className={`mt-0.5 block truncate text-[12.5px] font-semibold leading-tight ${cat.ink} ${
+                        b.done ? "line-through decoration-1" : ""
+                      }`}
                     >
                       {b.title}
                     </span>

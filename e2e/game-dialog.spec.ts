@@ -7,7 +7,9 @@ test("game overlay traps focus, closes with Escape, and restores its opener", as
   page,
 }) => {
   await gotoHydrated(page, "/app/play");
-  const opener = page.getByRole("button", { name: /Quick Tap/ });
+  // The catalog card, not "Today's three" — the daily pick includes Quick Tap
+  // on some dates, which made a bare /Quick Tap/ match two buttons.
+  const opener = page.getByRole("button", { name: /^Quick Tap Purple means go/ });
   await opener.focus();
   await opener.click();
 

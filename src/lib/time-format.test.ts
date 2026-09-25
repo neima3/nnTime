@@ -6,7 +6,7 @@
  * synced it, and nothing that drew a time ever read it.
  */
 import { describe, it, expect } from "vitest";
-import { formatHourLabel, formatTime, toHourCycle, formatDayLabel } from "./time-format";
+import { formatHourLabel, formatTime, toHourCycle, formatDayLabel, formatSpan, weekRangeLabel } from "./time-format";
 
 describe("formatTime — 24-hour (unchanged from the old fmt())", () => {
   it("formats without a leading zero", () => {
@@ -127,5 +127,26 @@ describe("formatDayLabel", () => {
     for (const [dateStr, weekday] of cases) {
       expect(formatDayLabel(dateStr).dayLabel).toBe(weekday);
     }
+  });
+});
+
+describe("formatSpan", () => {
+  it("reads like speech", () => {
+    expect(formatSpan(0)).toBe("0 min");
+    expect(formatSpan(45)).toBe("45 min");
+    expect(formatSpan(60)).toBe("1 hr");
+    expect(formatSpan(125)).toBe("2 hr 5 min");
+  });
+});
+
+describe("weekRangeLabel", () => {
+  it("names the month once inside one month", () => {
+    expect(weekRangeLabel("2026-09-20", "2026-09-26")).toBe("September 20 – 26");
+  });
+  it("abbreviates both months across a boundary", () => {
+    expect(weekRangeLabel("2026-09-27", "2026-10-03")).toBe("Sep 27 – Oct 3");
+  });
+  it("adds the year when the week crosses New Year", () => {
+    expect(weekRangeLabel("2026-12-27", "2027-01-02")).toBe("Dec 27 – Jan 2, 2027");
   });
 });

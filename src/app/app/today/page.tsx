@@ -40,6 +40,8 @@ import { Illustration } from "@/components/Illustration";
 import { appReturnTo } from "@/lib/auth-return";
 import { getMagicLinkRedirectError } from "@/lib/auth-redirect-error";
 import { focusHrefFromActivity } from "@/lib/focus-linkage";
+import { suggestNewStart } from "@/lib/slots";
+import { TodayStickyBar } from "@/components/TodayStickyBar";
 
 function shiftDate(dateStr: string, deltaDays: number): string {
   const [y, m, d] = dateStr.split("-").map(Number);
@@ -277,6 +279,10 @@ export default async function TodayPage({
           .filter((a) => !a.done && a.start + a.duration > nowMinutes)
           .sort((a, b) => a.start - b.start)[0]
       : undefined;
+  const newStart = suggestNewStart(
+    activities.map((a) => ({ start: a.start, end: a.start + a.duration })),
+    nowMinutes,
+  );
   const upNextIsCurrent =
     upNext != null && nowMinutes != null && upNext.start <= nowMinutes;
   const upNextMeta =
@@ -335,7 +341,19 @@ export default async function TodayPage({
     <AppShell active="today">
       <div className="timeline-scroll-container mx-auto flex max-w-5xl gap-8 px-4 py-6 md:px-8">
         <section className="min-w-0 flex-1">
-          <header className="mb-5 flex flex-wrap items-center gap-3 md:mb-6">
+          {authed && !emptyDay && (
+            <TodayStickyBar
+              watchId="today-header"
+              dayLabel={dayLabel}
+              dayDate={dayDate}
+              done={activities.filter((a) => a.done).length}
+              total={activities.length}
+              prevDate={prevDate}
+              nextDate={nextDate}
+              isToday={isToday}
+            />
+          )}
+          <header id="today-header" className="mb-5 flex flex-wrap items-center gap-3 md:mb-6">
             <div className="mr-auto min-w-0">
               <p className="text-[13px] font-semibold uppercase tracking-[0.14em] text-iris">
                 {dayLabel}
@@ -449,6 +467,8 @@ export default async function TodayPage({
                   revision: a.revision ?? 1,
                   occurrenceKey: a.occurrenceKey ?? "",
                   startMin: a.start,
+                  durationMin: a.duration,
+                  recurring: a.recurring,
                 }))}
             />
           )}
@@ -484,7 +504,7 @@ export default async function TodayPage({
               </p>
               <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
                 <Link
-                  href={`/app/editor?date=${date}&start=${9 * 60}`}
+                  href={`/app/editor?date=${date}&start=${newStart}`}
                   className="inline-flex items-center gap-2 rounded-xl bg-iris px-5 py-2.5 text-sm font-semibold text-ink-inverse shadow-card hover:bg-iris-deep focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
                 >
                   <Plus size={16} />
@@ -510,7 +530,12 @@ export default async function TodayPage({
           )}
         </section>
 
-        <aside className="rise-in hidden w-72 shrink-0 flex-col gap-4 lg:flex" style={{ animationDelay: "120ms" }}>
+        {/* Sticky: Today scrolls to the now-line on load, and a rail that scrolled
+            away with the header left half the desktop empty. */}
+        <aside
+          className="rise-in no-scrollbar sticky top-6 hidden max-h-[calc(100dvh-3rem)] w-72 shrink-0 flex-col gap-4 self-start overflow-y-auto lg:flex"
+          style={{ animationDelay: "120ms" }}
+        >
           <AnytimeRail
             items={inbox.map((t) => ({
               id: t.id,
@@ -570,11 +595,11 @@ export default async function TodayPage({
       <Link
         href={
           date !== "mock"
-            ? `/app/editor?date=${date}&start=${13 * 60}`
+            ? `/app/editor?date=${date}&start=${newStart}`
             : "/app/editor"
         }
         aria-label="Add activity"
-        className="fixed bottom-24 right-5 z-40 grid size-14 place-items-center rounded-2xl bg-iris text-ink-inverse shadow-float transition-transform hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none md:bottom-8 md:right-8"
+        className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] right-5 z-40 grid size-14 place-items-center rounded-2xl bg-iris text-ink-inverse shadow-float transition-transform hover:scale-105 active:scale-95 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none md:bottom-8 md:right-8"
       >
         <Plus size={26} strokeWidth={2.5} />
       </Link>

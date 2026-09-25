@@ -23,6 +23,8 @@ import {
   X,
 } from "lucide-react";
 import { dateToMinutesFromMidnight, localMinutesToInstant } from "@/lib/adapters";
+import { partitionReviewItems } from "@/lib/review-window";
+import { nextDateStr, seriesIdsOnDay } from "@/lib/next-day-copies";
 import { toast } from "./Toast";
 import { notifyDayChanged } from "./NowBar";
 
@@ -31,6 +33,9 @@ interface UnfinishedItem {
   revision: number;
   occurrenceKey: string;
   startMin: number;
+  durationMin: number;
+  /** Part of a repeating series — tomorrow already has its own copy. */
+  recurring?: boolean;
 }
 
 export function DayRituals({
@@ -79,6 +84,13 @@ export function DayRituals({
 
   const morningWindow = forced === "morning" || (forced == null && nowMin < 11 * 60);
   const eveningWindow = forced === "evening" || (forced == null && nowMin >= 19 * 60);
+
+  // Only blocks whose end has passed are "still open". Wind-down at 21:00 is
+  // not unfinished at 19:10 — carrying it to tomorrow would erase tonight.
+  const { past: leftovers, upcoming } = partitionReviewItems(
+    unfinished,
+    forced === "evening" ? 24 * 60 : nowMin,
+  );
 
   const dismiss = (which: "morning" | "evening") => {
     setDismissed(which);
@@ -156,36 +168,53 @@ export function DayRituals({
   const carryForward = async () => {
     setBusy(true);
     try {
-      const [y, m, d] = date.split("-").map(Number);
-      const tomorrow = new Date(Date.UTC(y!, m! - 1, d! + 1))
-        .toISOString()
-        .slice(0, 10);
+      const tomorrow = nextDateStr(date);
+      // A repeating block that already has tomorrow's copy would stack a
+      // duplicate there, so today's copy is let go instead. Only ask the day
+      // when something here repeats.
+      const onTomorrow = leftovers.some((i) => i.recurring)
+        ? await seriesIdsOnDay(tomorrow)
+        : null;
       let moved = 0;
-      for (const item of unfinished) {
+      let repeating = 0;
+      for (const item of leftovers) {
+        const alreadyThere = !!item.recurring && !!onTomorrow?.has(item.id);
+        const body = alreadyThere
+          ? { editScope: "this", occurrenceKey: item.occurrenceKey, status: "skipped" }
+          : {
+              editScope: "this",
+              occurrenceKey: item.occurrenceKey,
+              startAt: localMinutesToInstant(tomorrow, item.startMin, zone),
+            };
         const res = await fetch(`/api/v1/activities/${item.id}`, {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
             "If-Match": String(item.revision),
           },
-          body: JSON.stringify({
-            editScope: "this",
-            occurrenceKey: item.occurrenceKey,
-            startAt: localMinutesToInstant(tomorrow, item.startMin, zone),
-          }),
+          body: JSON.stringify(body),
         });
-        if (res.ok) moved++;
+        if (res.ok) {
+          moved++;
+          if (alreadyThere) repeating++;
+        }
       }
       // Only close the day when everything moved — stranding items silently
       // is exactly what this card exists to prevent.
-      if (moved === unfinished.length) {
-        toast(`Moved ${moved} to tomorrow — today is closed`);
+      if (moved === leftovers.length) {
+        toast(
+          repeating === 0
+            ? `Moved ${moved} to tomorrow — today is closed`
+            : moved === repeating
+              ? "Today is closed — repeating things come back tomorrow on their own"
+              : `Moved ${moved - repeating} to tomorrow — repeating things come back on their own`,
+        );
         dismiss("evening");
         notifyDayChanged();
         router.refresh();
       } else {
         toast(
-          `Moved ${moved} of ${unfinished.length} — ${unfinished.length - moved} didn't move, try again`,
+          `Moved ${moved} of ${leftovers.length} — ${leftovers.length - moved} didn't move, try again`,
         );
       }
     } catch {
@@ -247,7 +276,7 @@ export function DayRituals({
     );
   }
 
-  if (eveningWindow && unfinished.length > 0 && dismissed !== "evening") {
+  if (eveningWindow && leftovers.length > 0 && dismissed !== "evening") {
     return (
       <div className="mb-5 rounded-3xl border border-cat-lilac-ink/20 bg-cat-lilac/40 p-4">
         <div className="flex items-start justify-between gap-3">
@@ -258,9 +287,8 @@ export function DayRituals({
             <div>
               <p className="text-[14.5px] font-bold">Close the day</p>
               <p className="text-[12.5px] font-medium text-ink-soft">
-                {unfinished.length}{" "}
-                {unfinished.length === 1 ? "thing" : "things"} still open —
-                decide once, then rest.
+                {`${leftovers.length} ${leftovers.length === 1 ? "thing" : "things"} didn’t happen — decide once, then rest.`}
+                {upcoming > 0 && ` ${upcoming} still ahead tonight stay put.`}
               </p>
             </div>
           </div>
@@ -292,7 +320,7 @@ export function DayRituals({
             ) : (
               <ArrowRight size={14} />
             )}
-            Carry all to tomorrow
+            {leftovers.length === 1 ? "Carry it to tomorrow" : `Carry ${leftovers.length} to tomorrow`}
           </button>
         </div>
       </div>

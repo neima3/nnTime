@@ -375,7 +375,7 @@ export function QuickCapture() {
           type="button"
           aria-label="Quick capture a thought"
           onClick={() => setOpen(true)}
-          className="fixed bottom-24 left-5 z-40 grid size-12 place-items-center rounded-2xl border border-border bg-surface text-ink-soft shadow-float transition-transform hover:scale-105 active:scale-95 md:hidden"
+          className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] left-5 z-40 [html[data-now-strip]_&]:bottom-[calc(8rem+env(safe-area-inset-bottom))] grid size-12 place-items-center rounded-2xl border border-border bg-surface text-ink-soft shadow-float transition-transform hover:scale-105 active:scale-95 md:hidden"
         >
           <PenLine size={20} />
         </button>

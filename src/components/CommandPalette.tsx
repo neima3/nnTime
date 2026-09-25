@@ -59,7 +59,7 @@ interface Command {
 }
 
 const COMMANDS: Command[] = [
-  { id: "new", label: "New activity", hint: "n", keywords: "create add block event", icon: Plus, run: (r) => r.push(`/app/editor?date=${clientToday()}&start=${9 * 60}`) },
+  { id: "new", label: "New activity", hint: "n", keywords: "create add block event", icon: Plus, run: (r) => r.push(`/app/editor?date=${clientToday()}`) },
   { id: "capture", label: "Quick capture a thought", hint: "c", keywords: "brain dump inbox note idea", icon: PenLine, run: () => window.dispatchEvent(new Event("kairo:quick-capture")) },
   { id: "one-thing", label: "One thing — just show me now", hint: "o", keywords: "focus current single overwhelm", icon: Maximize2, run: () => window.dispatchEvent(new Event("kairo:one-thing")) },
   { id: "today", label: "Go to Today", hint: "t", keywords: "timeline day now", icon: CalendarDays, run: (r) => r.push("/app/today") },

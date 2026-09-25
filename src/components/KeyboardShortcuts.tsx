@@ -52,7 +52,7 @@ export function KeyboardShortcuts() {
         if (!pathname?.startsWith("/app")) return;
         e.preventDefault();
         const date = clientToday();
-        router.push(`/app/editor?date=${date}&start=${9 * 60}`);
+        router.push(`/app/editor?date=${date}`);
       }
     };
     window.addEventListener("keydown", onKey);
