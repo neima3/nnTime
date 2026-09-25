@@ -44,7 +44,10 @@ export default async function FocusPage({
           </div>
         }
       >
+        {/* Keyed so following a link to another block (the "On now"
+            suggestion) remounts with that block's identity. */}
         <FocusClient
+          key={`${activityId ?? ""}|${occurrenceKey ?? ""}`}
           defaultTitle={title}
           defaultEmoji={emoji}
           defaultDurationMin={duration}

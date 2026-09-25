@@ -1,5 +1,69 @@
 # Progress log
 
+## 2026-09-24 — Round 94: Keep your place (look + function pass, Opus 5.5)
+
+Plan/defect table: `docs/plans/2026-09-24-round94-keep-your-place.md`. Brief was
+"make this entire app look and function better like a 10x developer". Branch
+`round94-polish` off `origin/main` @ `40abd61` (the old
+`cursor/p0-p11-focus-ownership-8a4c` checkout was already merged, 40 behind).
+
+**Method:** before-set of all 15 routes × desktop/laptop/mobile × light/dark
+(`browser-qa/r94/before/`), then a realistic evening seeded on the local QA
+account (11 blocks, 19:00 NY) and a hands-on pass. Every fix was reproduced
+first.
+
+**Shipped:**
+- Today: sticky right rail (it scrolled away with the auto-scroll to now);
+  `TodayStickyBar` (date · done/total · Now jump · prev/next) appears when
+  the header leaves the viewport, signed-in only; now pill centred on its
+  line, colliding hour label hidden.
+- New-activity default time: `suggestNewStart` (first 45-min gap from now,
+  looks to midnight, lands after whatever is running; other days 09:00) for
+  the Today FAB + empty state; editor applies it when opened without a time
+  (`n`, command palette).
+- **Correctness:** "Close the day" only counts/carries blocks whose end has
+  passed (was carrying tonight's 20:00/21:00 plan to tomorrow). Carry and
+  Review → Move to tomorrow no longer duplicate a repeating block that
+  already has tomorrow's copy (`seriesIdsOnDay`); weekly blocks still move.
+- Mobile: quick-capture pencil no longer overlaps the Now strip
+  (`html[data-now-strip]`), safe-area insets on both FABs; strip copy
+  "Free until 9:00 PM · in 1 hr 45 min" (was "· at 9:00 PM").
+- Month: titled category chips on md+ (3 + "N more", done struck), filled
+  today date; Week: "September 20 – 26", done blocks struck/dimmed.
+- Focus: an "On now / Up next: 🌙 Wind down — Focus on it →" link (current
+  block, or one starting within 15 min) opens Focus linked to that exact
+  occurrence with its remaining minutes; the session-name field is labelled
+  "Focusing on" and sits above Start (it read as a static card below it);
+  FocusClient is keyed by activity+occurrence so the link remounts it.
+- e2e: `game-dialog.spec.ts` opener pinned to the catalog card — on dates
+  where Today's three includes Quick Tap the bare regex matched two buttons.
+
+**Gates (local, this machine):** `pnpm lint` 0, `pnpm typecheck` 0,
+`pnpm test` **170 files / 1501 tests passed**, `pnpm build` 0.
+`pnpm test:e2e` full run: 66 passed, 4 skipped, 4 failed → 2 were my sticky
+bar duplicating "Sample planner" on signed-out Today (fixed: signed-in only,
+abbreviated weekday), 1 date-dependent Play selector (fixed), 1 ECONNRESET
+from the dev server; re-run of those three specs: **30 passed, 4 skipped**
+(email-dependent auth, pre-existing). Parity unchanged: web 89.74% /
+iOS 86.93%.
+
+**Evidence** (`browser-qa/r94/`, git-ignored): `before/`, `after/` (65
+shots), `compare-desktop.png`, `compare-mobile.png`; `carry.mjs`,
+`carry2.mjs`, `review.mjs`, `editor.mjs` assert persisted API state
+(carry moved 5 ended blocks and left 5 evening blocks; daily Stretch/Meds
+not duplicated, weekly Plants moved; editor opened 19:18 → 19:30, other
+day → 09:00, explicit start respected).
+
+**Not done:** not committed, pushed or deployed (awaiting Neima); no live
+verification; iOS untouched (the native day ritual/review have the same
+carry semantics question — check `ios/App/Features` before claiming parity).
+Local QA DB has one duplicate Morning routine on 2026-09-25 from the pre-fix
+carry run.
+
+**Next:** commit on `round94-polish`, PR → main, CI green, Coolify deploy,
+live-verify the sticky rail/bar and the evening carry on time.neima.me with
+the QA account.
+
 ## 2026-09-13 — P3.1 NO-GO: SW eviction must be page-awaitable
 
 Formal no-go on draft PR #4 tip `8f004ec` (GHA

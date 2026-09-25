@@ -20,6 +20,7 @@ import {
 import { dateToMinutesFromMidnight, localMinutesToInstant } from "@/lib/adapters";
 import { clientToday, instantToLocalDateStr } from "@/lib/client-date";
 import { nowMinutesInZone } from "@/lib/client-now";
+import { suggestNewStart } from "@/lib/slots";
 import { useFocusTrap } from "@/lib/useFocusTrap";
 import { sendReplaySafeCreate } from "@/lib/offline-mutation";
 import {
@@ -495,6 +496,15 @@ export function ActivityEditor(props: ActivityEditorProps) {
       cancelled = true;
     };
   }, []);
+
+  // A new activity opened without a time (the `n` shortcut, the command
+  // palette) starts at the next open quarter hour today instead of a 09:00
+  // that may already be behind us. Re-runs once the account zone arrives.
+  useEffect(() => {
+    if (props.mode !== "create" || props.initialStartMin != null) return;
+    if (timeTouched.current || date !== clientToday(tz)) return;
+    setStartMin(suggestNewStart([], nowMinutesInZone(tz)));
+  }, [props.mode, props.initialStartMin, tz, date]);
 
   // Load existing activity when editing without prefilled props.
   useEffect(() => {

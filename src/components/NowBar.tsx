@@ -21,7 +21,7 @@ import { clientToday } from "@/lib/client-date";
 import { dateToMinutesFromMidnight } from "@/lib/adapters";
 import { getSettingsCached } from "@/lib/settings-cache";
 import { toast } from "./Toast";
-import { formatTime, type HourCycle } from "@/lib/time-format";
+import { formatSpan, formatTime, type HourCycle } from "@/lib/time-format";
 import { useHourCycle } from "@/lib/use-hour-cycle";
 
 interface DayActivity {
@@ -259,7 +259,7 @@ function nowLine(info: NowInfo, hourCycle: HourCycle): {
       label: "Now",
       title: info.current.title,
       emoji: info.current.emoji,
-      meta: `${left} min left`,
+      meta: `${formatSpan(left)} left`,
     };
   }
   if (info.next) {
@@ -268,7 +268,8 @@ function nowLine(info: NowInfo, hourCycle: HourCycle): {
       label: `Free until ${formatTime(info.next.startMin, hourCycle)}`,
       title: info.next.title,
       emoji: info.next.emoji,
-      meta: inMin <= 90 ? `in ${inMin} min` : `at ${formatTime(info.next.startMin, hourCycle)}`,
+      // The label already says when; the meta says how long that is.
+      meta: `in ${formatSpan(inMin)}`,
     };
   }
   return null;
@@ -334,8 +335,21 @@ export function NowCard({ active }: { active: string }) {
 export function NowStrip({ active }: { active: string }) {
   const info = useNowInfo();
   const hourCycle = useHourCycle();
-  if (!info || active === "focus" || active === "today") return null;
-  const line = nowLine(info, hourCycle);
+  const line =
+    !info || active === "focus" || active === "today"
+      ? null
+      : nowLine(info, hourCycle);
+  const shown = line != null;
+  // Floating controls (the quick-capture pencil) lift above the strip while
+  // it's on screen instead of sitting on top of it.
+  useEffect(() => {
+    if (!shown) return;
+    const root = document.documentElement;
+    root.dataset.nowStrip = "";
+    return () => {
+      delete root.dataset.nowStrip;
+    };
+  }, [shown]);
   if (!line) return null;
   const isNow = line.label === "Now";
   return (

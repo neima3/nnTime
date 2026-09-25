@@ -13,6 +13,7 @@ import { catClasses, type CategoryId } from "@/lib/mock";
 import { localMinutesToInstant } from "@/lib/adapters";
 import { authPageHref } from "@/lib/auth-return";
 import { sendRebasedStatusChange } from "@/lib/offline-mutation";
+import { nextDateStr, seriesIdsOnDay } from "@/lib/next-day-copies";
 import { celebrate } from "./Celebration";
 import { notifyDayChanged } from "./NowBar";
 import { toast } from "./Toast";
@@ -28,6 +29,8 @@ export type ReviewItem = {
   startMin: number;
   durationMin: number;
   checklist?: string;
+  /** Part of a repeating series (it may already have tomorrow's copy). */
+  recurring?: boolean;
 };
 
 export function ReviewClient({
@@ -137,11 +140,22 @@ export function ReviewClient({
   );
 
   const act = useCallback(
-    async (kind: "complete" | "skip" | "tomorrow") => {
+    async (requested: "complete" | "skip" | "tomorrow") => {
       if (!current || !authed) return false;
       setBusy(true);
       setError(null);
       try {
+        let kind = requested;
+        // A daily block already has tomorrow's copy; moving this one there
+        // would put it on tomorrow twice. Let today's go instead.
+        let alreadyTomorrow = false;
+        if (kind === "tomorrow" && current.recurring) {
+          const onTomorrow = await seriesIdsOnDay(nextDateStr(date));
+          if (onTomorrow?.has(current.id)) {
+            kind = "skip";
+            alreadyTomorrow = true;
+          }
+        }
         let nextRevision = current.revision + 1;
         if (kind === "complete" || kind === "skip") {
           const delivery = await sendRebasedStatusChange({
@@ -215,9 +229,11 @@ export function ReviewClient({
         toast(
           kind === "complete"
             ? "Marked done"
-            : kind === "skip"
-              ? "Let go"
-              : "Moved to tomorrow",
+            : alreadyTomorrow
+              ? "It’s already on tomorrow — let today’s go"
+              : kind === "skip"
+                ? "Let go"
+                : "Moved to tomorrow",
           {
             actionLabel: "Undo",
             onAction: () => {

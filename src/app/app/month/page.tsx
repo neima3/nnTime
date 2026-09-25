@@ -26,6 +26,8 @@ type DayCell = {
   otherMonth?: boolean;
   dots: CategoryId[];
   more?: number;
+  /** Titled blocks for the roomy (md+) grid; the phone grid keeps dots. */
+  items?: { title: string; emoji: string; cat: CategoryId; done: boolean }[];
 };
 
 function shiftMonth(year: number, month: number, delta: number) {
@@ -77,6 +79,7 @@ async function loadMonth(year: number, month: number): Promise<{
   // Expand RRULE series per day so recurring blocks show as dots (not only
   // the series dtstart day). Cap at 4 categories for the cell UI.
   const dotsByDay = new Map<number, CategoryId[]>();
+  const itemsByDay = new Map<number, NonNullable<DayCell["items"]>>();
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     const expanded = expandActivitiesForDay(
@@ -85,13 +88,19 @@ async function loadMonth(year: number, month: number): Promise<{
       resolveDayBounds(dateStr, zone),
     );
     const cats: CategoryId[] = [];
+    const items: NonNullable<DayCell["items"]> = [];
     for (const s of expanded) {
-      if (cats.length >= 4) break;
-      cats.push(
-        s.categoryId ? categoryMap.get(s.categoryId) ?? "sky" : "sky",
-      );
+      const cat = s.categoryId ? categoryMap.get(s.categoryId) ?? "sky" : "sky";
+      if (cats.length < 4) cats.push(cat);
+      items.push({
+        title: s.title,
+        emoji: s.emoji ?? "📋",
+        cat,
+        done: s.status === "completed",
+      });
     }
     if (cats.length) dotsByDay.set(d, cats);
+    if (items.length) itemsByDay.set(d, items);
   }
 
   const result: DayCell[] = [];
@@ -107,6 +116,7 @@ async function loadMonth(year: number, month: number): Promise<{
       isToday: dateStr === todayStr,
       dots: dots.slice(0, 3),
       more: dots.length > 3 ? dots.length - 3 : undefined,
+      items: itemsByDay.get(d),
     });
   }
   while (result.length % 7 !== 0) {
@@ -215,16 +225,24 @@ export default async function MonthPage({
             </div>
           ))}
           {days.map((d, i) => {
+            const shown = d.items?.slice(0, 3) ?? [];
+            const hidden = (d.items?.length ?? 0) - shown.length;
             const inner = (
               <>
                 <span
                   className={`tnum text-[13px] font-bold ${
-                    d.isToday ? "text-iris" : d.otherMonth ? "text-ink-faint" : ""
+                    d.isToday
+                      ? "inline-grid size-6 place-items-center rounded-full bg-iris text-ink-inverse md:-m-0.5"
+                      : d.otherMonth
+                        ? "text-ink-faint"
+                        : ""
                   }`}
                 >
                   {d.date}
                 </span>
-                <div className="mt-1.5 flex flex-wrap gap-0.5">
+                <div
+                  className={`mt-1.5 flex flex-wrap gap-0.5 ${d.items ? "md:hidden" : ""}`}
+                >
                   {d.dots.map((c, j) => (
                     <span
                       key={j}
@@ -237,14 +255,36 @@ export default async function MonthPage({
                     </span>
                   ) : null}
                 </div>
+                {d.items && (
+                  <ul className="mt-1.5 hidden space-y-1 md:block">
+                    {shown.map((it, j) => (
+                      <li
+                        key={j}
+                        className={`flex items-center gap-1 truncate rounded-md px-1.5 py-0.5 text-[11.5px] font-semibold leading-snug ${catClasses[it.cat].fill} ${catClasses[it.cat].ink} ${
+                          it.done ? "line-through decoration-1 opacity-70" : ""
+                        }`}
+                      >
+                        <span aria-hidden className="shrink-0 text-[10px]">
+                          {it.emoji}
+                        </span>
+                        <span className="truncate">{it.title}</span>
+                      </li>
+                    ))}
+                    {hidden > 0 && (
+                      <li className="px-1.5 text-[11px] font-semibold text-ink-faint">
+                        +{hidden} more
+                      </li>
+                    )}
+                  </ul>
+                )}
               </>
             );
-            const cls = `min-h-16 rounded-2xl border p-2 transition-colors ${
+            const cls = `min-h-16 min-w-0 overflow-hidden rounded-2xl border p-2 transition-colors focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none md:min-h-32 ${
               d.isToday
                 ? "border-iris bg-iris-ghost shadow-card"
                 : d.otherMonth
                   ? "border-transparent bg-transparent"
-                  : "border-border bg-surface hover:bg-surface-raised"
+                  : "border-border bg-surface hover:border-iris/40 hover:bg-surface-raised"
             }`;
             if (d.dateStr && !d.otherMonth) {
               return (

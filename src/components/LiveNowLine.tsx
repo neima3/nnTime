@@ -135,10 +135,11 @@ export function LiveNowLine({
     <div>
       <div
         ref={lineRef}
-        className="pointer-events-none absolute inset-x-0 z-20 flex items-center gap-2"
+        data-now-line
+        className="pointer-events-none absolute inset-x-0 z-20 flex -translate-y-1/2 items-center gap-2"
         style={{ top: top(clampedMin) }}
       >
-        <span className="tnum min-w-10 shrink-0 -translate-y-1/2 whitespace-nowrap rounded-md bg-now px-1 text-center text-[11px] font-bold text-now-ink">
+        <span className="tnum min-w-10 shrink-0 whitespace-nowrap rounded-md bg-now px-1 text-center text-[11px] font-bold text-now-ink">
           {formatTime(Math.floor(clampedMin), hourCycle)}
         </span>
         <div className="relative h-0.5 flex-1 rounded bg-now">

@@ -361,7 +361,14 @@ export function TimelineCanvas({
             className="absolute inset-x-0 flex items-start gap-3"
             style={{ top: top(h * 60) }}
           >
-            <span className="tnum w-10 -translate-y-1/2 text-right text-[12px] font-medium text-ink-faint">
+            <span
+              className={`tnum w-10 -translate-y-1/2 text-right text-[12px] font-medium text-ink-faint transition-opacity ${
+                // The now pill sits in this gutter; don't print "7 PM" under it.
+                showNowLine && liveNow != null && Math.abs(liveNow - h * 60) < 14
+                  ? "opacity-0"
+                  : ""
+              }`}
+            >
               {formatHourLabel(h, hourCycle)}
             </span>
             <div className="mt-px h-px flex-1 bg-border" />

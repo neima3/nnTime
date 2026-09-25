@@ -21,10 +21,14 @@ describe("DayRituals partial-failure handling", () => {
     const start = source.indexOf("const carryForward = async () => {");
     const end = source.indexOf("if (morningWindow &&");
     const carryForward = source.slice(start, end);
-    expect(carryForward).toContain("if (moved === unfinished.length) {");
-    expect(carryForward).toContain(
-      "toast(`Moved ${moved} to tomorrow — today is closed`)",
-    );
+    expect(carryForward).toContain("if (moved === leftovers.length) {");
+    // Only blocks that already ended are carried — never tonight's plan.
+    expect(carryForward).toContain("for (const item of leftovers)");
+    expect(carryForward).not.toContain("of unfinished");
+    expect(carryForward).toContain("`Moved ${moved} to tomorrow — today is closed`");
+    // Repeating blocks are let go today rather than duplicated onto tomorrow.
+    expect(carryForward).toContain("seriesIdsOnDay(tomorrow)");
+    expect(carryForward).toContain('status: "skipped"');
     expect(carryForward).toContain("didn't move, try again");
   });
 
@@ -34,5 +38,11 @@ describe("DayRituals partial-failure handling", () => {
     const rituals = source.slice(start, end);
     // dismiss() appears once per ritual, inside its success branch.
     expect(rituals.match(/dismiss\(/g)).toHaveLength(2);
+  });
+
+  it("counts and carries only blocks whose end has passed", () => {
+    expect(source).toContain("partitionReviewItems(");
+    expect(source).toContain("leftovers.length > 0 && dismissed !== \"evening\"");
+    expect(source).toContain("still ahead tonight stay put.");
   });
 });
