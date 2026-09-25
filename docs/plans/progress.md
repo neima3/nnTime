@@ -54,15 +54,27 @@ shots), `compare-desktop.png`, `compare-mobile.png`; `carry.mjs`,
 not duplicated, weekly Plants moved; editor opened 19:18 → 19:30, other
 day → 09:00, explicit start respected).
 
-**Not done:** not committed, pushed or deployed (awaiting Neima); no live
-verification; iOS untouched (the native day ritual/review have the same
-carry semantics question — check `ios/App/Features` before claiming parity).
-Local QA DB has one duplicate Morning routine on 2026-09-25 from the pre-fix
-carry run.
+**Shipped + deployed:** PR #5 (`c284d21` Today/carry/month/week, `d755c95`
+Focus, `31496fd` docs) merged as `f3fba99`. CI run **36080561054** on the PR:
+build-test ✅ (2m11s), e2e ✅ (4m53s), native-contract ✅ (22m24s). Coolify
+webhook build `mc9mi5tirlgtuy7nk4i66hzj` → `finished` for `f3fba99`.
 
-**Next:** commit on `round94-polish`, PR → main, CI green, Coolify deploy,
-live-verify the sticky rail/bar and the evening carry on time.neima.me with
-the QA account.
+**Live-verified** on https://time.neima.me: `/api/health` ok; stylesheet
+`29vnp2q1_0xmo.css` contains `data-now-strip`, `min-h-32`, `100dvh - 3rem`
+and `8rem + env` (only in this build). Browser pass with the prod QA account
+(`browser-qa/r94/live.mjs`, read-only): sticky rail `position: sticky`, Week
+title "September 20 – 26", Focus "Focusing on" field, Today "+" →
+`start=1305` (21:45 at 21:40 NY). `live2.mjs` created two temporary 🧪 blocks
+on the synthetic QA account, confirmed the sticky day bar (desktop + mobile,
+"0 of 2 done") and Month titled chips, then DELETEd both (204, 0 rows left).
+Screenshots `browser-qa/r94/live/`.
+
+**Not done:** iOS untouched — native ReviewSheet "Move to tomorrow" likely
+has the same daily-duplicate issue (task chip spawned). Local QA DB has one
+duplicate Morning routine on 2026-09-25 from the pre-fix carry run.
+
+**Next:** native parity for the carry/move rule (ReviewSheet.swift); then
+resume the 2026-09-13 program at the next open P-task.
 
 ## 2026-09-13 — P3.1 NO-GO: SW eviction must be page-awaitable
 
