@@ -18,8 +18,8 @@ a person actually hits. Every item below was reproduced before it was touched.
 | 7 | Mobile: quick-capture pencil overlapped the Now strip on every page but Today | Strip flags `html[data-now-strip]`; pencil lifts above it; safe-area insets on both FABs |
 | 8 | Now strip read "Free until 9:00 PM · at 9:00 PM" | "Free until 9:00 PM · in 1 hr 45 min" (`formatSpan`) |
 | 9 | Month: dots only, half the page empty | md+: titled category chips (3 + "N more"), done struck through, today as a filled date; phone keeps dots |
-| 11 | Focus: the session name field sat under Start and read as a static card; nothing pointed at the block that's on right now | Labelled "Focusing on", above Start; "On now: … Focus on it →" links the current (or ≤15-min-away) occurrence |
 | 10 | Week: "09/20 – 09/26"; done blocks looked pending | "September 20 – 26" / "Sep 27 – Oct 3" (`weekRangeLabel`); done blocks struck + dimmed |
+| 11 | Focus: the session name field sat under Start and read as a static card; nothing pointed at the block that's on right now | Labelled "Focusing on", above Start; "On now: … Focus on it →" links the current (or ≤15-min-away) occurrence |
 
 ## Not changed (checked, fine)
 Inbox, Routines, Templates, Play, Stats, Settings, Planner, landing — no
