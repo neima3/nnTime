@@ -10,8 +10,10 @@ import { useRouter } from "next/navigation";
 import { Check, Coffee, Gamepad2, Pause, Play, Plus, SkipForward } from "lucide-react";
 import { celebrate } from "./Celebration";
 import { toast } from "./Toast";
-import { notifyDayChanged } from "./NowBar";
+import { notifyDayChanged, useNowInfo } from "./NowBar";
+import Link from "next/link";
 import { companionLine, readCompanionPref, writeCompanionPref } from "@/lib/companion";
+import { focusHrefFromActivity } from "@/lib/focus-linkage";
 import {
   adoptFocusLinkage,
   canMarkOccurrenceDone,
@@ -146,6 +148,7 @@ export function FocusClient({
   steps?: string[];
 }) {
   const router = useRouter();
+  const nowInfo = useNowInfo();
   const [session, setSession] = useState<Session | null>(null);
   const [remainingSec, setRemainingSec] = useState(defaultDurationMin * 60);
   const [title, setTitle] = useState(defaultTitle);
@@ -763,6 +766,35 @@ export function FocusClient({
     );
   }
 
+  // What's on the plan right now (or starting within 15 min) is the most
+  // likely thing to focus on — offer it, linked to that exact occurrence.
+  const nowBlock =
+    nowInfo?.current ??
+    (nowInfo?.next && nowInfo.next.startMin - nowInfo.nowMin <= 15
+      ? nowInfo.next
+      : null);
+  const nowSuggestion =
+    nowBlock?.id && nowBlock.occurrenceKey
+      ? {
+          label: nowBlock === nowInfo?.current ? "On now" : "Up next",
+          title: nowBlock.title,
+          emoji: nowBlock.emoji,
+          href: focusHrefFromActivity({
+            title: nowBlock.title,
+            emoji: nowBlock.emoji,
+            durationMin: Math.max(
+              5,
+              Math.min(
+                nowBlock.endMin - Math.max(nowBlock.startMin, nowInfo!.nowMin),
+                90,
+              ),
+            ),
+            activityId: nowBlock.id,
+            occurrenceKey: nowBlock.occurrenceKey,
+          }),
+        }
+      : null;
+
   if (!session) {
     return (
       <div className="mx-auto flex min-h-[calc(100dvh-6rem)] max-w-2xl flex-col items-center px-4 py-6 sm:py-10 md:min-h-dvh md:justify-center">
@@ -783,9 +815,26 @@ export function FocusClient({
           />
         </div>
 
+        {!activityId && nowSuggestion && (
+          <Link
+            href={nowSuggestion.href}
+            className="mt-8 inline-flex max-w-full items-center gap-2 rounded-2xl border border-now/30 bg-surface px-4 py-2.5 text-[13.5px] font-semibold text-ink shadow-card transition-colors hover:border-now/60 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+          >
+            <span className="relative flex size-2 shrink-0" aria-hidden>
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-now opacity-60 motion-reduce:hidden" />
+              <span className="relative inline-flex size-2 rounded-full bg-now" />
+            </span>
+            <span className="truncate">
+              {nowSuggestion.label}: <span aria-hidden>{nowSuggestion.emoji}</span>{" "}
+              {nowSuggestion.title}
+            </span>
+            <span className="shrink-0 text-iris">Focus on it →</span>
+          </Link>
+        )}
+
         {!activityId && (
           <div
-            className="mt-8 flex flex-wrap items-center justify-center gap-2"
+            className={`${nowSuggestion ? "mt-4" : "mt-8"} flex flex-wrap items-center justify-center gap-2`}
             role="group"
             aria-label="Session rituals"
           >
@@ -861,6 +910,30 @@ export function FocusClient({
           ))}
         </div>
 
+        {/* Name the session before starting it — this field used to sit
+            under the Start button and read like a static card. */}
+        <label
+          htmlFor="focus-session-title"
+          className="mt-6 block w-full max-w-sm text-left text-[11px] font-bold uppercase tracking-[0.1em] text-ink-soft sm:mt-8"
+        >
+          Focusing on
+        </label>
+        <div className="mt-1.5 flex w-full max-w-sm items-center gap-2 rounded-2xl border border-border bg-surface p-2 shadow-card focus-within:ring-2 focus-within:ring-iris">
+          <input
+            value={emoji}
+            onChange={(e) => setEmoji(e.target.value)}
+            aria-label="Session emoji"
+            className="w-12 shrink-0 rounded-xl bg-surface-sunken py-2 text-center text-lg outline-none"
+          />
+          <input
+            id="focus-session-title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="What are you focusing on?"
+            className="w-full bg-transparent px-1 text-[15px] font-medium outline-none placeholder:text-ink-faint"
+          />
+        </div>
+
         {error && (
           <p role="alert" className="mt-4 text-[13px] font-semibold text-danger">
             {error}
@@ -870,7 +943,7 @@ export function FocusClient({
           type="button"
           onClick={() => void start()}
           disabled={mutationPending}
-          className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-iris px-8 py-3.5 text-[15px] font-semibold text-ink-inverse shadow-float sm:mt-8 transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:cursor-wait disabled:opacity-60"
+          className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-iris px-8 py-3.5 text-[15px] font-semibold text-ink-inverse shadow-float sm:mt-6 transition-transform hover:scale-105 focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none disabled:cursor-wait disabled:opacity-60"
         >
           <Play size={17} fill="currentColor" />
           Start focus
@@ -881,21 +954,6 @@ export function FocusClient({
           </p>
         )}
 
-        <div className="mt-8 flex w-full max-w-sm items-center gap-2 rounded-2xl border border-border bg-surface p-2 shadow-card focus-within:ring-2 focus-within:ring-iris">
-          <input
-            value={emoji}
-            onChange={(e) => setEmoji(e.target.value)}
-            aria-label="Session emoji"
-            className="w-12 shrink-0 rounded-xl bg-surface-sunken py-2 text-center text-lg outline-none"
-          />
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            aria-label="Session title"
-            placeholder="What are you focusing on?"
-            className="w-full bg-transparent px-1 text-[15px] font-medium outline-none placeholder:text-ink-faint"
-          />
-        </div>
       </div>
     );
   }

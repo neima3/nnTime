@@ -12,7 +12,7 @@ Plan/defect table: `docs/plans/2026-09-24-round94-keep-your-place.md`. Brief was
 account (11 blocks, 19:00 NY) and a hands-on pass. Every fix was reproduced
 first.
 
-**Shipped (uncommitted on the branch at hand-off):**
+**Shipped:**
 - Today: sticky right rail (it scrolled away with the auto-scroll to now);
   `TodayStickyBar` (date · done/total · Now jump · prev/next) appears when
   the header leaves the viewport, signed-in only; now pill centred on its
@@ -30,6 +30,11 @@ first.
   "Free until 9:00 PM · in 1 hr 45 min" (was "· at 9:00 PM").
 - Month: titled category chips on md+ (3 + "N more", done struck), filled
   today date; Week: "September 20 – 26", done blocks struck/dimmed.
+- Focus: an "On now / Up next: 🌙 Wind down — Focus on it →" link (current
+  block, or one starting within 15 min) opens Focus linked to that exact
+  occurrence with its remaining minutes; the session-name field is labelled
+  "Focusing on" and sits above Start (it read as a static card below it);
+  FocusClient is keyed by activity+occurrence so the link remounts it.
 - e2e: `game-dialog.spec.ts` opener pinned to the catalog card — on dates
   where Today's three includes Quick Tap the bare regex matched two buttons.
 
