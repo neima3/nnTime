@@ -1,5 +1,60 @@
 # Progress log
 
+## 2026-09-24 — Round 94 native follow-up: iOS "Move to tomorrow" (Opus 5.5)
+
+Brief: port R94 defect #6 (daily block duplicated on tomorrow) to iOS and
+check #5 (carry only ended blocks). Worktree branch
+`claude/funny-elbakyan-1cc82d` off `9ca7e90`.
+
+**Repro (local server, synthetic `qa-r95-*@kairo.test`, never prod):** the
+opt-in `ReviewTomorrowLiveTests` signs up a throwaway account, creates two
+FREQ=DAILY series from yesterday 00:05 plus a weekly one today, and runs the
+pre-fix iOS request (`moveActivity` startAt → tomorrow): tomorrow listed the
+daily series **2×**. With the fix: daily → 1 copy tomorrow, gone from today
+(skipped); weekly → moved (1 tomorrow, 0 today). Rows are deleted in teardown.
+
+**Shipped (uncommitted in the worktree at hand-off):**
+- `ios/App/Features/Today/ReviewTomorrow.swift` — `perform` mirrors
+  `next-day-copies.ts`: recurring block → `KairoAPI.day(nextDate)` via the
+  generated client; series already there → `setStatus(.skipped)`; else (or
+  day unreadable, or one-off) → `moveActivity`. `nextDate` is UTC string math.
+- `ReviewSheet` uses it; the let-go path records Undo as `.letGo`
+  (→ pending) and shows "It’s already on tomorrow — let today’s go".
+- #5: iOS has no carry-all — the 19:00 "Close the day gently" ritual only
+  opens ReviewSheet, already windowed by `ReviewWindow.partition`. No change.
+- Tests: `ReviewTomorrowTests` (6, pure), 4 transport tests in
+  `KairoAPITransportTests` (exact request sequence: `GET /day/<tomorrow>` →
+  PATCH `status: skipped` without `startAt`; weekly/one-off/unreadable move),
+  `ReviewTomorrowLiveTests` (skips unless
+  `TEST_RUNNER_KAIRO_LIVE_REVIEW_URL=http://localhost:3456`; refuses
+  non-local hosts), `KairoRound95ReviewTomorrowTour` UI tour (skips unless
+  URL/EMAIL/PASSWORD env set; local only).
+
+**Gates:** `pnpm lint` 0, `pnpm typecheck` 0, `pnpm test` 170 files / 1501
+passed (includes the iOS-source contract tests), `pnpm build` 0.
+`./scripts/ios-main-thread-gate.sh` → **Executed 445 tests, 2 skipped
+(NativeSyncStore protection — pre-existing; live test — opt-in), 0 failures**,
+no Main Thread Checker hits. Live test run: 1 passed.
+
+**Not verified:** the `KairoRound95ReviewTomorrowTour` UI tour never
+completed — run 1 died on unsigned keychain (below), run 2 was hijacked by
+another session's app on the shared simulator (Kairo had signed in and loaded
+both days first), runs 3–4 stalled/"Invalid device state" at host load
+~450–520. No ReviewSheet screenshot of the new notice exists yet. Next agent:
+seed with a daily + weekly series ended today on a `qa-*@kairo.test` account,
+then run the tour with `TEST_RUNNER_KAIRO_LIVE_REVIEW_URL/EMAIL/PASSWORD` and
+`TEST_RUNNER_KAIRO_UI_EVIDENCE_DIR=browser-qa/r95/ios` on a quiet simulator
+(signing allowed). All synthetic rows from this session are tombstoned.
+
+**Gotchas:** UI tours that sign in need normal simulator signing — with
+`CODE_SIGNING_ALLOWED=NO` sign-in returns 200 but the keychain envelope
+write fails ("Couldn't sign in"). Native `signOut` against localhost gets 403
+(pre-existing, harmless for tests). Booted simulators are shared with other
+sessions (another app took over mid-tour once); the host sat at load ~450
+this session and a freshly created simulator could not boot. `pnpm build`
+while `pnpm dev` runs wipes `.next/dev` (dev server 500s) — rm -rf .next and
+restart the preview.
+
 ## 2026-09-24 — Round 94: Keep your place (look + function pass, Opus 5.5)
 
 Plan/defect table: `docs/plans/2026-09-24-round94-keep-your-place.md`. Brief was

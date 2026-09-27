@@ -30,3 +30,17 @@ update (router.refresh); it's just slow on the dev server.
 Unit: new tests in `slots`, `time-format`, `next-day-copies`, DayRituals pin.
 Browser (Playwright + installed Chrome, `browser-qa/r94/`): before/after sets,
 carry-forward and Review scripts asserting persisted API state.
+
+## Native follow-up (iOS parity for #5 / #6)
+- **#6 on iOS — reproduced and fixed.** `ReviewSheet` "Move to tomorrow"
+  PATCHed the occurrence's `startAt` onto tomorrow unconditionally; against a
+  local server a FREQ=DAILY series then showed **2** copies on tomorrow.
+  `ReviewTomorrow.perform` (mirrors `next-day-copies.ts` + ReviewClient
+  `act`) reads `KairoAPI.day(tomorrow)` through the generated client; a
+  recurring block whose series is already there is let go today
+  (`status: skipped`, notice "It’s already on tomorrow — let today’s go",
+  Undo → pending). Weekly/one-offs still move; an unreadable tomorrow falls
+  back to moving.
+- **#5 on iOS — nothing to fix.** There is no native "carry all"; the evening
+  "Close the day gently" card only opens ReviewSheet, which already lists
+  just ended blocks (`ReviewWindow.partition`, R92).
