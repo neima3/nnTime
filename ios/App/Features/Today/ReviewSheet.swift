@@ -14,6 +14,7 @@ struct ReviewSheet: View {
     @State private var upcoming: Int
     @State private var busy = false
     @State private var lastUndo: (kind: Action, item: DayBlock, revision: Int)?
+    @State private var notice: String?
 
     init(
         date: String,
@@ -74,6 +75,9 @@ struct ReviewSheet: View {
                             Label("Let it go", systemImage: "wind").font(.kBody(15, weight: .semibold)).foregroundStyle(Color.kInkSoft)
                                 .frame(maxWidth: .infinity).padding(.vertical, 13)
                         }
+                        if let notice {
+                            Text(notice).font(.kBody(13, weight: .medium)).foregroundStyle(Color.kInkSoft)
+                        }
                         if lastUndo != nil {
                             Button("Undo") { Task { await undoLast() } }
                                 .font(.kBody(15, weight: .semibold))
@@ -93,6 +97,9 @@ struct ReviewSheet: View {
                             : "Nothing left to review for today."
                     )
                     .font(.kBody(14)).foregroundStyle(Color.kInkSoft)
+                    if let notice {
+                        Text(notice).font(.kBody(13, weight: .medium)).foregroundStyle(Color.kInkSoft)
+                    }
                     if lastUndo != nil {
                         Button("Undo") { Task { await undoLast() } }
                             .font(.kBody(15, weight: .semibold))
@@ -110,6 +117,7 @@ struct ReviewSheet: View {
         busy = true
         do {
             let updated: Activity
+            var undoKind = action
             switch action {
             case .complete:
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -129,19 +137,16 @@ struct ReviewSheet: View {
                     completedAt: nil
                 )
             case .tomorrow:
-                var cal = Calendar(identifier: .gregorian); cal.timeZone = zone
-                let comps = date.split(separator: "-").compactMap { Int($0) }
-                var dc = DateComponents(); dc.year = comps[0]; dc.month = comps[1]; dc.day = comps[2]
-                let tomorrow = cal.date(byAdding: .day, value: 1, to: cal.date(from: dc) ?? Date()) ?? Date()
-                let tKey = KTime.dateString(tomorrow, zone: zone)
-                updated = try await KairoAPI.shared.moveActivity(
-                    activityId: item.id,
-                    revision: item.revision,
-                    occurrenceKey: item.occurrenceKey,
-                    startAt: KTime.instant(date: tKey, minutes: item.startMin, zone: zone)
-                )
+                // A daily block already has tomorrow's copy; moving this one
+                // there would put it on tomorrow twice. Let today's go instead.
+                let result = try await ReviewTomorrow.perform(item, date: date, zone: zone, api: .shared)
+                updated = result.activity
+                if result.outcome == .alreadyTomorrow { undoKind = .letGo }
             }
-            lastUndo = (action, item, updated.revision)
+            lastUndo = (undoKind, item, updated.revision)
+            notice = action == .tomorrow && undoKind == .letGo
+                ? "It’s already on tomorrow — let today’s go"
+                : nil
             remaining.removeFirst()
             onChange()
         } catch {
@@ -173,6 +178,7 @@ struct ReviewSheet: View {
             }
             remaining.insert(last.item, at: 0)
             lastUndo = nil
+            notice = nil
             onChange()
         } catch {
             // Leave lastUndo so the user can retry.

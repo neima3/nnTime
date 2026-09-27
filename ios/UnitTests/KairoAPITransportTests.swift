@@ -907,6 +907,127 @@ final class KairoAPITransportTests: XCTestCase {
         XCTAssertEqual(offenders, [])
     }
 
+    // MARK: Review → Move to tomorrow (mirrors src/lib/next-day-copies.ts)
+
+    private static func reviewBlock(recurring: Bool) -> DayBlock {
+        DayBlock(
+            id: "activity-1",
+            title: "Stretch",
+            emoji: "🧘",
+            startMin: 8 * 60,
+            durationMin: 15,
+            category: .sky,
+            done: false,
+            recurring: recurring,
+            revision: 2,
+            occurrenceKey: "2026-07-28T13:00:00.000Z",
+            checklist: []
+        )
+    }
+
+    private static let emptyDayJSON = """
+    {
+      "date":"2026-07-29","zone":"America/Chicago",
+      "start":"2026-07-29T05:00:00Z","end":"2026-07-30T05:00:00Z",
+      "activities":[],"anytimeTasks":[],"occurrenceStatusBySeries":{}
+    }
+    """
+
+    private func reviewAPI(
+        recorder: PlannerRequestRecorder,
+        day: @escaping @Sendable () -> PlannerMockResponse
+    ) -> KairoAPI {
+        KairoAPI(
+            baseURL: URL(string: "http://127.0.0.1:3456")!,
+            plannerTransport: PlannerMockTransport(recorder: recorder) { operation in
+                operation == "getDay" ? day() : Self.successResponse(operation)
+            },
+            timezoneIdentifierProvider: { "America/Chicago" },
+            idempotencyKeyProvider: { "019fa64f-32f2-7001-8296-34373d7c90a0" }
+        )
+    }
+
+    func testMoveToTomorrowLetsTodayGoWhenDailySeriesIsAlreadyOnTomorrow() async throws {
+        let recorder = PlannerRequestRecorder()
+        let api = reviewAPI(recorder: recorder) { .init(status: .ok, body: Self.dayJSON) }
+
+        let result = try await ReviewTomorrow.perform(
+            Self.reviewBlock(recurring: true),
+            date: "2026-07-28",
+            zone: TimeZone(identifier: "America/Chicago")!,
+            api: api
+        )
+
+        XCTAssertEqual(result.outcome, .alreadyTomorrow)
+        let captures = await recorder.captures
+        XCTAssertEqual(
+            captures.map { "\($0.method) \($0.path)" },
+            ["GET /day/2026-07-29", "PATCH /activities/activity-1?editScope=this"]
+        )
+        let body = try captures[1].jsonBody()
+        XCTAssertEqual(body["status"] as? String, "skipped")
+        XCTAssertNil(body["startAt"], "must not move onto tomorrow's own copy")
+        XCTAssertEqual(captures[1].headers["if-match"], "2")
+    }
+
+    func testMoveToTomorrowStillMovesWeeklySeriesWithNoCopyTomorrow() async throws {
+        let recorder = PlannerRequestRecorder()
+        let api = reviewAPI(recorder: recorder) { .init(status: .ok, body: Self.emptyDayJSON) }
+
+        let result = try await ReviewTomorrow.perform(
+            Self.reviewBlock(recurring: true),
+            date: "2026-07-28",
+            zone: TimeZone(identifier: "America/Chicago")!,
+            api: api
+        )
+
+        XCTAssertEqual(result.outcome, .moved)
+        let captures = await recorder.captures
+        XCTAssertEqual(captures.map(\.operationID), ["getDay", "updateActivitySeries"])
+        let body = try captures[1].jsonBody()
+        XCTAssertNil(body["status"])
+        let startAt = try XCTUnwrap(body["startAt"] as? String)
+        XCTAssertTrue(startAt.hasPrefix("2026-07-29T13:00:00"), startAt)
+    }
+
+    func testMoveToTomorrowSkipsTheLookupForOneOffs() async throws {
+        let recorder = PlannerRequestRecorder()
+        let api = reviewAPI(recorder: recorder) { .init(status: .ok, body: Self.dayJSON) }
+
+        let result = try await ReviewTomorrow.perform(
+            Self.reviewBlock(recurring: false),
+            date: "2026-07-28",
+            zone: TimeZone(identifier: "America/Chicago")!,
+            api: api
+        )
+
+        XCTAssertEqual(result.outcome, .moved)
+        let captures = await recorder.captures
+        XCTAssertEqual(captures.map(\.operationID), ["updateActivitySeries"])
+    }
+
+    func testMoveToTomorrowFallsBackToMovingWhenTomorrowCannotBeRead() async throws {
+        let recorder = PlannerRequestRecorder()
+        let api = reviewAPI(recorder: recorder) {
+            .init(
+                status: .internalServerError,
+                body: Self.errorEnvelope(code: "INTERNAL", message: "boom")
+            )
+        }
+
+        let result = try await ReviewTomorrow.perform(
+            Self.reviewBlock(recurring: true),
+            date: "2026-07-28",
+            zone: TimeZone(identifier: "America/Chicago")!,
+            api: api
+        )
+
+        XCTAssertEqual(result.outcome, .moved)
+        let captures = await recorder.captures
+        XCTAssertEqual(captures.map(\.operationID), ["getDay", "updateActivitySeries"])
+        XCTAssertNotNil(try captures[1].jsonBody()["startAt"])
+    }
+
     private static func isUUIDv7Compatible(_ value: String) -> Bool {
         let pieces = value.lowercased().split(separator: "-")
         guard pieces.map(\.count) == [8, 4, 4, 4, 12] else { return false }
