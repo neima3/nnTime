@@ -1246,6 +1246,238 @@ export function prepareOrderRun(
   };
 }
 
+/* ---- Arrow Rush (flanker) ------------------------------------------------- */
+
+export const ARROW_ROUNDS = 20;
+/** No answer inside this window counts as "too slow" and the run moves on. */
+export const ARROW_LIMIT_MS = 1800;
+export const ARROW_GAP_MS = 380;
+
+export type ArrowDir = "left" | "right";
+
+export interface ArrowRound {
+  /** Where the middle arrow points — the answer. */
+  dir: ArrowDir;
+  /** Decoys agree with the middle one (easy) or point the other way. */
+  congruent: boolean;
+}
+
+/**
+ * A balanced run: exactly half the rounds have decoys pointing the wrong
+ * way, directions are coin flips, order shuffled. Random draws: one per
+ * round for direction, then Fisher–Yates — the Swift mirror consumes the
+ * same sequence.
+ */
+export function buildArrowRun(
+  random: () => number = Math.random,
+): ArrowRound[] {
+  const rounds: ArrowRound[] = [];
+  for (let i = 0; i < ARROW_ROUNDS; i++) {
+    rounds.push({ dir: random() < 0.5 ? "left" : "right", congruent: i % 2 === 0 });
+  }
+  for (let i = rounds.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [rounds[i], rounds[j]] = [rounds[j]!, rounds[i]!];
+  }
+  return rounds;
+}
+
+/** The five arrows on screen; the middle one (index 2) is the answer. */
+export function arrowRow(round: ArrowRound): ArrowDir[] {
+  const decoy: ArrowDir = round.congruent
+    ? round.dir
+    : round.dir === "left"
+      ? "right"
+      : "left";
+  return [decoy, decoy, round.dir, decoy, decoy];
+}
+
+export interface ArrowResult {
+  congruent: boolean;
+  correct: boolean;
+  /** Response time, or null when the window ran out. */
+  ms: number | null;
+}
+
+/** Half-up rounding that means the same thing in Swift (floor(x + 0.5)). */
+function roundHalfUp(x: number): number {
+  return Math.floor(x + 0.5);
+}
+
+/**
+ * Score plus the one number worth noticing: how much slower you were when
+ * the decoys disagreed ("decoy cost"). Only correct answers are timed.
+ */
+export function arrowSummary(results: ArrowResult[]): {
+  correct: number;
+  avgMs: number | null;
+  decoyCostMs: number | null;
+} {
+  const timed = results.filter((r) => r.correct && r.ms != null);
+  const mean = (xs: number[]) =>
+    xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null;
+  const all = mean(timed.map((r) => r.ms!));
+  const easy = mean(timed.filter((r) => r.congruent).map((r) => r.ms!));
+  const hard = mean(timed.filter((r) => !r.congruent).map((r) => r.ms!));
+  return {
+    correct: results.filter((r) => r.correct).length,
+    avgMs: all == null ? null : roundHalfUp(all),
+    decoyCostMs: easy == null || hard == null ? null : roundHalfUp(hard - easy),
+  };
+}
+
+/* ---- Slide Home (3×3 sliding puzzle) --------------------------------------- */
+
+export const SLIDE_SIDE = 3;
+export const SLIDE_SHUFFLE_MOVES = 20;
+/** Par window: long enough to feel like a puzzle, short enough to stay calm. */
+export const SLIDE_PAR_MIN = 12;
+export const SLIDE_PAR_MAX = 20;
+
+/** Board: 9 cells, tiles 1–8, 0 is the gap. Home is 1…8 then the gap. */
+export function slideSolved(): number[] {
+  return [1, 2, 3, 4, 5, 6, 7, 8, 0];
+}
+
+export function isSlideSolved(board: number[]): boolean {
+  return board.every((v, i) => v === (i === board.length - 1 ? 0 : i + 1));
+}
+
+/** Cells that share an edge with `idx`, in a fixed order: up, down, left, right. */
+export function slideNeighbors(idx: number): number[] {
+  const n = SLIDE_SIDE;
+  const row = Math.floor(idx / n);
+  const col = idx % n;
+  const out: number[] = [];
+  if (row > 0) out.push(idx - n);
+  if (row < n - 1) out.push(idx + n);
+  if (col > 0) out.push(idx - 1);
+  if (col < n - 1) out.push(idx + 1);
+  return out;
+}
+
+/** Slide the tile at `idx` into the gap; null when it isn't next to it. */
+export function slideTap(board: number[], idx: number): number[] | null {
+  const gap = board.indexOf(0);
+  if (idx === gap || !slideNeighbors(gap).includes(idx)) return null;
+  const next = [...board];
+  next[gap] = board[idx]!;
+  next[idx] = 0;
+  return next;
+}
+
+/**
+ * Arrow keys move a tile INTO the gap, the way physical puzzles feel:
+ * "up" lifts the tile below the gap. Returns that tile's cell or null.
+ */
+export function slideKeyTarget(
+  board: number[],
+  key: "up" | "down" | "left" | "right",
+): number | null {
+  const n = SLIDE_SIDE;
+  const gap = board.indexOf(0);
+  const row = Math.floor(gap / n);
+  const col = gap % n;
+  if (key === "up") return row < n - 1 ? gap + n : null;
+  if (key === "down") return row > 0 ? gap - n : null;
+  if (key === "left") return col < n - 1 ? gap + 1 : null;
+  return col > 0 ? gap - 1 : null;
+}
+
+/**
+ * Scramble by walking the gap through random legal moves (never straight
+ * back), so every board is solvable. One draw per move; if the walk lands
+ * home it takes one more step so the puzzle never starts solved.
+ */
+export function shuffleSlide(
+  random: () => number = Math.random,
+  moves: number = SLIDE_SHUFFLE_MOVES,
+): number[] {
+  const board = slideSolved();
+  let gap = board.length - 1;
+  let prev = -1;
+  const step = (to: number) => {
+    board[gap] = board[to]!;
+    board[to] = 0;
+    prev = gap;
+    gap = to;
+  };
+  for (let i = 0; i < moves; i++) {
+    const options = slideNeighbors(gap).filter((c) => c !== prev);
+    step(options[Math.floor(random() * options.length)]!);
+  }
+  if (isSlideSolved(board)) step(slideNeighbors(gap)[0]!);
+  return board;
+}
+
+function slideManhattan(board: number[]): number {
+  const n = SLIDE_SIDE;
+  let d = 0;
+  for (let i = 0; i < board.length; i++) {
+    const v = board[i]!;
+    if (v === 0) continue;
+    const home = v - 1;
+    d +=
+      Math.abs(Math.floor(i / n) - Math.floor(home / n)) +
+      Math.abs((i % n) - (home % n));
+  }
+  return d;
+}
+
+/** Fewest moves home (IDA* on Manhattan distance) — the par for the board. */
+export function slideShortest(start: number[]): number {
+  const board = [...start];
+  let gap = board.indexOf(0);
+  let bound = slideManhattan(board);
+  let found = 0;
+  const search = (g: number, prev: number): number => {
+    const h = slideManhattan(board);
+    const f = g + h;
+    if (f > bound) return f;
+    if (h === 0) {
+      found = g;
+      return -1;
+    }
+    let min = Infinity;
+    for (const to of slideNeighbors(gap)) {
+      if (to === prev) continue;
+      const from = gap;
+      board[from] = board[to]!;
+      board[to] = 0;
+      gap = to;
+      const t = search(g + 1, from);
+      board[to] = board[from]!;
+      board[from] = 0;
+      gap = from;
+      if (t === -1) return -1;
+      if (t < min) min = t;
+    }
+    return min;
+  };
+  for (;;) {
+    const t = search(0, -1);
+    if (t === -1) return found;
+    bound = t;
+  }
+}
+
+/**
+ * A board whose par sits in the calm window — reshuffles (up to 20 tries,
+ * then keeps the last) because random walks sometimes wander back home.
+ */
+export function buildSlideBoard(
+  random: () => number = Math.random,
+): { board: number[]; par: number } {
+  let board = shuffleSlide(random);
+  let par = slideShortest(board);
+  for (let tries = 1; tries < 20; tries++) {
+    if (par >= SLIDE_PAR_MIN && par <= SLIDE_PAR_MAX) break;
+    board = shuffleSlide(random);
+    par = slideShortest(board);
+  }
+  return { board, par };
+}
+
 /* ---- Daily Three (choice-paralysis-free rotation) ------------------------ */
 
 /**
@@ -1254,10 +1486,10 @@ export function prepareOrderRun(
  * logic and the iOS mirror share one source of truth.
  */
 export const MOOD_GAMES: readonly (readonly GameId[])[] = [
-  ["quick-tap", "number-hunt", "odd-one-out", "color-clash", "green-light"],
+  ["quick-tap", "number-hunt", "odd-one-out", "color-clash", "green-light", "arrow-rush"],
   ["emoji-match", "memory-trail", "digit-span", "pattern-tiles", "number-ladder", "in-order"],
   ["grammar-snap", "spell-check", "letter-soup", "proof-it"],
-  ["time-feel", "steady-breath", "night-sky"],
+  ["time-feel", "steady-breath", "night-sky", "slide-home"],
 ];
 
 /**
@@ -1310,9 +1542,43 @@ export type GameId =
   | "pattern-tiles"
   | "proof-it"
   | "number-ladder"
-  | "in-order";
+  | "in-order"
+  | "arrow-rush"
+  | "slide-home";
 
 const KEY = (id: GameId) => `kairo-play-best-${id}`;
+const PLAY_LOG_KEY = "kairo-play-log";
+
+/**
+ * Games finished on `dateKey` — one day kept, so "Today's three" can show
+ * what's already been played without growing a history nobody asked for.
+ */
+export function playedOn(dateKey: string = dailyThreeKey()): Set<GameId> {
+  try {
+    const raw = localStorage.getItem(PLAY_LOG_KEY);
+    if (!raw) return new Set();
+    const log = JSON.parse(raw) as { date?: string; ids?: GameId[] };
+    return log.date === dateKey && Array.isArray(log.ids)
+      ? new Set(log.ids)
+      : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+/** Mark a game as finished today. */
+export function recordPlay(id: GameId, dateKey: string = dailyThreeKey()): void {
+  try {
+    const ids = playedOn(dateKey);
+    ids.add(id);
+    localStorage.setItem(
+      PLAY_LOG_KEY,
+      JSON.stringify({ date: dateKey, ids: [...ids] }),
+    );
+  } catch {
+    // Private mode / blocked storage: the check mark is a nicety.
+  }
+}
 
 /** Read a stored best (number) or null. */
 export function readBest(id: GameId): number | null {
@@ -1336,6 +1602,7 @@ export function recordResult(
   value: number,
   direction: "high" | "low" | "count",
 ): boolean {
+  recordPlay(id);
   try {
     const prev = readBest(id);
     if (direction === "count") {

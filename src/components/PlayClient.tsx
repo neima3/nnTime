@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Brain breaks arcade (wave 9). Fifteen small games in four moods, personal
- * bests only, all client-side. Framed honestly: play that rests the brain —
+ * Brain breaks arcade. Twenty small games in four moods, personal bests
+ * only, all client-side. Framed honestly: play that rests the brain —
  * not "training".
  */
 import {
@@ -14,7 +14,7 @@ import {
   type ReactNode,
 } from "react";
 import dynamic from "next/dynamic";
-import { dailyThree, dailyThreeKey, readBest, type GameId } from "@/lib/games";
+import { dailyThree, dailyThreeKey, playedOn, readBest, type GameId } from "@/lib/games";
 import { hasIllustration, Illustration } from "./Illustration";
 
 /* Games load on tap, not with the arcade — the grid stays feather-light
@@ -86,6 +86,8 @@ const SpellCheckGame = dynamic(() => import("./games/SpellCheckGame").then((m) =
 const ProofIt = dynamic(() => import("./games/ProofIt").then((m) => m.ProofIt), { loading: GameLoading });
 const NumberLadder = dynamic(() => import("./games/NumberLadder").then((m) => m.NumberLadder), { loading: GameLoading });
 const InOrder = dynamic(() => import("./games/InOrder").then((m) => m.InOrder), { loading: GameLoading });
+const ArrowRush = dynamic(() => import("./games/ArrowRush").then((m) => m.ArrowRush), { loading: GameLoading });
+const SlideHome = dynamic(() => import("./games/SlideHome").then((m) => m.SlideHome), { loading: GameLoading });
 
 interface GameCard {
   id: GameId;
@@ -140,6 +142,14 @@ const SECTIONS: { label: string; blurb: string; games: GameCard[] }[] = [
         hook: "Green means tap. Red means don't. Simple. Ha.",
         tint: "bg-cat-mint",
         bestLabel: (v) => `best ${v}/24`,
+      },
+      {
+        id: "arrow-rush",
+        emoji: "🏹",
+        title: "Arrow Rush",
+        hook: "Which way does the middle one point? The crowd will lie.",
+        tint: "bg-cat-sky",
+        bestLabel: (v) => `best ${v}/20`,
       },
     ],
   },
@@ -263,6 +273,14 @@ const SECTIONS: { label: string; blurb: string; games: GameCard[] }[] = [
         tint: "bg-cat-lilac",
         bestLabel: (v) => `${v} skies traced`,
       },
+      {
+        id: "slide-home",
+        emoji: "🏡",
+        title: "Slide Home",
+        hook: "Eight tiles, one gap, no clock. Slide them home.",
+        tint: "bg-cat-peach",
+        bestLabel: (v) => (v === 0 ? "best: on par" : `best par +${v}`),
+      },
     ],
   },
 ];
@@ -306,6 +324,7 @@ export function PlayClient() {
   const [bests, setBests] = useState<Record<string, number | null>>({});
   // Client-only: hangs on the local date, so it must wait for hydration.
   const [daily, setDaily] = useState<GameId[]>([]);
+  const [played, setPlayed] = useState<Set<GameId>>(new Set());
   const openerId = useRef<GameId | null>(null);
   const gameButtons = useRef<
     Partial<Record<GameId, HTMLButtonElement | null>>
@@ -315,6 +334,7 @@ export function PlayClient() {
     const next: Record<string, number | null> = {};
     for (const g of ALL_GAMES) next[g.id] = readBest(g.id);
     setBests(next);
+    setPlayed(playedOn());
   };
 
   useEffect(() => {
@@ -363,6 +383,8 @@ export function PlayClient() {
   else if (active === "proof-it") activeGame = <ProofIt onExit={exit} />;
   else if (active === "number-ladder") activeGame = <NumberLadder onExit={exit} />;
   else if (active === "in-order") activeGame = <InOrder onExit={exit} />;
+  else if (active === "arrow-rush") activeGame = <ArrowRush onExit={exit} />;
+  else if (active === "slide-home") activeGame = <SlideHome onExit={exit} />;
 
   if (activeGame) {
     return (
@@ -375,6 +397,7 @@ export function PlayClient() {
   const dailyGames = daily
     .map((id) => ALL_GAMES.find((g) => g.id === id))
     .filter((g): g is GameCard => g != null);
+  const dailyDone = dailyGames.filter((g) => played.has(g.id)).length;
 
   return (
     <div className="flex flex-col gap-9">
@@ -384,29 +407,53 @@ export function PlayClient() {
             <h2 className="whitespace-nowrap text-[12.5px] font-bold uppercase tracking-[0.14em] text-iris">
               Today&apos;s three
             </h2>
-            <p className="text-[12.5px] text-ink-faint">
-              Picked for today — no choosing required.
+            <p className="text-[12.5px] text-ink-faint" aria-live="polite">
+              {dailyDone === 0
+                ? "Picked for today — no choosing required."
+                : dailyDone === 3
+                  ? "All three played. That’s a proper break."
+                  : `${dailyDone} of 3 played — the rest will keep.`}
             </p>
           </div>
           <div className="mt-3 grid gap-2.5 sm:grid-cols-3">
-            {dailyGames.map((g) => (
-              <button
-                key={`daily-${g.id}`}
-                type="button"
-                onClick={() => openGame(g.id)}
-                className="rise-in group flex items-center gap-3 rounded-2xl border border-iris/25 bg-surface px-4 py-3 text-left shadow-card transition-all hover:-translate-y-0.5 hover:shadow-float active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
-              >
-                <GameArt game={g} size={36} box="size-9 rounded-xl text-lg" />
-                <span className="min-w-0">
-                  <span className="block truncate font-display text-[15px] font-bold">
-                    {g.title}
+            {dailyGames.map((g) => {
+              const done = played.has(g.id);
+              return (
+                <button
+                  key={`daily-${g.id}`}
+                  type="button"
+                  onClick={() => openGame(g.id)}
+                  aria-label={done ? `${g.title}, played today` : g.title}
+                  className={`rise-in group flex items-center gap-3 rounded-2xl border bg-surface px-4 py-3 text-left shadow-card transition-all hover:-translate-y-0.5 hover:shadow-float active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none ${
+                    done ? "border-success/35" : "border-iris/25"
+                  }`}
+                >
+                  <GameArt game={g} size={36} box="size-9 rounded-xl text-lg" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-display text-[15px] font-bold">
+                      {g.title}
+                    </span>
+                    {done ? (
+                      <span className="block text-[11.5px] font-bold text-success">
+                        played today
+                      </span>
+                    ) : (
+                      <span className="block text-[11.5px] font-bold text-iris opacity-0 transition-opacity group-hover:opacity-100 max-sm:opacity-100">
+                        Play →
+                      </span>
+                    )}
                   </span>
-                  <span className="block text-[11.5px] font-bold text-iris opacity-0 transition-opacity group-hover:opacity-100">
-                    Play →
-                  </span>
-                </span>
-              </button>
-            ))}
+                  {done && (
+                    <span
+                      className="grid size-6 shrink-0 place-items-center rounded-full bg-success-soft text-[13px] font-bold text-success"
+                      aria-hidden
+                    >
+                      ✓
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </section>
       )}
@@ -418,9 +465,15 @@ export function PlayClient() {
             </h2>
             <p className="text-[12.5px] text-ink-faint">{section.blurb}</p>
           </div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <div className="mt-3 grid gap-2.5 sm:grid-cols-2 sm:gap-3">
             {section.games.map((g) => {
               const best = bests[g.id];
+              const bestChip =
+                best != null ? (
+                  <span className="tnum rounded-lg bg-surface-sunken px-2 py-1 text-[11px] font-bold text-ink-soft">
+                    {g.bestLabel(best)}
+                  </span>
+                ) : null;
               return (
                 <button
                   key={g.id}
@@ -429,25 +482,24 @@ export function PlayClient() {
                   }}
                   type="button"
                   onClick={() => openGame(g.id)}
-                  className="rise-in group rounded-3xl border border-border bg-surface p-5 text-left shadow-card transition-all hover:-translate-y-0.5 hover:shadow-float active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none"
+                  className="rise-in group flex items-center gap-4 rounded-3xl border border-border bg-surface p-4 text-left shadow-card transition-all hover:-translate-y-0.5 hover:shadow-float active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-iris focus-visible:outline-none sm:block sm:p-5"
                 >
-                  <div className="flex items-start justify-between">
-                    <GameArt game={g} size={54} box="size-14 rounded-2xl text-2xl" />
-                    {best != null && (
-                      <span className="tnum rounded-lg bg-surface-sunken px-2 py-1 text-[11px] font-bold text-ink-soft">
-                        {g.bestLabel(best)}
-                      </span>
-                    )}
+                  <div className="shrink-0 sm:flex sm:items-start sm:justify-between">
+                    <GameArt game={g} size={54} box="size-12 rounded-2xl text-2xl sm:size-14" />
+                    <span className="hidden sm:inline">{bestChip}</span>
                   </div>
-                  <h3 className="mt-3.5 font-display text-lg font-bold">
-                    {g.title}
-                  </h3>
-                  <p className="mt-1 text-[13.5px] leading-relaxed text-ink-soft">
-                    {g.hook}
-                  </p>
-                  <p className="mt-3 text-[12.5px] font-bold text-iris opacity-0 transition-opacity group-hover:opacity-100">
-                    Play →
-                  </p>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-display text-[16px] font-bold sm:mt-3.5 sm:text-lg">
+                      {g.title}
+                    </h3>
+                    <p className="mt-0.5 line-clamp-2 text-[13px] leading-snug text-ink-soft sm:mt-1 sm:line-clamp-none sm:text-[13.5px] sm:leading-relaxed">
+                      {g.hook}
+                    </p>
+                    {bestChip && <div className="mt-2 sm:hidden">{bestChip}</div>}
+                    <p className="mt-3 hidden text-[12.5px] font-bold text-iris opacity-0 transition-opacity group-hover:opacity-100 sm:block">
+                      Play →
+                    </p>
+                  </div>
                 </button>
               );
             })}
