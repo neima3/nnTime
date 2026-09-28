@@ -10,7 +10,8 @@ test("game header keeps complete instructions and controls visible at 320px", as
     localStorage.setItem("kairo-play-best-number-ladder", "4");
   });
   await gotoHydrated(page, "/app/play");
-  await page.getByRole("button", { name: /Number Ladder/ }).click();
+  // Catalog card only — Today's three can also hold Number Ladder on some dates.
+  await page.getByRole("button", { name: /^Number Ladder Start small/ }).click();
 
   const dialog = page.getByRole("dialog", { name: "Number Ladder" });
   const instruction = dialog.getByText(

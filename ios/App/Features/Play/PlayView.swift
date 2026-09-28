@@ -5,9 +5,11 @@ import SwiftUI
 struct PlayView: View {
     @State private var active: Game?
     @State private var bests: [String: Int] = [:]
+    @State private var played: Set<String> = []
     enum Game: String, Identifiable {
         case timeFeel, quickTap, emojiMatch, grammar, spelling, focusFinder, memoryTrail, colorClash, breath,
-             oddOneOut, digitSpan, greenLight, nightSky, letterSoup, patternTiles, proofIt, numberLadder, inOrder
+             oddOneOut, digitSpan, greenLight, nightSky, letterSoup, patternTiles, proofIt, numberLadder, inOrder,
+             arrowRush, slideHome
         var id: String { rawValue }
     }
 
@@ -32,6 +34,8 @@ struct PlayView: View {
                          best: bests["colorclash"].map { "best \($0)/12" }) { active = .colorClash }
                     card("🚦", "Green Light", "Green means tap. Red means don't. Simple. Ha.", .kCatMint,
                          best: bests["greenlight"].map { "best \($0)/24" }) { active = .greenLight }
+                    card("🏹", "Arrow Rush", "Which way does the middle one point? The crowd will lie.", .kCatSky,
+                         best: bests["arrowrush"].map { "best \($0)/20" }) { active = .arrowRush }
 
                     sectionHeader("Hold it in mind", "Working memory, lifting gently.")
                     card("🃏", "Emoji Match", "Eight pairs hiding in sixteen cards.", .kCatPeach,
@@ -63,6 +67,8 @@ struct PlayView: View {
                     card("🫧", "Steady Breath", "A square minute for a spinning head.", .kCatMint, best: nil) { active = .breath }
                     card("🌌", "Night Sky", "Connect the stars. Nothing is timed.", .kCatLilac,
                          best: bests["nightsky"].flatMap { $0 > 0 ? "\($0) skies traced" : nil }) { active = .nightSky }
+                    card("🏡", "Slide Home", "Eight tiles, one gap, no clock. Slide them home.", .kCatPeach,
+                         best: bests["slidehome"].map { $0 == 0 ? "best: on par" : "best par +\($0)" }) { active = .slideHome }
 
                     Text("Honesty corner: these are breaks, not brain training — the science on games \"fixing\" attention is thin, and we won't pretend otherwise.")
                         .font(.kBody(11.5)).foregroundStyle(Color.kInkFaint).padding(.top, 8)
@@ -117,6 +123,8 @@ struct PlayView: View {
             case .proofIt: ProofItGame { active = nil }
             case .numberLadder: NumberLadderGame { active = nil }
             case .inOrder: InOrderGame { active = nil }
+            case .arrowRush: ArrowRushGame { active = nil }
+            case .slideHome: SlideHomeGame { active = nil }
             case .breath: SteadyBreathGame { active = nil }
             }
         }
@@ -142,43 +150,63 @@ struct PlayView: View {
         "time-feel": (.timeFeel, "⏳", "Time Feel"),
         "steady-breath": (.breath, "🫧", "Steady Breath"),
         "night-sky": (.nightSky, "🌌", "Night Sky"),
+        "arrow-rush": (.arrowRush, "🏹", "Arrow Rush"),
+        "slide-home": (.slideHome, "🏡", "Slide Home"),
     ]
 
     private var dailyThreeStrip: some View {
-        let picks = ArcadeLogic.dailyThree(dateKey: ArcadeLogic.dailyThreeKey())
-            .compactMap { Self.webIdMeta[$0] }
+        let ids = ArcadeLogic.dailyThree(dateKey: ArcadeLogic.dailyThreeKey())
+        let picks = ids.compactMap { id in Self.webIdMeta[id].map { (id: id, meta: $0) } }
+        let done = picks.filter { played.contains($0.id) }.count
         return VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("TODAY'S THREE")
                     .font(.kBody(11.5, weight: .bold)).kerning(1.4)
                     .foregroundStyle(Color.kIris)
-                Text("Picked for today — no choosing required.")
+                Text(done == 0 ? "Picked for today — no choosing required."
+                     : done == 3 ? "All three played. That’s a proper break."
+                     : "\(done) of 3 played — the rest will keep.")
                     .font(.kBody(11.5)).foregroundStyle(Color.kInkFaint)
             }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
-            ForEach(picks, id: \.title) { pick in
+            ForEach(picks, id: \.id) { pick in
+                let isDone = played.contains(pick.id)
                 Button {
-                    active = pick.game
+                    active = pick.meta.game
                 } label: {
                     HStack(spacing: 10) {
-                        Text(pick.emoji)
+                        Text(pick.meta.emoji)
                             .font(.system(size: 17))
                             .frame(width: 34, height: 34)
                             .background(RoundedRectangle(cornerRadius: 10).fill(Color.kSurfaceSunken))
-                        Text(pick.title)
-                            .font(.kDisplay(15)).foregroundStyle(Color.kInk)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(pick.meta.title)
+                                .font(.kDisplay(15)).foregroundStyle(Color.kInk)
+                            if isDone {
+                                Text("played today")
+                                    .font(.kBody(11.5, weight: .bold)).foregroundStyle(Color.kSuccess)
+                            }
+                        }
                         Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color.kInkFaint)
+                        if isDone {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(Color.kSuccess)
+                                .frame(width: 24, height: 24)
+                                .background(Circle().fill(Color.kSuccessSoft))
+                        } else {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(Color.kInkFaint)
+                        }
                     }
                     .padding(.horizontal, 12).padding(.vertical, 9)
                     .background(RoundedRectangle(cornerRadius: 14).fill(Color.kSurface))
                     .overlay(RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color.kIris.opacity(0.25), lineWidth: 1))
+                        .stroke(isDone ? Color.kSuccess.opacity(0.35) : Color.kIris.opacity(0.25), lineWidth: 1))
                 }
-                .accessibilityLabel("Play \(pick.title), one of today's three")
+                .accessibilityLabel(isDone ? "\(pick.meta.title), played today" : "Play \(pick.meta.title), one of today's three")
             }
         }
         .padding(.bottom, 4)
@@ -189,10 +217,11 @@ struct PlayView: View {
         for key in ["timefeel", "quicktap", "emojimatch", "grammarsnap", "spellcheck",
                     "focusfinder", "memorytrail", "colorclash", "oddoneout", "digitspan",
                     "greenlight", "nightsky", "lettersoup", "patterntiles", "proofit",
-                    "numberladder", "inorder"] {
+                    "numberladder", "inorder", "arrowrush", "slidehome"] {
             next[key] = PlayScores.best(for: key)
         }
         bests = next
+        played = PlayLog.played()
     }
 
     private func sectionHeader(_ label: String, _ blurb: String) -> some View {
@@ -323,6 +352,7 @@ enum PlayScores {
 
     /// Record a score where higher is better; returns the current best.
     static func recordHigher(_ value: Int, for key: String) -> Int {
+        PlayLog.record(scoreKey: key)
         let k = "kairo-best-\(key)"
         let prev = store.object(forKey: k) as? Int
         let best = max(value, prev ?? value)
@@ -332,6 +362,7 @@ enum PlayScores {
 
     /// Accumulate a lifetime counter (e.g. skies traced); returns the total.
     static func recordCount(_ value: Int, for key: String) -> Int {
+        PlayLog.record(scoreKey: key)
         let k = "kairo-best-\(key)"
         let total = (store.object(forKey: k) as? Int ?? 0) + value
         store.set(total, forKey: k)
@@ -340,6 +371,7 @@ enum PlayScores {
 
     /// Record a score where lower is better (e.g. reaction ms); returns best.
     static func recordLower(_ value: Int, for key: String) -> Int {
+        PlayLog.record(scoreKey: key)
         let k = "kairo-best-\(key)"
         let prev = store.object(forKey: k) as? Int
         let best = min(value, prev ?? value)
@@ -480,7 +512,12 @@ struct SteadyBreathGame: View {
         let next = (phase + 1) % phases.count
         if next == 0 {
             cycle += 1
-            if cycle >= cyclesTarget { running = false; finished = true; return }
+            if cycle >= cyclesTarget {
+                running = false
+                finished = true
+                PlayLog.record(webId: "steady-breath")
+                return
+            }
         }
         phase = next; secLeft = phases[next].1
     }

@@ -3,6 +3,22 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  ARROW_ROUNDS,
+  arrowRow,
+  arrowSummary,
+  buildArrowRun,
+  buildSlideBoard,
+  isSlideSolved,
+  playedOn,
+  recordPlay,
+  SLIDE_PAR_MAX,
+  SLIDE_PAR_MIN,
+  shuffleSlide,
+  slideKeyTarget,
+  slideNeighbors,
+  slideShortest,
+  slideSolved,
+  slideTap,
   buildClashRound,
   buildGoSequence,
   buildMatchDeck,
@@ -1148,7 +1164,7 @@ describe("daily three", () => {
   it("covers every game id exactly once across the mood pools", () => {
     const all = MOOD_GAMES.flat();
     expect(new Set(all).size).toBe(all.length);
-    expect(all.length).toBe(18);
+    expect(all.length).toBe(20);
   });
 
   it("picks three distinct games from three distinct moods, deterministically", () => {
@@ -1171,15 +1187,18 @@ describe("daily three", () => {
       for (const g of dailyThree(d.toLocaleDateString("en-CA"))) seen.add(g);
       d.setDate(d.getDate() + 1);
     }
-    expect(seen.size).toBe(18);
+    expect(seen.size).toBe(20);
   });
 
   it("cross-platform pin — iOS ArcadeLogic must match these dates", () => {
     expect(dailyThree("2026-08-03")).toEqual([
-      "pattern-tiles", "spell-check", "time-feel",
+      "pattern-tiles", "spell-check", "steady-breath",
     ]);
     expect(dailyThree("2026-08-04")).toEqual([
-      "color-clash", "spell-check", "time-feel",
+      "green-light", "spell-check", "time-feel",
+    ]);
+    expect(dailyThree("2026-09-28")).toEqual([
+      "quick-tap", "number-ladder", "time-feel",
     ]);
   });
 });
@@ -1260,5 +1279,155 @@ describe("in order (rebuild the how-to)", () => {
       "A bath",
     ]);
     expect(scrambleOrder(5, seeded(0.137))).toEqual([4, 2, 3, 1, 0]);
+  });
+});
+
+/** 32-bit LCG — mirrored in ios/UnitTests/PlayArcadeLogicTests.swift. */
+const lcg = (seed: number) => {
+  let x = seed >>> 0;
+  return () => {
+    x = (Math.imul(x, 1664525) + 1013904223) >>> 0;
+    return x / 4294967296;
+  };
+};
+
+describe("arrow rush (flanker)", () => {
+  it("runs 20 rounds, exactly half with disagreeing decoys", () => {
+    for (let seed = 1; seed < 30; seed++) {
+      const run = buildArrowRun(lcg(seed));
+      expect(run).toHaveLength(ARROW_ROUNDS);
+      expect(run.filter((r) => !r.congruent)).toHaveLength(ARROW_ROUNDS / 2);
+    }
+  });
+
+  it("puts the answer in the middle and decoys around it", () => {
+    expect(arrowRow({ dir: "left", congruent: true })).toEqual([
+      "left", "left", "left", "left", "left",
+    ]);
+    expect(arrowRow({ dir: "left", congruent: false })).toEqual([
+      "right", "right", "left", "right", "right",
+    ]);
+    expect(arrowRow({ dir: "right", congruent: false })[2]).toBe("right");
+  });
+
+  it("scores correct answers and the decoy cost from correct times only", () => {
+    expect(
+      arrowSummary([
+        { congruent: true, correct: true, ms: 400 },
+        { congruent: true, correct: true, ms: 451 },
+        { congruent: false, correct: true, ms: 500 },
+        { congruent: false, correct: false, ms: 300 },
+        { congruent: false, correct: false, ms: null },
+      ]),
+    ).toEqual({ correct: 3, avgMs: 450, decoyCostMs: 75 });
+    expect(arrowSummary([])).toEqual({ correct: 0, avgMs: null, decoyCostMs: null });
+    expect(
+      arrowSummary([{ congruent: true, correct: true, ms: 320 }]).decoyCostMs,
+    ).toBeNull();
+  });
+
+  it("cross-platform pin — iOS ArcadeLogic.arrowRun must match", () => {
+    const code = buildArrowRun(lcg(7))
+      .map((r) => (r.dir === "left" ? "L" : "R") + (r.congruent ? "c" : "i"))
+      .join(" ");
+    expect(code).toBe(
+      "Ri Rc Ri Ri Ri Lc Lc Lc Lc Lc Rc Li Rc Rc Ri Ri Lc Ri Ri Li",
+    );
+  });
+});
+
+describe("slide home (3×3 sliding puzzle)", () => {
+  it("knows home and its neighbours", () => {
+    expect(isSlideSolved(slideSolved())).toBe(true);
+    expect(isSlideSolved([1, 2, 3, 4, 5, 6, 7, 0, 8])).toBe(false);
+    expect(slideNeighbors(0)).toEqual([3, 1]);
+    expect(slideNeighbors(4)).toEqual([1, 7, 3, 5]);
+    expect(slideNeighbors(8)).toEqual([5, 7]);
+  });
+
+  it("slides only tiles next to the gap", () => {
+    const home = slideSolved();
+    expect(slideTap(home, 7)).toEqual([1, 2, 3, 4, 5, 6, 7, 0, 8]);
+    expect(slideTap(home, 5)).toEqual([1, 2, 3, 4, 5, 0, 7, 8, 6]);
+    expect(slideTap(home, 0)).toBeNull();
+    expect(slideTap(home, 8)).toBeNull();
+  });
+
+  it("maps arrow keys to the tile that moves into the gap", () => {
+    const gapMiddle = [1, 2, 3, 4, 0, 5, 6, 7, 8];
+    expect(slideKeyTarget(gapMiddle, "up")).toBe(7);
+    expect(slideKeyTarget(gapMiddle, "down")).toBe(1);
+    expect(slideKeyTarget(gapMiddle, "left")).toBe(5);
+    expect(slideKeyTarget(gapMiddle, "right")).toBe(3);
+    expect(slideKeyTarget(slideSolved(), "up")).toBeNull();
+    expect(slideKeyTarget(slideSolved(), "left")).toBeNull();
+  });
+
+  it("shuffles into solvable, never-solved boards", () => {
+    for (let seed = 1; seed < 40; seed++) {
+      const board = shuffleSlide(lcg(seed));
+      expect([...board].sort()).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
+      expect(isSlideSolved(board)).toBe(false);
+    }
+  });
+
+  it("finds the true shortest path", () => {
+    expect(slideShortest(slideSolved())).toBe(0);
+    expect(slideShortest([1, 2, 3, 4, 5, 6, 7, 0, 8])).toBe(1);
+    expect(slideShortest([1, 2, 3, 4, 0, 5, 7, 8, 6])).toBe(2);
+    // Classic hard 8-puzzle instance with a known optimum of 31.
+    expect(slideShortest([8, 6, 7, 2, 5, 4, 3, 0, 1])).toBe(31);
+  });
+
+  it("keeps the par in the calm window", () => {
+    for (let seed = 1; seed < 60; seed++) {
+      const { board, par } = buildSlideBoard(lcg(seed));
+      expect(par).toBe(slideShortest(board));
+      expect(par).toBeGreaterThanOrEqual(SLIDE_PAR_MIN);
+      expect(par).toBeLessThanOrEqual(SLIDE_PAR_MAX);
+    }
+  });
+
+  it("cross-platform pin — iOS ArcadeLogic.slideBoard must match", () => {
+    expect(shuffleSlide(lcg(7))).toEqual([0, 1, 2, 8, 5, 3, 6, 4, 7]);
+    expect(buildSlideBoard(lcg(42))).toEqual({
+      board: [5, 2, 6, 7, 0, 4, 3, 1, 8],
+      par: 18,
+    });
+  });
+});
+
+describe("play log (today's three check marks)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("remembers what was finished today and forgets yesterday", () => {
+    vi.stubGlobal("localStorage", new FakeStorage());
+    recordPlay("quick-tap", "2026-09-28");
+    recordPlay("slide-home", "2026-09-28");
+    recordPlay("quick-tap", "2026-09-28");
+    expect([...playedOn("2026-09-28")].sort()).toEqual(["quick-tap", "slide-home"]);
+    expect(playedOn("2026-09-29").size).toBe(0);
+    recordPlay("arrow-rush", "2026-09-29");
+    expect([...playedOn("2026-09-29")]).toEqual(["arrow-rush"]);
+    expect(playedOn("2026-09-28").size).toBe(0);
+  });
+
+  it("finishing a game logs it", () => {
+    vi.stubGlobal("localStorage", new FakeStorage());
+    recordResult("arrow-rush", 18, "high");
+    expect(playedOn().has("arrow-rush")).toBe(true);
+  });
+
+  it("survives broken storage", () => {
+    vi.stubGlobal("localStorage", {
+      getItem: () => "{not json",
+      setItem: () => {
+        throw new Error("quota");
+      },
+    });
+    expect(playedOn("2026-09-28").size).toBe(0);
+    expect(() => recordPlay("quick-tap", "2026-09-28")).not.toThrow();
   });
 });
