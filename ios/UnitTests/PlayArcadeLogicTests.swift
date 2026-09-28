@@ -590,9 +590,9 @@ final class PlayArcadeLogicTests: XCTestCase {
 
     // MARK: Daily Three — mirrors src/lib/games.test.ts
 
-    func testDailyThreeMoodPoolsCoverAllSeventeenGamesOnce() {
+    func testDailyThreeMoodPoolsCoverAllTwentyGamesOnce() {
         let all = ArcadeLogic.moodGames.flatMap { $0 }
-        XCTAssertEqual(all.count, 18)
+        XCTAssertEqual(all.count, 20)
         XCTAssertEqual(Set(all).count, all.count)
     }
 
@@ -618,10 +618,13 @@ final class PlayArcadeLogicTests: XCTestCase {
     func testDailyThreeSeededPinMatchesWeb() {
         // Pinned by src/lib/games.test.ts — both platforms must agree.
         XCTAssertEqual(ArcadeLogic.dailyThree(dateKey: "2026-08-03"), [
-            "pattern-tiles", "spell-check", "time-feel",
+            "pattern-tiles", "spell-check", "steady-breath",
         ])
         XCTAssertEqual(ArcadeLogic.dailyThree(dateKey: "2026-08-04"), [
-            "color-clash", "spell-check", "time-feel",
+            "green-light", "spell-check", "time-feel",
+        ])
+        XCTAssertEqual(ArcadeLogic.dailyThree(dateKey: "2026-09-28"), [
+            "quick-tap", "number-ladder", "time-feel",
         ])
     }
 
@@ -674,5 +677,93 @@ final class PlayArcadeLogicTests: XCTestCase {
             ArcadeLogic.scrambleOrder(count: 5, random: orderSeed(0.137)),
             [4, 2, 3, 1, 0]
         )
+    }
+
+    // MARK: Arrow Rush + Slide Home — mirrors src/lib/games.test.ts
+
+    /// 32-bit LCG, identical to the web test's `lcg`.
+    private func lcg(_ seed: UInt32) -> () -> Double {
+        var x = seed
+        return {
+            x = x &* 1_664_525 &+ 1_013_904_223
+            return Double(x) / 4_294_967_296
+        }
+    }
+
+    func testArrowRunIsBalanced() {
+        for seed in UInt32(1)..<30 {
+            let run = ArcadeLogic.arrowRun(random: lcg(seed))
+            XCTAssertEqual(run.count, ArcadeLogic.arrowRounds)
+            XCTAssertEqual(run.filter { !$0.congruent }.count, ArcadeLogic.arrowRounds / 2)
+        }
+    }
+
+    func testArrowRowPutsAnswerInTheMiddle() {
+        XCTAssertEqual(ArcadeLogic.arrowRow(.init(dir: .left, congruent: false)), [.right, .right, .left, .right, .right])
+        XCTAssertEqual(ArcadeLogic.arrowRow(.init(dir: .right, congruent: true)), [.right, .right, .right, .right, .right])
+    }
+
+    func testArrowSummaryMatchesWeb() {
+        let s = ArcadeLogic.arrowSummary([
+            .init(congruent: true, correct: true, ms: 400),
+            .init(congruent: true, correct: true, ms: 451),
+            .init(congruent: false, correct: true, ms: 500),
+            .init(congruent: false, correct: false, ms: 300),
+            .init(congruent: false, correct: false, ms: nil),
+        ])
+        XCTAssertEqual(s.correct, 3)
+        XCTAssertEqual(s.avgMs, 450)
+        XCTAssertEqual(s.decoyCostMs, 75)
+        let empty = ArcadeLogic.arrowSummary([])
+        XCTAssertEqual(empty.correct, 0)
+        XCTAssertNil(empty.avgMs)
+        XCTAssertNil(empty.decoyCostMs)
+    }
+
+    func testArrowRunSeededPinMatchesWeb() {
+        let code = ArcadeLogic.arrowRun(random: lcg(7))
+            .map { ($0.dir == .left ? "L" : "R") + ($0.congruent ? "c" : "i") }
+            .joined(separator: " ")
+        XCTAssertEqual(code, "Ri Rc Ri Ri Ri Lc Lc Lc Lc Lc Rc Li Rc Rc Ri Ri Lc Ri Ri Li")
+    }
+
+    func testSlideBasics() {
+        XCTAssertTrue(ArcadeLogic.isSlideSolved(ArcadeLogic.slideSolved()))
+        XCTAssertEqual(ArcadeLogic.slideNeighbors(0), [3, 1])
+        XCTAssertEqual(ArcadeLogic.slideNeighbors(4), [1, 7, 3, 5])
+        XCTAssertEqual(ArcadeLogic.slideTap(ArcadeLogic.slideSolved(), 7), [1, 2, 3, 4, 5, 6, 7, 0, 8])
+        XCTAssertNil(ArcadeLogic.slideTap(ArcadeLogic.slideSolved(), 0))
+    }
+
+    func testSlideShortestIsOptimal() {
+        XCTAssertEqual(ArcadeLogic.slideShortest(ArcadeLogic.slideSolved()), 0)
+        XCTAssertEqual(ArcadeLogic.slideShortest([1, 2, 3, 4, 0, 5, 7, 8, 6]), 2)
+        XCTAssertEqual(ArcadeLogic.slideShortest([8, 6, 7, 2, 5, 4, 3, 0, 1]), 31)
+    }
+
+    func testSlideBoardsAreSolvableAndInTheParWindow() {
+        for seed in UInt32(1)..<40 {
+            let (board, par) = ArcadeLogic.buildSlideBoard(random: lcg(seed))
+            XCTAssertEqual(board.sorted(), Array(0...8))
+            XCTAssertFalse(ArcadeLogic.isSlideSolved(board))
+            XCTAssertTrue((ArcadeLogic.slideParMin...ArcadeLogic.slideParMax).contains(par))
+        }
+    }
+
+    func testSlideSeededPinMatchesWeb() {
+        XCTAssertEqual(ArcadeLogic.shuffleSlide(random: lcg(7)), [0, 1, 2, 8, 5, 3, 6, 4, 7])
+        let built = ArcadeLogic.buildSlideBoard(random: lcg(42))
+        XCTAssertEqual(built.board, [5, 2, 6, 7, 0, 4, 3, 1, 8])
+        XCTAssertEqual(built.par, 18)
+    }
+
+    func testPlayLogKeepsOnlyToday() {
+        PlayLog.record(webId: "arrow-rush", on: "2031-01-01")
+        PlayLog.record(webId: "slide-home", on: "2031-01-01")
+        XCTAssertEqual(PlayLog.played(on: "2031-01-01"), ["arrow-rush", "slide-home"])
+        PlayLog.record(webId: "quick-tap", on: "2031-01-02")
+        XCTAssertEqual(PlayLog.played(on: "2031-01-02"), ["quick-tap"])
+        XCTAssertEqual(PlayLog.played(on: "2031-01-01"), [])
+        XCTAssertEqual(PlayLog.webIdForScoreKey.count, 20, "every arcade game maps to its web id")
     }
 }

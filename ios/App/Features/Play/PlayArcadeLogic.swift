@@ -520,10 +520,10 @@ enum ArcadeLogic {
     /// Mood pools in display order — mirrors MOOD_GAMES in src/lib/games.ts
     /// (web GameIds; PlayView maps them to native cases).
     static let moodGames: [[String]] = [
-        ["quick-tap", "number-hunt", "odd-one-out", "color-clash", "green-light"],
+        ["quick-tap", "number-hunt", "odd-one-out", "color-clash", "green-light", "arrow-rush"],
         ["emoji-match", "memory-trail", "digit-span", "pattern-tiles", "number-ladder", "in-order"],
         ["grammar-snap", "spell-check", "letter-soup", "proof-it"],
-        ["time-feel", "steady-breath", "night-sky"],
+        ["time-feel", "steady-breath", "night-sky", "slide-home"],
     ]
 
     /// Three games for the day from the local date key (YYYY-MM-DD) —
