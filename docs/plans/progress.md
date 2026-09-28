@@ -1,5 +1,38 @@
 # Progress log
 
+## 2026-09-28 — Round 95: Arcade — Arrow Rush, Slide Home, lighter hub (Opus 5.5)
+
+Plan/defect table: `docs/plans/2026-09-28-round95-arcade.md`. Branch
+`round95-arcade` off `origin/main` @ `72a2771`.
+
+**Shipped:** two new games on web + iOS (Arrow Rush — flanker, Sharp & fast;
+Slide Home — untimed 3×3 sliding puzzle with an IDA* par, Slow down), a
+played-today log that ticks off Today's three on both platforms, and a
+compact phone hub (4,754 → 2,945 px). Arcade is now 20 games; MOOD_GAMES,
+daily-three pins and the Swift mirror updated together.
+
+**Evidence** (`browser-qa/r95/`, git-ignored): `audit/` (all 18 games,
+phone + desktop), `play/` — Playwright plays both new games for real in
+light + dark at 390/1440 (Arrow Rush 20 rounds incl. deliberate misses;
+Slide Home read from the DOM and solved by an independent BFS whose length
+equalled the in-game par every time: 18, 20, 18, 12), persisted bests +
+play log asserted, Today's three "2 of 3 played" verified. iOS:
+`KairoRound95ArcadeTour` (offline fixture) plays Arrow Rush to "N of 20
+right" and solves Slide Home to "Home in N moves" (`ios-tour/`).
+
+**Gates:** `pnpm lint` 0, `typecheck` 0, `pnpm test` 170 files / **1515**
+passed, `pnpm build` 0. `ios-main-thread-gate.sh` → **Executed 454 tests,
+2 skipped, 0 failures**, no Main Thread Checker hits. PlayArcadeLogicTests
+73/73 incl. seeded LCG pins matching web. `ios:release:preflight` passed.
+Parity unchanged: web 89.74% / iOS 86.93%.
+
+**Gotchas:** XCUITest `-only-testing:Target/Class/method` executed **0
+tests** yet printed TEST SUCCEEDED — filter at class level and read
+"Executed N". Exact-label queries break on tiles whose label gains ", home".
+
+**Next:** clay tiles for the two new games (needs Higgsfield credits —
+ask first); then resume the 2026-09-13 program.
+
 ## 2026-09-24 — Round 94 native follow-up: iOS "Move to tomorrow" (Opus 5.5)
 
 Brief: port R94 defect #6 (daily block duplicated on tomorrow) to iOS and
