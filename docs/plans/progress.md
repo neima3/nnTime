@@ -30,6 +30,18 @@ Parity unchanged: web 89.74% / iOS 86.93%.
 tests** yet printed TEST SUCCEEDED — filter at class level and read
 "Executed N". Exact-label queries break on tiles whose label gains ", home".
 
+**Shipped + deployed:** PR #7 merged as `0270089`. CI run 36472827600:
+build-test ✅, e2e ✅, native-contract ✅ (first run caught a date-dependent
+`/Number Ladder/` opener in `game-header.spec.ts` — Number Ladder is in
+Today's three on 2026-09-28 — pinned to the catalog card in `79eba12`).
+Coolify auto-deploy `m45ugfyxwp25ly8fpnwccmre` → `finished` for `0270089`.
+
+**Live-verified** on https://time.neima.me (signed out, client-side games
+only — no planner data touched): `/api/health` ok; `browser-qa/r95/live.mjs`
+played Arrow Rush (18/20) and solved Slide Home at 390 and 1440 (BFS = par:
+20, 18), bests + play log persisted, phone hub 2,945 px, 0 page errors.
+Screens in `browser-qa/r95/live/`.
+
 **Next:** clay tiles for the two new games (needs Higgsfield credits —
 ask first); then resume the 2026-09-13 program.
 
