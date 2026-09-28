@@ -42,8 +42,17 @@ played Arrow Rush (18/20) and solved Slide Home at 390 and 1440 (BFS = par:
 20, 18), bests + play log persisted, phone hub 2,945 px, 0 page errors.
 Screens in `browser-qa/r95/live/`.
 
-**Next:** clay tiles for the two new games (needs Higgsfield credits —
-ask first); then resume the 2026-09-13 program.
+**Tiles (follow-up, Neima approved the spend):** `tile-arrow-rush` and
+`tile-slide-home` generated with Higgsfield `gpt_image_2` (quality high,
+existing tile as style reference) → `remove_background` →
+`scripts/illustrations.mjs --merge` (new flag; without it the manifest is
+rebuilt from the source dir alone and would have dropped 32 assets). First
+Arrow Rush render (arrows on a sky slab) washed out on the sky card and
+letterboxed; replaced with a compact iris/butter cluster. Verified on the
+hub light/dark × phone/desktop and the reduced-stimulation emoji fallback
+(`browser-qa/r95/tiles/`). Subject lines in `docs/design/illustrations.md`.
+
+**Next:** resume the 2026-09-13 program.
 
 ## 2026-09-24 — Round 94 native follow-up: iOS "Move to tomorrow" (Opus 5.5)
 

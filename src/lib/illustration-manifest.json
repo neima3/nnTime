@@ -47,6 +47,10 @@
     "w": 629,
     "h": 555
   },
+  "tile-arrow-rush": {
+    "w": 222,
+    "h": 256
+  },
   "tile-color-clash": {
     "w": 256,
     "h": 250
@@ -105,6 +109,10 @@
   },
   "tile-quick-tap": {
     "w": 182,
+    "h": 256
+  },
+  "tile-slide-home": {
+    "w": 253,
     "h": 256
   },
   "tile-spell-check": {

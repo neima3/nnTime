@@ -53,7 +53,7 @@ butter, mint, sky, rose, paper. No text, no faces, no logos.
 | `pick-for-me` | one die decides | onboarding step 3 |
 | `play` | two tiles, play allowed | Play header |
 | `sunrise` | a minute of setup | onboarding step 1 |
-| `tile-<gameId>` × 18 | one per arcade game (arrow-rush, slide-home fall back to their emoji until tiles are generated) | Play cards + Today's three |
+| `tile-<gameId>` × 20 | one per arcade game | Play cards + Today's three |
 
 ## Subject lines (for regeneration)
 - inbox-clear — an empty rounded lilac clay tray, a small peach feather inside, a mint sparkle above
@@ -70,3 +70,6 @@ butter, mint, sky, rose, paper. No text, no faces, no logos.
 - play — a rose tile with a lilac star and a butter tile with a sky dot, overlapping
 - sunrise — a butter half-disc rising between two mint hills, a peach cloud above
 - tiles — see the batch prompts in the round plan; each is one bold object per game in that game's tint family
+- tile-arrow-rush (R95) — one big plump iris clay arrow pointing left, a small butter arrow pointing right tucked above it and another below, compact near-square cluster, no base (a sky slab version washed out on the sky card tint)
+- tile-slide-home (R95) — a rounded lilac clay tray holding a 3×3 sliding puzzle: butter row, peach row, two mint tiles and one clearly empty slot bottom-right
+- R95 recipe detail: reference image = an existing tile flattened on paper (`tile-pattern-tiles`), `gpt_image_2` quality **high** (the model defaults to low), then `remove_background`, then `node scripts/illustrations.mjs --src <dir> --merge` (without `--merge` the manifest is rebuilt from `<dir>` alone)

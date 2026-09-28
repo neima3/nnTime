@@ -3,7 +3,10 @@
  * remove_background) into the WebP assets the app serves, plus the size
  * manifest the <Illustration> component reads so nothing ever lays out twice.
  *
- *   node scripts/illustrations.mjs --src <dir-of-transparent-pngs>
+ *   node scripts/illustrations.mjs --src <dir-of-transparent-pngs> [--merge]
+ *
+ * --merge keeps the existing manifest entries and only adds/replaces the
+ * assets in <dir> (for adding one or two new tiles without the full set).
  *
  * Sources are NOT committed (multi-MB renders); the outputs in
  * public/illustrations/ and src/lib/illustration-manifest.json are.
@@ -16,7 +19,7 @@
  */
 import { createRequire } from "node:module";
 import { realpathSync } from "node:fs";
-import { mkdir, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const require = createRequire(import.meta.url);
@@ -48,7 +51,9 @@ if (files.length === 0) {
 }
 
 /** @type {Record<string, {w:number,h:number}>} */
-const manifest = {};
+const manifest = args.includes("--merge")
+  ? JSON.parse(await readFile(manifestPath, "utf8"))
+  : {};
 
 for (const file of files) {
   const name = file.replace(/\.png$/, "");
@@ -72,5 +77,8 @@ for (const file of files) {
   console.log(`${name}.webp ${info.width}×${info.height} ${(webp.length / 1024).toFixed(0)}kB`);
 }
 
-await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+const sorted = Object.fromEntries(
+  Object.entries(manifest).sort(([a], [b]) => a.localeCompare(b)),
+);
+await writeFile(manifestPath, JSON.stringify(sorted, null, 2) + "\n");
 console.log(`manifest → ${path.relative(root, manifestPath)} (${Object.keys(manifest).length} assets)`);
