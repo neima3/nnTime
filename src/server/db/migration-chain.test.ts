@@ -68,6 +68,11 @@ describe("migration chain", () => {
     }
   });
 
+  it("ends main at 0009 — parked branches own 0010+", () => {
+    expect(files.at(-1)).toBe("0009_durable_notification_jobs.sql");
+    expect(files.some((f) => f.startsWith("0010_"))).toBe(false);
+  });
+
   it("keeps the superseded push-subscription rebuilds inert", () => {
     // 0008 is the correct rebuild; 0006/0007 must stay no-ops so the chain
     // reaches it on a fresh database.

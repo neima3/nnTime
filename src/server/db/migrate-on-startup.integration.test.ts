@@ -1,6 +1,7 @@
-import { readdirSync } from "node:fs";
-import { resolve } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { copyFileSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
   createEphemeralDb,
   rethrowIfMigrationFailure,
@@ -95,5 +96,64 @@ describe("startup migration concurrency", () => {
       WHERE filename = ${target}
     `;
     expect(applied[0]?.count).toBe("1");
+  });
+});
+
+describe("failed migration and simulated restart", () => {
+  itDb("ensureMigrated reports unhealthy until the broken file is removed", async (env) => {
+    const realDir = resolve(process.cwd(), "drizzle");
+    const brokenPath = join(realDir, "0099_rehearsal_broken.sql");
+    writeFileSync(brokenPath, "CREATE TABLE __rehearsal_broken_syntax (;");
+    try {
+      vi.stubEnv("DATABASE_URL", env.url);
+      await vi.resetModules();
+      const failed = await import("./migrate-on-startup");
+      await failed.ensureMigrated();
+      expect(failed.getMigrationStatus().ok).toBe(false);
+      expect(failed.getMigrationStatus().error).toBeTruthy();
+
+      rmSync(brokenPath);
+      await vi.resetModules();
+      const recovered = await import("./migrate-on-startup");
+      await recovered.ensureMigrated();
+      expect(recovered.getMigrationStatus().ok).toBe(true);
+    } finally {
+      if (readdirSync(realDir).includes("0099_rehearsal_broken.sql")) {
+        rmSync(brokenPath);
+      }
+      vi.resetModules();
+      vi.unstubAllEnvs();
+    }
+  });
+
+  itDb("retries forward after a failed migration file on a fresh import", async (env) => {
+    const realDir = resolve(process.cwd(), "drizzle");
+    const badDir = mkdtempSync(join(tmpdir(), "kairo-bad-migrate-"));
+    try {
+      for (const file of readdirSync(realDir).filter((f) => /^\d{4}_.*\.sql$/.test(f))) {
+        copyFileSync(join(realDir, file), join(badDir, file));
+      }
+      writeFileSync(
+        join(badDir, "0099_rehearsal_broken.sql"),
+        "CREATE TABLE __rehearsal_broken_syntax (;",
+      );
+
+      await vi.resetModules();
+      const first = await import("./migrate-on-startup");
+      await expect(first.runMigrationsForUrl!(env.url, badDir)).rejects.toThrow();
+
+      await vi.resetModules();
+      const second = await import("./migrate-on-startup");
+      await expect(second.runMigrationsForUrl!(env.url, realDir)).resolves.toBeUndefined();
+      const applied = await env.sql`
+        SELECT count(*)::text AS count FROM __migrations
+      `;
+      expect(Number(applied[0]?.count)).toBe(
+        readdirSync(realDir).filter((f) => /^\d{4}_.*\.sql$/.test(f)).length,
+      );
+    } finally {
+      rmSync(badDir, { recursive: true, force: true });
+      vi.resetModules();
+    }
   });
 });
