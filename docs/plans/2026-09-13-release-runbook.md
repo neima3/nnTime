@@ -116,9 +116,24 @@ automatic on ambiguous failure.
 3. After stable health, backup again.
 4. Merge + deploy `feat/client-error-sink` → verify `POST /api/v1/client-errors` 401 when signed out.
 
+## Scheduler and notifications (Task 5.2)
+
+See **`docs/plans/2026-09-13-task-5.2-durable-scheduling.md`** for architecture trace,
+ADR-004 alignment, delivery-stage vocabulary, and alert thresholds.
+
+**Quick operator checks (no production mutation):**
+
+1. Coolify → app → scheduled tasks → `kairo-jobs-tick` → **executions** (not just
+   task existence): consecutive **200** responses ~1 minute apart.
+2. `GET /api/health`: `checks.scheduler` is `ok` or bounded `warming`; `schedulerLagSeconds`
+   < **300** when `ok`.
+3. On 503: read `checks.migrate`, `checks.db`, `checks.scheduler`; for `failed` /
+   `lagging`, inspect latest `scheduler_runs` row and Coolify tick logs.
+
 ## What remains unverified
 
 - **B6 production `pg_dump` / off-host encrypted storage / prod restore drill** on the
   current schema (0000–0009 live, 0010+ parked).
 - Coolify scheduled-backup UI configuration (API read-only token cannot confirm).
+- Physical Web Push / iOS local notification observation (P7 — mocked provider only in 5.2).
 - Any recovery action against Neima's live planner without explicit authorization.

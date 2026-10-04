@@ -1,5 +1,27 @@
 # Progress log
 
+## 2026-10-04 — P5 Task 5.2 durable scheduling and delivery
+
+Branch `cursor/task-5-2-durable-scheduling-c3a8` off `dff7ae0` (main @ P5.1
+squash). **No deploy. No production access.**
+
+**Architecture / contract:** `docs/plans/2026-09-13-task-5.2-durable-scheduling.md`
+traces Coolify loopback cron → `POST /api/v1/jobs/tick` → materialize /
+compute / deliver locks. ADR-004 updated to match (HTTP tick primary; no in-process
+`node-cron`). Runbook §Scheduler links the doc + alert thresholds.
+
+**Behavioral proof (synthetic Postgres):** new
+`scheduler-behavior.integration.test.ts`, `jobs/tick/route.integration.test.ts`;
+existing delivery / compute / materializer / health / push suites unchanged in
+scope. Vocabulary: job created → provider accepted (mock) — not device observed (P7).
+
+**Gates (Linux, local Postgres):** `pnpm lint` 0, `typecheck` 0, `build` 0;
+Task 5.2 Vitest **11 files / 90 passed / 0 skipped**. `swift package dump-package`
+— **ENOENT** (environment gap; native-contract not claimed). Commits: `[skip ci]`.
+
+**Still unverified:** Coolify tick execution history on prod, physical PWA/iOS
+delivery (P7), parked `0011` client-error telemetry, any schema beyond `0009`.
+
 ## 2026-10-04 — P5 Task 5.1 local recovery + migration rehearsal
 
 Branch `cursor/task-5-1-recovery-rehearsal-52b5` off `77823d3` (main after P3.2

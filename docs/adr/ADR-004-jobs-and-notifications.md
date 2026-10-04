@@ -3,11 +3,15 @@
 Status: **Accepted** (2026-07-12). Binding.
 
 ## Job runner
-- One durable scheduler: a dedicated worker process in the app container
-  (node, `node-cron`-style tick every minute) guarded by a Postgres
-  **advisory-lock lease** so exactly one instance runs work even with
-  replicas/restarts. Coolify cron hitting an authenticated endpoint is the
-  fallback if the worker proves unreliable — decision recorded here either way.
+- One durable scheduler: **Coolify scheduled task** (every minute) POSTs
+  `/api/v1/jobs/tick` on loopback with bearer `CRON_SECRET`. There is no
+  separate in-process `node-cron` worker in the app image; the HTTP tick
+  orchestrates materialization, notification compute, and delivery.
+- Concurrency: each stage uses Postgres **advisory transaction locks**
+  (`8947231` materialize, `8947232` compute) plus row claims (`SKIP LOCKED`,
+  lease heartbeat on delivery) so replicas and overlapping ticks cannot duplicate
+  routine series or logical notifications. An optional future in-container cron
+  would remain subject to the same tick endpoint and locks — not deployed today.
 - Jobs table: (id, type, run_at, unique dedup key, attempts, last_error,
   state). Retries with backoff; expiry; observability = job log rows +
   `/api/health` reporting scheduler lag.
