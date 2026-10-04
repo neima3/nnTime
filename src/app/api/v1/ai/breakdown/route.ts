@@ -4,8 +4,8 @@
  */
 import { requireSession } from "@/server/auth-session";
 import { handleErrors, parseBody, errorResponse } from "@/server/api-errors";
-import { breakDownTask, AiQuotaExceededError, AiUnavailableError } from "@/server/services/ai";
-import { rateLimitedResponse } from "@/server/ratelimit";
+import { breakDownTask } from "@/server/services/ai";
+import { mapAiRouteError } from "../map-ai-route-error";
 import { z } from "zod";
 
 const bodySchema = z.object({
@@ -28,19 +28,7 @@ export async function POST(request: Request) {
       const result = await breakDownTask(body.title, userId);
       return Response.json(result);
     } catch (e) {
-      if (e instanceof AiUnavailableError) {
-        return errorResponse(
-          "service_unavailable",
-          "The AI co-planner is unavailable right now. Your plan is untouched — try again shortly.",
-          503,
-          { retryable: true },
-        );
-      }
-      if (e instanceof AiQuotaExceededError) {
-        return rateLimitedResponse(e.result, "Daily AI quota exceeded");
-      }
-      console.error("[ai/breakdown]", e);
-      return errorResponse("internal", "An unexpected error occurred", 500);
+      return mapAiRouteError(e, "[ai/breakdown]");
     }
   });
 }

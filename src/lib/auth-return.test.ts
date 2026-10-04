@@ -10,6 +10,7 @@ describe("safeAuthReturnTo", () => {
   it.each([
     "/app",
     "/app/inbox",
+    "/app/search?q=dentist",
     "/app/today?date=2026-08-01#now",
     "/app/inbox?filter=work%2Fhome",
     "/app/inbox?note=why%3Fnow%23later",
