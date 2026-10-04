@@ -1,5 +1,24 @@
 # Progress log
 
+## 2026-10-04 — P4 Task 4.1 auth boundary (activities slice, local)
+
+Branch `cursor/task-4-1-activities-auth-integration-6ca9` off `c41d396` (main).
+Draft PR — **no deploy, no CI dispatch.**
+
+**Scope:** first planner mutation family missing HTTP-level negative integration
+coverage (`createActivitySeries` / activity series). Added
+`src/app/api/v1/activities/route.integration.test.ts` (unauthenticated POST → 401 +
+no row; cross-user PATCH → 404 + unchanged owner row) and
+`src/server/test-api-route-auth.ts` (real Better Auth session cookies on ephemeral
+Postgres). Existing `route.test.ts` files mock `requireSession` — not counted as
+integration boundary proof.
+
+**Gates (local, Postgres):** `vitest run` on the new file — **2 passed**; eslint +
+typecheck on touched paths. Commits: `[skip ci]`.
+
+**Still open (Task 4.1):** remaining mutation families, stale revision / CSRF /
+idempotency matrix at HTTP layer, signup/magic-link audit, AI/ICS slices.
+
 ## 2026-10-04 — P5 Task 5.3 release provenance (local half)
 
 Branch `cursor/task-5-3-local-provenance-7f92` off `fe4c77c` (main @ P5.2 squash).
