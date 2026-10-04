@@ -65,11 +65,13 @@ Acceptance: local rehearsal evidence and an executable owner runbook exist; prod
 
 Files: `src/server/services/scheduler-runs.ts`, `notification-delivery.ts`, `notification-policy.ts`, `notifications.ts`, `routine-materializer.ts`, corresponding integration suites, `src/app/api/health/route.ts`, scheduler deployment sections.
 
-- [ ] Trace the actual deployed-worker/cron architecture from code and runbook. Record discrepancies with ADR-004 and resolve the documentation/contract decision without silently changing worker topology.
-- [ ] Test two concurrent workers, process restart, expired lease, missed tick/backfill, retry exhaustion, expiry and delivery failure with synthetic fixtures. No duplicate routine instances or repeated logical notifications.
-- [ ] Test notification cancellation after edit/delete/completion, timezone/quiet-hours changes, stale 410 subscriptions and privacy mode. Assert at-most-one active job for each dedup identity and honest terminal/retry states.
-- [ ] Distinguish “job created,” “provider accepted,” and “notification observed.” Delivery on a physical installed PWA/iOS device is a P7 gate, not established by a mocked push response.
-- [ ] Verify health reflects meaningful DB/migration/scheduler failures. Record thresholds from actual policy; document actionable alerts for failed backups, stale scheduler, repeated job failure and elevated request errors.
+Evidence: `docs/plans/2026-09-13-task-5.2-durable-scheduling.md` (local behavioral proof; prod tick executions still B6/P7).
+
+- [x] Trace the actual deployed-worker/cron architecture from code and runbook. Record discrepancies with ADR-004 and resolve the documentation/contract decision without silently changing worker topology.
+- [x] Test two concurrent workers, process restart, expired lease, missed tick/backfill, retry exhaustion, expiry and delivery failure with synthetic fixtures. No duplicate routine instances or repeated logical notifications.
+- [x] Test notification cancellation after edit/delete/completion, timezone/quiet-hours changes, stale 410 subscriptions and privacy mode. Assert at-most-one active job for each dedup identity and honest terminal/retry states.
+- [x] Distinguish “job created,” “provider accepted,” and “notification observed.” Delivery on a physical installed PWA/iOS device is a P7 gate, not established by a mocked push response.
+- [x] Verify health reflects meaningful DB/migration/scheduler failures. Record thresholds from actual policy; document actionable alerts for failed backups, stale scheduler, repeated job failure and elevated request errors.
 
 If client telemetry is needed, inspect parked `feat/client-error-sink` first. Revalidate current schema/OpenAPI/ownership/rate limits/redaction/deletion cascade, prepare locally, and hold its migration off auto-deploying main until B6. Adding telemetry is not a reason to log planner contents.
 
