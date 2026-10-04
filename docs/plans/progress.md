@@ -1,5 +1,22 @@
 # Progress log
 
+## 2026-10-04 — P5 Task 5.3 release provenance (local half)
+
+Branch `cursor/task-5-3-local-provenance-7f92` off `fe4c77c` (main @ P5.2 squash).
+Draft PR **#12**. **No deploy. No CI dispatch.**
+
+**Provenance:** `GET /api/release` → `{ commit, builtAt }`; `prebuild` embeds git
+SHA + UTC time (`scripts/write-build-provenance.mjs`). Tests reject canary secret
+leakage. `docs/DEPLOYMENT.md` + `docs/plans/2026-09-13-task-5.3-release-provenance-local.md`
+document interim SHA + static asset marker until live `/api/release`.
+
+**Local gates:** frozen install, lint, typecheck, provenance Vitest **4/4**, `pnpm build`
+pass. Full `pnpm test`: 1359 pass / 6 fail — `plutil` ENOENT, dirty-tree iOS release
+guard, `swift` ENOENT (environment gaps). Commits: `[skip ci]`.
+
+**Still unverified (Task 5.3 remainder):** CI skip honesty, Coolify deploy, live
+provenance/route checks. Release-plan Task 5.3 boxes **not** checked complete.
+
 ## 2026-10-04 — P5 Task 5.2 durable scheduling and delivery
 
 Branch `cursor/task-5-2-durable-scheduling-c3a8` off `dff7ae0` (main @ P5.1
