@@ -1,5 +1,24 @@
 # Progress log
 
+## 2026-10-04 — P4 Task 4.1 auth boundary (task CRUD slice, local)
+
+Branch `cursor/task-crud-auth-integration-d911` off `548b314` (main @ PR #14).
+Draft PR — **no deploy, no CI dispatch.**
+
+**Scope:** task create/update HTTP mutations still mocked `requireSession` only
+(`route.test.ts` on `[id]`). Added
+`src/app/api/v1/tasks/route.integration.test.ts` (unauthenticated POST → 401 +
+no row; cross-user PATCH → 404 + unchanged owner row) reusing
+`src/server/test-api-route-auth.ts`. Activity series (PR #13) and task schedule
+(PR #14) unchanged.
+
+**Gates (local, Postgres):** `vitest run` on the new file — **2 passed**; eslint +
+typecheck green. Full `pnpm test`: 1547 pass / 6 fail — `plutil` ENOENT, dirty-tree
+iOS release guard, `swift` ENOENT (environment gaps). Commits: `[skip ci]`.
+
+**Still open (Task 4.1):** remaining mutation families at HTTP layer, stale revision /
+CSRF / idempotency matrix, signup/magic-link audit, AI/ICS slices.
+
 ## 2026-10-04 — P4 Task 4.1 auth boundary (activities slice, local)
 
 Branch `cursor/task-4-1-activities-auth-integration-6ca9` off `c41d396` (main).
