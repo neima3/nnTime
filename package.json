@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/write-build-provenance.mjs",
     "build": "next build",
     "start": "pnpm start:standalone",
     "start:standalone": "mkdir -p .next/standalone/public .next/standalone/.next/static && cp -R public/. .next/standalone/public/ && cp -R .next/static/. .next/standalone/.next/static/ && node .next/standalone/server.js",

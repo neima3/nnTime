@@ -41,6 +41,27 @@ retrieve with `op item get 4apenih3hzviy2o2jjlonbdh54 --fields credential --reve
    "confirm" a deploy that never landed.
 5. Report truthfully what was and wasn't verified.
 
+### Web build provenance
+
+After deploy, prefer **`GET /api/release`** (no auth). The response exposes only:
+
+- `commit` — full git SHA embedded at **`pnpm build`** time (via
+  `scripts/write-build-provenance.mjs`; no runtime env vars).
+- `builtAt` — UTC ISO timestamp from the same build step, or `null` on an
+  unstamped dev checkout.
+
+It must **not** echo configuration, secrets, or connection strings. Until a
+deploy includes this route, continue using a **unique asset marker** plus the
+**exact app-code SHA** you intended to ship:
+
+1. Note the commit SHA from git (or the Coolify build log).
+2. Confirm the live bundle changed, e.g. extract a CSS path from a public page
+   and verify a rule or hash that exists only in that commit's build output
+   (step 4 above).
+
+Record both the SHA and the marker in release notes when `/api/release` is
+absent or still returns a prior build's embedded values.
+
 ## Native iOS distribution
 
 Kairo's iOS release is produced from the XcodeGen application target and kept
