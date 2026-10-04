@@ -1,5 +1,29 @@
 # Progress log
 
+## 2026-10-04 — P3.2 feature capability audit (Task 3.2)
+
+Branch `cursor/task-3-2-capability-audit-a77e` off `65f2806` (main @ Round 95
+merge). **No deploy.**
+
+**Ledger:** `docs/plans/2026-09-13-p3-2-feature-readiness-ledger.md` — one row
+per advertised feature; Google/OAuth calendar sync marked **deferred** (P7);
+ICS + SSRF, AI confirm/quota, search scoping, prefs isolation, games pinned
+with existing tests.
+
+**Fixes:** ICS redirect → private blocked (`calendar-fetch-ssrf.test.ts`);
+`GET /api/v1/search` session-scoped DAL tests; AI malformed JSON/schema → 502
+`bad_gateway` via `map-ai-route-error.ts`; auth return allows
+`/app/search?q=…`; QuickCapture accept contract tests.
+
+**Gates (Linux):** `pnpm lint` 0, `typecheck` 0, Vitest **172 files / 1505
+tests: 1337 passed, 167 skipped (no local Postgres), 1 failed**
+(`ios-generated-client-adoption.test.ts` — no Swift; **native-contract** owns),
+`pnpm build` 0, `api:check-ios` + `api:check-ios-client` 0. No GitHub Actions
+touched; commits include `[skip ci]`.
+
+**Next:** P3.2 remaining partial rows (ICS UID dedupe, iOS Search UX on
+simulator) or P3.3 per program — not P4.
+
 ## 2026-09-28 — Round 95: Arcade — Arrow Rush, Slide Home, lighter hub (Opus 5.5)
 
 Plan/defect table: `docs/plans/2026-09-28-round95-arcade.md`. Branch
