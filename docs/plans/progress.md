@@ -1,5 +1,28 @@
 # Progress log
 
+## 2026-10-04 — P5 Task 5.1 local recovery + migration rehearsal
+
+Branch `cursor/task-5-1-recovery-rehearsal-52b5` off `77823d3` (main after P3.2
+squash). **No deploy. No production access.**
+
+**Runbook:** `docs/plans/2026-09-13-release-runbook.md` — migration inventory
+(`0000`–`0009` on main), parked `0010`/`0011` on `feat/quiet-today` /
+`feat/client-error-sink`, B6 operator checklist, synthetic local rehearsal
+commands. Production dump/restore **still unverified (B6)**.
+
+**Behavioral proof:** `recovery-rehearsal.integration.test.ts` (pg_dump → isolated
+pg_restore + planner/sync/recurrence integrity), extended
+`migrate-on-startup.integration.test.ts` (failure + restart, concurrent lock),
+`/api/health` migration-fail 503 test, `migration-chain.test.ts` main ends at
+`0009`.
+
+**Gates (Linux, Postgres local):** `pnpm lint` 0, `typecheck` 0, Vitest **172
+files / 1501 passed** (excluding three macOS iOS release suites), **6 failed**
+(iOS release/adoption — environment gap), `pnpm build` 0. `swift package
+dump-package` — **ENOENT** (no Swift on Linux). Commits: `[skip ci]`.
+
+**Next unchecked in release plan:** Task 5.2 (durable scheduling / delivery).
+
 ## 2026-10-04 — P3.2 feature capability audit (Task 3.2)
 
 Branch `cursor/task-3-2-capability-audit-a77e` off `65f2806` (main @ Round 95

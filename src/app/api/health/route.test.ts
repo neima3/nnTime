@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
     execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
   },
   ensureMigrated: vi.fn().mockResolvedValue(undefined),
-  getMigrationStatus: vi.fn(() => ({ ok: true })),
+  getMigrationStatus: vi.fn((): { ok: boolean; error?: string } => ({ ok: true })),
   getSchedulerHealth: vi.fn(),
 }));
 
@@ -110,6 +110,22 @@ describe("GET /api/health scheduler honesty", () => {
     await expect(response.json()).resolves.toMatchObject({
       status: "ok",
       checks: { scheduler: "unconfigured" },
+    });
+  });
+
+  it("degrades when migrations did not complete", async () => {
+    mocks.getMigrationStatus.mockReturnValue({
+      ok: false,
+      error: "syntax error at or near",
+    });
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toMatchObject({
+      status: "degraded",
+      checks: { migrate: "fail", db: "ok" },
     });
   });
 
