@@ -117,6 +117,9 @@ Files: locate web queue/store modules via `rg --files src/lib | rg 'offline|queu
 
 ### Task 3.2 — Feature capability audit and targeted completion
 
+- [x] Readiness ledger: `docs/plans/2026-09-13-p3-2-feature-readiness-ledger.md` (one row per feature; P7 gaps marked deferred).
+- [x] Highest-severity fixes: ICS redirect SSRF test, search session scoping tests, AI malformed → 502, auth return for `/app/search?q=`.
+
 Create a row per feature in the readiness ledger. Inspect and test existing implementation before deciding anything is missing.
 
 | Feature / starting files | Required acceptance |
